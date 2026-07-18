@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# Secrets et configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Données clients et fichiers générés
+dossiers/
+storage/
+uploads/
+backups/
+logs/
+*.log
+
+# PDF générés ou dossiers clients
+_pc_dossier.pdf
+_pc_notice.pdf
+*_dossier.pdf
+*_notice.pdf
+
+# WordPress
+wp-config.php
+
+# Dépendances
+node_modules/
+vendor/

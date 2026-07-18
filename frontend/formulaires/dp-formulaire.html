@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Déclaration préalable de travaux — demande en ligne</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     Design tokens — univers cadastre / plan technique
+     Un seul accent : le rouge des lignes de parcelle du cadastre.
+     ============================================================ */
+  #dp-app {
+    --paper:        #EAEEF2;
+    --grid:         #DCE3EA;
+    --surface:      #FBFCFD;
+    --ink:          #14233B;
+    --ink-soft:     #55617A;
+    --ink-faint:    #8791A6;
+    --line:         #C9D3DD;
+    --line-strong:  #9FADBC;
+    --cadastre:     #128A5A;   /* accent marque (vert urbizen) */
+    --cadastre-dk:  #0E6E48;
+    --cadastre-sf:  #E4F5EC;
+    --mint:         #54CF99;   /* vert clair du logo */
+    --error:        #C0392B;   /* reserve aux erreurs de saisie */
+    --ok:           #128A5A;
+    --radius:       3px;
+    --maxw:         960px;
+
+    box-sizing: border-box;
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    color: var(--ink);
+    line-height: 1.55;
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 26px 26px,
+      var(--paper);
+    padding: clamp(16px, 4vw, 48px) clamp(12px, 4vw, 32px);
+    min-height: 100%;
+  }
+  #dp-app *, #dp-app *::before, #dp-app *::after { box-sizing: inherit; }
+
+  #dp-app .dp-shell {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 0 rgba(27,36,48,.04), 0 24px 48px -32px rgba(27,36,48,.5);
+    overflow: hidden;
+  }
+
+  /* -------- Header : cartouche de plan -------- */
+  #dp-app .dp-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: clamp(20px,4vw,32px) clamp(20px,4vw,36px);
+    border-bottom: 1px solid var(--line);
+    background:
+      repeating-linear-gradient(90deg, transparent 0 11px, rgba(84,207,153,.10) 11px 12px);
+  }
+  #dp-app .dp-eyebrow {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    color: var(--cadastre);
+    margin: 0 0 6px;
+  }
+  #dp-app .dp-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: clamp(21px, 3.4vw, 30px);
+    line-height: 1.12;
+    letter-spacing: -.01em;
+    margin: 0 0 6px;
+  }
+  #dp-app .dp-sub {
+    color: var(--ink-soft);
+    font-size: 14px;
+    max-width: 46ch;
+    margin: 0;
+  }
+  #dp-app .dp-compass {
+    flex: none;
+    width: 48px; height: 48px;
+    color: var(--ink-faint);
+  }
+  #dp-app .dp-compass .n { fill: var(--cadastre); }
+  #dp-app .dp-logo { flex: none; height: 44px; width: auto; align-self: flex-start; }
+  @media (max-width: 720px) { #dp-app .dp-logo { height: 34px; } }
+
+  /* -------- Corps : légende (rail) + panneau -------- */
+  #dp-app .dp-body {
+    display: grid;
+    grid-template-columns: 232px 1fr;
+  }
+
+  /* Légende = signature de la page : les 8 cadres comme une légende de plan */
+  #dp-app .dp-legend {
+    border-right: 1px solid var(--line);
+    padding: 22px 18px;
+    background: linear-gradient(180deg, #F2F5F8, var(--surface) 120px);
+  }
+  #dp-app .dp-legend h2 {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 14px;
+    font-weight: 500;
+  }
+  #dp-app .dp-legend ol { list-style: none; margin: 0; padding: 0; }
+  #dp-app .dp-legend li {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 8px 0;
+    color: var(--ink-faint);
+    font-size: 13.5px;
+    cursor: default;
+  }
+  #dp-app .dp-legend li::before { /* connecteur vertical façon fil de côte */
+    content: "";
+    position: absolute;
+    left: 11px; top: 30px; bottom: -8px;
+    width: 1px;
+    background: var(--line);
+  }
+  #dp-app .dp-legend li:last-child::before { display: none; }
+  #dp-app .dp-legend .num {
+    flex: none;
+    width: 23px; height: 23px;
+    display: grid; place-items: center;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--ink-soft);
+    z-index: 1;
+    transition: all .18s ease;
+  }
+  #dp-app .dp-legend li.is-active { color: var(--ink); font-weight: 500; }
+  #dp-app .dp-legend li.is-active .num {
+    background: var(--cadastre); border-color: var(--cadastre); color: #fff;
+    box-shadow: 0 0 0 3px var(--cadastre-sf);
+  }
+  #dp-app .dp-legend li.is-done .num {
+    background: var(--ink); border-color: var(--ink); color: #fff;
+  }
+  #dp-app .dp-legend li.is-done .num::after { content: "✓"; font-size: 12px; }
+  #dp-app .dp-legend li.is-done .num span { display: none; }
+
+  /* -------- Panneau formulaire -------- */
+  #dp-app .dp-panel { padding: clamp(20px,4vw,34px) clamp(20px,4vw,38px); min-width: 0; }
+
+  #dp-app .dp-step { display: none; animation: dpFade .28s ease; }
+  #dp-app .dp-step.is-active { display: block; }
+  @keyframes dpFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    #dp-app .dp-step, #dp-app * { animation: none !important; transition: none !important; }
+  }
+
+  #dp-app .dp-step-kicker {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--cadastre); margin: 0 0 4px;
+  }
+  #dp-app .dp-step-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600; font-size: clamp(19px,2.6vw,24px);
+    margin: 0 0 4px; letter-spacing: -.01em;
+  }
+  #dp-app .dp-step-hint { color: var(--ink-soft); font-size: 13.5px; margin: 0 0 22px; max-width: 54ch; }
+
+  #dp-app .dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  #dp-app .dp-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  #dp-app .dp-field.col-2 { grid-column: 1 / -1; }
+  #dp-app label { font-size: 13px; font-weight: 500; color: var(--ink); }
+  #dp-app label .req { color: var(--cadastre); margin-left: 2px; }
+  #dp-app .dp-note { font-size: 12px; color: var(--ink-faint); }
+
+  #dp-app input[type=text], #dp-app input[type=email], #dp-app input[type=tel],
+  #dp-app input[type=number], #dp-app input[type=date], #dp-app select, #dp-app textarea {
+    font-family: inherit; font-size: 14px; color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 9px 11px;
+    width: 100%;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  /* champs "mesure" : mono, façon relevé cadastral */
+  #dp-app input.measure {
+    font-family: "IBM Plex Mono", monospace;
+    letter-spacing: .02em;
+  }
+  #dp-app textarea { resize: vertical; min-height: 88px; }
+  #dp-app input:focus, #dp-app select:focus, #dp-app textarea:focus {
+    outline: none; border-color: var(--cadastre);
+    box-shadow: 0 0 0 3px var(--cadastre-sf);
+  }
+  #dp-app .dp-suffix { position: relative; }
+  #dp-app .dp-suffix .unit {
+    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint);
+    pointer-events: none;
+  }
+  #dp-app .dp-suffix input { padding-right: 42px; }
+
+  /* choix segmenté (particulier / personne morale, oui / non) */
+  #dp-app .dp-seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius); overflow: hidden; }
+  #dp-app .dp-seg label {
+    padding: 8px 15px; font-size: 13.5px; cursor: pointer; background: var(--surface);
+    border-right: 1px solid var(--line); user-select: none;
+  }
+  #dp-app .dp-seg label:last-child { border-right: none; }
+  #dp-app .dp-seg input { position: absolute; opacity: 0; width: 0; height: 0; }
+  #dp-app .dp-seg input:checked + label,
+  #dp-app .dp-seg label.on { background: var(--ink); color: #fff; }
+  #dp-app .dp-seg:focus-within { box-shadow: 0 0 0 3px var(--cadastre-sf); border-color: var(--cadastre); }
+
+  /* nature des travaux : cases à cocher en cartes */
+  #dp-app .dp-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 9px; }
+  #dp-app .dp-check {
+    display: flex; align-items: center; gap: 9px;
+    border: 1px solid var(--line-strong); border-radius: var(--radius);
+    padding: 10px 12px; font-size: 13.5px; cursor: pointer; background: var(--surface);
+    transition: border-color .15s, background .15s;
+  }
+  #dp-app .dp-check:hover { border-color: var(--line-strong); background: #F5F8FA; }
+  #dp-app .dp-check input { accent-color: var(--cadastre); width: 16px; height: 16px; flex: none; }
+  #dp-app .dp-check.on { border-color: var(--cadastre); background: var(--cadastre-sf); }
+
+  /* dépôt de pièces */
+  #dp-app .dp-piece {
+    display: flex; align-items: center; gap: 12px; justify-content: space-between;
+    border: 1px dashed var(--line-strong); border-radius: var(--radius);
+    padding: 11px 13px; margin-bottom: 8px; background: var(--surface);
+  }
+  #dp-app .dp-piece .lab { font-size: 13.5px; }
+  #dp-app .dp-piece .lab b { font-family: "IBM Plex Mono", monospace; color: var(--cadastre); margin-right: 7px; }
+  #dp-app .dp-piece .picked { font-size: 12px; color: var(--ok); font-weight: 500; }
+  #dp-app .dp-file-btn {
+    font-family: inherit; font-size: 12.5px; color: var(--ink); cursor: pointer;
+    border: 1px solid var(--line-strong); background: #F1F5F8; border-radius: var(--radius);
+    padding: 7px 12px; white-space: nowrap;
+  }
+  #dp-app .dp-file-btn:hover { border-color: var(--cadastre); color: var(--cadastre-dk); }
+  #dp-app .dp-piece input[type=file] { display: none; }
+
+  /* attestation */
+  #dp-app .dp-attest {
+    display: flex; gap: 11px; align-items: flex-start;
+    background: #F1F5F8; border: 1px solid var(--line); border-left: 3px solid var(--cadastre);
+    border-radius: var(--radius); padding: 13px 15px; margin-top: 6px;
+  }
+  #dp-app .dp-attest input { accent-color: var(--cadastre); margin-top: 3px; width: 16px; height: 16px; flex: none; }
+  #dp-app .dp-attest label { font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+
+  /* conditionnels */
+  #dp-app [data-when] { display: none; }
+  #dp-app [data-when].show { display: grid; }
+  #dp-app .dp-field[data-when].show { display: flex; }
+
+  /* -------- pied : navigation -------- */
+  #dp-app .dp-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line);
+  }
+  #dp-app .dp-count { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink-faint); }
+  #dp-app .dp-btns { display: flex; gap: 10px; }
+  #dp-app button.dp-btn {
+    font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 14px;
+    padding: 10px 20px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent;
+    transition: background .15s, border-color .15s, transform .05s;
+  }
+  #dp-app button.dp-btn:active { transform: translateY(1px); }
+  #dp-app button.dp-back { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+  #dp-app button.dp-back:hover { border-color: var(--ink-soft); }
+  #dp-app button.dp-next { background: var(--ink); color: #fff; }
+  #dp-app button.dp-next:hover { background: #0F1620; }
+  #dp-app button.dp-send { background: var(--cadastre); color: #fff; }
+  #dp-app button.dp-send:hover { background: var(--cadastre-dk); }
+  #dp-app button:focus-visible { outline: 2px solid var(--cadastre); outline-offset: 2px; }
+  #dp-app .dp-err { color: var(--error); font-size: 12.5px; margin-top: 8px; min-height: 1em; }
+
+  /* -------- écran de confirmation -------- */
+  #dp-app .dp-done { text-align: center; padding: 40px 20px; display: none; }
+  #dp-app .dp-done.show { display: block; }
+  #dp-app .dp-done .mark {
+    width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%;
+    background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 26px;
+  }
+  #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: 22px; margin: 0 0 8px; }
+  #dp-app .dp-done p { color: var(--ink-soft); max-width: 44ch; margin: 0 auto; }
+  #dp-app .dp-debug {
+    text-align: left; margin: 22px auto 0; max-width: 640px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-soft);
+    background: #0F1620; color: #C9D3DD; border-radius: var(--radius); padding: 14px; overflow: auto;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  /* -------- responsive -------- */
+  @media (max-width: 720px) {
+    #dp-app .dp-body { grid-template-columns: 1fr; }
+    #dp-app .dp-legend {
+      border-right: none; border-bottom: 1px solid var(--line);
+      padding: 14px 16px;
+    }
+    #dp-app .dp-legend ol { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 4px; }
+    #dp-app .dp-legend li { flex-direction: column; text-align: center; gap: 5px; padding: 4px 6px; font-size: 11px; min-width: 62px; }
+    #dp-app .dp-legend li::before { display: none; }
+    #dp-app .dp-grid { grid-template-columns: 1fr; }
+    #dp-app .dp-compass { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="dp-app">
+  <div class="dp-shell">
+    <header class="dp-head">
+      <div>
+        <p class="dp-eyebrow">Autorisation d’urbanisme · Cerfa 16702*02</p>
+        <h1 class="dp-title">Votre déclaration préalable de travaux</h1>
+        <p class="dp-sub">Répondez aux 7 rubriques ci-dessous. Je constitue ensuite votre dossier complet (formulaire, notice et bordereau des pièces), prêt à déposer en ligne.</p>
+      </div>
+      <img class="dp-logo" src="data:image/png;base64,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" alt="urbizen — urbanisme & projets" />
+    </header>
+
+    <div class="dp-body">
+      <nav class="dp-legend" aria-label="Progression">
+        <h2>Légende du dossier</h2>
+        <ol id="dp-legend"></ol>
+      </nav>
+
+      <div class="dp-panel">
+        <form id="dp-form" novalidate>
+
+          <!-- 1 — Déclarant -->
+          <section class="dp-step" data-step="0">
+            <p class="dp-step-kicker">Cadre 1 · 2</p>
+            <h2 class="dp-step-title">Qui déclare les travaux&nbsp;?</h2>
+            <p class="dp-step-hint">Le déclarant est la personne responsable du projet vis-à-vis de la mairie.</p>
+            <div class="dp-grid">
+              <div class="dp-field col-2">
+                <label>Vous êtes <span class="req">*</span></label>
+                <div class="dp-seg" role="radiogroup">
+                  <input type="radio" id="q_part" name="declarant_type" value="particulier" checked><label for="q_part">Un particulier</label>
+                  <input type="radio" id="q_moral" name="declarant_type" value="personne_morale"><label for="q_moral">Une société / SCI</label>
+                </div>
+              </div>
+              <div class="dp-field" data-when="declarant_type=particulier">
+                <label for="f_nom">Nom <span class="req">*</span></label>
+                <input type="text" id="f_nom" name="nom" autocomplete="family-name">
+              </div>
+              <div class="dp-field" data-when="declarant_type=particulier">
+                <label for="f_prenom">Prénom <span class="req">*</span></label>
+                <input type="text" id="f_prenom" name="prenom" autocomplete="given-name">
+              </div>
+              <div class="dp-field col-2" data-when="declarant_type=personne_morale">
+                <label for="f_denom">Dénomination / raison sociale <span class="req">*</span></label>
+                <input type="text" id="f_denom" name="denomination">
+              </div>
+              <div class="dp-field" data-when="declarant_type=personne_morale">
+                <label for="f_siret">N° SIRET</label>
+                <input type="text" id="f_siret" name="siret" class="measure" inputmode="numeric">
+              </div>
+              <div class="dp-field" data-when="declarant_type=personne_morale">
+                <label for="f_repres">Représentant (nom prénom)</label>
+                <input type="text" id="f_repres" name="representant">
+              </div>
+              <div class="dp-field col-2">
+                <label>Qualité du déclarant <span class="req">*</span></label>
+                <select name="qualite">
+                  <option value="">— sélectionner —</option>
+                  <option>Propriétaire</option>
+                  <option>Mandataire du propriétaire</option>
+                  <option>Locataire avec accord du propriétaire</option>
+                  <option>Copropriété (syndic)</option>
+                  <option>Autre</option>
+                </select>
+              </div>
+              <div class="dp-field"><label for="f_email">E-mail <span class="req">*</span></label><input type="email" id="f_email" name="email" autocomplete="email"></div>
+              <div class="dp-field"><label for="f_tel">Téléphone <span class="req">*</span></label><input type="tel" id="f_tel" name="telephone" autocomplete="tel"></div>
+              <div class="dp-field col-2"><label for="f_adr">Adresse postale du déclarant <span class="req">*</span></label><input type="text" id="f_adr" name="adresse_declarant" autocomplete="street-address"></div>
+              <div class="dp-field"><label for="f_cp">Code postal <span class="req">*</span></label><input type="text" id="f_cp" name="cp_declarant" class="measure" inputmode="numeric" autocomplete="postal-code"></div>
+              <div class="dp-field"><label for="f_ville">Commune <span class="req">*</span></label><input type="text" id="f_ville" name="ville_declarant" autocomplete="address-level2"></div>
+            </div>
+          </section>
+
+          <!-- 2 — Terrain -->
+          <section class="dp-step" data-step="1">
+            <p class="dp-step-kicker">Cadre 3</p>
+            <h2 class="dp-step-title">Où se situe le terrain&nbsp;?</h2>
+            <p class="dp-step-hint">Les références cadastrales figurent sur votre acte de propriété ou sur <span style="font-family:'IBM Plex Mono',monospace">cadastre.gouv.fr</span> (section + numéro de parcelle).</p>
+            <div class="dp-grid">
+              <div class="dp-field col-2"><label for="t_adr">Adresse du terrain <span class="req">*</span></label><input type="text" id="t_adr" name="terrain_adresse"></div>
+              <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric"></div>
+              <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville"></div>
+              <div class="dp-field"><label for="t_sec">Section cadastrale <span class="req">*</span></label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. AB"></div>
+              <div class="dp-field"><label for="t_num">N° de parcelle <span class="req">*</span></label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 0142"></div>
+              <div class="dp-field col-2">
+                <label for="t_sup">Superficie totale du terrain <span class="req">*</span></label>
+                <div class="dp-suffix"><input type="number" id="t_sup" name="terrain_superficie" class="measure" min="0" step="1"><span class="unit">m²</span></div>
+                <span class="dp-note">Surface de la parcelle, pas de la construction.</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- 3 — Projet -->
+          <section class="dp-step" data-step="2">
+            <p class="dp-step-kicker">Cadre 4</p>
+            <h2 class="dp-step-title">En quoi consistent les travaux&nbsp;?</h2>
+            <p class="dp-step-hint">Cochez tout ce qui s’applique, puis décrivez le projet le plus précisément possible.</p>
+            <div class="dp-field col-2" style="margin-bottom:16px">
+              <label>Nature des travaux <span class="req">*</span></label>
+              <div class="dp-checks" id="nature">
+                <label class="dp-check"><input type="checkbox" name="nature" value="Extension"> Extension</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Abri / annexe"> Abri, annexe</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Piscine"> Piscine</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Clôture / mur"> Clôture, mur</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Modification de façade"> Façade / ouverture</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Ravalement"> Ravalement</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Toiture"> Toiture</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Panneaux solaires"> Panneaux solaires</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Changement de destination"> Changement de destination</label>
+                <label class="dp-check"><input type="checkbox" name="nature" value="Autre"> Autre</label>
+              </div>
+            </div>
+            <div class="dp-grid">
+              <div class="dp-field col-2">
+                <label>Type d’intervention <span class="req">*</span></label>
+                <div class="dp-seg" role="radiogroup">
+                  <input type="radio" id="i_exist" name="intervention" value="existant" checked><label for="i_exist">Sur l’existant</label>
+                  <input type="radio" id="i_new" name="intervention" value="nouvelle"><label for="i_new">Construction nouvelle</label>
+                </div>
+              </div>
+              <div class="dp-field col-2">
+                <label for="p_desc">Description du projet <span class="req">*</span></label>
+                <textarea id="p_desc" name="description" placeholder="Ex. : création d’une extension de plain-pied de 18 m² à l’arrière de la maison, toiture monopente, enduit ton pierre identique à l’existant, menuiseries aluminium gris anthracite."></textarea>
+              </div>
+              <div class="dp-field col-2">
+                <label for="p_mat">Matériaux et couleurs (aspect extérieur)</label>
+                <input type="text" id="p_mat" name="materiaux" placeholder="Ex. : enduit gratté ton sable · tuiles terre cuite rouge · menuiseries alu RAL 7016">
+              </div>
+            </div>
+          </section>
+
+          <!-- 4 — Surfaces -->
+          <section class="dp-step" data-step="3">
+            <p class="dp-step-kicker">Cadre 5</p>
+            <h2 class="dp-step-title">Surfaces du projet</h2>
+            <p class="dp-step-hint">Ces chiffres déterminent si une DP suffit ou si un permis de construire est requis. Laissez 0 si non concerné.</p>
+            <div class="dp-grid">
+              <div class="dp-field"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field"><label for="s_pt">Surface de plancher <b>totale</b> après travaux</label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field"><label for="s_ep">Emprise au sol <b>créée</b></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field"><label for="s_taxe">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="s_taxe" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+            </div>
+            <div class="dp-attest" style="border-left-color:var(--ink-faint);margin-top:18px">
+              <span aria-hidden="true" style="font-family:'IBM Plex Mono',monospace;color:var(--cadastre)">i</span>
+              <label style="color:var(--ink-soft)">Au-delà de 20 m² créés (40 m² en zone urbaine PLU) ou 150 m² de surface totale, le projet peut basculer en permis de construire. Je vous le confirme après étude.</label>
+            </div>
+          </section>
+
+          <!-- 5 — Situation -->
+          <section class="dp-step" data-step="4">
+            <p class="dp-step-kicker">Cadre 6 · 7</p>
+            <h2 class="dp-step-title">Contexte du terrain</h2>
+            <p class="dp-step-hint">Ces éléments modifient le délai d’instruction et les pièces à joindre.</p>
+            <div class="dp-grid">
+              <div class="dp-field col-2">
+                <label>Le terrain est-il en secteur protégé (abords d’un monument, site classé, ABF)&nbsp;?</label>
+                <div class="dp-seg" role="radiogroup">
+                  <input type="radio" id="abf_no" name="abf" value="non" checked><label for="abf_no">Non / je ne sais pas</label>
+                  <input type="radio" id="abf_yes" name="abf" value="oui"><label for="abf_yes">Oui</label>
+                </div>
+              </div>
+              <div class="dp-field col-2">
+                <label>Y a-t-il une démolition&nbsp;?</label>
+                <div class="dp-seg" role="radiogroup">
+                  <input type="radio" id="dem_no" name="demolition" value="non" checked><label for="dem_no">Non</label>
+                  <input type="radio" id="dem_yes" name="demolition" value="oui"><label for="dem_yes">Oui, partielle/totale</label>
+                </div>
+              </div>
+              <div class="dp-field col-2" data-when="nature=Changement de destination">
+                <label for="cd">Changement de destination — précisez</label>
+                <input type="text" id="cd" name="changement_destination" placeholder="Ex. : local commercial → habitation">
+              </div>
+              <div class="dp-field col-2">
+                <label for="rmq">Informations complémentaires (facultatif)</label>
+                <textarea id="rmq" name="remarques" style="min-height:70px" placeholder="Contraintes de voisinage, PLU particulier, délai souhaité…"></textarea>
+              </div>
+            </div>
+          </section>
+
+          <!-- 6 — Pièces -->
+          <section class="dp-step" data-step="5">
+            <p class="dp-step-kicker">Pièces graphiques · DP1 à DP8</p>
+            <h2 class="dp-step-title">Vos plans et photos</h2>
+            <p class="dp-step-hint">Joignez ce que vous avez déjà. Ce qui manque, je le réalise ou vous guide pour l’obtenir. Formats acceptés : PDF, JPG, PNG.</p>
+            <div id="pieces"></div>
+          </section>
+
+          <!-- 7 — Envoi -->
+          <section class="dp-step" data-step="6">
+            <p class="dp-step-kicker">Cadre 8 · Engagement</p>
+            <h2 class="dp-step-title">Vérification et envoi</h2>
+            <p class="dp-step-hint">Un récapitulatif vous sera envoyé par e-mail. Le dépôt en mairie se fait après votre validation du dossier.</p>
+            <div class="dp-attest">
+              <input type="checkbox" id="a1" name="attest_exact">
+              <label for="a1">Je certifie exactes les informations fournies et j’ai qualité pour déclarer ces travaux.</label>
+            </div>
+            <div class="dp-attest">
+              <input type="checkbox" id="a2" name="attest_rgpd">
+              <label for="a2">J’accepte que ces données soient utilisées pour constituer mon dossier d’urbanisme (RGPD).</label>
+            </div>
+            <div class="dp-err" id="dp-final-err" role="alert"></div>
+          </section>
+
+          <footer class="dp-foot">
+            <span class="dp-count" id="dp-count">Rubrique 1 / 7</span>
+            <div class="dp-btns">
+              <button type="button" class="dp-btn dp-back" id="dp-back" hidden>Précédent</button>
+              <button type="button" class="dp-btn dp-next" id="dp-next">Continuer</button>
+              <button type="submit" class="dp-btn dp-send" id="dp-send" hidden>Envoyer ma demande</button>
+            </div>
+          </footer>
+        </form>
+
+        <div class="dp-done" id="dp-done" aria-live="polite">
+          <div class="mark">✓</div>
+          <h3>Demande envoyée</h3>
+          <p>Merci. Votre dossier est en cours de constitution — vous recevrez un récapitulatif par e-mail rapidement.</p>
+          <pre class="dp-debug" id="dp-debug" hidden></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     CONFIG — à renseigner : URL de votre microservice Python.
+     Laissez vide pour tester : le formulaire affiche alors
+     les données collectées (JSON) au lieu de les envoyer.
+     ========================================================= */
+  var ENDPOINT = ""; // ex. "https://api.votresite.fr/api/dp"
+
+  var app   = document.getElementById("dp-app");
+  var form  = document.getElementById("dp-form");
+  var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
+  var legendData = [
+    "Déclarant", "Terrain", "Projet", "Surfaces", "Contexte", "Pièces", "Envoi"
+  ];
+  var PIECES = [
+    ["DP1", "Plan de situation du terrain"],
+    ["DP2", "Plan de masse coté"],
+    ["DP3", "Plan en coupe (si terrassement)"],
+    ["DP4", "Plan des façades et toitures"],
+    ["DP5", "Insertion (photomontage / perspective)"],
+    ["DP6", "Photo depuis la rue"],
+    ["DP7", "Photo de l’environnement lointain"],
+    ["DP8", "Document(s) complémentaire(s)"]
+  ];
+  var current = 0;
+
+  /* ----- construire la légende ----- */
+  var legendEl = document.getElementById("dp-legend");
+  legendData.forEach(function (label, i) {
+    var li = document.createElement("li");
+    li.dataset.i = i;
+    li.innerHTML = '<span class="num"><span>' + String(i + 1).padStart(2, "0") + "</span></span>" + label;
+    legendEl.appendChild(li);
+  });
+
+  /* ----- construire les lignes de pièces ----- */
+  var piecesEl = document.getElementById("pieces");
+  PIECES.forEach(function (p) {
+    var row = document.createElement("div");
+    row.className = "dp-piece";
+    var id = "file_" + p[0];
+    row.innerHTML =
+      '<span class="lab"><b>' + p[0] + "</b>" + p[1] + "</span>" +
+      '<span style="display:flex;align-items:center;gap:10px">' +
+        '<span class="picked" data-picked></span>' +
+        '<label class="dp-file-btn" for="' + id + '">Choisir un fichier</label>' +
+      "</span>" +
+      '<input type="file" id="' + id + '" name="piece_' + p[0] + '" accept=".pdf,.jpg,.jpeg,.png" multiple>';
+    piecesEl.appendChild(row);
+    var input = row.querySelector("input[type=file]");
+    var picked = row.querySelector("[data-picked]");
+    input.addEventListener("change", function () {
+      picked.textContent = input.files.length
+        ? input.files.length + " fichier" + (input.files.length > 1 ? "s" : "") + " ✓"
+        : "";
+    });
+  });
+
+  /* ----- conditionnels (data-when="name=value") ----- */
+  function refreshConditionals() {
+    form.querySelectorAll("[data-when]").forEach(function (el) {
+      var cond = el.dataset.when.split("=");
+      var name = cond[0], val = cond[1];
+      var match = false;
+      form.querySelectorAll('[name="' + name + '"]').forEach(function (inp) {
+        if ((inp.type === "radio" || inp.type === "checkbox")) {
+          if (inp.checked && inp.value === val) match = true;
+        } else if (inp.value === val) match = true;
+      });
+      el.classList.toggle("show", match);
+    });
+  }
+  form.addEventListener("change", function (e) {
+    refreshConditionals();
+    if (e.target.closest(".dp-check")) {
+      e.target.closest(".dp-check").classList.toggle("on", e.target.checked);
+    }
+  });
+
+  /* ----- navigation ----- */
+  var backBtn = document.getElementById("dp-back");
+  var nextBtn = document.getElementById("dp-next");
+  var sendBtn = document.getElementById("dp-send");
+  var countEl = document.getElementById("dp-count");
+
+  function render() {
+    steps.forEach(function (s, i) { s.classList.toggle("is-active", i === current); });
+    legendEl.querySelectorAll("li").forEach(function (li, i) {
+      li.classList.toggle("is-active", i === current);
+      li.classList.toggle("is-done", i < current);
+    });
+    countEl.textContent = "Rubrique " + (current + 1) + " / " + steps.length;
+    backBtn.hidden = current === 0;
+    var last = current === steps.length - 1;
+    nextBtn.hidden = last;
+    sendBtn.hidden = !last;
+    app.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* validation minimale du pas courant : champs requis visibles */
+  function validateStep() {
+    var step = steps[current];
+    var ok = true, firstBad = null;
+    step.querySelectorAll("input, select, textarea").forEach(function (el) {
+      if (el.offsetParent === null) return; // caché
+      var labelReq = el.closest(".dp-field") && el.closest(".dp-field").querySelector(".req");
+      var group = el.closest(".dp-field");
+      var needed = labelReq && (el.tagName === "SELECT" || el.type === "text" || el.type === "email" || el.type === "tel" || el.type === "number" || el.tagName === "TEXTAREA");
+      if (needed && !String(el.value).trim()) {
+        ok = false; el.style.borderColor = "var(--error)";
+        if (!firstBad) firstBad = el;
+      } else if (needed) {
+        el.style.borderColor = "";
+      }
+    });
+    // nature : au moins une case au pas 3
+    if (current === 2) {
+      var anyNature = form.querySelector('input[name="nature"]:checked');
+      if (!anyNature) { ok = false; }
+    }
+    if (firstBad) firstBad.focus();
+    return ok;
+  }
+
+  nextBtn.addEventListener("click", function () {
+    if (!validateStep()) return;
+    if (current < steps.length - 1) { current++; render(); }
+  });
+  backBtn.addEventListener("click", function () {
+    if (current > 0) { current--; render(); }
+  });
+
+  /* ----- soumission ----- */
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var err = document.getElementById("dp-final-err");
+    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
+      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi.";
+      return;
+    }
+    err.textContent = "";
+    sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
+
+    var fd = new FormData(form);
+    // sérialiser les cases "nature" (multiples) en liste lisible
+    fd.set("nature", Array.prototype.map.call(
+      form.querySelectorAll('input[name="nature"]:checked'), function (n) { return n.value; }
+    ).join(", "));
+
+    if (!ENDPOINT) {
+      // mode démo : afficher les données
+      var obj = {};
+      fd.forEach(function (v, k) {
+        if (v instanceof File) { if (v.name) obj[k] = "[fichier] " + v.name; }
+        else obj[k] = v;
+      });
+      showDone(JSON.stringify(obj, null, 2));
+      return;
+    }
+
+    fetch(ENDPOINT, { method: "POST", body: fd })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
+      .then(function () { showDone(null); })
+      .catch(function () {
+        sendBtn.disabled = false; sendBtn.textContent = "Envoyer ma demande";
+        err.textContent = "L’envoi a échoué. Réessayez ou contactez-moi directement.";
+      });
+  });
+
+  function showDone(debug) {
+    form.style.display = "none";
+    var done = document.getElementById("dp-done");
+    done.classList.add("show");
+    if (debug) {
+      var d = document.getElementById("dp-debug");
+      d.hidden = false;
+      d.textContent = "Données collectées (mode démo) :\n\n" + debug;
+    }
+  }
+
+  refreshConditionals();
+  render();
+})();
+</script>
+</body>
+</html>
