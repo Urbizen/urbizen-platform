@@ -9,128 +9,132 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 ---
 
-## Session du 19 juillet 2026
+## Session du 20 juillet 2026
 
-### Branche et Pull Request
+### Point de reprise
 
 | Élément | Valeur |
 |---|---|
-| Branche courante | `feature/form-cadastre-integration` |
-| Pull Request courante | **à ouvrir** vers `main` |
-| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) fusionnée — merge `5989ba9` |
-| Reproductibilité backend | PR [#5](https://github.com/Urbizen/urbizen-platform/pull/5) fusionnée — merge `8214ae6` |
-| Composant cadastre | PR [#6](https://github.com/Urbizen/urbizen-platform/pull/6) fusionnée — merge `639e131` |
+| Branche stable | **`main`** |
+| Commit courant | **`90191f062b0e1ef4e0804d9af1c9b1b4d8c56a79`** |
+| Dernière PR fusionnée | [#7](https://github.com/Urbizen/urbizen-platform/pull/7) — **MERGED** |
+| Plugin en production | `urbizen-platform` **0.4.0**, **actif** |
+| Production vs `main` | **identiques fichier par fichier** (53 fichiers, empreinte `7834f6a4…`) |
+| Page 1157 | **brouillon de validation interne**, conservé |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
+
+Historique des fusions : PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4)
+socle (`5989ba9`) · [#5](https://github.com/Urbizen/urbizen-platform/pull/5)
+reproductibilité backend (`8214ae6`) ·
+[#6](https://github.com/Urbizen/urbizen-platform/pull/6) composant cadastre
+(`639e131`) · [#7](https://github.com/Urbizen/urbizen-platform/pull/7)
+formulaire de localisation (`90191f0`).
 
 ### Où en est le projet
 
-L'étape 1 de l'intégration WordPress est **terminée, fusionnée dans `main` et en
-production**. Le socle est posé — thème enfant et extension — mais il ne porte
-encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
+Le socle WordPress, le composant cadastre et le **premier formulaire Urbizen**
+sont fusionnés dans `main` et déployés. La chaîne **cadastre → formulaire de
+localisation est validée en conditions réelles** : une parcelle confirmée sur la
+carte remplit le formulaire, la personne peut corriger ses valeurs, revenir
+modifier son adresse, ou effacer ses données.
 
-Le composant cadastre est **fusionné dans `main` et déployé en production en
-0.3.0**, validé en conditions réelles le 19/07/2026.
-
-La branche en cours prépare la **0.4.0** : contrat de données canonique 1.0 et
-premier formulaire Urbizen, qui reprend la localisation confirmée. **Rien n'est
-déployé** — la production reste en 0.3.0 — et **aucune donnée ne quitte le
-navigateur** : la validation est locale.
+**Aucune transmission serveur en 0.4.0.** La validation est entièrement locale :
+ni `fetch`, ni `XMLHttpRequest`, ni `sendBeacon`, ni soumission HTML. Le contrat
+validé est publié par l'événement `urbizen:location-form-validated`, à charge de
+l'hôte d'en faire quelque chose. Rien n'est écrit en base, aucune route REST
+n'existe.
 
 ### Ce qui a été fait
 
-- Amorçage du thème enfant `urbizen-child` et de l'extension `urbizen-platform`.
-- Export des gabarits FSE de production en fichiers versionnés (`parts/`), et
-  report des styles globaux dans `theme.json` : le rendu ne dépend plus de la base.
-- Correctif `urbizen_child_restore_theme_json()` — sans lui, l'activation du thème
-  enfant fait repasser le site sur la palette sombre de Hostinger.
-- Documentation permanente du projet ouverte (plan directeur, contexte, décisions,
-  changelog, feuille de route, ce fichier).
-- Audit complet du WordPress de production, en lecture seule.
-- Anonymisation des coordonnées serveur dans la documentation : **le dépôt GitHub
-  est public**, compte et adresse ne doivent jamais y figurer.
-- Reproductibilité du backend soldée : `requirements.txt`, `.env.example` et
-  documentation de lancement local corrigée.
-- Composant cadastre porté dans l'extension : bloc `urbizen/cadastre` et
-  shortcode `[urbizen_cadastre]` au rendu commun, Leaflet 1.9.4 embarqué avec
-  sa licence BSD 2-Clause, `innerHTML` supprimés, identifiants uniques par
-  instance, `clearStored()` et `destroy()`.
-- Interface d'édition Gutenberg ajoutée après revue : `block.json` comme
-  déclaration unique des attributs, `editor.js`, `editor.css`, aperçu statique
-  sans appel IGN ni carte Leaflet.
-- Version du plugin portée à **0.3.0**, handles versionnés pour casser les
-  caches navigateur et LiteSpeed.
-- Premiers tests automatiques du projet : `tests/cadastre/`.
-
-### État vérifié de la production
-
-| Élément | Valeur |
-|---|---|
-| WordPress · PHP · WP-CLI | 7.0.2 fr_FR · 8.3.30 · 2.12.0 |
-| Thème actif | `urbizen-child` 0.1.0 (parent `hostinger-ai-theme` 2.0.18) — inchangé |
-| Extension Urbizen | `urbizen-platform` **0.3.0**, active, module cadastre chargé (la 0.4.0 n'est **pas** déployée) |
-| Page de test | ID 1157, **brouillon**, non indexée, à supprimer après revue |
-| Rendu | validé identique — captures 1440 px et 390 px, empreintes SHA-256 égales |
-| Réponse HTTP | 200 |
-| Effets de bord | aucun : ni table, ni option, ni fichier créé |
-
-Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
+- Socle : thème enfant `urbizen-child` et extension `urbizen-platform`, avec les
+  correctifs de compatibilité du thème FSE Hostinger.
+- Gabarits FSE exportés en fichiers versionnés : le rendu ne dépend plus de la base.
+- Composant cadastre : bloc et shortcode au rendu commun, Leaflet 1.9.4 embarqué
+  avec sa licence, aucun `innerHTML` sur une donnée, identifiants uniques.
+- **Contrat canonique 1.0** (D-009) : structure imbriquée et versionnée, sans
+  géométrie, avec les deux codes commune conservés séparément.
+- **Formulaire de localisation** : `FormDefinition`, `FormRegistry`, `Renderer`,
+  bloc `urbizen/formulaire` et shortcode `[urbizen_formulaire]`, pont
+  `urbizen-form.js` indépendant du script cadastre.
+- Reproductibilité du backend Python : `requirements.txt`, `.env.example`,
+  documentation de lancement local.
+- Documentation permanente : plan directeur, contexte, décisions, changelog,
+  feuille de route, ce fichier.
 
 ### Contrôles effectués
 
-- Les 5 commits attendus présents sur `origin`, branche sans conflit avec `main`.
-- Aucun secret, identifiant, fichier local ni sauvegarde dans le dépôt.
-- `php -l` conforme sur les **11 fichiers PHP**, `theme.json` valide (version 3).
-- Aucun effet de bord non documenté : ni `add_option`, ni `dbDelta`, ni
-  `CREATE TABLE`, ni écriture de fichier, ni appel réseau.
-- Rendu comparé avant/après activation : identique.
-- Backend : installation des dépendances validée dans un venv neuf (Python 3.13),
-  imports `documents`, `cerfa` et `app` opérationnels, `GET /api/health` → 200,
-  `POST /api/dp` sans champ → 400 avec la liste des champs manquants.
-- Aucun secret dans les fichiers ajoutés : `.env.example` ne contient que des
-  noms de variables et des exemples fictifs.
-- Cadastre : 12 fichiers PHP au lint sans erreur ; syntaxe JS et `block.json`
-  validés ; **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu
-  PHP** avec doublures, tous verts ; aucune référence CDN ; images de
-  `leaflet.css` toutes présentes.
-- **0.4.0 (branche en cours)** : les quatre bancs se lancent par une commande
-  unique — `cd tests/cadastre && npm test`. Elle régénère la fixture depuis le
-  rendu réel de `Renderer.php`, puis enchaîne les quatre suites et s'arrête au
-  premier échec. **243 contrôles** : 32 + 126 côté JavaScript, 36 + 49 côté
-  rendu PHP. Tous verts.
-- Revue de la PR #7 : sept défauts relevés, six corrigés (I-1 à I-5, A-1).
-  Deux défauts supplémentaires ont été trouvés **par les tests** pendant la
-  correction : un payload inexploitable ignoré en silence, et la zone d'état qui
-  s'écrasait elle-même.
-- Ces contrôles restent **simulés** : le formulaire n'a pas encore été ouvert
-  dans un éditeur réel ni essayé sur le site. Ces contrôles sont **simulés** : le formulaire n'a pas encore été
-  ouvert dans un vrai éditeur ni essayé sur le site.
-- **Test WordPress réel du 19/07/2026** : 13 contrôles passés dans l'éditeur et
-  sur le site public — insertion, réglages, enregistrement, rechargement sans
-  erreur de validation, rendu, absence de 404, autocomplétion IGN, parcelle
-  confirmée, `sessionStorage`, mobile, isolation des assets. Aucune erreur PHP
-  ni JavaScript imputable au composant. Détail dans `CHANGELOG.md` 0.3.0.
+- **243 assertions automatisées**, toutes vertes, par une commande unique :
+  `cd tests/cadastre && npm test`. Elle régénère la fixture depuis le rendu réel
+  de `Renderer.php`, puis enchaîne les quatre bancs et s'arrête au premier échec.
+  Répartition : 32 + 126 côté JavaScript, 36 + 49 côté rendu PHP.
+- **Validation navigateur réussie** sur la page 1157 : bloc présent dans l'outil
+  d'insertion, réglages, enregistrement et rechargement sans erreur de
+  validation, parcelle réelle reprise dans le formulaire, messages d'erreur
+  accessibles, correction d'adresse, deux instances cloisonnées, effacement
+  explicite, rendu mobile sans débordement horizontal.
+- **Aucune erreur PHP liée à Urbizen** : le journal du serveur ne contient
+  aucune entrée mentionnant l'extension, ni aucune erreur fatale.
+- Aucune requête réseau émise par la validation locale, mesurée par interception.
+- Aucune donnée personnelle en console, y compris en cas d'erreur.
 
-### Prochaine étape
+### Réserves non bloquantes
 
-**Revue de la 0.4.0**, puis validation réelle du formulaire sur la page de test
-1157, conservée à cet effet : insertion du bloc formulaire à côté du bloc
-cadastre, reprise de la localisation, correction d'adresse, effacement.
+1. **Une correction manuelle n'est pas persistée.** Une surface corrigée dans le
+   formulaire figure bien dans le contrat validé, mais `sessionStorage` conserve
+   la valeur cadastrale : après rechargement, la correction est perdue. Cohérent
+   avec la règle « la validation n'écrit pas dans le stockage », mais surprenant
+   pour la personne. À trancher avec la soumission serveur.
+2. **Accords grammaticaux** de certains messages d'erreur, composés par
+   concaténation, sans accord en genre ni en nombre : « Section cadastrale
+   incorrect », « 5 chiffres attendu ».
+3. **Google Fonts est encore chargé par le thème** — connu, **hors périmètre**
+   de la 0.4.0, à traiter avec l'auto-hébergement des polices.
 
-Ensuite, la **validation serveur** : c'est le vrai chantier suivant. La 0.4.0
-valide uniquement côté navigateur ; toute soumission devra revalider
-l'intégralité des champs, sans faire confiance aux champs masqués.
+### Prochaine étape — décision d'architecture, pas encore du code
 
-Restent ouverts : l'auto-hébergement des polices (Google Fonts est encore
-appelé par le thème) et la reprise du composant dans les pages publiques —
-aucune page publiée ne l'utilise à ce jour.
+**Définir le contrat de soumission serveur sécurisé avant toute implémentation.**
+
+C'est une décision à prendre, pas un développement autorisé. Rien ne doit être
+écrit tant que les points suivants ne sont pas tranchés et consignés dans
+`DECISIONS.md` :
+
+- **Périmètre d'une demande client** : quelles données la constituent, et
+  lesquelles restent hors dossier.
+- **Autorité de la saisie** : à quel moment la correction manuelle devient la
+  valeur de référence face à la donnée cadastrale.
+- **Confirmation explicite** avant tout envoi : rien ne part sans un acte clair.
+- **Validation PHP complète**, sans aucune confiance envers les champs masqués.
+- **Nonce REST** et contrôle des capacités.
+- **Limitation de débit** et **anti-spam** (honeypot, délai minimal de saisie).
+- **Stockage WordPress ou transmission directe** au service Python : l'un,
+  l'autre, ou les deux, et pourquoi.
+- **Politique de conservation et de suppression RGPD**, avec durées chiffrées.
+- **Gestion des pièces jointes** : type MIME réel, plafonds, stockage hors
+  racine web.
+- **Relation avec le backend Python** : authentification, idempotence, rejeu.
+- **États métier d'une soumission**, à raccorder aux 13 statuts du `CLAUDE.md`.
+- **Stratégie de reprise après erreur** : ce que voit la personne, ce que
+  devient sa saisie.
+
+### État des branches
+
+| Branche | État | Recommandation |
+|---|---|---|
+| `feature/cadastre-block` | fusionnée par la PR #6 | **supprimable** — contenu doublement recouvert depuis |
+| `feature/form-cadastre-integration` | fusionnée par la PR #7 | **temporairement conservée** — isole proprement les deux commits en cas de retour arrière ciblé |
+| `docs/passation-0.4.0` | branche documentaire courante | à supprimer après le merge de sa PR |
+
+Supprimer une branche distante n'efface aucun commit : tous restent atteignables
+depuis `main`.
 
 ### Interdictions
 
-1. **Ne pas publier la page de test 1157** : elle reste en brouillon, puis sera
-   supprimée. Aucune page publiée n'utilise encore le composant.
+1. **Ne pas publier la page 1157** : elle reste en brouillon et sert de page de
+   validation interne et de non-régression. Aucune page publiée n'utilise le
+   composant.
 2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
 3. Ne jamais pousser directement sur `main`.
-4. **Ancien format 0.3.0** : un onglet ouvert avant le déploiement conservera un
+4. **Ancien format 0.3.0** : un onglet ouvert avant le déploiement conserve un
    payload plat, désormais ignoré. La personne devra confirmer à nouveau sa
    parcelle. Aucune migration n'est prévue, rien n'est effacé automatiquement.
 5. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle
@@ -145,11 +149,13 @@ aucune page publiée ne l'utilise à ce jour.
    en priorité 1000. Recontrôler le rendu après toute mise à jour du parent
    (2.0.29 disponible).
 2. **Gabarits en base** — `wp_template_part` et `wp_global_styles` restent
-   rattachés au terme `wp_theme` du **parent**. Ne pas s'appuyer dessus : la
-   source de vérité est le dossier `parts/` du thème enfant.
+   rattachés au terme `wp_theme` du **parent**. La source de vérité est le
+   dossier `parts/` du thème enfant.
 3. **Dépôt public** — aucune coordonnée serveur, aucune donnée personnelle,
    aucune sauvegarde dans Git.
-4. **Données réelles** — les 4 entrées Fluent Forms sont des données personnelles :
-   les exporter chiffrées, hors dépôt, avant toute désactivation du plugin.
+4. **Données réelles** — les 4 entrées Fluent Forms sont des données
+   personnelles : les exporter chiffrées, hors dépôt, avant toute désactivation.
 5. **`wp db export` échoue sous CageFS** — passer par `mysqldump` avec un fichier
    d'identifiants temporaire en mode 600, détruit par `shred -u` après usage.
+6. **Cas corse** — les codes INSEE de Corse ne sont pas cinq chiffres (`2B033`
+   pour Bastia). Toute règle de validation sur un code commune doit les accepter.
