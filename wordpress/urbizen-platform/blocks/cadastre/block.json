@@ -1,0 +1,42 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/block.json",
+	"apiVersion": 3,
+	"name": "urbizen/cadastre",
+	"version": "0.3.0",
+	"title": "Cadastre Urbizen",
+	"category": "widgets",
+	"icon": "location-alt",
+	"description": "Saisie d’adresse, carte IGN et confirmation de parcelle. Le rendu est produit côté serveur : aucune adresse ni parcelle n’est enregistrée dans la page.",
+	"keywords": [ "cadastre", "parcelle", "adresse", "urbanisme", "carte" ],
+	"textdomain": "urbizen-platform",
+	"supports": {
+		"html": false,
+		"multiple": true,
+		"reusable": true,
+		"anchor": true
+	},
+	"attributes": {
+		"label": {
+			"type": "string",
+			"default": "Adresse du projet"
+		},
+		"placeholder": {
+			"type": "string",
+			"default": "Commencez à saisir une adresse…"
+		},
+		"continueLabel": {
+			"type": "string",
+			"default": "Continuer"
+		},
+		"storageKey": {
+			"type": "string",
+			"default": "parcel"
+		},
+		"mapHeight": {
+			"type": "string",
+			"default": ""
+		}
+	},
+	"editorScript": "urbizen-cadastre-editor",
+	"editorStyle": "urbizen-cadastre-editor"
+}

@@ -163,7 +163,37 @@ refonte des pages, pas avant.
 
 ---
 
-## 5. Règles de travail non négociables
+## 5. Services publics externes utilisés
+
+Le composant cadastre est le seul module à appeler des services tiers. Tous sont
+**publics, gratuits et sans clé d'API**. Aucun secret n'est donc requis, mais
+chacun a ses limites.
+
+| Service | Point d'entrée | Usage | Limites connues |
+|---|---|---|---|
+| Géocodage IGN — complétion | `data.geopf.fr/geocodage/completion` | autocomplétion d'adresse | quota d'usage raisonnable, non contractuel ; 7 réponses demandées, saisie ≥ 3 caractères, requêtes espacées de 260 ms |
+| Géocodage IGN — recherche | `data.geopf.fr/geocodage/search` | coordonnées canoniques et code INSEE | même quota ; en cas d'échec, repli sur les coordonnées de l'autocomplétion |
+| Tuiles WMTS IGN | `data.geopf.fr/wmts` | photo aérienne, plan IGN v2, parcellaire express | zoom maximal 20 ; couverture et fraîcheur variables selon les communes |
+| API Carto — cadastre | `apicarto.ign.fr/api/cadastre/parcelle` | géométrie et références de parcelle (source PCI) | **parcellaire mis à jour environ 2 fois par an** ; la contenance est une **surface cadastrale indicative**, jamais une surface arpentée |
+
+Trois conséquences à retenir :
+
+1. **Aucune donnée n'est envoyée à un serveur Urbizen** par ce composant. Les
+   requêtes partent du navigateur du visiteur vers l'IGN. L'adresse saisie et la
+   parcelle confirmée restent dans l'onglet (`sessionStorage`, clé préfixée
+   `urbizen:`), effaçables par `UrbizenCadastre.clearStored()`.
+2. **Toute panne se voit** : délai maximal de 8 s par requête, puis message
+   explicite — recherche indisponible, aucune adresse trouvée, carte
+   momentanément indisponible, lecture de parcelle impossible.
+3. `api-adresse.data.gouv.fr` n'est **pas** utilisé : consigne de projet, la
+   Géoplateforme IGN fait foi.
+
+Leaflet 1.9.4 est **embarqué dans le dépôt** (`assets/vendor/leaflet/`), jamais
+chargé depuis un CDN : aucune adresse IP de visiteur ne part chez un tiers.
+
+---
+
+## 6. Règles de travail non négociables
 
 1. **Sauvegarder avant d'agir** : base et fichiers, intégrité vérifiée.
 2. **Vérifier après chaque action** : voir le protocole du plan directeur, §7.
@@ -176,7 +206,7 @@ refonte des pages, pas avant.
 
 ---
 
-## 6. Boucle de vérification après déploiement
+## 7. Boucle de vérification après déploiement
 
 ```bash
 # 1. Lint PHP — pas de PHP en local, on lint via le serveur
@@ -201,22 +231,26 @@ wp theme activate hostinger-ai-theme && wp litespeed-purge all
 
 ---
 
-## 7. Cartographie du dépôt
+## 8. Cartographie du dépôt
 
 ```
 backend/dp-service/      service Python : Cerfa, notice, bordereau, assemblage PDF
 frontend/homepage/       maquette HTML/CSS/JS de l'accueil (référence de refonte)
 frontend/formulaires/    formulaires DP et PCMI de référence (à porter dans l'extension)
-frontend/assets/         urbizen-tokens.css, composant cadastre (CSS + JS)
+frontend/assets/         urbizen-tokens.css (charte, à porter dans le thème)
 wordpress/urbizen-child/     thème enfant : rendu et gabarits
 wordpress/urbizen-platform/  extension : toute la logique métier
+  assets/js|css/             composant cadastre — SOURCE DE VÉRITÉ UNIQUE (D-008)
+  assets/vendor/leaflet/     Leaflet 1.9.4 embarqué, jamais de CDN
+  src/Blocks/                bloc Gutenberg et shortcode
 docs/                    documentation du projet
-tests/ scripts/          à créer
+tests/cadastre/          bancs d'essai du composant (JS avec jsdom, rendu PHP)
+scripts/                 à créer
 ```
 
 ---
 
-## 8. Points ouverts connus
+## 9. Points ouverts connus
 
 - Les mappings Cerfa de `backend/dp-service/cerfa.py` sont tous en `TODO_` :
   aucun champ n'est réellement rempli aujourd'hui.

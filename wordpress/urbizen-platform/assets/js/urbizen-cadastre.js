@@ -6,7 +6,21 @@
    persistance sessionStorage, événement `urbizen:parcel-confirmed`.
 
    Réutilisable : page d'accueil, formulaire DP, formulaire PCMI, espace client.
-   Dépendances : Leaflet (window.L), urbizen-cadastre.css, urbizen-tokens.css.
+   Source de vérité unique — ce fichier ne doit exister qu'ici (voir D-008).
+
+   Dépendances : Leaflet (window.L), servi localement depuis assets/vendor/,
+   et urbizen-cadastre.css. Les tokens de charte `--u-*` sont facultatifs :
+   chaque var() porte une valeur de repli côté CSS.
+
+   ── Sécurité ──
+   Aucune donnée d'API ni option d'attribut n'est insérée via innerHTML : le DOM
+   est construit par createElement / textContent / setAttribute. L'échappement
+   PHP côté serveur ne dispense pas de cette règle.
+
+   ── Vie privée ──
+   L'adresse et la parcelle restent dans l'onglet du navigateur (sessionStorage,
+   clé préfixée et configurable). Rien n'est envoyé à un serveur Urbizen ; seuls
+   les services publics IGN ci-dessous sont appelés. `clearStored()` efface.
 
    ── Services cartographiques (Géoplateforme IGN — configuration centralisée) ──
    Géocodage      : https://data.geopf.fr/geocodage   (service IGN, base BAN)
@@ -34,10 +48,22 @@
     debounceMs: 260,
     requestTimeoutMs: 8000,
     defaultView: { lat: 46.8, lon: 1.9, zoom: 6 },  // centre France
+    storagePrefix: "urbizen:",
     storageKey: "urbizen:parcel"
   };
 
   function tileUrl(layer, fmt) { return CONFIG.wmts + "&LAYER=" + layer + "&FORMAT=" + fmt; }
+
+  /* Compteur d'instances : garantit des identifiants HTML uniques par composant,
+     pour que plusieurs cadastres cohabitent sur une même page sans casser les
+     liens `for`, `aria-controls` et `aria-activedescendant`. */
+  var instanceSeq = 0;
+
+  /* Clé de stockage : toujours préfixée, quelle que soit la valeur reçue. */
+  function storageKeyFor(key) {
+    if (!key) { return CONFIG.storageKey; }
+    return key.indexOf(CONFIG.storagePrefix) === 0 ? key : CONFIG.storagePrefix + key;
+  }
 
   /* Modèle de données conservé (schéma fixé par la spécification) */
   function emptyData() {
@@ -71,11 +97,29 @@
     };
   }
 
-  function el(tag, cls, html) {
+  /* Fabrique d'éléments : le texte passe TOUJOURS par textContent.
+     Aucune variante acceptant du HTML n'est fournie, volontairement. */
+  function el(tag, cls, text) {
     var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (html != null) e.innerHTML = html;
+    if (cls) { e.className = cls; }
+    if (text != null) { e.textContent = text; }
     return e;
+  }
+
+  function setAttrs(node, attrs) {
+    for (var k in attrs) {
+      if (Object.prototype.hasOwnProperty.call(attrs, k) && attrs[k] != null) {
+        node.setAttribute(k, String(attrs[k]));
+      }
+    }
+    return node;
+  }
+
+  function append(parent) {
+    for (var i = 1; i < arguments.length; i++) {
+      if (arguments[i]) { parent.appendChild(arguments[i]); }
+    }
+    return parent;
   }
 
   /* ==========================================================================
@@ -85,7 +129,8 @@
     this.opts = options || {};
     this.root = typeof container === "string" ? document.querySelector(container) : container;
     if (!this.root) { console.warn("[urbizen-cadastre] conteneur introuvable"); return; }
-    this.storageKey = this.opts.storageKey || CONFIG.storageKey;
+    this.uid = "uc-" + (++instanceSeq);
+    this.storageKey = storageKeyFor(this.opts.storageKey);
     this.data = emptyData();
     this.map = null;
     this.layers = {};
@@ -101,59 +146,92 @@
     this._bind();
   }
 
+  /* Construction du DOM.
+     Tout passe par createElement / textContent / setAttribute : les libellés
+     viennent d'attributs de bloc éditables et les suggestions d'une API
+     publique — aucun des deux n'est digne de confiance pour de l'innerHTML.
+     Les identifiants sont préfixés par `this.uid`, unique à chaque instance. */
   Cadastre.prototype._build = function () {
     this.root.classList.add("uc-root");
-    var labelText = this.opts.label || "Adresse du projet";
-    var placeholder = this.opts.placeholder || "Commencez à saisir une adresse…";
 
-    this.root.innerHTML =
-      '<div class="uc-field">' +
-        '<label class="uc-label" for="uc-input">' + labelText + '</label>' +
-        '<input class="uc-input" id="uc-input" type="text" autocomplete="off" ' +
-          'role="combobox" aria-expanded="false" aria-autocomplete="list" ' +
-          'aria-controls="uc-suggest" placeholder="' + placeholder + '">' +
-        '<span class="uc-spinner" aria-hidden="true"></span>' +
-        '<ul class="uc-suggest" id="uc-suggest" role="listbox" hidden></ul>' +
-      '</div>' +
-      '<div class="uc-error" role="alert" hidden></div>' +
-      '<div class="uc-map-wrap" hidden>' +
-        '<div class="uc-map-bar">' +
-          '<span class="uc-status" role="status" aria-live="polite"><span class="uc-dot"></span><span class="uc-status-txt">Cliquez sur votre parcelle pour la confirmer.</span></span>' +
-          '<button type="button" class="uc-toggle">Vue plan</button>' +
-        '</div>' +
-        '<div class="uc-map" id="uc-map"></div>' +
-        '<div class="uc-parcel" hidden>' +
-          '<div>' +
-            '<div class="uc-parcel-head">Parcelle sélectionnée</div>' +
-            '<div class="uc-parcel-body"><span class="uc-parcel-ref">—</span></div>' +
-          '</div>' +
-          '<div class="uc-parcel-actions">' +
-            '<button type="button" class="uc-btn uc-btn-confirm">Confirmer cette parcelle</button>' +
-            '<button type="button" class="uc-link">Ce n\u2019est pas la bonne parcelle</button>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="uc-continue-row">' +
-        '<button type="button" class="uc-continue" disabled>' + (this.opts.continueLabel || "Continuer") + '</button>' +
-        '<span class="uc-continue-hint">Confirmez votre parcelle pour continuer.</span>' +
-      '</div>';
+    var idInput   = this.uid + "-input";
+    var idSuggest = this.uid + "-suggest";
+    var idMap     = this.uid + "-map";
+    var idStatus  = this.uid + "-status";
+    var idError   = this.uid + "-error";
 
-    this.$input   = this.root.querySelector(".uc-input");
-    this.$field   = this.root.querySelector(".uc-field");
-    this.$suggest = this.root.querySelector(".uc-suggest");
-    this.$error   = this.root.querySelector(".uc-error");
-    this.$mapWrap = this.root.querySelector(".uc-map-wrap");
-    this.$mapEl   = this.root.querySelector(".uc-map");
-    this.$status  = this.root.querySelector(".uc-status-txt");
-    this.$statusWrap = this.root.querySelector(".uc-status");
-    this.$toggle  = this.root.querySelector(".uc-toggle");
-    this.$parcel  = this.root.querySelector(".uc-parcel");
-    this.$parcelRef = this.root.querySelector(".uc-parcel-ref");
-    this.$confirm = this.root.querySelector(".uc-btn-confirm");
-    this.$reject  = this.root.querySelector(".uc-link");
-    this.$continue = this.root.querySelector(".uc-continue");
-    this.$continueHint = this.root.querySelector(".uc-continue-hint");
+    while (this.root.firstChild) { this.root.removeChild(this.root.firstChild); }
+
+    /* --- Champ de saisie et suggestions --- */
+    var label = el("label", "uc-label", this.opts.label || "Adresse du projet");
+    setAttrs(label, { "for": idInput });
+
+    this.$input = setAttrs(el("input", "uc-input"), {
+      id: idInput,
+      type: "text",
+      autocomplete: "off",
+      role: "combobox",
+      "aria-expanded": "false",
+      "aria-autocomplete": "list",
+      "aria-controls": idSuggest,
+      "aria-describedby": idStatus,
+      placeholder: this.opts.placeholder || "Commencez à saisir une adresse…"
+    });
+
+    var spinner = setAttrs(el("span", "uc-spinner"), { "aria-hidden": "true" });
+    this.$suggest = setAttrs(el("ul", "uc-suggest"), { id: idSuggest, role: "listbox" });
+    this.$suggest.hidden = true;
+
+    this.$field = append(el("div", "uc-field"), label, this.$input, spinner, this.$suggest);
+
+    /* --- Zone d'erreur --- */
+    this.$error = setAttrs(el("div", "uc-error"), { id: idError, role: "alert" });
+    this.$error.hidden = true;
+
+    /* --- Barre de statut et bascule de fond de carte --- */
+    this.$status = el("span", "uc-status-txt", "Cliquez sur votre parcelle pour la confirmer.");
+    this.$statusWrap = setAttrs(el("span", "uc-status"), {
+      id: idStatus, role: "status", "aria-live": "polite"
+    });
+    append(this.$statusWrap, el("span", "uc-dot"), this.$status);
+
+    this.$toggle = setAttrs(el("button", "uc-toggle", "Vue plan"), { type: "button" });
+    var bar = append(el("div", "uc-map-bar"), this.$statusWrap, this.$toggle);
+
+    /* --- Carte --- */
+    this.$mapEl = setAttrs(el("div", "uc-map"), { id: idMap });
+    if (this.opts.mapHeight) { this.$mapEl.style.height = this.opts.mapHeight; }
+
+    /* --- Cartouche de la parcelle --- */
+    this.$parcelRef = el("span", "uc-parcel-ref", "—");
+    var parcelInfo = append(
+      el("div", null),
+      el("div", "uc-parcel-head", "Parcelle sélectionnée"),
+      append(el("div", "uc-parcel-body"), this.$parcelRef)
+    );
+
+    this.$confirm = setAttrs(el("button", "uc-btn uc-btn-confirm", "Confirmer cette parcelle"), { type: "button" });
+    this.$reject  = setAttrs(el("button", "uc-link", "Ce n’est pas la bonne parcelle"), { type: "button" });
+    var actions = append(el("div", "uc-parcel-actions"), this.$confirm, this.$reject);
+
+    this.$parcel = append(el("div", "uc-parcel"), parcelInfo, actions);
+    this.$parcel.hidden = true;
+
+    this.$mapWrap = append(el("div", "uc-map-wrap"), bar, this.$mapEl, this.$parcel);
+    this.$mapWrap.hidden = true;
+
+    /* --- Action finale --- */
+    this.$continue = setAttrs(
+      el("button", "uc-continue", this.opts.continueLabel || "Continuer"),
+      { type: "button" }
+    );
+    this.$continue.disabled = true;
+    this.$continueHint = el("span", "uc-continue-hint", "Confirmez votre parcelle pour continuer.");
+    var continueRow = append(el("div", "uc-continue-row"), this.$continue, this.$continueHint);
+
+    append(this.root, this.$field, this.$error, this.$mapWrap, continueRow);
   };
+
 
   Cadastre.prototype._bind = function () {
     var self = this;
@@ -161,7 +239,10 @@
     this.$input.addEventListener("input", onType);
     this.$input.addEventListener("keydown", function (e) { self._onKey(e); });
     this.$input.addEventListener("focus", function () { if (self.suggestions.length) self._openSuggest(); });
-    document.addEventListener("click", function (e) { if (!self.root.contains(e.target)) self._closeSuggest(); });
+    /* Mémorisé pour pouvoir être retiré par destroy() : sans cela, chaque
+       remontage laisserait un écouteur orphelin sur le document. */
+    this._onDocClick = function (e) { if (!self.root.contains(e.target)) self._closeSuggest(); };
+    document.addEventListener("click", this._onDocClick);
 
     this.$toggle.addEventListener("click", function () { self._setBase(!self.baseOrtho); });
     this.$confirm.addEventListener("click", function () { self._confirmCurrent(); });
@@ -193,21 +274,25 @@
   };
 
   Cadastre.prototype._renderSuggest = function (networkError) {
-    this.$suggest.innerHTML = "";
+    while (this.$suggest.firstChild) { this.$suggest.removeChild(this.$suggest.firstChild); }
     this.suggestIndex = -1;
+    this.$input.removeAttribute("aria-activedescendant");
     if (networkError) {
-      this.$suggest.appendChild(el("li", "uc-empty", "Recherche indisponible. Réessayez."));
+      this.$suggest.appendChild(el("li", "uc-empty",
+        "Recherche indisponible : vérifiez votre connexion, puis réessayez."));
       this._openSuggest(); return;
     }
     if (!this.suggestions.length) {
-      this.$suggest.appendChild(el("li", "uc-empty", "Aucune adresse trouvée."));
+      this.$suggest.appendChild(el("li", "uc-empty",
+        "Aucune adresse trouvée. Vérifiez l’orthographe ou précisez la commune."));
       this._openSuggest(); return;
     }
     var self = this;
     this.suggestions.forEach(function (s, i) {
-      var li = el("li", null, '<span class="uc-pin">\u25C9</span><span>' + (s.fulltext || "") + "</span>");
-      li.setAttribute("role", "option");
-      li.setAttribute("id", "uc-opt-" + i);
+      /* `fulltext` vient d'un service externe : jamais d'innerHTML dessus. */
+      var li = setAttrs(el("li"), { role: "option", id: self.uid + "-opt-" + i });
+      var pin = setAttrs(el("span", "uc-pin", "◉"), { "aria-hidden": "true" });
+      append(li, pin, el("span", null, s.fulltext || ""));
       li.addEventListener("click", function () { self._pick(i); });
       self.$suggest.appendChild(li);
     });
@@ -215,7 +300,14 @@
   };
 
   Cadastre.prototype._openSuggest = function () { this.$suggest.hidden = false; this.$input.setAttribute("aria-expanded", "true"); };
-  Cadastre.prototype._closeSuggest = function () { this.$suggest.hidden = true; this.$input.setAttribute("aria-expanded", "false"); this.suggestIndex = -1; };
+  Cadastre.prototype._closeSuggest = function () {
+    this.$suggest.hidden = true;
+    this.$input.setAttribute("aria-expanded", "false");
+    this.suggestIndex = -1;
+    /* Aucune option active : l'attribut doit disparaître, sans quoi les
+       lecteurs d'écran annoncent une option qui n'existe plus. */
+    this.$input.removeAttribute("aria-activedescendant");
+  };
 
   Cadastre.prototype._onKey = function (e) {
     if (this.$suggest.hidden) return;
@@ -228,9 +320,17 @@
   };
   Cadastre.prototype._highlight = function (items) {
     for (var i = 0; i < items.length; i++) items[i].setAttribute("aria-selected", i === this.suggestIndex ? "true" : "false");
+    if (this.suggestIndex < 0) {
+      this.$input.removeAttribute("aria-activedescendant");
+      return;
+    }
     if (this.suggestIndex >= 0) {
-      this.$input.setAttribute("aria-activedescendant", "uc-opt-" + this.suggestIndex);
-      items[this.suggestIndex].scrollIntoView({ block: "nearest" });
+      this.$input.setAttribute("aria-activedescendant", this.uid + "-opt-" + this.suggestIndex);
+      /* scrollIntoView n'existe pas partout (environnements de test, vieux
+         navigateurs) : son absence ne doit pas casser la navigation clavier. */
+      if (typeof items[this.suggestIndex].scrollIntoView === "function") {
+        items[this.suggestIndex].scrollIntoView({ block: "nearest" });
+      }
     }
   };
 
@@ -291,6 +391,10 @@
         this.layers.cadastre = global.L.tileLayer(tileUrl(CONFIG.layers.cadastre, "image/png"), { maxZoom: 20, opacity: 0.9 }).addTo(this.map);
         var self = this;
         this.map.on("click", function (e) { self._queryParcel(e.latlng.lng, e.latlng.lat, true); });
+        /* Une couche IGN qui ne répond pas ne doit pas laisser une carte muette :
+           on prévient une fois, sans masquer ce qui s'affiche déjà. */
+        this.layers.ortho.on("tileerror", function () { self._tileError(); });
+        this.layers.cadastre.on("tileerror", function () { self._tileError(); });
       } catch (err) { this._showError("La carte est momentanément indisponible."); return; }
     } else {
       this.map.setView([lat, lon], 18);
@@ -342,10 +446,18 @@
     this.selLayer = global.L.geoJSON(feature, { style: { color: "#128A5A", weight: 2, fillColor: "#54CF99", fillOpacity: 0.25 } }).addTo(this.map);
     try { this.map.fitBounds(this.selLayer.getBounds(), { maxZoom: 19, padding: [20, 20] }); } catch (e) {}
     // cartouche
+    // cartouche — construit en DOM : `section`, `numero` et `contenance`
+    // proviennent d'API Carto et ne sont pas de confiance.
     var sec = p.section || "", num = p.numero || "", area = (p.contenance != null ? p.contenance : "");
-    this.$parcelRef.innerHTML =
-      "Section <b>" + sec + "</b> &middot; parcelle <b>n\u00B0" + num + "</b>" +
-      (area !== "" ? '<br><span class="uc-area">Surface indicative : <b>' + area + " m\u00B2</b></span>" : "");
+    while (this.$parcelRef.firstChild) { this.$parcelRef.removeChild(this.$parcelRef.firstChild); }
+    append(this.$parcelRef,
+      document.createTextNode("Section "), el("b", null, sec),
+      document.createTextNode(" · parcelle "), el("b", null, "n° " + num));
+    if (area !== "") {
+      var areaWrap = el("span", "uc-area", "Surface indicative : ");
+      append(areaWrap, el("b", null, area + " m²"));
+      append(this.$parcelRef, el("br"), areaWrap);
+    }
     this.$parcel.hidden = false;
     // une sélection (auto ou clic) n'est PAS une confirmation : on attend l'action du client
     this._setConfirmed(false);
@@ -396,6 +508,32 @@
     if (typeof this.opts.onConfirm === "function") this.opts.onConfirm(this.data);
   };
 
+  /* Signale une seule fois l'indisponibilité des tuiles. */
+  Cadastre.prototype._tileError = function () {
+    if (this._tileErrorShown) { return; }
+    this._tileErrorShown = true;
+    this._setStatus("Le fond de carte ne répond pas. Vous pouvez réessayer plus tard ; la sélection de parcelle reste possible.");
+  };
+
+  /* Démonte proprement l'instance : carte Leaflet, écouteurs, DOM et marqueur
+     de montage. Après appel, le conteneur peut être remonté par autoMount(). */
+  Cadastre.prototype.destroy = function () {
+    if (this.activeGeocode) { try { this.activeGeocode.abort(); } catch (e) {} }
+    if (this.activeParcel) { try { this.activeParcel.abort(); } catch (e) {} }
+    if (this._onDocClick) { document.removeEventListener("click", this._onDocClick); this._onDocClick = null; }
+    if (this.map) { try { this.map.remove(); } catch (e) {} this.map = null; }
+    this.layers = {};
+    this.selLayer = null;
+    this.pointMarker = null;
+    if (this.root) {
+      while (this.root.firstChild) { this.root.removeChild(this.root.firstChild); }
+      this.root.classList.remove("uc-root");
+      this.root.removeAttribute("data-uc-mounted");
+      delete this.root.urbizenCadastre;
+    }
+    return true;
+  };
+
   Cadastre.prototype._setStatus = function (txt) { if (this.$status) this.$status.textContent = txt; };
   Cadastre.prototype._searching = function (on) { if (this.$statusWrap) this.$statusWrap.classList.toggle("is-searching", on); };
   Cadastre.prototype._showError = function (msg) { this.$error.textContent = msg; this.$error.hidden = false; };
@@ -407,14 +545,56 @@
   var UrbizenCadastre = {
     config: CONFIG,
     mount: function (container, options) { return new Cadastre(container, options); },
+
     /** Récupère les dernières données confirmées (page d'accueil -> formulaires) */
     getStored: function (key) {
-      try { return JSON.parse(sessionStorage.getItem(key || CONFIG.storageKey)); }
+      try { return JSON.parse(sessionStorage.getItem(storageKeyFor(key))); }
       catch (e) { return null; }
+    },
+
+    /** Efface les données de localisation conservées dans l'onglet.
+        À appeler après reprise dans un formulaire, ou sur demande du visiteur. */
+    clearStored: function (key) {
+      try { sessionStorage.removeItem(storageKeyFor(key)); return true; }
+      catch (e) { return false; }
+    },
+
+    /** Monte automatiquement tout conteneur `[data-urbizen-cadastre]`.
+        Les options sont lues sur des attributs `data-*` : c'est ce que rend le
+        bloc côté PHP, après échappement. Idempotent : un conteneur déjà monté
+        est ignoré. */
+    autoMount: function (scope) {
+      var nodes = (scope || document).querySelectorAll("[data-urbizen-cadastre]");
+      var mounted = [];
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        if (n.getAttribute("data-uc-mounted") === "1") { continue; }
+        n.setAttribute("data-uc-mounted", "1");
+        var inst = new Cadastre(n, {
+          label:         n.getAttribute("data-label") || undefined,
+          placeholder:   n.getAttribute("data-placeholder") || undefined,
+          continueLabel: n.getAttribute("data-continue-label") || undefined,
+          storageKey:    n.getAttribute("data-storage-key") || undefined,
+          mapHeight:     n.getAttribute("data-map-height") || undefined
+        });
+        /* Accessible depuis l'hôte : instance.destroy(), lecture de instance.data. */
+        n.urbizenCadastre = inst;
+        mounted.push(inst);
+      }
+      return mounted;
     }
   };
 
   global.UrbizenCadastre = UrbizenCadastre;
   if (typeof module !== "undefined" && module.exports) module.exports = UrbizenCadastre;
+
+  /* Montage automatique des conteneurs rendus par le bloc ou le shortcode. */
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function () { UrbizenCadastre.autoMount(); });
+    } else {
+      UrbizenCadastre.autoMount();
+    }
+  }
 
 })(typeof window !== "undefined" ? window : this);

@@ -15,9 +15,10 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 | Élément | Valeur |
 |---|---|
-| Branche courante | `fix/backend-reproductibilite` |
-| Pull Request courante | ouverte vers `main`, **en attente de revue** |
-| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) **fusionnée** — merge `5989ba9` |
+| Branche courante | `feature/cadastre-block` |
+| Pull Request courante | ouverte vers `main`, **en attente de revue — ne pas merger** |
+| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) fusionnée — merge `5989ba9` |
+| Reproductibilité backend | PR [#5](https://github.com/Urbizen/urbizen-platform/pull/5) fusionnée — merge `8214ae6` |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
 
 ### Où en est le projet
@@ -26,9 +27,12 @@ L'étape 1 de l'intégration WordPress est **terminée, fusionnée dans `main` e
 production**. Le socle est posé — thème enfant et extension — mais il ne porte
 encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
 
-La branche en cours ne touche qu'à la **reproductibilité du backend Python** :
-dépendances, configuration et documentation de lancement. Aucune logique métier
-n'est modifiée, aucune ligne de production n'est touchée.
+La branche en cours porte le **composant cadastre** dans l'extension : bloc
+Gutenberg, shortcode, Leaflet embarqué, source de vérité unique. L'extension est
+**déployée en production en 0.3.0** et le composant a été **validé en conditions
+réelles** le 19/07/2026, sur une page de test en brouillon non indexé.
+
+La PR #6 reste **ouverte, non fusionnée**, en attente de décision.
 
 ### Ce qui a été fait
 
@@ -44,14 +48,25 @@ n'est modifiée, aucune ligne de production n'est touchée.
   est public**, compte et adresse ne doivent jamais y figurer.
 - Reproductibilité du backend soldée : `requirements.txt`, `.env.example` et
   documentation de lancement local corrigée.
+- Composant cadastre porté dans l'extension : bloc `urbizen/cadastre` et
+  shortcode `[urbizen_cadastre]` au rendu commun, Leaflet 1.9.4 embarqué avec
+  sa licence BSD 2-Clause, `innerHTML` supprimés, identifiants uniques par
+  instance, `clearStored()` et `destroy()`.
+- Interface d'édition Gutenberg ajoutée après revue : `block.json` comme
+  déclaration unique des attributs, `editor.js`, `editor.css`, aperçu statique
+  sans appel IGN ni carte Leaflet.
+- Version du plugin portée à **0.3.0**, handles versionnés pour casser les
+  caches navigateur et LiteSpeed.
+- Premiers tests automatiques du projet : `tests/cadastre/`.
 
 ### État vérifié de la production
 
 | Élément | Valeur |
 |---|---|
 | WordPress · PHP · WP-CLI | 7.0.2 fr_FR · 8.3.30 · 2.12.0 |
-| Thème actif | `urbizen-child` 0.1.0 (parent `hostinger-ai-theme` 2.0.18) |
-| Extension Urbizen | `urbizen-platform` 0.1.0, active, aucun module chargé |
+| Thème actif | `urbizen-child` 0.1.0 (parent `hostinger-ai-theme` 2.0.18) — inchangé |
+| Extension Urbizen | `urbizen-platform` **0.3.0**, active, module cadastre chargé |
+| Page de test | ID 1157, **brouillon**, non indexée, à supprimer après revue |
 | Rendu | validé identique — captures 1440 px et 390 px, empreintes SHA-256 égales |
 | Réponse HTTP | 200 |
 | Effets de bord | aucun : ni table, ni option, ni fichier créé |
@@ -71,17 +86,32 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
   `POST /api/dp` sans champ → 400 avec la liste des champs manquants.
 - Aucun secret dans les fichiers ajoutés : `.env.example` ne contient que des
   noms de variables et des exemples fictifs.
+- Cadastre : 12 fichiers PHP au lint sans erreur ; syntaxe JS et `block.json`
+  validés ; **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu
+  PHP** avec doublures, tous verts ; aucune référence CDN ; images de
+  `leaflet.css` toutes présentes.
+- **Test WordPress réel du 19/07/2026** : 13 contrôles passés dans l'éditeur et
+  sur le site public — insertion, réglages, enregistrement, rechargement sans
+  erreur de validation, rendu, absence de 404, autocomplétion IGN, parcelle
+  confirmée, `sessionStorage`, mobile, isolation des assets. Aucune erreur PHP
+  ni JavaScript imputable au composant. Détail dans `CHANGELOG.md` 0.3.0.
 
 ### Prochaine étape
 
-Composant cadastre : Leaflet embarqué localement dans l'extension, puis bloc
-Gutenberg `CadastreBlock` réutilisant `frontend/assets/js/urbizen-cadastre.js`.
-Cette étape n'a **pas** été démarrée.
+**Décision sur la PR #6**, techniquement prête et validée en production. Puis,
+après fusion, suppression de la page de test 1157.
+
+Ensuite, étape 4 : moteur de formulaires, qui consommera l'événement
+`urbizen:parcel-confirmed` émis par le cadastre.
+
+Restent ouverts sur le composant : l'auto-hébergement des polices (Google Fonts
+est encore appelé par le thème) et, à terme, la reprise du composant dans les
+pages publiques — aucune page publiée ne l'utilise à ce jour.
 
 ### Interdictions
 
-1. **Ne pas commencer le composant cadastre** tant que le socle — thème enfant et
-   extension fusionnés dans `main` — n'a pas été validé.
+1. **Ne pas publier la page de test 1157** : elle reste en brouillon, puis sera
+   supprimée. Aucune page publiée n'utilise encore le composant.
 2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
 3. Ne jamais pousser directement sur `main`.
 4. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle

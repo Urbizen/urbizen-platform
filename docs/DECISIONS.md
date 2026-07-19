@@ -168,3 +168,57 @@ que la documentation n'est pas à jour **dans le même commit**.
   conversation.
 - Les pièges vérifiés en production sont consignés une fois pour toutes.
 - Une Pull Request qui touche l'architecture sans toucher `docs/` est incomplète.
+
+---
+
+## D-008 — Le composant cadastre devient un module de l'extension
+
+**Date** : 19 juillet 2026 · **État** : actée
+
+**Contexte.** Le composant cadastre — saisie d'adresse, carte IGN, sélection et
+confirmation de parcelle — a été prototypé dans `frontend/assets/`, chargé par la
+page d'accueil statique avec Leaflet servi depuis `unpkg.com`. Trois obstacles
+interdisaient de le porter tel quel dans WordPress : le HTML est construit par
+`innerHTML` à partir de données d'API et d'options, les identifiants HTML sont en
+dur (`uc-input`, `uc-map`), et le CSS dépend de tokens `--u-*` absents du thème
+enfant en production.
+
+**Décision.** Le composant devient un module de `urbizen-platform`, avec une
+**source de vérité unique** :
+
+- `assets/js/urbizen-cadastre.js`, `assets/css/urbizen-cadastre.css` et
+  `assets/vendor/leaflet/` vivent dans l'extension ;
+- les copies de `frontend/assets/` sont supprimées ; le prototype de la page
+  d'accueil référence les fichiers de l'extension par chemin relatif ;
+- aucune copie générée, aucun script de synchronisation.
+
+Cinq règles encadrent le portage :
+
+1. **Leaflet 1.9.4 est embarqué** dans le dépôt, servi localement, jamais depuis
+   un CDN — pas de fuite d'adresse IP des visiteurs vers un tiers.
+2. **Aucun `innerHTML` pour une donnée d'API ou d'attribut** : le DOM est
+   construit par `createElement`, `textContent` et `setAttribute`. Pas de
+   fonction d'échappement maison. L'échappement PHP ne dispense pas de celui du
+   JavaScript, les deux sont exigés.
+3. **Identifiants uniques par instance** — champ, label, liste de suggestions,
+   carte, options ARIA et messages d'état — pour que plusieurs composants
+   cohabitent sur une même page sans casser `for`, `aria-controls` ni
+   `aria-activedescendant`.
+4. **Tokens en repli explicite** : `var(--u-brand, #128A5A)`. Le composant est
+   correct sans le thème et hérite de la charte dès qu'elle est déployée.
+   L'extension **ne redéclare jamais** les tokens dans `:root` : le rendu
+   appartient au thème (voir D-002).
+5. **Bloc et shortcode partagent exactement** le même `render_callback` et la
+   même logique d'enfilage. Le bloc est **rendu dynamiquement côté PHP** : ni
+   adresse, ni parcelle, ni donnée métier n'est enregistrée dans `post_content`.
+
+**Conséquences.**
+- Les assets ne sont chargés que sur les pages qui rendent le composant.
+- L'activation de l'extension n'écrit toujours rien en base.
+- Aucun appel au backend Python : le composant ne parle qu'aux services publics
+  IGN, sans clé d'API.
+- `sessionStorage` reste utilisé avec une clé préfixée et configurable ; adresse
+  et parcelle ne quittent pas l'onglet du navigateur. L'API JavaScript expose
+  `clearStored()` pour permettre un effacement explicite.
+- Les services IGN sont soumis à quota et le parcellaire n'est mis à jour que
+  deux fois par an : la surface cadastrale affichée est **indicative**.

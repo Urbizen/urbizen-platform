@@ -5,6 +5,138 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.3.0] — 19 juillet 2026
+
+Composant cadastre porté dans l'extension, **version du plugin portée à 0.3.0**,
+**déployée en production** le 19 juillet 2026 après validation. La page
+d'accueil publiée n'est pas modifiée et ne charge aucun asset du composant.
+
+> **Statut du bloc Gutenberg : validé en conditions réelles** le 19 juillet 2026.
+> Extension déployée en production, bloc inséré et réglé dans l'éditeur sur une
+> page en brouillon non indexée, enregistré et rechargé sans erreur. Détail des
+> 13 contrôles en fin d'entrée.
+
+### Ajouté
+- `src/Blocks/CadastreBlock.php` : bloc Gutenberg `urbizen/cadastre` et
+  shortcode `[urbizen_cadastre]`, partageant **exactement** le même rendu et le
+  même enfilage. Rendu dynamique côté PHP ; `post_content` ne contient jamais
+  d'adresse ni de parcelle.
+- `blocks/cadastre/block.json` : **déclaration unique** des cinq attributs.
+  PHP les relit depuis ce fichier, l'éditeur les reçoit de WordPress : aucune
+  valeur par défaut n'est dupliquée.
+- `blocks/cadastre/editor.js` : `registerBlockType` avec `InspectorControls`
+  pour le libellé, le texte d'aide, le bouton Continuer, la clé de stockage et
+  la hauteur de carte, plus un **aperçu statique**. Aucun appel IGN, aucune
+  carte Leaflet dans l'éditeur. `save()` renvoie `null`.
+- `blocks/cadastre/editor.css` : styles de l'aperçu, éditeur uniquement.
+- `assets/vendor/leaflet/LICENSE` : licence **BSD 2-Clause** officielle de
+  Leaflet 1.9.4, et `README.md` précisant version, source, empreintes SHA-256
+  et règle de mise à jour.
+- `Cadastre.prototype.destroy()` : démontage propre — carte Leaflet, écouteur
+  document, DOM et marqueur de montage —, permettant un remontage.
+- `assets/vendor/leaflet/` : Leaflet 1.9.4 embarqué (JS, CSS, images). Plus
+  aucun appel à `unpkg.com`.
+- `UrbizenCadastre.autoMount()` : montage automatique des conteneurs
+  `[data-urbizen-cadastre]`, idempotent, options lues sur des `data-*`.
+- `UrbizenCadastre.clearStored()` : effacement explicite des données de
+  localisation conservées dans l'onglet.
+- Repli `<noscript>` : le composant ne laisse jamais un conteneur muet.
+- `tests/cadastre/` : deux bancs d'essai, comportement JavaScript sous jsdom et
+  rendu PHP avec doublures WordPress. Le répertoire `tests/` n'était pas
+  utilisé jusqu'ici.
+- `docs/AI_CONTEXT.md` : section sur les services publics externes, leurs points
+  d'entrée et leurs limites.
+
+### Modifié
+- **Source de vérité unique** (D-008) : `urbizen-cadastre.js` et
+  `urbizen-cadastre.css` vivent désormais dans l'extension. Les copies de
+  `frontend/assets/` sont supprimées et le prototype de la page d'accueil
+  référence les fichiers canoniques par chemin relatif.
+- Le CSS porte une valeur de repli sur chacun de ses 64 `var(--u-*)` : le
+  composant reste correct sans les tokens du thème, sans jamais les redéclarer
+  dans `:root`.
+- Messages d'erreur rendus plus explicites : « vérifiez votre connexion »,
+  « vérifiez l'orthographe ou précisez la commune ».
+- Version du plugin **0.1.0 → 0.3.0**, en-tête et constante alignées. Les
+  handles CSS et JavaScript portent cette version : la montée de version casse
+  le cache navigateur et LiteSpeed, les anciens assets ne peuvent pas rester
+  servis. Leaflet garde sa propre version, 1.9.4.
+- `aria-activedescendant` désormais **retiré** dès qu'aucune suggestion n'est
+  active — à la fermeture de la liste, quand elle est vide et à chaque
+  reconstruction. Il annonçait auparavant une option disparue.
+- `scrollIntoView` appelé seulement s'il existe : son absence ne casse plus la
+  navigation clavier.
+- Panne d'une couche IGN : message de statut explicite, affiché une seule fois,
+  sans masquer ce qui s'affiche déjà.
+
+### Corrigé
+- **Le bloc n'était pas utilisable dans Gutenberg** : `register_block_type()`
+  côté PHP ne suffit pas, il faut un enregistrement côté éditeur. Sans
+  `block.json` ni script d'éditeur, le bloc n'apparaissait pas dans l'outil
+  d'insertion. C'est l'objet de cette correction.
+- Écouteur `click` posé sur `document` à chaque montage sans jamais être
+  retiré : fuite corrigée par `destroy()`.
+
+### Sécurité
+- **Suppression de tout `innerHTML`** sur des données d'API ou d'attributs : le
+  DOM est construit par `createElement`, `textContent` et `setAttribute`. Une
+  suggestion piégée de la Géoplateforme ne peut plus injecter de balise.
+- **Identifiants HTML uniques par instance** : plusieurs composants cohabitent
+  sur une page sans casser `for`, `aria-controls` ni `aria-activedescendant`.
+- Attributs assainis et échappés côté PHP, hauteur de carte validée par
+  expression régulière **des deux côtés** — l'éditeur avertit, le serveur
+  tranche. L'échappement PHP ne remplace pas celui du JavaScript : les deux
+  sont en place.
+
+### Tests
+- **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu PHP** avec
+  doublures WordPress, tous verts. Couvrent désormais l'enregistrement de
+  l'éditeur, la cohérence des attributs, les versions de handles, les
+  dépendances, l'absence de double enfilage et la licence Leaflet.
+
+### Validation en conditions réelles — 19 juillet 2026
+Extension déployée sur la production (0.1.0 → 0.3.0), page de test créée en
+**brouillon non indexé**, 13 contrôles passés :
+
+**Éditeur** — « Cadastre Urbizen » présent dans l'outil d'insertion ; bloc
+inséré ; les cinq réglages modifiables par la barre latérale ; une hauteur
+invalide déclenche bien l'avertissement et n'est pas retenue ; enregistrement
+sans erreur ; après rechargement, **3 blocs sur 3 valides**, aucun message de
+contenu inattendu, attributs conservés à l'identique.
+
+**`post_content`** — uniquement le commentaire de bloc et ses attributs de
+présentation. Aucune coordonnée, aucun code postal, aucune référence
+cadastrale, aucune géométrie.
+
+**Site public** — 3 composants montés, identifiants uniques (`uc-1`, `uc-2`,
+`uc-3`), **aucune ressource en échec**, chaque asset chargé **une seule fois**
+malgré deux blocs et un shortcode sur la même page. Aucune requête vers un CDN
+pour le cadastre.
+
+**Parcours** — autocomplétion IGN sur une adresse publique (3 suggestions) ;
+carte, orthophoto et parcellaire affichés ; parcelle détectée et confirmée,
+cartouche cohérent avec le cadastre ; `sessionStorage` alimenté sous la clé
+préfixée du bloc, 13 champs ; `clearStored()` efface ; clés normalisées avec
+ou sans préfixe.
+
+**Erreurs** — « Aucune adresse trouvée… » sur requête sans résultat,
+« Recherche indisponible… » sur panne réseau **et** sur erreur HTTP 500. La
+page reste fonctionnelle dans les trois cas.
+
+**Mobile** — aucun débordement horizontal, carte et champs à la largeur de
+l'écran, contrôles utilisables.
+
+**Isolation** — la page d'accueil publiée ne charge **aucun** asset cadastre :
+ni Leaflet, ni CSS, ni JavaScript.
+
+**Journal PHP** — aucune entrée liée à `urbizen-platform` ni au cadastre.
+
+Observation sans gravité : une hauteur de carte explicite l'emporte sur la
+règle responsive `@media (max-width: 520px)`. C'est le comportement attendu
+d'un réglage posé par la rédactrice ou le rédacteur, mais il faut le savoir.
+
+---
+
 ## [0.2.2] — 19 juillet 2026
 
 Reproductibilité du backend Python. **Aucune logique métier modifiée.**

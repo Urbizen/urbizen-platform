@@ -1,0 +1,70 @@
+/* ============================================================================
+   editor.css — aperçu statique du bloc cadastre dans l'éditeur.
+
+   Ne s'applique QU'À l'éditeur. Le site public utilise urbizen-cadastre.css.
+   Aucune redéclaration de token dans :root (D-002) : valeurs de repli seulement.
+   ========================================================================== */
+
+.urbizen-cadastre-preview {
+	border: 1px solid var(--u-line, #C9D3DD);
+	border-radius: var(--u-radius, 4px);
+	padding: 16px;
+	background: var(--u-surface, #FBFCFD);
+}
+
+.urbizen-cadastre-preview .uc-label {
+	display: block;
+	font-size: 13px;
+	font-weight: 500;
+	margin-bottom: 6px;
+	color: var(--u-ink, #14233B);
+}
+
+.urbizen-cadastre-preview-input {
+	padding: 13px 14px;
+	border: 1px solid var(--u-line-strong, #9FADBC);
+	border-radius: var(--u-radius, 4px);
+	background: #fff;
+	color: var(--u-ink-faint, #8791A6);
+	font-size: 15px;
+}
+
+.urbizen-cadastre-preview-map {
+	margin-top: 14px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border: 1px dashed var(--u-line-strong, #9FADBC);
+	border-radius: var(--u-radius, 4px);
+	background:
+		linear-gradient(var(--u-grid, #DCE3EA) 1px, transparent 1px) 0 0 / 28px 28px,
+		linear-gradient(90deg, var(--u-grid, #DCE3EA) 1px, transparent 1px) 0 0 / 28px 28px,
+		var(--u-paper, #EAEEF2);
+	color: var(--u-ink-soft, #55617A);
+	font-size: 13px;
+	text-align: center;
+	padding: 12px;
+}
+
+.urbizen-cadastre-preview .uc-continue-row {
+	margin-top: 14px;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+
+.urbizen-cadastre-preview-btn {
+	display: inline-block;
+	padding: 10px 16px;
+	border-radius: var(--u-radius, 4px);
+	background: var(--u-brand, #128A5A);
+	color: #fff;
+	font-size: 14px;
+	opacity: .55; /* inactif : l'aperçu ne réagit pas */
+}
+
+.urbizen-cadastre-preview .uc-continue-hint {
+	font-size: 12px;
+	color: var(--u-ink-faint, #8791A6);
+}

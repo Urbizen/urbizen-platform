@@ -30,10 +30,23 @@ Dernière mise à jour : 19 juillet 2026.
 
 ## Étape 3 — Composant cadastre
 
-- [ ] Auto-hébergement de Leaflet et des polices, fin des appels CDN (RGPD)
-- [ ] Shortcode et bloc `[urbizen_cadastre]`
-- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires
-- [ ] Validation sur une page de test non indexée
+- [x] Auto-hébergement de Leaflet, fin des appels CDN (RGPD) — *19/07/2026*
+- [x] Shortcode `[urbizen_cadastre]` et rendu dynamique commun — *19/07/2026*
+- [x] Bloc Gutenberg `urbizen/cadastre` : `block.json`, `editor.js`,
+      `InspectorControls`, aperçu statique — **validé dans l'éditeur réel**
+      le 19/07/2026 (insertion, édition des 5 réglages, enregistrement,
+      rechargement sans erreur de validation)
+- [x] Source de vérité unique dans l'extension, copies supprimées (D-008) — *19/07/2026*
+- [x] Suppression des `innerHTML` et identifiants uniques par instance — *19/07/2026*
+- [x] Licence Leaflet BSD 2-Clause versionnée, source et empreintes documentées — *19/07/2026*
+- [x] Bancs d'essai **simulés** `tests/cadastre/` : 32 contrôles JS (jsdom),
+      36 contrôles PHP (doublures) — *19/07/2026*
+- [x] **Test WordPress réel** sur page brouillon non indexée — *19/07/2026* :
+      13 contrôles passés, aucune erreur, aucun 404 (voir DEPLOY_CADASTRE.md)
+- [ ] Auto-hébergement des **polices** (Google Fonts encore appelé par le thème)
+- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires (étape 4)
+
+Légende : `[x]` terminé et vérifié · `[~]` écrit, non validé en conditions réelles.
 
 ---
 
@@ -119,7 +132,7 @@ conservant les URL existantes.
 | Mappings Cerfa en `TODO_` | existant | 5 |
 | `POST /api/dp` non authentifié, CORS `*` | existant | 5 |
 | ~~`requirements.txt` et `.env.example` absents~~ | existant | **soldé le 19/07/2026** |
-| Aucun test automatique : `tests/` est vide | existant | 5 |
+| Aucun test du service Python (`tests/cadastre/` existe désormais) | existant | 5 |
 | CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
 | Slug CGV `refund_returns` | héritage WooCommerce | 6 |
 | 393 Mo de médias non optimisés | existant | 6 |
