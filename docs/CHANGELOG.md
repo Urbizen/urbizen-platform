@@ -1,0 +1,62 @@
+# Journal des évolutions
+
+Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/).
+Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
+
+---
+
+## [0.2.0] — 19 juillet 2026
+
+### Ajouté
+- Gabarits FSE du site exportés en fichiers versionnés dans
+  `wordpress/urbizen-child/parts/` : `header.html`, `footer.html`,
+  `footer-landing.html`, `superposition-de-navigation.html`.
+- Styles globaux du site reportés dans `wordpress/urbizen-child/theme.json` :
+  palette de 6 couleurs, styles de base et 5 502 caractères de CSS personnalisé.
+- Documentation permanente du projet : `docs/PROJECT_MASTER_PLAN.md`,
+  `docs/AI_CONTEXT.md`, `docs/DECISIONS.md`, `docs/CHANGELOG.md`, et réécriture
+  de `docs/ROADMAP.md`.
+
+### Modifié
+- Le bloc de navigation de l'en-tête, qui référençait `wp_navigation` ID 15, est
+  désormais **inliné** : le thème enfant ne dépend plus de la base pour son menu.
+- `docs/ROADMAP.md` réaligné sur l'architecture réelle et l'avancement constaté.
+
+### Notes
+- Le CSS personnalisé est repris **tel quel**, règles dupliquées et caractère
+  parasite compris, afin de garantir l'équivalence visuelle. Nettoyage prévu lors
+  de la refonte des pages.
+- Aucune écriture durable en base de données. Aucune page, option ou donnée
+  Fluent Forms modifiée.
+
+---
+
+## [0.1.0] — 19 juillet 2026
+
+### Ajouté
+- Thème enfant `urbizen-child` : `style.css` sans règle, `theme.json` vide,
+  structure `templates/`, `parts/`, `patterns/`, `assets/`, `languages/`.
+- Extension `urbizen-platform` : chargement automatique PSR-4 sans Composer,
+  contrôle d'environnement PHP 8.1 / WordPress 6.5, activation et désactivation
+  sans effet de bord, désinstallation protégée par `URBIZEN_ALLOW_DATA_DELETION`.
+- Bases `Support` : journal sans donnée personnelle, réglages centralisés,
+  références de dossier `URB-AAAA-NNNN`.
+- Arborescence des modules à venir : formulaires, HTTP, fichiers, soumissions,
+  backend, RGPD, courriel, administration, shortcodes, blocs.
+
+### Corrigé
+- Compatibilité avec le thème parent `hostinger-ai-theme`, qui résout ses chemins
+  avec `get_stylesheet_directory()` : pré-définition de ses constantes vers le
+  répertoire parent, et repli automatique des URL d'assets absents du thème
+  enfant. Sans ce correctif, l'activation du thème enfant produirait des 404 sur
+  `style.min.css` et `front-scripts.min.js`.
+
+### Vérifié en production
+- Sauvegardes préalables : base 1,9 Mo pour 86 tables, fichiers 553 Mo pour
+  35 421 fichiers, intégrité contrôlée.
+- Extension activée sans aucune erreur PHP, sans créer de table ni d'option.
+- Les 11 pages publiques répondent en HTTP 200, contenu identique.
+
+### Connu
+- L'activation du thème enfant a été testée puis **annulée** : les gabarits FSE
+  étaient rattachés au thème parent en base. Corrigé en 0.2.0.

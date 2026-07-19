@@ -1,4 +1,66 @@
 {
-	"version": 2,
-	"$schema": "https://schemas.wp.org/trunk/theme.json"
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 3,
+	"settings": {
+		"color": {
+			"palette": {
+				"theme": [
+					{
+						"slug": "color1",
+						"color": "#f9b233",
+						"name": "Color 1 (Section backgrounds)"
+					},
+					{
+						"slug": "color2",
+						"color": "#0B1F3A",
+						"name": "Color 2 (Section backgrounds)"
+					},
+					{
+						"slug": "color3",
+						"color": "#0b1f3a",
+						"name": "Color 3 (Button background)"
+					},
+					{
+						"slug": "light",
+						"color": "#ffffff",
+						"name": "Light (Text on Color 2 and Gradient)"
+					},
+					{
+						"slug": "dark",
+						"color": "#f6f8fb",
+						"name": "Dark (Text on Light and Color 1)"
+					},
+					{
+						"slug": "grey",
+						"color": "#fff9f0",
+						"name": "Grey (Form borders)"
+					}
+				],
+				"custom": [
+					{
+						"color": "#000",
+						"name": "Couleur 1",
+						"slug": "custom-color-1"
+					}
+				]
+			}
+		}
+	},
+	"styles": {
+		"color": {
+			"background": "var(--wp--preset--color--light)",
+			"text": "#1f2937"
+		},
+		"spacing": {
+			"blockGap": "0px"
+		},
+		"elements": {
+			"link": {
+				"color": {
+					"text": "var(--wp--preset--color--color2)"
+				}
+			}
+		},
+		"css": "/* Marge interne du header : bas + droite */\nheader .wp-block-group,\n.wp-block-template-part .wp-block-group {\n  padding-bottom: 10px !important;\n  padding-right: 38px !important;\n}\n\n/* Ombre douce sous le header */\nheader,\n.wp-block-template-part {\n  box-shadow: 0 8px 24px rgba(11, 31, 58, 0.08) !important;\n  position: relative !important;\n  z-index: 10 !important;\n}\n/* Puces rondes Urbizen */\n.urbizen-list-check {\n  list-style: none;\n  padding-left: 0;\n  margin-left: 0;\n}\n\n.urbizen-list-check li {\n  position: relative;\n  padding-left: 34px;\n  margin-bottom: 12px;\n  line-height: 1.5;\n}\n\n.urbizen-list-check li::before {\n  content: \"✓\";\n  position: absolute;\n  left: 0;\n  top: 2px;\n  width: 20px;\n  height: 20px;\n  border-radius: 999px;\n  background: #F9B233;\n  color: #0B1F3A;\n  font-weight: 900;\n  font-size: 13px;\n  line-height: 20px;\n  text-align: center;\n}\n\n/* Puces rondes Urbizen - version forcée */\nul.urbizen-list-check {\n  list-style: none !important;\n  padding-left: 0 !important;\n  margin-left: 0 !important;\n}\n\nul.urbizen-list-check li {\n  position: relative !important;\n  padding-left: 34px !important;\n  margin-bottom: 12px !important;\n  line-height: 1.5 !important;\n}\n\nul.urbizen-list-check li::before {\n  content: \"✓\" !important;\n  position: absolute !important;\n  left: 0 !important;\n  top: 2px !important;\n  width: 20px !important;\n  height: 20px !important;\n  border-radius: 999px !important;\n  background: #F9B233 !important;\n  color: #0B1F3A !important;\n  font-weight: 900 !important;\n  font-size: 13px !important;\n  line-height: 20px !important;\n  text-align: center !important;\n}\n`/* Puces rondes Urbizen - version compacte */\nul.urbizen-list-check {\n  list-style: none !important;\n  padding-left: 0 !important;\n  margin-left: 0 !important;\n}\n\nul.urbizen-list-check li {\n  position: relative !important;\n  padding-left: 40px !important;\n  margin-bottom: 6px !important;\n  line-height: 1.35 !important;\n}\n\nul.urbizen-list-check li::before {\n  content: \"✓\" !important;\n  position: absolute !important;\n  left: 10px !important;\n  top: 1px !important;\n  width: 17px !important;\n  height: 17px !important;\n  border-radius: 999px !important;\n  background: #7BDCB5 !important;\n  color: #0B1F3A !important;\n  font-weight: 900 !important;\n  font-size: 11px !important;\n  line-height: 17px !important;\n  text-align: center !important;\n}\n.urbizen-step-icon {\n  width: 48px !important;\n  height: 48px !important;\n  border-radius: 999px !important;\n  background: #7BDCB5 !important;\n  color: #0B1F3A !important;\n  display: flex !important;\n  align-items: center !important;\n  justify-content: center !important;\n  font-weight: 800 !important;\n  font-size: 17px !important;\n  line-height: 1 !important;\n  margin-bottom: 18px !important;\n}\n/* Section Pourquoi choisir Urbizen */\n@media (min-width: 782px) {\n  .grille-urbizen {\n    position: relative;\n    margin-top: 45px;\n  }\n\n  .grille-urbizen::before {\n    content: \"\";\n    position: absolute;\n    top: -28px;\n    left: 12%;\n    right: 12%;\n    height: 4px;\n    background: #8DE0BF;\n    border-radius: 999px;\n    z-index: 1;\n  }\n\n  .grille-urbizen .carte-urbizen {\n    position: relative;\n    z-index: 2;\n  }\n\n  .grille-urbizen .carte-urbizen::before {\n    content: \"\";\n    position: absolute;\n    top: -28px;\n    left: 50%;\n    transform: translateX(-50%);\n    width: 4px;\n    height: 28px;\n    background: #8DE0BF;\n    border-radius: 999px;\n    z-index: 1;\n  }\n}\n\n@media (max-width: 781px) {\n  .grille-urbizen::before,\n  .grille-urbizen .carte-urbizen::before {\n    display: none;\n  }\n}\n/* Liste Urbizen avec ronds verts reliés */\n.urbizen-timeline-list {\n  list-style: none;\n  padding-left: 0;\n  margin-left: 0;\n  position: relative;\n}\n\n.urbizen-timeline-list li {\n  position: relative;\n  padding-left: 34px;\n  margin-bottom: 14px;\n  color: #334155;\n  font-size: 18px;\n  line-height: 1.45;\n}\n\n/* Ligne verticale */\n.urbizen-timeline-list li::before {\n  content: \"\";\n  position: absolute;\n  left: 8px;\n  top: 21px;\n  width: 3px;\n  height: calc(100% + 14px);\n  background: #002D6B;\n  opacity: 0.65;\n}\n\n/* Rond vert */\n.urbizen-timeline-list li::after {\n  content: \"\";\n  position: absolute;\n  left: 0;\n  top: 6px;\n  width: 18px;\n  height: 18px;\n  background: #002D6B;\n  border-radius: 50%;\n  box-shadow: 0 0 0 2px rgba(123, 220, 181, 0.18);\n}\n\n/* Pas de ligne après le dernier élément */\n.urbizen-timeline-list li:last-child::before {\n  display: none;\n}\n.urbizen-check-blue {\n  list-style: none;\n  padding-left: 0;\n  margin-left: 0;\n}\n\n.urbizen-check-blue li {\n  position: relative;\n  padding-left: 34px;\n  margin-bottom: 13px;\n  color: #334155;\n  font-size: 17px;\n  line-height: 1.55;\n}\n\n.urbizen-check-blue li::before {\n  content: \"✓\";\n  position: absolute;\n  left: 0;\n  top: 2px;\n  width: 22px;\n  height: 22px;\n  border-radius: 50%;\n  background: #002D6B;\n  color: #ffffff;\n  font-size: 14px;\n  font-weight: 900;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n}\n@media screen and (max-width: 900px) {\n  .wp-block-column.mobile-hidden-column,\n  .mobile-hidden-column {\n    display: none !important;\n    visibility: hidden !important;\n    opacity: 0 !important;\n    height: 0 !important;\n    min-height: 0 !important;\n    max-height: 0 !important;\n    width: 0 !important;\n    min-width: 0 !important;\n    max-width: 0 !important;\n    flex-basis: 0 !important;\n    flex-grow: 0 !important;\n    flex-shrink: 0 !important;\n    margin: 0 !important;\n    padding: 0 !important;\n    overflow: hidden !important;\n  }\n}"
+	}
 }

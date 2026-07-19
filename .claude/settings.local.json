@@ -5,7 +5,11 @@
       "Bash(git add *)",
       "Bash(git check-ignore *)",
       "Bash(echo \"leaflet ignoré ? exit=$?\")",
-      "Bash(echo \"exit=$? \\(1 = non ignoré, correct\\)\")"
+      "Bash(echo \"exit=$? \\(1 = non ignoré, correct\\)\")",
+      "Bash(rsync -az --delete -e 'ssh -i /Users/anaisbacarisse/.ssh/urbizen_hostinger -p 65002 -o BatchMode=yes' urbizen-child/ __TRACKED_VAR__/themes/urbizen-child/)",
+      "Bash(rsync -az --delete -e 'ssh -i /Users/anaisbacarisse/.ssh/urbizen_hostinger -p 65002 -o BatchMode=yes' urbizen-platform/ __TRACKED_VAR__/plugins/urbizen-platform/)",
+      "Bash(gh pr create --base main --head feature/wordpress-integration --title 'feat\\(wordpress\\): thème enfant urbizen-child et extension urbizen-platform' --body ' *)",
+      "Bash(python3 *)"
     ]
   }
 }
