@@ -1,0 +1,13 @@
+{
+  "name": "urbizen-tests-cadastre",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bancs d'essai du composant cadastre : rendu PHP et comportement JavaScript.",
+  "type": "module",
+  "scripts": {
+    "test": "node test-cadastre.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^27.0.0"
+  }
+}

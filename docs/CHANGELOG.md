@@ -5,6 +5,52 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.3.0] — 19 juillet 2026
+
+Composant cadastre porté dans l'extension. **Rien n'est déployé en production**
+et la page d'accueil publiée n'est pas modifiée.
+
+### Ajouté
+- `src/Blocks/CadastreBlock.php` : bloc Gutenberg `urbizen/cadastre` et
+  shortcode `[urbizen_cadastre]`, partageant **exactement** le même rendu et le
+  même enfilage. Rendu dynamique côté PHP ; `post_content` ne contient jamais
+  d'adresse ni de parcelle.
+- `assets/vendor/leaflet/` : Leaflet 1.9.4 embarqué (JS, CSS, images). Plus
+  aucun appel à `unpkg.com`.
+- `UrbizenCadastre.autoMount()` : montage automatique des conteneurs
+  `[data-urbizen-cadastre]`, idempotent, options lues sur des `data-*`.
+- `UrbizenCadastre.clearStored()` : effacement explicite des données de
+  localisation conservées dans l'onglet.
+- Repli `<noscript>` : le composant ne laisse jamais un conteneur muet.
+- `tests/cadastre/` : deux bancs d'essai — comportement JavaScript sous jsdom
+  (16 contrôles) et rendu PHP avec doublures WordPress (15 contrôles). Le
+  répertoire `tests/` n'était pas utilisé jusqu'ici.
+- `docs/AI_CONTEXT.md` : section sur les services publics externes, leurs points
+  d'entrée et leurs limites.
+
+### Modifié
+- **Source de vérité unique** (D-008) : `urbizen-cadastre.js` et
+  `urbizen-cadastre.css` vivent désormais dans l'extension. Les copies de
+  `frontend/assets/` sont supprimées et le prototype de la page d'accueil
+  référence les fichiers canoniques par chemin relatif.
+- Le CSS porte une valeur de repli sur chacun de ses 64 `var(--u-*)` : le
+  composant reste correct sans les tokens du thème, sans jamais les redéclarer
+  dans `:root`.
+- Messages d'erreur rendus plus explicites : « vérifiez votre connexion »,
+  « vérifiez l'orthographe ou précisez la commune ».
+
+### Sécurité
+- **Suppression de tout `innerHTML`** sur des données d'API ou d'attributs : le
+  DOM est construit par `createElement`, `textContent` et `setAttribute`. Une
+  suggestion piégée de la Géoplateforme ne peut plus injecter de balise.
+- **Identifiants HTML uniques par instance** : plusieurs composants cohabitent
+  sur une page sans casser `for`, `aria-controls` ni `aria-activedescendant`.
+- Attributs assainis et échappés côté PHP, hauteur de carte validée par
+  expression régulière. L'échappement PHP ne remplace pas celui du JavaScript :
+  les deux sont en place.
+
+---
+
 ## [0.2.2] — 19 juillet 2026
 
 Reproductibilité du backend Python. **Aucune logique métier modifiée.**

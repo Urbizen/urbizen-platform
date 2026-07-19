@@ -15,9 +15,10 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 | Élément | Valeur |
 |---|---|
-| Branche courante | `fix/backend-reproductibilite` |
-| Pull Request courante | ouverte vers `main`, **en attente de revue** |
-| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) **fusionnée** — merge `5989ba9` |
+| Branche courante | `feature/cadastre-block` |
+| Pull Request courante | ouverte vers `main`, **en attente de revue — ne pas merger** |
+| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) fusionnée — merge `5989ba9` |
+| Reproductibilité backend | PR [#5](https://github.com/Urbizen/urbizen-platform/pull/5) fusionnée — merge `8214ae6` |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
 
 ### Où en est le projet
@@ -26,9 +27,10 @@ L'étape 1 de l'intégration WordPress est **terminée, fusionnée dans `main` e
 production**. Le socle est posé — thème enfant et extension — mais il ne porte
 encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
 
-La branche en cours ne touche qu'à la **reproductibilité du backend Python** :
-dépendances, configuration et documentation de lancement. Aucune logique métier
-n'est modifiée, aucune ligne de production n'est touchée.
+La branche en cours porte le **composant cadastre** dans l'extension : bloc
+Gutenberg, shortcode, Leaflet embarqué, source de vérité unique. Le code est
+écrit et testé hors ligne, mais **rien n'est déployé** : la production tourne
+toujours sur `urbizen-platform` 0.1.0 sans module cadastre.
 
 ### Ce qui a été fait
 
@@ -44,6 +46,10 @@ n'est modifiée, aucune ligne de production n'est touchée.
   est public**, compte et adresse ne doivent jamais y figurer.
 - Reproductibilité du backend soldée : `requirements.txt`, `.env.example` et
   documentation de lancement local corrigée.
+- Composant cadastre porté dans l'extension : bloc `urbizen/cadastre` et
+  shortcode `[urbizen_cadastre]` au rendu commun, Leaflet 1.9.4 embarqué,
+  `innerHTML` supprimés, identifiants uniques par instance, `clearStored()`.
+- Premiers tests automatiques du projet : `tests/cadastre/`.
 
 ### État vérifié de la production
 
@@ -71,17 +77,28 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
   `POST /api/dp` sans champ → 400 avec la liste des champs manquants.
 - Aucun secret dans les fichiers ajoutés : `.env.example` ne contient que des
   noms de variables et des exemples fictifs.
+- Cadastre : 12 fichiers PHP au lint sans erreur ; syntaxe JS validée
+  (`node --check`) ; 16 contrôles JavaScript sous jsdom et 15 contrôles de
+  rendu PHP, tous verts ; aucune référence CDN dans les assets ; images
+  référencées par `leaflet.css` toutes présentes.
 
 ### Prochaine étape
 
-Composant cadastre : Leaflet embarqué localement dans l'extension, puis bloc
-Gutenberg `CadastreBlock` réutilisant `frontend/assets/js/urbizen-cadastre.js`.
-Cette étape n'a **pas** été démarrée.
+**Revue de la PR du cadastre**, puis validation en conditions réelles : déployer
+l'extension, poser le bloc sur une **page en brouillon non indexée**, et
+contrôler sur ordinateur et mobile l'autocomplétion, la carte, la sélection et
+la confirmation de parcelle. Rien de tout cela n'a encore été fait en
+production.
+
+Restent ouverts sur le composant : l'interface d'édition du bloc dans Gutenberg
+(les attributs se règlent aujourd'hui par shortcode ou par code) et
+l'auto-hébergement des polices, encore chargées depuis Google Fonts par le
+thème.
 
 ### Interdictions
 
-1. **Ne pas commencer le composant cadastre** tant que le socle — thème enfant et
-   extension fusionnés dans `main` — n'a pas été validé.
+1. **Ne pas déployer le composant cadastre** en production avant revue de la PR
+   et validation sur une page en brouillon non indexée.
 2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
 3. Ne jamais pousser directement sur `main`.
 4. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle

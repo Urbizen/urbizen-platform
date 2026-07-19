@@ -30,10 +30,16 @@ Dernière mise à jour : 19 juillet 2026.
 
 ## Étape 3 — Composant cadastre
 
-- [ ] Auto-hébergement de Leaflet et des polices, fin des appels CDN (RGPD)
-- [ ] Shortcode et bloc `[urbizen_cadastre]`
-- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires
-- [ ] Validation sur une page de test non indexée
+- [x] Auto-hébergement de Leaflet, fin des appels CDN (RGPD) — *19/07/2026*
+- [x] Shortcode `[urbizen_cadastre]` et bloc `urbizen/cadastre`, rendu commun — *19/07/2026*
+- [x] Source de vérité unique dans l'extension, copies supprimées (D-008) — *19/07/2026*
+- [x] Suppression des `innerHTML` et identifiants uniques par instance — *19/07/2026*
+- [x] Bancs d'essai `tests/cadastre/` : 16 contrôles JS, 15 contrôles PHP — *19/07/2026*
+- [ ] Auto-hébergement des **polices** (Google Fonts encore appelé par le thème)
+- [ ] Validation sur une page de test non indexée, en conditions réelles
+- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires (étape 4)
+- [ ] Interface d'édition du bloc (`edit.js`) : aujourd'hui les attributs se
+      règlent par le shortcode ou le code, pas encore dans l'éditeur
 
 ---
 
