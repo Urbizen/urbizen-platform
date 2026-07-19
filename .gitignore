@@ -42,3 +42,6 @@ wordpress/urbizen-platform/vendor/
 backups/
 !wordpress/urbizen-platform/assets/vendor/
 !wordpress/urbizen-platform/assets/vendor/**
+
+# Reglages locaux de l outillage (machine de developpement)
+.claude/settings.local.json
