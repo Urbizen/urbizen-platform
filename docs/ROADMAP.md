@@ -57,6 +57,9 @@ Dernière mise à jour : 19 juillet 2026.
 - [ ] Authentification de `POST /api/dp` et CORS restreint côté Python
 - [ ] Complétion des mappings Cerfa, aujourd'hui tous en `TODO_`
 - [ ] `requirements.txt` et `.env.example`, absents du dépôt
+- [ ] Normalisation de la génération des PDF selon la convention
+      `URB-AAAA-NNNN_type-document_version.ext`
+- [ ] Documentation du lancement local du service Python
 
 ---
 
