@@ -324,7 +324,44 @@
     #dp-app .dp-seg { display: flex; width: 100%; }
     #dp-app .dp-seg label { flex: 1 1 0; text-align: center; padding-left: 10px; padding-right: 10px; }
   }
+  /* -- Cadastre / carte -- */
+  #dp-app .dp-locate {
+    margin-top: 10px; align-self: flex-start;
+    font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 13.5px;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: var(--radius); cursor: pointer;
+    background: var(--surface); color: var(--ink); border: 1px solid var(--cadastre);
+  }
+  #dp-app .dp-locate::before { content: "\1F4CD"; }
+  #dp-app .dp-locate:hover { background: var(--cadastre-sf); }
+  #dp-app .dp-locate.loading { opacity: .6; pointer-events: none; }
+  #dp-app .dp-map-wrap { margin-top: 12px; }
+  #dp-app .dp-map-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+  #dp-app .dp-map-hint { font-size: 12.5px; color: var(--ink-soft); }
+  #dp-app .dp-map-toggle {
+    font-size: 12px; font-family:"IBM Plex Mono",monospace; cursor:pointer;
+    border:1px solid var(--line-strong); background:var(--surface); color:var(--ink);
+    border-radius: var(--radius); padding: 5px 10px; white-space: nowrap;
+  }
+  #dp-app #cad-map { height: 360px; border:1px solid var(--line-strong); border-radius: var(--radius); z-index:0; }
+  #dp-app .dp-parcel {
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+    margin-top: 10px; padding: 12px 14px; border-radius: var(--radius);
+    background: var(--cadastre-sf); border: 1px solid var(--cadastre);
+  }
+  #dp-app .dp-parcel-info { font-size: 14px; color: var(--ink); }
+  #dp-app .dp-parcel-info b { font-family:"IBM Plex Mono",monospace; }
+  #dp-app .dp-parcel-ok {
+    font-family:"Space Grotesk",sans-serif; font-weight:500; font-size:13.5px; cursor:pointer;
+    background: var(--cadastre); color:#fff; border:none; border-radius:var(--radius); padding: 9px 16px;
+  }
+  #dp-app .dp-parcel-ok:hover { background: var(--cadastre-dk); }
+  #dp-app .dp-parcel.confirmed { background:#E7F3EC; }
+  #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
+  #dp-app .leaflet-container { font: inherit; }
 </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 <div id="dp-app">
@@ -416,7 +453,23 @@
                 <span class="dp-note">Surface de la parcelle, pas de la construction.</span>
               </div>
             </div>
-          </section>
+                        <div class="dp-field col-2">
+                <label>Situer votre parcelle</label>
+                <span class="dp-note">Repérez votre terrain sur le plan : je récupère automatiquement la référence cadastrale et la surface.</span>
+                <button type="button" class="dp-locate" id="cad-locate">Localiser ma parcelle</button>
+                <div class="dp-map-wrap" id="cad-wrap" hidden>
+                  <div class="dp-map-tools">
+                    <span class="dp-map-hint" id="cad-hint">Cliquez sur votre parcelle pour la sélectionner.</span>
+                    <button type="button" class="dp-map-toggle" id="cad-toggle">Vue plan</button>
+                  </div>
+                  <div id="cad-map"></div>
+                  <div class="dp-parcel" id="cad-parcel" hidden>
+                    <div class="dp-parcel-info"><span id="cad-ref">&mdash;</span></div>
+                    <button type="button" class="dp-parcel-ok" id="cad-confirm">&#10003; C&rsquo;est bien ma parcelle</button>
+                  </div>
+                </div>
+              </div>
+</section>
 
           <!-- 3 — Projet -->
           <section class="dp-step" data-step="2">
@@ -737,6 +790,92 @@
 
   refreshConditionals();
   render();
+})();
+</script>
+<script>
+(function () {
+  "use strict";
+  var GEOPF = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}";
+  function tile(layer, fmt){ return GEOPF + "&LAYER=" + layer + "&FORMAT=" + fmt; }
+  var $ = function(id){ return document.getElementById(id); };
+  var locateBtn = $("cad-locate");
+  if (!locateBtn || typeof L === "undefined") return;
+  var wrap = $("cad-wrap"), hint = $("cad-hint"), toggleBtn = $("cad-toggle"),
+      parcelPanel = $("cad-parcel"), refEl = $("cad-ref"), confirmBtn = $("cad-confirm");
+  var map = null, ortho, plan, cadastre, selLayer = null, marker = null, baseOrtho = true, current = null;
+
+  function fieldVal(id){ var e = $(id); return e ? e.value.trim() : ""; }
+  function buildQuery(){ return [fieldVal("t_adr"), fieldVal("t_cp"), fieldVal("t_ville")].filter(Boolean).join(" "); }
+
+  function initMap(lon, lat){
+    map = L.map("cad-map").setView([lat, lon], 18);
+    ortho = L.tileLayer(tile("ORTHOIMAGERY.ORTHOPHOTOS","image/jpeg"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" }).addTo(map);
+    plan  = L.tileLayer(tile("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2","image/png"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" });
+    cadastre = L.tileLayer(tile("CADASTRALPARCELS.PARCELLAIRE_EXPRESS","image/png"), { maxZoom: 20, opacity: 0.9 }).addTo(map);
+    map.on("click", function(e){ queryParcel(e.latlng.lng, e.latlng.lat); });
+  }
+  function setBase(on){
+    baseOrtho = on;
+    if (on){ map.addLayer(ortho); map.removeLayer(plan); toggleBtn.textContent = "Vue plan"; }
+    else { map.addLayer(plan); map.removeLayer(ortho); toggleBtn.textContent = "Vue photo"; }
+    if (cadastre) cadastre.bringToFront();
+  }
+  function geocodeAndLocate(){
+    if (!fieldVal("t_adr") || !fieldVal("t_ville")) { wrap.hidden = false; hint.textContent = "Renseignez d\u2019abord l\u2019adresse et la commune ci-dessus."; return; }
+    locateBtn.classList.add("loading");
+    fetch("https://api-adresse.data.gouv.fr/search/?limit=1&q=" + encodeURIComponent(buildQuery()))
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        locateBtn.classList.remove("loading");
+        wrap.hidden = false;
+        if (!d.features || !d.features.length) {
+          hint.textContent = "Adresse introuvable \u2014 cliquez directement sur votre parcelle.";
+          if (!map) initMap(1.7, 46.8);
+          setTimeout(function(){ map.invalidateSize(); }, 60); return;
+        }
+        var c = d.features[0].geometry.coordinates;
+        if (!map) initMap(c[0], c[1]); else map.setView([c[1], c[0]], 18);
+        setTimeout(function(){ map.invalidateSize(); }, 60);
+        if (marker) map.removeLayer(marker);
+        marker = L.circleMarker([c[1], c[0]], { radius: 7, color: "#14233B", weight: 2, fillColor: "#54CF99", fillOpacity: 1 }).addTo(map);
+        queryParcel(c[0], c[1]);
+      })
+      .catch(function(){ locateBtn.classList.remove("loading"); wrap.hidden = false; hint.textContent = "La localisation a \u00E9chou\u00E9. Cliquez sur votre parcelle."; });
+  }
+  function queryParcel(lon, lat){
+    var geom = encodeURIComponent(JSON.stringify({ type: "Point", coordinates: [lon, lat] }));
+    fetch("https://apicarto.ign.fr/api/cadastre/parcelle?source_ign=PCI&geom=" + geom)
+      .then(function(r){ return r.json(); })
+      .then(function(fc){
+        if (!fc.features || !fc.features.length) { hint.textContent = "Aucune parcelle ici \u2014 zoomez et cliquez sur votre terrain."; return; }
+        showParcel(fc.features[0]);
+      })
+      .catch(function(){ hint.textContent = "Lecture de la parcelle impossible. R\u00E9essayez."; });
+  }
+  function showParcel(f){
+    current = f.properties;
+    if (selLayer) map.removeLayer(selLayer);
+    selLayer = L.geoJSON(f, { style: { color: "#128A5A", weight: 2, fillColor: "#54CF99", fillOpacity: 0.25 } }).addTo(map);
+    try { map.fitBounds(selLayer.getBounds(), { maxZoom: 19, padding: [20, 20] }); } catch (e) {}
+    var p = f.properties, sec = p.section || "", num = p.numero || "", cont = p.contenance || "";
+    refEl.innerHTML = "Section <b>" + sec + "</b> \u00B7 parcelle <b>n\u00B0" + num + "</b>" + (cont ? " \u00B7 <b>" + cont + " m\u00B2</b>" : "");
+    parcelPanel.hidden = false; parcelPanel.classList.remove("confirmed");
+    confirmBtn.innerHTML = "\u2713 C\u2019est bien ma parcelle";
+    hint.textContent = "Ce n\u2019est pas la bonne ? Cliquez sur une autre parcelle.";
+  }
+  function setField(id, v){ var e = $(id); if (e && v != null && v !== "") { e.value = v; e.style.borderColor = "var(--cadastre)"; } }
+
+  locateBtn.addEventListener("click", geocodeAndLocate);
+  toggleBtn.addEventListener("click", function(){ setBase(!baseOrtho); });
+  confirmBtn.addEventListener("click", function(){
+    if (!current) return;
+    setField("t_sec", current.section || "");
+    setField("t_num", current.numero || "");
+    if (current.contenance) setField("t_sup", current.contenance);
+    parcelPanel.classList.add("confirmed");
+    refEl.innerHTML = "\u2713 Parcelle confirm\u00E9e \u2014 Section <b>" + (current.section || "") + "</b> n\u00B0<b>" + (current.numero || "") + "</b>";
+    confirmBtn.innerHTML = "Confirm\u00E9e";
+  });
 })();
 </script>
 </body>
