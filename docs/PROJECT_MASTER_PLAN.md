@@ -68,9 +68,10 @@ Responsabilités : rendu, gabarits, patterns, styles.
 **Interdits : logique métier, requête SQL, appel réseau, traitement de données
 personnelles.**
 
-Contient deux correctifs de compatibilité indispensables, décrits en détail dans
-[AI_CONTEXT.md](AI_CONTEXT.md) : résolution des chemins du thème parent, et
-gabarits FSE exportés en fichiers.
+Contient trois correctifs de compatibilité indispensables, décrits en détail dans
+[AI_CONTEXT.md](AI_CONTEXT.md) : résolution des chemins du thème parent, gabarits
+FSE exportés en fichiers, et réapplication de la palette et de la police des
+titres que le thème parent écrase en priorité 999.
 
 ### 3.2 Extension `urbizen-platform`
 
@@ -117,8 +118,8 @@ Site : <https://urbizen.fr> — WordPress 7.0.2, PHP 8.3, WP-CLI 2.12.
 
 | Élément | État au 19/07/2026 |
 |---|---|
-| Thème actif | `hostinger-ai-theme` 2.0.18 |
-| `urbizen-child` | déployé, **activation en cours de validation** |
+| Thème actif | **`urbizen-child` 0.1.0** (parent `hostinger-ai-theme` 2.0.18) |
+| `urbizen-child` | déployé et **actif**, rendu pixel-identique à la référence |
 | `urbizen-platform` | déployé et **actif** (0.1.0, sans module) |
 | Fluent Forms | actif, **conservé** jusqu'à migration complète |
 | Fluent SMTP | actif, **conservé** |
@@ -134,8 +135,8 @@ Détail complet de l'installation, des extensions et des pièges : voir
 | Étape | Contenu | État |
 |---|---|---|
 | 1 | Thème enfant nu + extension nue | ✅ terminée |
-| 2 | Gabarits FSE en fichiers versionnés + documentation permanente | 🔄 en cours |
-| 3 | Composant cadastre en shortcode | à venir |
+| 2 | Gabarits FSE en fichiers versionnés + documentation permanente | ✅ terminée |
+| 3 | Composant cadastre en shortcode | 🔜 prochaine |
 | 4 | Moteur de formulaires + formulaire de contact | à venir |
 | 5 | Formulaires DP et PCMI + pièces jointes + backend Python | à venir |
 | 6 | Refonte des pages dans l'univers Urbizen | à venir |

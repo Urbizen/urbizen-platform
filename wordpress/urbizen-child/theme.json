@@ -3,47 +3,43 @@
 	"version": 3,
 	"settings": {
 		"color": {
-			"palette": {
-				"theme": [
-					{
-						"slug": "color1",
-						"color": "#f9b233",
-						"name": "Color 1 (Section backgrounds)"
-					},
-					{
-						"slug": "color2",
-						"color": "#0B1F3A",
-						"name": "Color 2 (Section backgrounds)"
-					},
-					{
-						"slug": "color3",
-						"color": "#0b1f3a",
-						"name": "Color 3 (Button background)"
-					},
-					{
-						"slug": "light",
-						"color": "#ffffff",
-						"name": "Light (Text on Color 2 and Gradient)"
-					},
-					{
-						"slug": "dark",
-						"color": "#f6f8fb",
-						"name": "Dark (Text on Light and Color 1)"
-					},
-					{
-						"slug": "grey",
-						"color": "#fff9f0",
-						"name": "Grey (Form borders)"
-					}
-				],
-				"custom": [
-					{
-						"color": "#000",
-						"name": "Couleur 1",
-						"slug": "custom-color-1"
-					}
-				]
-			}
+			"palette": [
+				{
+					"slug": "color1",
+					"color": "#f9b233",
+					"name": "Color 1 (Section backgrounds)"
+				},
+				{
+					"slug": "color2",
+					"color": "#0B1F3A",
+					"name": "Color 2 (Section backgrounds)"
+				},
+				{
+					"slug": "color3",
+					"color": "#0b1f3a",
+					"name": "Color 3 (Button background)"
+				},
+				{
+					"slug": "light",
+					"color": "#ffffff",
+					"name": "Light (Text on Color 2 and Gradient)"
+				},
+				{
+					"slug": "dark",
+					"color": "#f6f8fb",
+					"name": "Dark (Text on Light and Color 1)"
+				},
+				{
+					"slug": "grey",
+					"color": "#fff9f0",
+					"name": "Grey (Form borders)"
+				},
+				{
+					"color": "#000",
+					"name": "Couleur 1",
+					"slug": "custom-color-1"
+				}
+			]
 		}
 	},
 	"styles": {
@@ -58,6 +54,11 @@
 			"link": {
 				"color": {
 					"text": "var(--wp--preset--color--color2)"
+				}
+			},
+			"heading": {
+				"typography": {
+					"fontFamily": "Poppins, sans-serif"
 				}
 			}
 		},

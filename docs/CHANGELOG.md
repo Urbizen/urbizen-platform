@@ -7,6 +7,12 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ## [0.2.0] — 19 juillet 2026
 
+### Corrigé
+- Nouveau correctif de compatibilité `urbizen_child_restore_theme_json()` :
+  le thème parent écrasait, en priorité 999, la palette de couleurs et la police
+  des titres. Le thème enfant les réapplique en priorité 1000, en les relisant
+  depuis son propre `theme.json`.
+
 ### Ajouté
 - Gabarits FSE du site exportés en fichiers versionnés dans
   `wordpress/urbizen-child/parts/` : `header.html`, `footer.html`,
@@ -22,12 +28,25 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
   désormais **inliné** : le thème enfant ne dépend plus de la base pour son menu.
 - `docs/ROADMAP.md` réaligné sur l'architecture réelle et l'avancement constaté.
 
+### Vérifié en production
+- Thème enfant **activé**, les 11 pages publiques en HTTP 200 et texte visible
+  identique à la référence.
+- Captures ordinateur (1440 px) et mobile (390 px) de l'accueil et de la page
+  Contact : **pixel-identiques** à la référence, empreintes SHA-256 égales.
+- 56 ressources contrôlées (CSS, JavaScript, images, polices) : **aucun 404**.
+- En-tête, navigation, menu mobile et pied de page conservés, aucun gabarit par
+  défaut du parent réapparu.
+- Aucune erreur PHP, aucune erreur JavaScript de page.
+- Options Hostinger intactes, aucune table créée, aucune écriture durable en
+  base de données.
+
 ### Notes
 - Le CSS personnalisé est repris **tel quel**, règles dupliquées et caractère
   parasite compris, afin de garantir l'équivalence visuelle. Nettoyage prévu lors
   de la refonte des pages.
-- Aucune écriture durable en base de données. Aucune page, option ou donnée
-  Fluent Forms modifiée.
+- Le débordement horizontal de l'accueil sur mobile est **préexistant** : il est
+  présent à l'identique avant et après activation, et sera traité à la refonte.
+- Aucune page, option ou donnée Fluent Forms modifiée.
 
 ---
 

@@ -79,6 +79,68 @@ add_filter( 'style_loader_src', 'urbizen_child_resolve_parent_asset', 10, 1 );
 add_filter( 'script_loader_src', 'urbizen_child_resolve_parent_asset', 10, 1 );
 
 /**
+ * Compatibilité 3/3 — palette de couleurs et police des titres.
+ *
+ * Le thème parent accroche `WebsiteBuilder::update_theme_json` au filtre
+ * `wp_theme_json_data_theme` en priorité 999. Il y écrase deux choses :
+ *
+ * 1. `settings.color`, remplacé par une palette lue dans l'option Hostinger
+ *    `hostinger_ai_colors` ;
+ * 2. `styles.elements.heading.typography.fontFamily`, recalculé par
+ *    `Fonts::get_main_font()`. Sous thème enfant, cette méthode ne retrouve pas
+ *    les familles de polices et retombe sur `system-ui` : les titres perdent
+ *    Poppins.
+ *
+ * Sous le thème parent, les styles globaux « utilisateur » enregistrés en base
+ * reprenaient la main sur la couleur. Ces styles étant rattachés au thème
+ * parent, ils ne suivent pas le thème enfant : sans ce filtre, le site repasse
+ * sur la palette sombre de Hostinger, fonds noirs et textes illisibles.
+ *
+ * On réapplique donc les deux réglages après le parent, en priorité 1000. La
+ * source de vérité reste le theme.json de l'enfant : aucune valeur n'est
+ * dupliquée ici, tout est lu depuis le fichier versionné.
+ *
+ * @param \WP_Theme_JSON_Data $theme_json Données theme.json du thème.
+ * @return \WP_Theme_JSON_Data
+ */
+function urbizen_child_restore_theme_json( $theme_json ) {
+	static $overrides = null;
+
+	if ( null === $overrides ) {
+		$data = wp_json_file_decode(
+			get_stylesheet_directory() . '/theme.json',
+			array( 'associative' => true )
+		);
+
+		$palette      = $data['settings']['color']['palette'] ?? array();
+		$heading_font = $data['styles']['elements']['heading']['typography']['fontFamily'] ?? '';
+
+		$overrides = array( 'version' => 3 );
+
+		if ( ! empty( $palette ) ) {
+			$overrides['settings'] = array( 'color' => array( 'palette' => $palette ) );
+		}
+
+		if ( '' !== $heading_font ) {
+			$overrides['styles'] = array(
+				'elements' => array(
+					'heading' => array(
+						'typography' => array( 'fontFamily' => $heading_font ),
+					),
+				),
+			);
+		}
+	}
+
+	if ( count( $overrides ) < 2 || ! is_object( $theme_json ) || ! method_exists( $theme_json, 'update_with' ) ) {
+		return $theme_json;
+	}
+
+	return $theme_json->update_with( $overrides );
+}
+add_filter( 'wp_theme_json_data_theme', 'urbizen_child_restore_theme_json', 1000 );
+
+/**
  * Charge la feuille de style du thème enfant.
  *
  * Elle dépend du handle du parent afin d'être toujours chargée après lui.

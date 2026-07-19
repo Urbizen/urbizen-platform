@@ -111,7 +111,37 @@ Le bloc `wp:site-logo` reste dépendant de l'option `site_logo` : c'est de
 l'identité de site, donc une donnée d'exploitation, pas de la configuration
 technique.
 
-### 4.4 Le CSS personnalisé repris est imparfait
+### 4.4 Le thème parent écrase la palette et la police des titres
+
+`includes/Builder/WebsiteBuilder.php` accroche `update_theme_json` au filtre
+`wp_theme_json_data_theme` en **priorité 999** et y remplace :
+
+- `settings.color`, par une palette lue dans l'option `hostinger_ai_colors` ;
+- `styles.elements.heading.typography.fontFamily`, recalculé par
+  `Fonts::get_main_font()`, qui sous thème enfant ne retrouve pas les familles
+  de polices et retombe sur `system-ui`.
+
+Sous le thème parent, les styles globaux **utilisateur** en base reprenaient la
+main sur les couleurs. Rattachés au thème parent, ils ne suivent pas le thème
+enfant. Sans correctif, le site repassait sur la palette sombre de Hostinger
+(`color2` valant `#2C2A29`) : fonds noirs, textes illisibles, boutons verts sur
+vert — constaté en production, puis annulé en moins d'une minute.
+
+Corrigé par `urbizen_child_restore_theme_json()` dans le `functions.php` de
+l'enfant, accroché au même filtre en **priorité 1000**. Il relit la palette et
+la police des titres depuis le `theme.json` de l'enfant : source unique de
+vérité, aucune valeur dupliquée dans le PHP.
+
+Deux pièges annexes vérifiés :
+- dans `theme.json`, `settings.color.palette` doit être un **tableau**. La forme
+  `{"theme": [...], "custom": [...]}` provient des styles globaux utilisateur et
+  est silencieusement ignorée ;
+- WordPress normalise les identifiants de palette en kebab-case : le slug
+  `color1` devient la variable `--wp--preset--color--color-1`.
+
+**Ne pas retirer ce correctif.**
+
+### 4.5 Le CSS personnalisé repris est imparfait
 
 Les 5 502 caractères de `styles.css` du `theme.json` contiennent des règles
 dupliquées et un caractère parasite, hérités de l'éditeur. Ils ont été repris

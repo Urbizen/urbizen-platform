@@ -17,14 +17,14 @@ Dernière mise à jour : 19 juillet 2026.
 
 ---
 
-## Étape 2 — Gabarits et mémoire du projet 🔄 en cours
+## Étape 2 — Gabarits et mémoire du projet ✅ terminée
 
 - [x] Export des gabarits FSE en fichiers versionnés
 - [x] Report des styles globaux dans `theme.json`
 - [x] Suppression de la dépendance à `wp_navigation` ID 15
 - [x] Documentation permanente en cinq documents
-- [ ] Activation du thème enfant validée par le protocole complet, captures
-      d'écran ordinateur et mobile comprises
+- [x] Activation du thème enfant validée par le protocole complet, captures
+      d'écran ordinateur et mobile pixel-identiques
 
 ---
 

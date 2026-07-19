@@ -119,6 +119,12 @@ d'exploitation sont sauvegardés séparément.*
   reprises automatiquement : elles devront être réexportées vers le dépôt.
 - Le CSS personnalisé est repris tel quel, imperfections comprises, pour garantir
   l'équivalence visuelle. Nettoyage différé à la refonte des pages.
+- Le thème parent écrasant la palette et la police des titres par un filtre en
+  priorité 999, le thème enfant les réapplique en priorité 1000 en les relisant
+  depuis son propre `theme.json` : la configuration reste dans Git, jamais
+  dupliquée dans le PHP ni figée en base.
+- Résultat vérifié en production : rendu **pixel-identique** à la référence sur
+  ordinateur et sur mobile.
 
 ---
 
