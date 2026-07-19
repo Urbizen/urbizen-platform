@@ -64,8 +64,10 @@ Fluent SMTP, All in One SEO, LiteSpeed Cache, Kadence Blocks, Google Site Kit,
 MonsterInsights, plus les extensions Hostinger. WooCommerce est **inactif** mais
 ses 4 pages boutique sont publiées.
 
-**Extension Urbizen** : `urbizen-platform` 0.1.0, **active**, sans aucun module
-chargé — ni table, ni option, ni route REST, ni formulaire.
+**Extension Urbizen** : `urbizen-platform` **0.4.0**, **active**, avec le module
+cadastre et le formulaire de localisation. Toujours **ni table, ni option, ni
+route REST** : la validation du formulaire est locale, rien n'est transmis à un
+serveur en 0.4.0.
 
 **Aucune extension de sécurité applicative** : la protection est assurée par
 Imunify360 côté hébergeur. Un seul compte administrateur.

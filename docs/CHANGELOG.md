@@ -7,9 +7,13 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ## [0.4.0] — 19 juillet 2026
 
-Connexion du composant cadastre au futur formulaire Urbizen. **Rien n'est
-déployé** : la production reste en 0.3.0. Aucune requête réseau n'est émise par
-cette version — la validation est entièrement locale.
+Connexion du composant cadastre au premier formulaire Urbizen. Aucune requête
+réseau n'est émise par cette version — la validation est entièrement locale.
+
+> **Fusionnée par la PR [#7](https://github.com/Urbizen/urbizen-platform/pull/7)**
+> — merge `90191f0` — et **déployée en production** le 20 juillet 2026, après
+> validation en conditions réelles sur la page brouillon 1157. Le contenu de la
+> production est identique à `main`, fichier par fichier.
 
 ### Ajouté
 - **Contrat de données canonique 1.0** (D-009) : structure imbriquée et
