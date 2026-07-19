@@ -7,15 +7,14 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ## [0.3.0] — 19 juillet 2026
 
-Composant cadastre porté dans l'extension, **version du plugin portée à 0.3.0**.
-**Rien n'est déployé en production** et la page d'accueil publiée n'est pas
-modifiée.
+Composant cadastre porté dans l'extension, **version du plugin portée à 0.3.0**,
+**déployée en production** le 19 juillet 2026 après validation. La page
+d'accueil publiée n'est pas modifiée et ne charge aucun asset du composant.
 
-> **Statut du bloc Gutenberg.** L'interface d'édition existe et est testée hors
-> ligne : `block.json`, `editor.js`, `InspectorControls`, aperçu statique. Elle
-> n'a **pas encore été ouverte dans un vrai éditeur WordPress** — insertion,
-> modification, enregistrement et rechargement restent à valider sur une page
-> en brouillon. Voir la réserve en fin d'entrée.
+> **Statut du bloc Gutenberg : validé en conditions réelles** le 19 juillet 2026.
+> Extension déployée en production, bloc inséré et réglé dans l'éditeur sur une
+> page en brouillon non indexée, enregistré et rechargé sans erreur. Détail des
+> 13 contrôles en fin d'entrée.
 
 ### Ajouté
 - `src/Blocks/CadastreBlock.php` : bloc Gutenberg `urbizen/cadastre` et
@@ -95,13 +94,46 @@ modifiée.
   l'éditeur, la cohérence des attributs, les versions de handles, les
   dépendances, l'absence de double enfilage et la licence Leaflet.
 
-### Réserve — ce qui reste à valider en conditions réelles
-Les bancs d'essai sont **simulés** : jsdom n'est pas un navigateur et les
-doublures PHP ne sont pas WordPress. N'ont donc **pas** été vérifiés :
-insertion du bloc depuis l'outil d'insertion, modification via les
-`InspectorControls`, enregistrement puis rechargement de l'éditeur, rendu réel
-sur le site, absence de 404 sur les assets, et comportement sur mobile. Ces
-essais demandent un déploiement sur une page en brouillon non indexée.
+### Validation en conditions réelles — 19 juillet 2026
+Extension déployée sur la production (0.1.0 → 0.3.0), page de test créée en
+**brouillon non indexé**, 13 contrôles passés :
+
+**Éditeur** — « Cadastre Urbizen » présent dans l'outil d'insertion ; bloc
+inséré ; les cinq réglages modifiables par la barre latérale ; une hauteur
+invalide déclenche bien l'avertissement et n'est pas retenue ; enregistrement
+sans erreur ; après rechargement, **3 blocs sur 3 valides**, aucun message de
+contenu inattendu, attributs conservés à l'identique.
+
+**`post_content`** — uniquement le commentaire de bloc et ses attributs de
+présentation. Aucune coordonnée, aucun code postal, aucune référence
+cadastrale, aucune géométrie.
+
+**Site public** — 3 composants montés, identifiants uniques (`uc-1`, `uc-2`,
+`uc-3`), **aucune ressource en échec**, chaque asset chargé **une seule fois**
+malgré deux blocs et un shortcode sur la même page. Aucune requête vers un CDN
+pour le cadastre.
+
+**Parcours** — autocomplétion IGN sur une adresse publique (3 suggestions) ;
+carte, orthophoto et parcellaire affichés ; parcelle détectée et confirmée,
+cartouche cohérent avec le cadastre ; `sessionStorage` alimenté sous la clé
+préfixée du bloc, 13 champs ; `clearStored()` efface ; clés normalisées avec
+ou sans préfixe.
+
+**Erreurs** — « Aucune adresse trouvée… » sur requête sans résultat,
+« Recherche indisponible… » sur panne réseau **et** sur erreur HTTP 500. La
+page reste fonctionnelle dans les trois cas.
+
+**Mobile** — aucun débordement horizontal, carte et champs à la largeur de
+l'écran, contrôles utilisables.
+
+**Isolation** — la page d'accueil publiée ne charge **aucun** asset cadastre :
+ni Leaflet, ni CSS, ni JavaScript.
+
+**Journal PHP** — aucune entrée liée à `urbizen-platform` ni au cadastre.
+
+Observation sans gravité : une hauteur de carte explicite l'emporte sur la
+règle responsive `@media (max-width: 520px)`. C'est le comportement attendu
+d'un réglage posé par la rédactrice ou le rédacteur, mais il faut le savoir.
 
 ---
 

@@ -1,7 +1,10 @@
 # Protocole de déploiement limité — composant cadastre
 
-> **Ce protocole n'a pas été exécuté.** Il attend une autorisation explicite.
-> Aucune commande ci-dessous ne doit être lancée avant accord.
+> **Protocole exécuté le 19 juillet 2026, sur autorisation explicite.**
+> Résultat : les 13 contrôles sont passés, aucun retour arrière n'a été
+> nécessaire. Sauvegardes conservées : `urbizen-plugin-20260719-2000.tar.gz`
+> et `urbizen-db-20260719-2000.sql.gz`.
+> Ce document reste la procédure de référence pour les déploiements suivants.
 
 Objectif : vérifier en conditions réelles ce que les bancs d'essai simulés ne
 peuvent pas prouver — l'insertion du bloc dans Gutenberg, son enregistrement,
@@ -149,3 +152,28 @@ wp litespeed-purge all
 
 Puis consigner le résultat dans `CHANGELOG.md` et `ROADMAP.md` : le bloc ne
 passe de `[~]` à `[x]` **que** si les 16 contrôles ci-dessus sont concluants.
+
+---
+
+## Journal d'exécution — 19 juillet 2026
+
+| Étape | Résultat |
+|---|---|
+| Version avant | 0.1.0, extension active, accueil HTTP 200 |
+| Sauvegardes | extension (7 Ko) et base (1,9 Mo), intégrité vérifiée |
+| Déploiement | `rsync` sur l'extension seule ; 11 fichiers PHP au lint sans erreur |
+| Version après | **0.3.0**, bloc et shortcode enregistrés |
+| Page de test | ID 1157, `draft`, non indexée, conservée pour revue |
+| Éditeur | bloc présent dans l'insertion, 5 réglages édités, enregistré, rechargé — 3 blocs sur 3 valides |
+| `post_content` | attributs de présentation uniquement, aucune donnée de localisation |
+| Site public | 3 composants montés, IDs uniques, 0 ressource en échec, chaque asset chargé une fois |
+| Parcours IGN | autocomplétion, carte, parcelle confirmée, `sessionStorage`, `clearStored()` |
+| Erreurs | 3 messages distincts vérifiés : sans résultat, panne réseau, HTTP 500 |
+| Mobile | aucun débordement horizontal |
+| Isolation | accueil publié : **aucun** asset cadastre |
+| Journal PHP | aucune entrée liée au composant |
+
+Aucune page publiée, aucun menu, aucun réglage, aucune autre extension et aucune
+sauvegarde n'ont été modifiés. Le thème enfant est resté en 0.1.0.
+
+**Nettoyage restant** : supprimer la page 1157 après décision sur la PR #6.

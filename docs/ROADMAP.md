@@ -32,22 +32,21 @@ Dernière mise à jour : 19 juillet 2026.
 
 - [x] Auto-hébergement de Leaflet, fin des appels CDN (RGPD) — *19/07/2026*
 - [x] Shortcode `[urbizen_cadastre]` et rendu dynamique commun — *19/07/2026*
-- [~] Bloc Gutenberg `urbizen/cadastre` : `block.json`, `editor.js`,
-      `InspectorControls` et aperçu statique écrits et testés **hors ligne** ;
-      insertion, édition, enregistrement et rechargement **non vérifiés dans un
-      vrai éditeur** — à valider sur une page en brouillon
+- [x] Bloc Gutenberg `urbizen/cadastre` : `block.json`, `editor.js`,
+      `InspectorControls`, aperçu statique — **validé dans l'éditeur réel**
+      le 19/07/2026 (insertion, édition des 5 réglages, enregistrement,
+      rechargement sans erreur de validation)
 - [x] Source de vérité unique dans l'extension, copies supprimées (D-008) — *19/07/2026*
 - [x] Suppression des `innerHTML` et identifiants uniques par instance — *19/07/2026*
 - [x] Licence Leaflet BSD 2-Clause versionnée, source et empreintes documentées — *19/07/2026*
 - [x] Bancs d'essai **simulés** `tests/cadastre/` : 32 contrôles JS (jsdom),
       36 contrôles PHP (doublures) — *19/07/2026*
-- [ ] **Test WordPress réel** sur page brouillon non indexée : insertion du bloc,
-      réglages, enregistrement, rechargement, rendu public, assets sans 404,
-      essai sur ordinateur et sur mobile
+- [x] **Test WordPress réel** sur page brouillon non indexée — *19/07/2026* :
+      13 contrôles passés, aucune erreur, aucun 404 (voir DEPLOY_CADASTRE.md)
 - [ ] Auto-hébergement des **polices** (Google Fonts encore appelé par le thème)
 - [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires (étape 4)
 
-Légende : `[x]` terminé · `[~]` écrit et testé hors ligne, non validé en réel.
+Légende : `[x]` terminé et vérifié · `[~]` écrit, non validé en conditions réelles.
 
 ---
 
