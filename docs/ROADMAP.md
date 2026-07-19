@@ -56,10 +56,11 @@ Dernière mise à jour : 19 juillet 2026.
 - [ ] Client HTTP vers le service Python : HMAC, idempotence, rejeu
 - [ ] Authentification de `POST /api/dp` et CORS restreint côté Python
 - [ ] Complétion des mappings Cerfa, aujourd'hui tous en `TODO_`
-- [ ] `requirements.txt` et `.env.example`, absents du dépôt
+- [x] `requirements.txt` et `.env.example` — *fait le 19/07/2026*
 - [ ] Normalisation de la génération des PDF selon la convention
       `URB-AAAA-NNNN_type-document_version.ext`
-- [ ] Documentation du lancement local du service Python
+- [x] Documentation du lancement local du service Python — *fait le 19/07/2026*
+- [ ] Tests automatiques du service : `tests/` est vide à ce jour
 
 ---
 
@@ -117,7 +118,8 @@ conservant les URL existantes.
 |---|---|---|
 | Mappings Cerfa en `TODO_` | existant | 5 |
 | `POST /api/dp` non authentifié, CORS `*` | existant | 5 |
-| `requirements.txt` et `.env.example` absents | existant | 5 |
+| ~~`requirements.txt` et `.env.example` absents~~ | existant | **soldé le 19/07/2026** |
+| Aucun test automatique : `tests/` est vide | existant | 5 |
 | CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
 | Slug CGV `refund_returns` | héritage WooCommerce | 6 |
 | 393 Mo de médias non optimisés | existant | 6 |

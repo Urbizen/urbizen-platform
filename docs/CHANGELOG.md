@@ -5,6 +5,26 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.2.2] — 19 juillet 2026
+
+Reproductibilité du backend Python. **Aucune logique métier modifiée.**
+
+### Ajouté
+- `backend/dp-service/requirements.txt` : les cinq dépendances réellement
+  importées par le code — Flask, Flask-Cors, pypdf, reportlab, pillow — plus
+  waitress pour la production. Majeures figées, correctifs acceptés.
+- `.env.example` à la racine : les neuf variables lues par le service, avec
+  leurs valeurs par défaut et des exemples fictifs. Aucune valeur sensible.
+
+### Modifié
+- `backend/dp-service/README.md` : mise en place en 4 étapes, environnement
+  virtuel, chargement de la configuration, chemins corrigés (le document
+  décrivait des fichiers comme adjacents alors qu'ils vivent dans `frontend/`),
+  lancement Linux documenté, tableau exhaustif des variables d'environnement
+  avec le fichier qui les lit.
+
+---
+
 ## [0.2.1] — 19 juillet 2026
 
 ### Sécurité
