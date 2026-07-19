@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Urbizen — Votre dossier d'urbanisme, préparé de A à Z</title>
+<meta name="description" content="Déclaration préalable, permis de construire, plans et documents administratifs réalisés à distance par Urbizen. Localisez votre parcelle et démarrez votre dossier en ligne." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<!-- Leaflet (carte du composant cadastre) -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<!-- Charte + composant partagés, puis styles de la page -->
+<link rel="stylesheet" href="../assets/css/urbizen-tokens.css" />
+<link rel="stylesheet" href="../assets/css/urbizen-cadastre.css" />
+<link rel="stylesheet" href="homepage.css" />
+</head>
+<body class="u-grid-bg">
+
+<a class="u-skip" href="#localisation">Aller au contenu principal</a>
+
+<!-- ===== Section 1 — En-tête ===== -->
+<header class="site" id="top">
+  <div class="wrap nav">
+    <a class="logo" href="#top" aria-label="Urbizen — accueil">
+      <img src="assets/logo-urbizen.png" alt="Urbizen · urbanisme & projets" />
+    </a>
+    <nav class="nav-links" aria-label="Navigation principale">
+      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
+      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
+      <a href="#prestations">Nos prestations</a>
+      <a href="#methode">Comment ça marche</a>
+      <a href="#tarifs">Tarifs</a>
+      <a href="#faq">Questions fréquentes</a>
+    </nav>
+    <div class="nav-right">
+      <a class="link-login" href="#" title="Espace client — bientôt disponible">Se connecter</a>
+      <a class="btn btn-primary btn-sm js-start" href="#localisation">Démarrer mon projet</a>
+      <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <div id="mmenu" class="mmenu" hidden>
+    <div class="wrap">
+      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
+      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
+      <a href="#prestations">Nos prestations</a>
+      <a href="#methode">Comment ça marche</a>
+      <a href="#tarifs">Tarifs</a>
+      <a href="#faq">Questions fréquentes</a>
+      <a href="#" class="link-login">Se connecter</a>
+      <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<!-- ===== Section 2 — Hero ===== -->
+<section class="hero" id="accueil">
+  <div class="wrap hero-grid">
+    <div class="hero-text">
+      <span class="eyebrow">Dossiers d'urbanisme à distance</span>
+      <h1>Votre dossier d'urbanisme, préparé de A à Z.</h1>
+      <p class="lead">Déclaration préalable, permis de construire, plans et documents administratifs réalisés à distance par Urbizen.</p>
+      <div class="hero-cta">
+        <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+        <a class="btn btn-ghost" href="#prestations">Découvrir nos prestations</a>
+      </div>
+      <ul class="hero-reassure">
+        <li>Dossier complet</li>
+        <li>Accompagnement humain</li>
+        <li>Service 100&nbsp;% à distance</li>
+      </ul>
+    </div>
+
+    <!-- Composition technique (plan / cadastre / cartouche) -->
+    <div class="hero-plan" aria-hidden="true">
+      <span class="hero-plan-tag">PIÈCES DU DOSSIER</span>
+      <svg viewBox="0 0 440 360" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="hg" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0H0V20" fill="none" stroke="#DCE3EA" stroke-width="1"/>
+          </pattern>
+        </defs>
+        <rect width="440" height="360" fill="url(#hg)"/>
+        <!-- Planche : 4 pièces, chacune se dessine (contour) puis se remplit -->
+        <rect class="hp-fade hp-d1" x="8"   y="8"   width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
+        <rect class="hp-fade hp-d2" x="226" y="8"   width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
+        <rect class="hp-fade hp-d3" x="8"   y="190" width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
+        <rect class="hp-fade hp-d4" x="226" y="190" width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
+
+        <!-- DP2 · Plan de masse -->
+        <g class="hp-fade hp-fd1">
+          <text x="20" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP2 · MASSE</text>
+          <path d="M36 56 L188 48 L196 150 L44 158 Z" fill="#54CF99" fill-opacity="0.14" stroke="none"/>
+          <rect x="92" y="84" width="64" height="46" rx="1.5" fill="#14233B" fill-opacity="0.9"/>
+          <line x1="44" y1="150" x2="196" y2="146" stroke="#128A5A" stroke-width="1" stroke-dasharray="3 3"/>
+        </g>
+        <path class="hp-draw hp-dr1" pathLength="1" d="M36 56 L188 48 L196 150 L44 158 Z" fill="none" stroke="#128A5A" stroke-width="2"/>
+
+        <!-- DP4 · Façades -->
+        <g class="hp-fade hp-fd2">
+          <text x="238" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP4 · FA&#199;ADES</text>
+          <line x1="248" y1="152" x2="410" y2="152" stroke="#9FADBC" stroke-width="1"/>
+          <path d="M292 94 L334 64 L376 94 Z" fill="#54CF99" fill-opacity="0.4" stroke="none"/>
+          <rect x="326" y="120" width="16" height="32" fill="#14233B" fill-opacity="0.85"/>
+          <rect x="306" y="106" width="14" height="13" fill="none" stroke="#14233B" stroke-width="1.2"/>
+          <rect x="348" y="106" width="14" height="13" fill="none" stroke="#14233B" stroke-width="1.2"/>
+        </g>
+        <path class="hp-draw hp-dr2" pathLength="1" d="M298 152 L298 94 L292 94 L334 64 L376 94 L370 94 L370 152" fill="none" stroke="#14233B" stroke-width="1.5"/>
+
+        <!-- DP3 · Coupe -->
+        <g class="hp-fade hp-fd3">
+          <text x="20" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP3 · COUPE</text>
+          <rect x="20" y="302" width="190" height="40" fill="#E4F5EC"/>
+          <path d="M66 252 L112 226 L158 252 Z" fill="#54CF99" fill-opacity="0.35" stroke="none"/>
+          <line x1="66" y1="276" x2="158" y2="276" stroke="#9FADBC" stroke-width="1" stroke-dasharray="3 3"/>
+          <line x1="30" y1="314" x2="40" y2="324" stroke="#9FADBC" stroke-width="1"/>
+          <line x1="50" y1="314" x2="60" y2="324" stroke="#9FADBC" stroke-width="1"/>
+          <line x1="70" y1="314" x2="80" y2="324" stroke="#9FADBC" stroke-width="1"/>
+        </g>
+        <path class="hp-draw hp-dr3" pathLength="1" d="M20 302 L210 302 M66 302 L66 252 L112 226 L158 252 L158 302" fill="none" stroke="#14233B" stroke-width="1.4"/>
+
+        <!-- DP6 · Insertion 3D -->
+        <g class="hp-fade hp-fd4">
+          <text x="238" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP6 · INSERTION 3D</text>
+          <rect x="234" y="302" width="190" height="40" fill="#E4F5EC"/>
+          <path d="M300 264 L340 264 L340 302 L300 302 Z" fill="#14233B" fill-opacity="0.88"/>
+          <path d="M340 264 L360 252 L360 290 L340 302 Z" fill="#14233B" fill-opacity="0.62"/>
+          <path d="M296 264 L320 246 L344 264 Z" fill="#54CF99" fill-opacity="0.5" stroke="none"/>
+          <path d="M344 264 L320 246 L360 252 Z" fill="#54CF99" fill-opacity="0.3" stroke="none"/>
+          <rect x="312" y="280" width="13" height="22" fill="#FBFCFD" fill-opacity="0.9"/>
+          <!-- petit arbre à côté de la maison -->
+          <rect x="383" y="287" width="6" height="15" rx="1" fill="#14233B" fill-opacity="0.85"/>
+          <circle cx="386" cy="279" r="13" fill="#54CF99" fill-opacity="0.55"/>
+        </g>
+        <path class="hp-draw hp-dr4" pathLength="1" d="M300 302 L300 264 L340 264 L340 302 M340 264 L360 252 L360 290 M296 264 L320 246 L344 264 M344 264 L360 252 M373 279 a13 13 0 1 0 26 0 a13 13 0 1 0 -26 0" fill="none" stroke="#14233B" stroke-width="1.2"/>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<!-- Bandeau réassurance -->
+<div class="trust">
+  <div class="wrap">
+    <span class="trust-item"><span class="trust-dot"></span><b>100&nbsp;% à distance</b></span>
+    <span class="trust-item"><span class="trust-dot"></span>France métropolitaine</span>
+    <span class="trust-item"><span class="trust-dot"></span>CERFA + pièces graphiques</span>
+    <span class="trust-item"><span class="trust-dot"></span>Devis &amp; étude gratuits</span>
+  </div>
+</div>
+
+<!-- ===== Section 3 — Localisation cadastrale (interaction principale) ===== -->
+<section class="locate" id="localisation">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Étape 1</span>
+      <h2>Je renseigne l'adresse de mon projet</h2>
+      <p>Nous localisons votre terrain et retrouvons votre parcelle cadastrale.</p>
+    </div>
+    <div class="locate-card">
+      <!-- Le composant partagé se monte ici -->
+      <div id="cadastre-mount"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 4 — Type de projet ===== -->
+<section class="projet" id="projet">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Étape 2</span>
+      <h2>Quel est votre projet&nbsp;?</h2>
+      <p>Sélectionnez la nature de votre projet. Nous confirmons la démarche adaptée après étude.</p>
+    </div>
+    <div class="projet-grid" role="group" aria-label="Type de projet">
+      <button type="button" class="pcard" data-projet="piscine"><span class="pcard-ico" aria-hidden="true">▢</span><span class="pcard-t">Piscine</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="extension"><span class="pcard-ico" aria-hidden="true">▤</span><span class="pcard-t">Extension</span><span class="pcard-d">Étude du projet nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="garage"><span class="pcard-ico" aria-hidden="true">▣</span><span class="pcard-t">Garage</span><span class="pcard-d">Déclaration ou permis selon surface</span></button>
+      <button type="button" class="pcard" data-projet="abri"><span class="pcard-ico" aria-hidden="true">◱</span><span class="pcard-t">Abri de jardin</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="pergola"><span class="pcard-ico" aria-hidden="true">◲</span><span class="pcard-t">Pergola</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="facade"><span class="pcard-ico" aria-hidden="true">◫</span><span class="pcard-t">Modification de façade</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="toiture"><span class="pcard-ico" aria-hidden="true">◪</span><span class="pcard-t">Toiture / fenêtres de toit</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="solaire"><span class="pcard-ico" aria-hidden="true">☼</span><span class="pcard-t">Panneaux solaires</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="maison"><span class="pcard-ico" aria-hidden="true">⌂</span><span class="pcard-t">Maison individuelle</span><span class="pcard-d">Permis de construire souvent nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="autre"><span class="pcard-ico" aria-hidden="true">✎</span><span class="pcard-t">Autre projet</span><span class="pcard-d">Étude du projet nécessaire</span></button>
+    </div>
+    <div class="projet-continue">
+      <button type="button" class="btn btn-primary" id="js-continue" disabled>Continuer vers ma demande</button>
+      <span class="projet-continue-hint" id="js-continue-hint">Sélectionnez un type de projet pour continuer.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 5 — Comment ça marche ===== -->
+<section class="methode" id="methode">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Comment ça marche</span>
+      <h2>Quatre étapes, à distance</h2>
+    </div>
+    <ol class="steps">
+      <li class="step"><span class="step-n">01</span><h3>Vous décrivez votre projet</h3><p>Adresse, dimensions, photos et caractéristiques.</p></li>
+      <li class="step"><span class="step-n">02</span><h3>Nous préparons le dossier</h3><p>Formulaire, plans, notice, insertion et pièces nécessaires.</p></li>
+      <li class="step"><span class="step-n">03</span><h3>Vous vérifiez</h3><p>Le dossier vous est transmis pour validation.</p></li>
+      <li class="step"><span class="step-n">04</span><h3>Vous déposez</h3><p>Vous recevez un dossier prêt à transmettre à la mairie.</p></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ===== Section 6 — Contenu d'un dossier ===== -->
+<section class="dossier" id="dossier">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Contenu d'un dossier</span>
+      <h2>Un dossier complet, pas seulement un formulaire</h2>
+      <p>Les pièces sont adaptées à la nature de chaque projet et aux exigences applicables.</p>
+    </div>
+    <div class="planche">
+      <div class="planche-item"><span class="code">DP1 · PCMI1</span><span class="planche-t">Plan de situation</span></div>
+      <div class="planche-item"><span class="code">DP2 · PCMI2</span><span class="planche-t">Plan de masse</span></div>
+      <div class="planche-item"><span class="code">DP3 · PCMI3</span><span class="planche-t">Plan en coupe</span></div>
+      <div class="planche-item"><span class="code">DP4 · PCMI5</span><span class="planche-t">Façades &amp; toitures</span></div>
+      <div class="planche-item"><span class="code">DP6 · PCMI6</span><span class="planche-t">Insertion graphique</span></div>
+      <div class="planche-item"><span class="code">PCMI4</span><span class="planche-t">Notice descriptive</span></div>
+      <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span></div>
+      <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 7 — Prestations + tarifs réels ===== -->
+<section class="prestations" id="prestations">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Nos prestations</span>
+      <h2>Trois parcours selon votre projet</h2>
+    </div>
+    <div class="presta-grid">
+      <article class="presta">
+        <h3>Déclaration préalable</h3>
+        <p>Pour les projets tels que piscine, extension, garage, abri, pergola, façade, toiture ou panneaux solaires.</p>
+        <p class="presta-price">À partir de <b>149&nbsp;€</b></p>
+        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/declarations-prealables/">Découvrir la déclaration préalable</a>
+      </article>
+      <article class="presta featured">
+        <h3>Permis de construire</h3>
+        <p>Pour une maison individuelle ou les projets nécessitant une autorisation plus importante.</p>
+        <p class="presta-price">À partir de <b>449&nbsp;€</b></p>
+        <a class="btn btn-primary btn-sm" href="https://urbizen.fr/permis-de-construire/">Découvrir le permis de construire</a>
+      </article>
+      <article class="presta">
+        <h3>Orientation du projet</h3>
+        <p>Vous ne savez pas quelle démarche choisir&nbsp;? Envoyez votre projet, nous vous indiquons la formule adaptée.</p>
+        <p class="presta-price">Étude <b>gratuite</b></p>
+        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/contact/">Faire étudier mon projet</a>
+      </article>
+    </div>
+
+    <!-- Forfaits réels (repris du site, non inventés) -->
+    <div id="tarifs" class="tarifs">
+      <div class="tarif"><span class="tarif-badge">Déclaration préalable</span><h3>Panneaux solaires</h3><div class="tarif-price">149&nbsp;€</div></div>
+      <div class="tarif featured"><span class="tarif-badge">Le plus demandé</span><h3>Projet standard</h3><div class="tarif-price">249&nbsp;€</div></div>
+      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Projets simples</h3><div class="tarif-price">449&nbsp;€</div></div>
+      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Extension / agrandissement</h3><div class="tarif-price">649&nbsp;€</div></div>
+      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Maison individuelle</h3><div class="tarif-price">849&nbsp;€</div></div>
+    </div>
+    <p class="tarif-note">Tarifs maison individuelle et extension indiqués hors étude BBIO, hors étude thermique / RE2020, hors mission d'architecte, et sous réserve que le projet ne nécessite pas le recours obligatoire à un architecte (généralement au-delà de 150&nbsp;m² de surface de plancher après travaux). Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables.</p>
+  </div>
+</section>
+
+<!-- ===== Section 8 — Pourquoi Urbizen ===== -->
+<section class="pourquoi-wrap" id="pourquoi">
+  <div class="wrap">
+    <div class="pourquoi">
+      <span class="eyebrow">Pourquoi Urbizen</span>
+      <h2>Un accompagnement clair et structuré</h2>
+      <div class="pourquoi-grid">
+        <div class="pq"><span class="pq-k">01</span><div><h3>Service entièrement à distance</h3><p>Vous transmettez vos informations, photos et dimensions en ligne, partout en France métropolitaine.</p></div></div>
+        <div class="pq"><span class="pq-k">02</span><div><h3>Dossier adapté au projet</h3><p>Les pièces sont choisies selon la nature du projet et les exigences applicables.</p></div></div>
+        <div class="pq"><span class="pq-k">03</span><div><h3>Échanges humains</h3><p>Un interlocuteur suit votre dossier et répond à vos questions.</p></div></div>
+        <div class="pq"><span class="pq-k">04</span><div><h3>Documents prêts à déposer</h3><p>CERFA, plans et pièces graphiques constituent un dossier clair et structuré.</p></div></div>
+        <div class="pq"><span class="pq-k">05</span><div><h3>Suivi clair</h3><p>Les demandes de pièces complémentaires de la mairie sont traitées jusqu'à l'accord du dossier.</p></div></div>
+        <div class="pq"><span class="pq-k">06</span><div><h3>Assurance professionnelle</h3><p>Urbizen exerce dans un cadre professionnel assuré.</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 9 — Exemples de dossiers (démonstrations) ===== -->
+<section class="exemples" id="exemples">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Exemples de dossiers</span>
+      <h2>À quoi ressemble un dossier préparé</h2>
+      <p>Exemples de démonstration, présentés à titre illustratif.</p>
+    </div>
+    <div class="exemple-grid">
+      <article class="exemple"><span class="demo-flag">Démonstration</span><h3>Projet : piscine</h3><p class="mono">Type : déclaration préalable</p><p class="mono">Pièces : DP1, DP2, DP3, DP6</p></article>
+      <article class="exemple"><span class="demo-flag">Démonstration</span><h3>Projet : façade &amp; toiture</h3><p class="mono">Type : déclaration préalable</p><p class="mono">Pièces : DP1, DP2, DP4</p></article>
+      <article class="exemple"><span class="demo-flag">Démonstration</span><h3>Projet : extension</h3><p class="mono">Type : DP ou permis selon surface</p><p class="mono">Pièces : DP1, DP2, DP3, DP4, DP6</p></article>
+      <article class="exemple"><span class="demo-flag">Démonstration</span><h3>Projet : maison individuelle</h3><p class="mono">Type : permis de construire</p><p class="mono">Pièces : PCMI1 à PCMI6 + notice</p></article>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 10 — Avis clients ===== -->
+<!-- Masquée au lancement : aucun avis réel disponible. Pour l'activer : retirer l'attribut "hidden"
+     ci-dessous et remplacer le contenu par de vrais avis clients vérifiés (jamais de faux avis). -->
+<section class="avis" id="avis" hidden>
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="eyebrow">Avis clients</span>
+      <h2>La parole à nos clients</h2>
+    </div>
+    <div class="avis-placeholder">
+      <p>Emplacement réservé aux avis clients vérifiés. Aucun avis n'est affiché tant qu'ils n'ont pas été recueillis.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 11 — FAQ ===== -->
+<section class="faq-wrap" id="faq">
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="eyebrow">Questions fréquentes</span>
+      <h2>Vos questions les plus courantes</h2>
+    </div>
+    <div class="faq">
+      <details><summary>Ai-je besoin d'une déclaration préalable ou d'un permis&nbsp;?</summary><div class="a">Cela dépend de la nature du projet, des surfaces créées, de l'aspect extérieur et des règles d'urbanisme de votre commune. Nous étudions votre projet pour vous indiquer la démarche adaptée.</div></details>
+      <details><summary>Quels documents dois-je fournir&nbsp;?</summary><div class="a">En général : adresse du terrain, photos de l'existant, dimensions du projet, implantation souhaitée, croquis éventuel, matériaux et aspect extérieur prévus.</div></details>
+      <details><summary>Travaillez-vous partout en France&nbsp;?</summary><div class="a">Le service est proposé à distance partout en France métropolitaine.</div></details>
+      <details><summary>Le service est-il entièrement à distance&nbsp;?</summary><div class="a">Oui. Vous transmettez les informations, photos, dimensions et documents utiles en ligne, et le dossier est préparé à distance.</div></details>
+      <details><summary>Réalisez-vous les plans&nbsp;?</summary><div class="a">Oui, les plans et pièces graphiques du dossier standard sont réalisés par Urbizen dans le cadre d'une mission administrative et graphique, hors maîtrise d'œuvre.</div></details>
+      <details><summary>Le dépôt en mairie est-il inclus&nbsp;?</summary><div class="a">Vous recevez un dossier prêt à déposer. Le dépôt s'effectue de votre côté, sur le guichet dématérialisé ou en mairie.</div></details>
+      <details><summary>Que se passe-t-il si la mairie demande une pièce complémentaire&nbsp;?</summary><div class="a">Les demandes de pièces complémentaires liées au dossier préparé sont traitées jusqu'à l'accord du dossier.</div></details>
+      <details><summary>L'accord de la mairie est-il garanti&nbsp;?</summary><div class="a">Non. L'accord dépend de l'instruction de la mairie et des règles d'urbanisme applicables à votre terrain.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ===== Section 12 — CTA final ===== -->
+<section class="cta-final">
+  <div class="wrap">
+    <div class="cta-band">
+      <h2>Votre projet peut commencer maintenant.</h2>
+      <p>Localisez votre terrain et laissez-vous guider.</p>
+      <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ===== Section 13 — Footer ===== -->
+<footer class="site-footer">
+  <div class="wrap foot">
+    <div class="foot-brand">
+      <img src="assets/logo-urbizen.png" alt="Urbizen" class="foot-logo" />
+      <p>Dossiers d'urbanisme à distance : déclaration préalable, permis de construire, CERFA, plans, insertions paysagères et pièces graphiques prêts à déposer. Partout en France métropolitaine.</p>
+    </div>
+    <div>
+      <h4>Prestations</h4>
+      <ul>
+        <li><a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a></li>
+        <li><a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a></li>
+        <li><a href="#tarifs">Tarifs</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Contact</h4>
+      <ul>
+        <li><a href="mailto:contact@urbizen.fr">contact@urbizen.fr</a></li>
+        <li><a href="tel:+33664895815">+33 6 64 89 58 15</a></li>
+        <li><a href="#" title="Espace client — bientôt disponible">Espace client (bientôt)</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Informations</h4>
+      <ul>
+        <li><a href="https://urbizen.fr/mentions-legales/">Mentions légales</a></li>
+        <li><a href="https://urbizen.fr/privacy-policy/">Politique de confidentialité</a></li>
+        <li><a href="https://urbizen.fr/refund_returns/">Conditions générales de service</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="wrap foot-bottom">
+    <span>© 2026 Urbizen — Urbanisme &amp; projets</span>
+    <span class="mono">urbizen.fr</span>
+  </div>
+</footer>
+
+<!-- Scripts : Leaflet, composant partagé, puis logique de page -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
+<script src="../assets/js/urbizen-cadastre.js" defer></script>
+<script src="homepage.js" defer></script>
+</body>
+</html>
