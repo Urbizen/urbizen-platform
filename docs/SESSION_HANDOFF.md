@@ -1,0 +1,95 @@
+# Passation de session
+
+Photographie de l'état du projet à la fin d'une session de travail, pour qu'une
+reprise — humaine ou assistée — parte du réel et non d'une supposition.
+Ce fichier est **réécrit à chaque fin de session**, jamais complété par empilement.
+
+Contexte durable et règles de travail : [AI_CONTEXT.md](AI_CONTEXT.md).
+Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md).
+
+---
+
+## Session du 19 juillet 2026
+
+### Branche et Pull Request
+
+| Élément | Valeur |
+|---|---|
+| Branche | `feature/wordpress-integration` |
+| Pull Request | [#4](https://github.com/Urbizen/urbizen-platform/pull/4) → `main` |
+| Commits | `5f2d49a`, `6162a8e`, `a199238`, `00ad5cb`, `4317b69`, plus l'anonymisation |
+| Dépôt | `Urbizen/urbizen-platform` — **public** |
+
+### Où en est le projet
+
+L'étape 1 de l'intégration WordPress est **terminée et en production**. Le socle
+est posé — thème enfant et extension — mais il ne porte encore **aucune logique
+métier** : ni formulaire, ni cadastre, ni route REST.
+
+### Ce qui a été fait
+
+- Amorçage du thème enfant `urbizen-child` et de l'extension `urbizen-platform`.
+- Export des gabarits FSE de production en fichiers versionnés (`parts/`), et
+  report des styles globaux dans `theme.json` : le rendu ne dépend plus de la base.
+- Correctif `urbizen_child_restore_theme_json()` — sans lui, l'activation du thème
+  enfant fait repasser le site sur la palette sombre de Hostinger.
+- Documentation permanente du projet ouverte (plan directeur, contexte, décisions,
+  changelog, feuille de route, ce fichier).
+- Audit complet du WordPress de production, en lecture seule.
+- Anonymisation des coordonnées serveur dans la documentation : **le dépôt GitHub
+  est public**, compte et adresse ne doivent jamais y figurer.
+
+### État vérifié de la production
+
+| Élément | Valeur |
+|---|---|
+| WordPress · PHP · WP-CLI | 7.0.2 fr_FR · 8.3.30 · 2.12.0 |
+| Thème actif | `urbizen-child` 0.1.0 (parent `hostinger-ai-theme` 2.0.18) |
+| Extension Urbizen | `urbizen-platform` 0.1.0, active, aucun module chargé |
+| Rendu | validé identique — captures 1440 px et 390 px, empreintes SHA-256 égales |
+| Réponse HTTP | 200 |
+| Effets de bord | aucun : ni table, ni option, ni fichier créé |
+
+Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
+
+### Contrôles effectués
+
+- Les 5 commits attendus présents sur `origin`, branche sans conflit avec `main`.
+- Aucun secret, identifiant, fichier local ni sauvegarde dans le dépôt.
+- `php -l` conforme sur les **11 fichiers PHP**, `theme.json` valide (version 3).
+- Aucun effet de bord non documenté : ni `add_option`, ni `dbDelta`, ni
+  `CREATE TABLE`, ni écriture de fichier, ni appel réseau.
+- Rendu comparé avant/après activation : identique.
+
+### Prochaine étape
+
+Composant cadastre : Leaflet embarqué localement dans l'extension, puis bloc
+Gutenberg `CadastreBlock` réutilisant `frontend/assets/js/urbizen-cadastre.js`.
+Cette étape n'a **pas** été démarrée.
+
+### Interdictions
+
+1. **Ne pas commencer le composant cadastre** tant que le socle — thème enfant et
+   extension fusionnés dans `main` — n'a pas été validé.
+2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
+3. Ne jamais pousser directement sur `main`.
+4. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle
+   ni de sauvegarde : le dépôt est public.
+5. Ne jamais afficher le contenu de `wp-config.php`.
+6. Ne rien modifier en production via l'éditeur de fichiers de WordPress.
+
+### Points de vigilance pour la reprise
+
+1. **Palette et filtre du parent** — le thème parent écrase palette et police des
+   titres via `wp_theme_json_data_theme` en priorité 999 ; l'enfant les réapplique
+   en priorité 1000. Recontrôler le rendu après toute mise à jour du parent
+   (2.0.29 disponible).
+2. **Gabarits en base** — `wp_template_part` et `wp_global_styles` restent
+   rattachés au terme `wp_theme` du **parent**. Ne pas s'appuyer dessus : la
+   source de vérité est le dossier `parts/` du thème enfant.
+3. **Dépôt public** — aucune coordonnée serveur, aucune donnée personnelle,
+   aucune sauvegarde dans Git.
+4. **Données réelles** — les 4 entrées Fluent Forms sont des données personnelles :
+   les exporter chiffrées, hors dépôt, avant toute désactivation du plugin.
+5. **`wp db export` échoue sous CageFS** — passer par `mysqldump` avec un fichier
+   d'identifiants temporaire en mode 600, détruit par `shred -u` après usage.

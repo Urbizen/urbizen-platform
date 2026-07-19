@@ -1,0 +1,23 @@
+/*!
+Theme Name: Urbizen
+Theme URI: https://urbizen.fr
+Template: hostinger-ai-theme
+Author: Urbizen
+Author URI: https://urbizen.fr
+Description: Thème enfant Urbizen — rendu et gabarits uniquement. Toute la logique métier (formulaires, cadastre, dossiers) est portée par l'extension urbizen-platform. Ce thème ne doit contenir ni traitement de données, ni appel réseau, ni requête SQL.
+Version: 0.1.0
+Requires at least: 6.5
+Requires PHP: 8.1
+License: GPLv3
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
+Text Domain: urbizen-child
+Tags: urbanisme, block-theme
+*/
+
+/* ---------------------------------------------------------------------------
+   Étape 1 — thème enfant nu.
+   Aucune règle de style n'est déclarée volontairement : l'objectif de cette
+   étape est que le rendu du site reste strictement identique au thème parent.
+   Les surcharges Urbizen (tokens, gabarits, patterns) seront ajoutées ensuite,
+   étape par étape, dans assets/css/urbizen-child.css.
+   --------------------------------------------------------------------------- */

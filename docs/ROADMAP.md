@@ -1,62 +1,126 @@
-# Roadmap Urbizen
+# Feuille de route Urbizen
 
-## Phase 1 — Stabilisation du socle
+> Alignée sur l'architecture réelle et l'avancement constaté en production.
+> La référence d'ensemble reste [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md).
 
-- auditer le service Python existant ;
-- compléter le remplissage des Cerfa ;
-- corriger les références de formulaires ;
-- ajouter une configuration par variables d’environnement ;
-- sécuriser les téléchargements ;
-- ajouter des tests ;
-- normaliser la génération des PDF ;
-- documenter le lancement local.
+Dernière mise à jour : 19 juillet 2026.
 
-## Phase 2 — Gestion des dossiers
+---
 
-- créer le modèle de données dossier ;
-- créer les statuts ;
-- ajouter les références de dossier ;
-- ajouter l’historique des changements ;
-- ajouter les versions des documents ;
-- ajouter les commentaires internes.
+## Étape 1 — Socle technique ✅ terminée
 
-## Phase 3 — Espace client
+- [x] Audit complet du dépôt et de la production
+- [x] Thème enfant `urbizen-child` nu, avec correctifs de compatibilité
+- [x] Extension `urbizen-platform` nue, sans effet de bord
+- [x] Déploiement et activation de l'extension, sans erreur PHP
+- [x] Procédure de sauvegarde et de retour arrière éprouvée
 
-- inscription et connexion ;
-- tableau de bord ;
-- questionnaire ;
-- dépôt de documents ;
-- liste des pièces manquantes ;
-- suivi de l’avancement ;
-- validation des plans ;
-- téléchargement des documents.
+---
 
-## Phase 4 — Administration Urbizen
+## Étape 2 — Gabarits et mémoire du projet ✅ terminée
 
-- tableau de bord global ;
-- filtres par statut ;
-- documents manquants ;
-- gestion des paiements ;
-- messages clients ;
-- génération des documents ;
-- archivage.
+- [x] Export des gabarits FSE en fichiers versionnés
+- [x] Report des styles globaux dans `theme.json`
+- [x] Suppression de la dépendance à `wp_navigation` ID 15
+- [x] Documentation permanente en cinq documents
+- [x] Activation du thème enfant validée par le protocole complet, captures
+      d'écran ordinateur et mobile pixel-identiques
 
-## Phase 5 — Paiement et notifications
+---
 
-- acompte ;
-- solde ;
-- factures ;
-- Stripe ;
-- emails automatiques ;
-- rappels ;
-- notifications de validation.
+## Étape 3 — Composant cadastre
 
-## Phase 6 — Industrialisation
+- [ ] Auto-hébergement de Leaflet et des polices, fin des appels CDN (RGPD)
+- [ ] Shortcode et bloc `[urbizen_cadastre]`
+- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires
+- [ ] Validation sur une page de test non indexée
 
-- environnement de staging ;
-- sauvegardes ;
-- logs ;
-- monitoring ;
-- sécurité ;
-- conformité RGPD ;
-- déploiement automatisé.
+---
+
+## Étape 4 — Moteur de formulaires
+
+- [ ] Définitions déclaratives versionnées dans `src/Forms/definitions/`
+- [ ] Rendu accessible : labels, `aria-describedby`, navigation clavier
+- [ ] Validation serveur, nonces, limitation de débit, honeypot et délai minimal
+- [ ] Tables `wp_urbizen_submissions`, `_submission_fields`, `_files`, `_log`
+- [ ] Formulaire de contact, en remplacement de Fluent Forms n° 5
+- [ ] Bascule de la page Contact, puis 7 jours d'observation
+
+---
+
+## Étape 5 — Formulaires métier et backend
+
+- [ ] Formulaire DP, porté depuis `frontend/formulaires/dp-formulaire.html`
+- [ ] Formulaire PCMI, porté depuis `pc-formulaire.html`
+- [ ] Pièces jointes : type MIME réel, plafonds, SHA-256, stockage hors racine web
+- [ ] Client HTTP vers le service Python : HMAC, idempotence, rejeu
+- [ ] Authentification de `POST /api/dp` et CORS restreint côté Python
+- [ ] Complétion des mappings Cerfa, aujourd'hui tous en `TODO_`
+- [ ] `requirements.txt` et `.env.example`, absents du dépôt
+- [ ] Normalisation de la génération des PDF selon la convention
+      `URB-AAAA-NNNN_type-document_version.ext`
+- [ ] Documentation du lancement local du service Python
+
+---
+
+## Étape 6 — Refonte des pages dans l'univers Urbizen
+
+Toutes les pages sont refaites à partir de `frontend/homepage/` et de
+`urbizen-tokens.css`, sous forme de patterns versionnés dans le thème enfant, en
+conservant les URL existantes.
+
+- [ ] Accueil
+- [ ] Déclaration préalable · Permis de construire
+- [ ] Tarifs · Autres projets · Espace professionnels
+- [ ] Commander un dossier · Contact
+- [ ] Pages légales : mentions, confidentialité, CGV
+- [ ] Correction du slug `refund_returns` avec redirection 301
+- [ ] Futures pages SEO et blog
+- [ ] Nettoyage du CSS personnalisé hérité de l'éditeur
+
+---
+
+## Étape 7 — Retrait de Fluent Forms
+
+- [ ] Export chiffré des 6 définitions et des 4 entrées, hors dépôt
+- [ ] Import des entrées dans les tables Urbizen
+- [ ] Désactivation, puis 30 jours d'observation
+- [ ] Suppression de l'extension et de ses 7 tables
+- [ ] Reprise du transport SMTP par l'extension, puis retrait de Fluent SMTP
+
+---
+
+## Étape 8 — Dossiers et espace client
+
+- [ ] Modèle de dossier et les 13 statuts métier
+- [ ] Historique des changements et versions des documents
+- [ ] Inscription, connexion, tableau de bord client
+- [ ] Dépôt de pièces, liste des pièces manquantes, validation des plans
+- [ ] Téléchargements protégés par jeton expirant
+
+---
+
+## Étape 9 — Administration, paiement, industrialisation
+
+- [ ] Tableau de bord Urbizen, filtres par statut, commentaires internes
+- [ ] Acompte, solde, factures, Stripe
+- [ ] Courriels transactionnels et rappels automatiques
+- [ ] Purge RGPD planifiée et outils d'export et d'effacement
+- [ ] Environnement de préproduction, sauvegardes automatisées, supervision
+- [ ] Tests automatisés dans `tests/`, scripts de déploiement dans `scripts/`
+
+---
+
+## Dette technique suivie
+
+| Sujet | Origine | Étape de traitement |
+|---|---|---|
+| Mappings Cerfa en `TODO_` | existant | 5 |
+| `POST /api/dp` non authentifié, CORS `*` | existant | 5 |
+| `requirements.txt` et `.env.example` absents | existant | 5 |
+| CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
+| Slug CGV `refund_returns` | héritage WooCommerce | 6 |
+| 393 Mo de médias non optimisés | existant | 6 |
+| Pages WooCommerce publiées, extension inactive | existant | 7 |
+| Triple analytics, 5 extensions marketing | existant | 7 |
+| Compte administrateur unique, sans 2FA | existant | 9 |
