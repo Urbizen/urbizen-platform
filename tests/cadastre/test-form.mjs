@@ -2,7 +2,7 @@
    Couvre les 12 exigences de la version 0.4.0 et les 14 contrôles
    supplémentaires demandés à la revue. Aucun appel réseau réel. */
 import { JSDOM } from "jsdom";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -16,60 +16,34 @@ const check = (label, cond) => {
   console.log(label.padEnd(66), cond ? "OK" : "ECHEC");
 };
 
-/* Gabarit reproduisant fidèlement le rendu de Renderer.php. */
-function gabaritFormulaire(storageKey = "parcel", formId = "") {
-  const champsVisibles = [
-    ["terrain_adresse", "address.label", "text"],
-    ["terrain_cp", "address.postcode", "text"],
-    ["terrain_ville", "address.city", "text"],
-    ["cad_section", "parcel.section", "text"],
-    ["cad_numero", "parcel.number", "text"],
-    ["terrain_superficie", "parcel.surfaceM2", "number"],
-  ];
-  const champsCaches = [
-    ["adresse_code_commune", "address.cityCode"],
-    ["parcelle_code_commune", "parcel.communeCode"],
-    ["terrain_latitude", "location.latitude"],
-    ["terrain_longitude", "location.longitude"],
-    ["cad_prefixe", "parcel.prefix"],
-    ["cad_identifiant", "parcel.id"],
-    ["schema_version", "schemaVersion"],
-    ["confirme_le", "confirmedAt"],
-  ];
-  const requis = new Set(["terrain_adresse", "terrain_cp", "terrain_ville", "cad_section", "cad_numero"]);
-  return `
-  <div class="urbizen-form" data-urbizen-form="1" data-form-type="localisation"
-       data-storage-key="${storageKey}"${formId ? ` data-form-id="${formId}"` : ""}>
-    <h3 class="uf-title">Localisation du projet</h3>
-    <div class="uf-summary" hidden>
-      <p class="uf-summary-line uf-summary-address"></p>
-      <p class="uf-summary-line uf-summary-parcel"></p>
-      <button type="button" class="uf-edit">Modifier l’adresse</button>
-    </div>
-    <p class="uf-notice" role="status" hidden></p>
-    <form class="uf-form" novalidate>
-      <div class="uf-fields">
-        ${champsVisibles.map(([n, from, type]) => `
-        <div class="uf-field uf-field-${n}">
-          <label class="uf-label" for="uf-${n}">${n}</label>
-          <div class="uf-control">
-            <input type="${type}" id="uf-${n}" name="${n}" class="uf-input" value=""
-                   data-from="${from}"${requis.has(n) ? " required=\"required\"" : ""} />
-          </div>
-          <p class="uf-error" hidden></p>
-        </div>`).join("")}
-      </div>
-      <div class="uf-technical" hidden data-urbizen-technical="1">
-        ${champsCaches.map(([n, from]) => `<input type="hidden" name="${n}" data-from="${from}" value="" />`).join("")}
-      </div>
-      <div class="uf-actions">
-        <button type="submit" class="uf-submit">Valider ma localisation</button>
-        <button type="button" class="uf-clear">Effacer mes données de localisation</button>
-      </div>
-      <div class="uf-result" role="status" hidden></div>
-    </form>
-    <noscript><p class="uf-noscript">Ce formulaire nécessite JavaScript.</p></noscript>
-  </div>`;
+/* ── HTML réel, produit par Renderer.php ──
+   La fixture est régénérée par run-all.sh avant chaque exécution
+   (`php make-fixture.php > fixture.html`). Aucune structure HTML n'est
+   reproduite à la main ici : si le rendu serveur change de façon
+   incompatible, ces tests échouent au lieu de rester verts sur une copie
+   périmée. */
+const FIXTURE = resolve(dirname(fileURLToPath(import.meta.url)), "fixture.html");
+
+if (!existsSync(FIXTURE)) {
+  console.error("fixture.html absente. Lancez ./run-all.sh, qui la génère depuis Renderer.php.");
+  process.exit(2);
+}
+
+const FIXTURE_HTML = readFileSync(FIXTURE, "utf8");
+
+/* Découpe la fixture en instances, indexées par leur clé de stockage. */
+const INSTANCES = new Map();
+for (const bloc of FIXTURE_HTML.split(/\n(?=<div class="urbizen-form")/)) {
+  const m = bloc.match(/data-storage-key="([^"]+)"/);
+  if (m) INSTANCES.set(m[1], bloc.trim());
+}
+
+function gabaritFormulaire(storageKey = "parcel") {
+  const html = INSTANCES.get(storageKey);
+  if (!html) {
+    throw new Error(`fixture.html ne contient pas d'instance « ${storageKey} » — regénérez-la via run-all.sh`);
+  }
+  return html;
 }
 
 const CONTRAT = {
@@ -157,7 +131,7 @@ const val = (w, from, i = 0) => w.document.querySelectorAll(`[data-from="${from}
 
 /* ===== 6 et 9. Plusieurs formulaires, ciblage déterministe ===== */
 {
-  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a", "A") + gabaritFormulaire("parcel-b", "B"));
+  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a") + gabaritFormulaire("parcel-b"));
   w.sessionStorage.setItem("urbizen:parcel-a", JSON.stringify(CONTRAT));
   w.sessionStorage.setItem("urbizen:parcel-b", JSON.stringify({ ...CONTRAT, address: { ...CONTRAT.address, label: "Autre adresse 33000 Bordeaux" } }));
   chargerForm(w);
@@ -340,7 +314,7 @@ const val = (w, from, i = 0) => w.document.querySelectorAll(`[data-from="${from}
   champ().value = ""; let r = soumettre();
   check("+ Surface absente : validation acceptée, surfaceM2 null", r && r.contract.parcel.surfaceM2 === null);
   champ().value = "0"; r = soumettre();
-  check("+ Surface nulle : acceptée", r && r.contract.parcel.surfaceM2 === 0);
+  check("+ Surface nulle : refusée (strictement positive attendue)", r === null);
   champ().value = "-5"; r = soumettre();
   check("+ Surface négative : refusée", r === null && !w.document.querySelector(".uf-field-terrain_superficie .uf-error").hidden);
   champ().value = "123.45"; r = soumettre();
@@ -368,9 +342,23 @@ const val = (w, from, i = 0) => w.document.querySelectorAll(`[data-from="${from}
   chargerForm(w);
   const long = "X".repeat(5000);
   w.document.dispatchEvent(new w.CustomEvent("urbizen:parcel-confirmed", { detail: { ...CONTRAT, address: { ...CONTRAT.address, label: long, city: long }, parcel: { ...CONTRAT.parcel, section: long } } }));
-  check("+ Longueur bornée : label ≤ 300", val(w, "address.label").length === 300);
-  check("+ Longueur bornée : commune ≤ 120", val(w, "address.city").length === 120);
-  check("+ Longueur bornée : section ≤ 10", val(w, "parcel.section").length === 10);
+  /* Plus aucune troncature silencieuse : une valeur démesurée est refusée en
+     entier, une valeur simplement non conforme est conservée et signalée. */
+  /* Tout ce qui identifiait la localisation ayant été refusé, le contrat
+     devient inexploitable : rien n'est repris, et la personne en est avertie
+     plutôt que de voir un formulaire muet. */
+  check("+ Chaîne démesurée refusée, pas tronquée", val(w, "address.label") === "" && val(w, "parcel.section") === "");
+  check("+ Payload inexploitable : signalé, pas ignoré en silence",
+    !w.document.querySelector(".uf-notice").hidden
+    && /n’a pas pu être reprise/.test(w.document.querySelector(".uf-notice").textContent));
+  /* Une valeur simplement non conforme, elle, est conservée et signalée sur
+     son champ — la personne peut la corriger. */
+  const w2 = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w2);
+  w2.document.dispatchEvent(new w2.CustomEvent("urbizen:parcel-confirmed", { detail: { ...CONTRAT, parcel: { ...CONTRAT.parcel, section: "TROPLONG" } } }));
+  check("+ Section non conforme conservée telle quelle", val(w2, "parcel.section") === "TROPLONG");
+  check("+ Section non conforme signalée sur le champ",
+    w2.document.querySelector('[data-from="parcel.section"]').getAttribute("aria-invalid") === "true");
 }
 
 /* Pollution de prototype */
@@ -389,7 +377,7 @@ const val = (w, from, i = 0) => w.document.querySelectorAll(`[data-from="${from}
 
 /* Bouton « Modifier l'adresse » avec plusieurs instances */
 {
-  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a", "A") + gabaritFormulaire("parcel-b", "B"));
+  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a") + gabaritFormulaire("parcel-b"));
   chargerForm(w);
   const demandes = [];
   w.document.addEventListener("urbizen:cadastre-edit-requested", (e) => demandes.push(e.detail));
@@ -428,6 +416,168 @@ const val = (w, from, i = 0) => w.document.querySelectorAll(`[data-from="${from}
   const montes = w.UrbizenForm.autoMount();
   check("+ Formulaire monté après coup : reprise immédiate", montes.length === 1 && val(w, "address.label") === CONTRAT.address.label);
   check("+ autoMount idempotent", w.UrbizenForm.autoMount().length === 0);
+}
+
+/* ===== I-5. Le HTML testé vient bien du rendu PHP ===== */
+{
+  check("I-5. Fixture issue de Renderer.php (3 instances)", INSTANCES.size === 3);
+  check("I-5. Fixture sans aucune valeur préremplie", !/value="[^"]+"/.test(FIXTURE_HTML));
+  const w = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w);
+  check("I-5. Le JS monte sur le HTML réel de Renderer.php",
+    w.document.querySelectorAll('[data-uf-mounted="1"]').length === 1
+    && w.document.querySelectorAll(".uf-input").length === 6
+    && w.document.querySelectorAll(".uf-technical [data-from]").length === 8);
+  w.document.dispatchEvent(new w.CustomEvent("urbizen:parcel-confirmed", { detail: CONTRAT }));
+  check("I-5. Reprise fonctionnelle sur le HTML réel", val(w, "address.label") === CONTRAT.address.label);
+}
+
+/* ===== I-1. Identifiants uniques dès le rendu serveur ===== */
+{
+  const ids = [...FIXTURE_HTML.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  check("I-1. Aucun ID dupliqué dans le HTML serveur (3 formulaires)",
+    ids.length > 0 && new Set(ids).size === ids.length);
+  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a") + gabaritFormulaire("parcel-b"));
+  const avant = [...w.document.querySelectorAll(".uf-input")].map((i) => i.id);
+  chargerForm(w);
+  const apres = [...w.document.querySelectorAll(".uf-input")].map((i) => i.id);
+  check("I-1. Le JS n'ajoute aucun second préfixe", JSON.stringify(avant) === JSON.stringify(apres));
+  const forms = [...w.document.querySelectorAll(".urbizen-form")];
+  check("I-1. Chaque label vise son propre champ", forms.every((f) => {
+    const l = f.querySelector("label[for]");
+    return f.contains(w.document.getElementById(l.getAttribute("for")));
+  }));
+  const errIds = [...w.document.querySelectorAll(".uf-error")].map((e) => e.id);
+  check("I-1. Identifiants des messages d'erreur uniques",
+    errIds.every(Boolean) && new Set(errIds).size === errIds.length);
+}
+
+/* ===== I-2. Accessibilité des erreurs ===== */
+{
+  const w = await nouvelleFenetre(gabaritFormulaire("parcel-a") + gabaritFormulaire("parcel-b"));
+  chargerForm(w);
+  const f2 = w.document.querySelectorAll(".urbizen-form")[1];
+  f2.querySelector(".uf-form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));
+  const champ = f2.querySelector(".uf-input[required]");
+  const err = w.document.getElementById(champ.getAttribute("aria-describedby").split(/\s+/).find((id) => id.endsWith("-error")));
+  check("I-2. Erreur affichée", !err.hidden && err.textContent.length > 0);
+  check("I-2. Message relié au bon champ", f2.contains(err));
+  check("I-2. aria-invalid posé", champ.getAttribute("aria-invalid") === "true");
+  check("I-2. Annonce non intrusive (aria-live)", err.getAttribute("aria-live") === "polite");
+  // description existante conservée : la note de surface reste référencée
+  const surf = f2.querySelector('[data-from="parcel.surfaceM2"]');
+  const desc = (surf.getAttribute("aria-describedby") || "").split(/\s+/);
+  check("I-2. Description d'aide conservée", desc.some((id) => id.endsWith("-note")) && desc.some((id) => id.endsWith("-error")));
+  // correction : l'état invalide disparaît
+  champ.value = "12 rue des Lilas";
+  champ.dispatchEvent(new w.Event("input", { bubbles: true }));
+  check("I-2. aria-invalid retiré après correction", champ.getAttribute("aria-invalid") === null);
+  check("I-2. Message vidé après correction", err.hidden && err.textContent === "");
+  // aucune collision entre les deux formulaires
+  const f1 = w.document.querySelectorAll(".urbizen-form")[0];
+  check("I-2. Premier formulaire non affecté",
+    f1.querySelector(".uf-input[required]").getAttribute("aria-invalid") === null);
+}
+
+/* ===== I-3. Validation réaliste, sans troncature silencieuse ===== */
+{
+  const w = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w);
+  const n = (o) => w.UrbizenForm.normalizeWithIssues(o);
+  const base = (p) => ({ schemaVersion: "1.0", address: { label: "X", ...(p.address || {}) }, location: p.location || {}, parcel: { section: "KE", number: "0112", ...(p.parcel || {}) } });
+
+  // valides aux limites
+  check("I-3. cityCode 5 chiffres accepté", n(base({ address: { cityCode: "33063" } })).anomalies.length === 0);
+  check("I-3. cityCode corse 2B033 accepté (cas réel Bastia)", n(base({ address: { cityCode: "2B033" } })).anomalies.length === 0);
+  check("I-3. cityCode 2A004 accepté", n(base({ address: { cityCode: "2A004" } })).anomalies.length === 0);
+  check("I-3. prefix 000 accepté", n(base({ parcel: { prefix: "000" } })).anomalies.length === 0);
+  check("I-3. section 1 à 3 caractères acceptée",
+    n(base({ parcel: { section: "A" } })).anomalies.length === 0
+    && n(base({ parcel: { section: "KE" } })).anomalies.length === 0
+    && n(base({ parcel: { section: "0AB" } })).anomalies.length === 0);
+  check("I-3. numéro 1 à 4 chiffres accepté",
+    n(base({ parcel: { number: "1" } })).anomalies.length === 0
+    && n(base({ parcel: { number: "0112" } })).anomalies.length === 0);
+  check("I-3. idu 14 caractères accepté", n(base({ parcel: { id: "33063000KE0112" } })).anomalies.length === 0);
+  check("I-3. postcode 5 chiffres accepté", n(base({ address: { postcode: "33000" } })).anomalies.length === 0);
+  check("I-3. champs vides sans anomalie", n(base({})).anomalies.length === 0);
+
+  // invalides : signalés, jamais tronqués
+  const mauvaisCode = n(base({ address: { cityCode: "pas-un-code" } }));
+  check("I-3. cityCode invalide signalé", mauvaisCode.anomalies.some((a) => a.chemin === "address.cityCode"));
+  check("I-3. cityCode invalide NON tronqué", mauvaisCode.contrat.address.cityCode === "PAS-UN-CODE");
+  check("I-3. postcode invalide signalé", n(base({ address: { postcode: "AZERTY" } })).anomalies.length === 1);
+  check("I-3. section trop longue signalée", n(base({ parcel: { section: "1234567890" } })).anomalies.length === 1);
+  check("I-3. numéro non numérique signalé", n(base({ parcel: { number: "@@@@" } })).anomalies.length === 1);
+  check("I-3. idu de mauvaise longueur signalé", n(base({ parcel: { id: "trop-court" } })).anomalies.length === 1);
+  check("I-3. prefix à 2 chiffres signalé", n(base({ parcel: { prefix: "00" } })).anomalies.length === 1);
+
+  // normalisation explicite : casse
+  check("I-3. section normalisée en majuscules", n(base({ parcel: { section: "ke" } })).contrat.parcel.section === "KE");
+  check("I-3. idu normalisé en majuscules", n(base({ parcel: { id: "33063000ke0112" } })).contrat.parcel.id === "33063000KE0112");
+
+  // coordonnées et surface
+  check("I-3. latitude hors bornes refusée et signalée", (() => { const r = n(base({ location: { latitude: 91, longitude: 0 } })); return r.contrat.location.latitude === null && r.anomalies.some((a) => a.chemin === "location.latitude"); })());
+  check("I-3. longitude hors bornes refusée", n(base({ location: { latitude: 0, longitude: 181 } })).contrat.location.longitude === null);
+  check("I-3. latitude aux bornes acceptée", n(base({ location: { latitude: -90, longitude: 180 } })).anomalies.length === 0);
+  check("I-3. surface nulle refusée (strictement positive)", n(base({ parcel: { surfaceM2: 0 } })).contrat.parcel.surfaceM2 === null);
+  check("I-3. surface 1 m² acceptée", n(base({ parcel: { surfaceM2: 1 } })).contrat.parcel.surfaceM2 === 1);
+  check("I-3. surface au plafond acceptée", n(base({ parcel: { surfaceM2: 10000000 } })).contrat.parcel.surfaceM2 === 10000000);
+  check("I-3. surface au-dessus du plafond refusée", n(base({ parcel: { surfaceM2: 10000001 } })).contrat.parcel.surfaceM2 === null);
+  check("I-3. chaîne démesurée refusée", n(base({ address: { label: "X".repeat(1001) } })).contrat.address.label === "");
+
+  // revalidation des données entrantes : message visible sur un champ visible
+  const w2 = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w2);
+  w2.document.dispatchEvent(new w2.CustomEvent("urbizen:parcel-confirmed", { detail: { ...CONTRAT, address: { ...CONTRAT.address, postcode: "AZERTY" } } }));
+  const champCp = w2.document.querySelector('[data-from="address.postcode"]');
+  check("I-3. Donnée cadastre invalide : champ marqué à la reprise", champCp.getAttribute("aria-invalid") === "true");
+  check("I-3. Donnée cadastre invalide : valeur affichée telle quelle", champCp.value === "AZERTY");
+  // technique invalide : signalé dans la zone d'état
+  const w3 = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w3);
+  w3.document.dispatchEvent(new w3.CustomEvent("urbizen:parcel-confirmed", { detail: { ...CONTRAT, parcel: { ...CONTRAT.parcel, id: "court" } } }));
+  check("I-3. Donnée technique invalide : signalée dans la zone d'état",
+    !w3.document.querySelector(".uf-notice").hidden && /Identifiant cadastral/.test(w3.document.querySelector(".uf-notice").textContent));
+}
+
+/* ===== A-1. Provenance honnête ===== */
+{
+  // saisie entièrement manuelle
+  const w = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w);
+  for (const [from, v] of [["address.label", "12 rue de la Paix"], ["address.postcode", "75002"], ["address.city", "Paris"], ["parcel.section", "AB"], ["parcel.number", "0142"]]) {
+    w.document.querySelector(`[data-from="${from}"]`).value = v;
+  }
+  let d = null;
+  w.document.addEventListener("urbizen:location-form-validated", (e) => { d = e.detail; });
+  w.document.querySelector(".uf-form").dispatchEvent(new w.Event("submit", { bubbles: true, cancelable: true }));
+  check("A-1. Saisie manuelle : source = urbizen-form", d && d.contract.source === "urbizen-form");
+  check("A-1. Saisie manuelle : confirmedAt reste vide", d && d.contract.confirmedAt === "");
+
+  // reprise cadastre puis correction manuelle
+  const w2 = await nouvelleFenetre(gabaritFormulaire());
+  chargerForm(w2);
+  w2.document.dispatchEvent(new w2.CustomEvent("urbizen:parcel-confirmed", { detail: CONTRAT }));
+  w2.document.querySelector('[data-from="address.city"]').value = "Bordeaux Métropole";
+  let d2 = null;
+  w2.document.addEventListener("urbizen:location-form-validated", (e) => { d2 = e.detail; });
+  w2.document.querySelector(".uf-form").dispatchEvent(new w2.Event("submit", { bubbles: true, cancelable: true }));
+  check("A-1. Cadastre puis correction : source reste urbizen-cadastre", d2 && d2.contract.source === "urbizen-cadastre");
+  check("A-1. Cadastre : confirmedAt conservé", d2 && d2.contract.confirmedAt === CONTRAT.confirmedAt);
+  check("A-1. Validation locale ne crée aucun nouvel horodatage", d2 && d2.contract.confirmedAt === CONTRAT.confirmedAt);
+
+  // effacement : la provenance repart de zéro
+  w2.document.querySelector(".uf-clear").click();
+  w2.document.querySelector('[data-from="address.label"]').value = "1 rue de Rivoli";
+  w2.document.querySelector('[data-from="address.postcode"]').value = "75001";
+  w2.document.querySelector('[data-from="address.city"]').value = "Paris";
+  w2.document.querySelector('[data-from="parcel.section"]').value = "AB";
+  w2.document.querySelector('[data-from="parcel.number"]').value = "0001";
+  let d3 = null;
+  w2.document.addEventListener("urbizen:location-form-validated", (e) => { d3 = e.detail; });
+  w2.document.querySelector(".uf-form").dispatchEvent(new w2.Event("submit", { bubbles: true, cancelable: true }));
+  check("A-1. Après effacement : source repasse à urbizen-form", d3 && d3.contract.source === "urbizen-form");
 }
 
 console.log("\n" + (fail === 0 ? "TOUS LES CONTROLES PASSENT" : fail + " CONTROLE(S) EN ECHEC"));

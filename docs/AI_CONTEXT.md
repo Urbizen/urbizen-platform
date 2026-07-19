@@ -219,11 +219,17 @@ Cinq points à ne pas oublier :
 3. **`surfaceM2` est indicative** : surface cadastrale, pas surface de terrain.
    Un projet peut couvrir plusieurs parcelles.
 4. **Aucune valeur fabriquée** : chaîne vide ou `null`, jamais un repli inventé.
+   Les codes, section, numéro et identifiant sont validés par expression
+   régulière — **jamais tronqués**. Attention au cas corse : le code INSEE de
+   Bastia est `2B033`, une règle « 5 chiffres » rejetterait toute la Corse.
 5. **Aucune propriété plate** n'est conservée : vérifié, aucun consommateur ne
    lisait l'ancien format.
 
 Le formulaire lit **la seule clé de stockage qu'on lui a désignée**. Parcourir
 les clés `urbizen:*` pour choisir une parcelle au hasard est interdit.
+
+Le payload plat de la 0.3.0 encore présent dans un onglet est **ignoré**, sans
+migration ni effacement automatique : il faut confirmer à nouveau la parcelle.
 
 En version 0.4.0, **aucune donnée ne quitte le navigateur** : la validation est
 locale et publie `urbizen:location-form-validated`. Le futur point de

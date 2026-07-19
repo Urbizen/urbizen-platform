@@ -288,12 +288,46 @@ payload. Maintenir des champs plats pour un lecteur inexistant aurait créé une
 seconde source de vérité sans bénéfice. Il n'y a donc rien à déprécier, et
 aucune date de suppression à prévoir.
 
+**Règles de format, sans troncature silencieuse.** Une valeur non conforme est
+**refusée et signalée**, jamais raccourcie en douce :
+
+| Champ | Règle | Justification |
+|---|---|---|
+| `address.postcode` | `^[0-9]{5}$` | code postal français |
+| `address.cityCode`, `parcel.communeCode` | `^(?:[0-9]{5}\|2[AB][0-9]{3})$` | **cas réel vérifié** : le code INSEE de Bastia est `2B033`. La règle « exactement 5 chiffres » aurait rejeté toute la Corse |
+| `parcel.prefix` | `^[0-9]{3}$` | `com_abs`, vaut `000` hors communes fusionnées |
+| `parcel.section` | `^[0-9A-Z]{1,3}$` | sections observées à 2 caractères (`KE`, `KI`), la marge couvre les sections préfixées |
+| `parcel.number` | `^[0-9]{1,4}$` | numéros observés sur 4 chiffres (`0112`) |
+| `parcel.id` | `^[0-9A-Z]{14}$` | `idu` = INSEE (5) + préfixe (3) + section (2) + numéro (4) |
+| `location.latitude` / `longitude` | nombre fini, ±90 / ±180 | bornes terrestres |
+| `parcel.surfaceM2` | nombre fini, **strictement positif**, ≤ 10 000 000 | une parcelle de 0 m² n'existe pas |
+
+Deux transformations restent autorisées parce qu'elles sont **explicites et
+prévisibles** : `trim` sur toutes les chaînes, et passage en majuscules de la
+section, de l'identifiant et des codes commune. Toute autre valeur non conforme
+produit un message compréhensible — sur le champ s'il est visible, dans la zone
+d'état s'il est technique. Un payload dont plus rien n'est exploitable est
+**signalé**, jamais ignoré en silence.
+
+**L'ancien format plat 0.3.0 n'est pas migré.** Une personne dont l'onglet
+contient encore un payload produit par la 0.3.0 verra le formulaire vide : le
+format inconnu est **ignoré**, ni interprété ni transmis, et il lui faudra
+confirmer à nouveau sa parcelle. Rien n'est effacé automatiquement — la clé
+ancienne reste en place jusqu'à la fermeture de l'onglet. Une migration serait
+du code à écrire, à tester et à retirer plus tard pour un cas qui se résout de
+lui-même en une confirmation.
+
 **Conséquences.**
 - `street`, `houseNumber` et le préfixe cadastral (`com_abs`), jusque-là
   ignorés alors que les API les fournissent, sont désormais captés : le Cerfa
   distingue numéro et voie.
 - Le formulaire reconstruit le contrat **à partir des champs** au moment de la
   validation : ce que la personne a corrigé fait foi, pas le contrat d'origine.
+- **La provenance est honnête** : `source` vaut `urbizen-cadastre` si la
+  localisation vient d'une confirmation sur la carte — même corrigée ensuite —
+  et `urbizen-form` si tout a été saisi à la main. `confirmedAt` reste vide dans
+  ce second cas : la validation locale ne crée aucun horodatage, elle n'est pas
+  une confirmation cadastrale.
 - Un futur point de soumission serveur devra **tout revalider**. Les champs
   masqués viennent du navigateur : ils ne sont pas dignes de confiance.
 

@@ -32,8 +32,9 @@ cette version — la validation est entièrement locale.
   redonne la main au cadastre **par événement**, sans appeler de méthode privée
   ni dépendre d'un identifiant HTML fixe.
 - `UrbizenCadastre.getContract()` et `Cadastre.requestEdit()`.
-- `tests/cadastre/test-form.mjs` (**74 contrôles**) et `test-form-render.php`
-  (**39 contrôles**). Suite complète du dépôt : **181 contrôles**, tous verts.
+- `tests/cadastre/test-form.mjs` (**126 contrôles**), `test-form-render.php`
+  (**49 contrôles**), `make-fixture.php` et `run-all.sh`. Suite complète du
+  dépôt : **243 contrôles**, tous verts.
 
 ### Modifié
 - Le composant cadastre capte désormais `street`, `houseNumber` et le préfixe
@@ -61,6 +62,40 @@ cette version — la validation est entièrement locale.
 - Conservation documentée (D-010) : `sessionStorage` seul, portée de l'onglet,
   aucune durée inventée, effacement explicite, et **ni la reprise ni la
   validation n'effacent** quoi que ce soit.
+
+### Corrigé après revue de la PR #7
+- **Identifiants HTML uniques dès le rendu serveur** : `Renderer.php` préfixe
+  chaque instance (`uf-1-…`). Le HTML est valide sans JavaScript, et un libellé
+  cliqué vise bien son propre champ. Le script ne pose plus de second préfixe
+  lorsqu'il en trouve déjà un.
+- **Messages d'erreur accessibles** : chaque champ visible porte un conteneur
+  d'erreur identifié, référencé par `aria-describedby` dès le rendu, annoncé par
+  `aria-live="polite"`. Les descriptions d'aide existantes sont conservées.
+  `aria-invalid` est posé à l'erreur et **retiré dès la correction**.
+- **Fin de la troncature silencieuse.** Les codes, section, numéro et
+  identifiant cadastral sont validés par expression régulière ; une valeur non
+  conforme est refusée et signalée, jamais raccourcie. Le cas corse (`2B033`)
+  est pris en charge : la règle « 5 chiffres » aurait rejeté toute la Corse.
+- **Surface strictement positive** lorsqu'elle est renseignée : 0 m² est refusé.
+- **Un payload devenu inexploitable est signalé** au lieu d'être ignoré en
+  silence — défaut trouvé par un test pendant la correction.
+- **Zone d'état ne s'écrase plus elle-même** : les messages techniques et la
+  divergence des codes commune sont rassemblés puis rendus une seule fois.
+  Autre défaut trouvé par un test.
+- **Provenance honnête** : `source` vaut `urbizen-form` sur une saisie
+  entièrement manuelle, `urbizen-cadastre` dès qu'une confirmation cadastre est
+  à l'origine, même corrigée ensuite.
+- **Commande unique** `npm test` (`run-all.sh`) : régénère la fixture puis
+  enchaîne les quatre bancs, s'arrête avec un code non nul au premier échec.
+- **Le banc JavaScript consomme le HTML réel** produit par `Renderer.php` :
+  plus aucune copie manuelle de la structure, donc plus de faux positif
+  possible si le rendu change.
+
+### Ancien format 0.3.0
+Le payload plat de la 0.3.0 encore présent dans un onglet est **ignoré** : ni
+interprété, ni transmis. La personne devra confirmer à nouveau sa parcelle.
+Aucune donnée ancienne n'est effacée automatiquement, aucune migration n'est
+prévue.
 
 ### Limites assumées
 Aucune soumission serveur, aucune route REST, aucune table, aucun nonce, aucun

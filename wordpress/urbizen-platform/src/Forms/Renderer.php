@@ -25,6 +25,17 @@ defined( 'ABSPATH' ) || exit;
 final class Renderer {
 
 	/**
+	 * Compteur d'instances rendues dans la page courante.
+	 *
+	 * Garantit des identifiants HTML uniques **dès le rendu serveur** : le HTML
+	 * est valide avant toute exécution de JavaScript, et un libellé cliqué sans
+	 * JavaScript vise bien son propre champ.
+	 *
+	 * @var int
+	 */
+	private static int $instance = 0;
+
+	/**
 	 * Rend le formulaire complet.
 	 *
 	 * @param FormDefinition       $def     Définition.
@@ -35,8 +46,13 @@ final class Renderer {
 		$storage_key = isset( $options['storageKey'] ) ? (string) $options['storageKey'] : 'parcel';
 		$form_id     = isset( $options['formId'] ) ? (string) $options['formId'] : '';
 
+		$prefix = 'uf-' . ( ++self::$instance );
+
 		$html  = '<div class="urbizen-form"';
 		$html .= ' data-urbizen-form="1"';
+		// Signale au JavaScript que les identifiants sont déjà uniques : il ne
+		// doit pas en ajouter un second préfixe.
+		$html .= ' data-uf-instance="' . esc_attr( $prefix ) . '"';
 		$html .= ' data-form-type="' . esc_attr( $def->type() ) . '"';
 		$html .= ' data-storage-key="' . esc_attr( $storage_key ) . '"';
 
@@ -64,7 +80,7 @@ final class Renderer {
 
 		// Aucun `action` ni `method` : rien n'est soumis à cette étape.
 		$html .= '<form class="uf-form" novalidate>';
-		$html .= self::render_fields( $def );
+		$html .= self::render_fields( $def, $prefix );
 		$html .= '<div class="uf-actions">';
 		$html .= '<button type="submit" class="uf-submit">' . esc_html( $def->submit_label() ) . '</button>';
 		$html .= '<button type="button" class="uf-clear">'
@@ -88,14 +104,15 @@ final class Renderer {
 	/**
 	 * Rend les champs, visibles puis masqués.
 	 *
-	 * @param FormDefinition $def Définition.
+	 * @param FormDefinition $def    Définition.
+	 * @param string         $prefix Préfixe d'instance.
 	 * @return string HTML échappé.
 	 */
-	private static function render_fields( FormDefinition $def ): string {
+	private static function render_fields( FormDefinition $def, string $prefix ): string {
 		$html = '<div class="uf-fields">';
 
 		foreach ( $def->visible_fields() as $field ) {
-			$html .= self::render_visible_field( $field );
+			$html .= self::render_visible_field( $field, $prefix );
 		}
 
 		$html .= '</div>';
@@ -124,13 +141,15 @@ final class Renderer {
 	/**
 	 * Rend un champ visible avec son étiquette.
 	 *
-	 * @param array<string, mixed> $field Champ.
+	 * @param array<string, mixed> $field  Champ.
+	 * @param string               $prefix Préfixe d'instance.
 	 * @return string HTML échappé.
 	 */
-	private static function render_visible_field( array $field ): string {
-		$name = (string) $field['name'];
-		$id   = 'uf-' . $name;
-		$type = 'number' === $field['type'] ? 'number' : 'text';
+	private static function render_visible_field( array $field, string $prefix ): string {
+		$name     = (string) $field['name'];
+		$id       = $prefix . '-' . $name;
+		$error_id = $id . '-error';
+		$type     = 'number' === $field['type'] ? 'number' : 'text';
 
 		$attrs = array(
 			'type'      => $type,
@@ -151,12 +170,18 @@ final class Renderer {
 			$attrs['required'] = 'required';
 		}
 
-		$note_id = '';
+		$note_id  = '';
+		$described = array();
 
 		if ( ! empty( $field['note'] ) ) {
-			$note_id            = $id . '-note';
-			$attrs['aria-describedby'] = $note_id;
+			$note_id     = $id . '-note';
+			$described[] = $note_id;
 		}
+
+		// Le message d'erreur est TOUJOURS référencé, même vide : le champ et
+		// son message restent liés, et le JavaScript n'a qu'à remplir le texte.
+		$described[]               = $error_id;
+		$attrs['aria-describedby'] = implode( ' ', $described );
 
 		$html  = '<div class="uf-field uf-field-' . esc_attr( $name ) . '">';
 		$html .= '<label class="uf-label" for="' . esc_attr( $id ) . '">' . esc_html( (string) $field['label'] );
@@ -187,9 +212,22 @@ final class Renderer {
 				. esc_html( (string) $field['note'] ) . '</p>';
 		}
 
-		$html .= '<p class="uf-error" hidden></p>';
+		// aria-live plutôt que role="alert" : le message est annoncé quand il
+		// apparaît, sans interrompre la saisie ni se répéter à chaque frappe.
+		$html .= '<p class="uf-error" id="' . esc_attr( $error_id ) . '" aria-live="polite" hidden></p>';
 		$html .= '</div>';
 
 		return $html;
+	}
+
+	/**
+	 * Réinitialise le compteur d'instances.
+	 *
+	 * Réservé aux tests : une requête WordPress rend une page puis s'achève.
+	 *
+	 * @return void
+	 */
+	public static function reset_instances(): void {
+		self::$instance = 0;
 	}
 }

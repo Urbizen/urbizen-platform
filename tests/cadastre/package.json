@@ -5,7 +5,10 @@
   "description": "Bancs d'essai du composant cadastre : rendu PHP et comportement JavaScript.",
   "type": "module",
   "scripts": {
-    "test": "node test-cadastre.mjs"
+    "test": "./run-all.sh",
+    "test:cadastre": "node test-cadastre.mjs",
+    "test:form": "node test-form.mjs",
+    "fixture": "php make-fixture.php > fixture.html"
   },
   "devDependencies": {
     "jsdom": "^27.0.0"

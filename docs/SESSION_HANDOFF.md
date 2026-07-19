@@ -92,9 +92,17 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
   validés ; **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu
   PHP** avec doublures, tous verts ; aucune référence CDN ; images de
   `leaflet.css` toutes présentes.
-- **0.4.0 (branche en cours)** : 74 contrôles JavaScript et 39 contrôles de
-  rendu PHP pour le formulaire, plus 32 + 36 pour le cadastre en
-  non-régression — **181 au total, tous verts**. Ces contrôles sont **simulés** : le formulaire n'a pas encore été
+- **0.4.0 (branche en cours)** : les quatre bancs se lancent par une commande
+  unique — `cd tests/cadastre && npm test`. Elle régénère la fixture depuis le
+  rendu réel de `Renderer.php`, puis enchaîne les quatre suites et s'arrête au
+  premier échec. **243 contrôles** : 32 + 126 côté JavaScript, 36 + 49 côté
+  rendu PHP. Tous verts.
+- Revue de la PR #7 : sept défauts relevés, six corrigés (I-1 à I-5, A-1).
+  Deux défauts supplémentaires ont été trouvés **par les tests** pendant la
+  correction : un payload inexploitable ignoré en silence, et la zone d'état qui
+  s'écrasait elle-même.
+- Ces contrôles restent **simulés** : le formulaire n'a pas encore été ouvert
+  dans un éditeur réel ni essayé sur le site. Ces contrôles sont **simulés** : le formulaire n'a pas encore été
   ouvert dans un vrai éditeur ni essayé sur le site.
 - **Test WordPress réel du 19/07/2026** : 13 contrôles passés dans l'éditeur et
   sur le site public — insertion, réglages, enregistrement, rechargement sans
@@ -122,10 +130,13 @@ aucune page publiée ne l'utilise à ce jour.
    supprimée. Aucune page publiée n'utilise encore le composant.
 2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
 3. Ne jamais pousser directement sur `main`.
-4. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle
+4. **Ancien format 0.3.0** : un onglet ouvert avant le déploiement conservera un
+   payload plat, désormais ignoré. La personne devra confirmer à nouveau sa
+   parcelle. Aucune migration n'est prévue, rien n'est effacé automatiquement.
+5. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle
    ni de sauvegarde : le dépôt est public.
-5. Ne jamais afficher le contenu de `wp-config.php`.
-6. Ne rien modifier en production via l'éditeur de fichiers de WordPress.
+6. Ne jamais afficher le contenu de `wp-config.php`.
+7. Ne rien modifier en production via l'éditeur de fichiers de WordPress.
 
 ### Points de vigilance pour la reprise
 

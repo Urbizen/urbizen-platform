@@ -153,7 +153,12 @@ check( 'Aucun champ prerempli par le serveur',
 // --- Bloc et shortcode identiques ---
 $a = FormBlock::render_block( array( 'storageKey' => 'terrain-a', 'formId' => 'A' ) );
 $b = FormBlock::render_shortcode( array( 'storagekey' => 'terrain-a', 'formid' => 'A' ) );
-check( 'Bloc et shortcode : rendu identique', $a === $b );
+// Chaque rendu porte son propre prefixe d'instance (uf-1, uf-2...) : c'est
+// justement ce qui garantit l'unicite des identifiants. On neutralise ce
+// numero pour comparer la logique de rendu, qui doit etre identique.
+$sans_instance = static fn( $h ) => preg_replace( '/\buf-\d+\b/', 'uf-N', $h );
+check( 'Bloc et shortcode : rendu identique (hors numero d instance)', $sans_instance( $a ) === $sans_instance( $b ) );
+check( 'Deux rendus successifs ont des prefixes differents', $a !== $b );
 check( 'Cle de stockage personnalisee prise en compte', str_contains( $a, 'data-storage-key="terrain-a"' ) );
 
 // --- Robustesse des attributs ---
@@ -176,6 +181,42 @@ FormBlock::render_block( array() );
 FormBlock::render_block( array( 'storageKey' => 'autre' ) );
 FormBlock::render_shortcode( array() );
 check( 'Trois rendus : chaque handle enfile une seule fois', 2 === count( array_unique( $GLOBALS['enqueued'] ) ) );
+
+// --- I-1 : identifiants uniques des le rendu serveur, sur trois formulaires ---
+\Urbizen\Platform\Forms\Renderer::reset_instances();
+$page = FormBlock::render_block( array( 'storageKey' => 'un' ) )
+	. FormBlock::render_block( array( 'storageKey' => 'deux' ) )
+	. FormBlock::render_shortcode( array( 'storagekey' => 'trois' ) );
+
+preg_match_all( '/\bid="([^"]+)"/', $page, $mm );
+$ids = $mm[1];
+check( 'Trois rendus : au moins 18 identifiants produits', count( $ids ) >= 18 );
+check( 'Trois rendus : AUCUN identifiant duplique', count( $ids ) === count( array_unique( $ids ) ) );
+
+preg_match_all( '/<label[^>]*for="([^"]+)"/', $page, $ml );
+check( 'Trois rendus : chaque label vise un identifiant existant',
+	count( $ml[1] ) === count( array_intersect( $ml[1], $ids ) ) );
+check( 'Trois rendus : aucun label duplique', count( $ml[1] ) === count( array_unique( $ml[1] ) ) );
+
+// --- I-2 : accessibilite des messages d'erreur ---
+preg_match_all( '/<p class="uf-error" id="([^"]+)"([^>]*)>/', $page, $me );
+check( 'Chaque champ visible a un conteneur d erreur identifie', count( $me[1] ) === 18 );
+check( 'Identifiants des messages d erreur uniques', count( $me[1] ) === count( array_unique( $me[1] ) ) );
+check( 'Messages d erreur annonces sans interruption (aria-live)',
+	count( array_filter( $me[2], static fn( $a ) => str_contains( $a, 'aria-live="polite"' ) ) ) === 18 );
+
+preg_match_all( '/<input[^>]*class="uf-input"[^>]*>/', $page, $mi );
+$relies = 0;
+$avec_note = 0;
+foreach ( $mi[0] as $input ) {
+	preg_match( '/aria-describedby="([^"]+)"/', $input, $d );
+	if ( empty( $d[1] ) ) { continue; }
+	$refs = explode( ' ', $d[1] );
+	if ( array_intersect( $refs, $me[1] ) ) { $relies++; }
+	if ( array_filter( $refs, static fn( $r ) => str_ends_with( $r, '-note' ) ) ) { $avec_note++; }
+}
+check( 'Chaque champ visible est relie a son message d erreur', 18 === $relies );
+check( 'La note d aide reste referencee a cote du message', 3 === $avec_note );
 
 // --- Registre ---
 check( 'Type inconnu refuse par le registre', null === FormRegistry::get( 'inexistant' ) );
