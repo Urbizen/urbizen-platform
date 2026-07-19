@@ -3,7 +3,7 @@ Contributors: urbizen
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.3.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -36,11 +36,19 @@ Le sens des dépendances est unique : thème -> extension -> service Python.
 
 == État actuel ==
 
-Version 0.1.0 — amorçage nu (étape 1). L'extension ne crée aucune table,
-aucune option et aucun fichier ; elle n'expose ni formulaire ni route REST.
-Les modules seront ajoutés un par un, avec vérification à chaque étape.
+Version 0.3.0 — composant cadastre (étape 2). L'extension ne crée toujours
+aucune table, aucune option et aucun fichier ; elle n'expose ni formulaire ni
+route REST. Les modules sont ajoutés un par un, avec vérification à chaque étape.
 
 == Changelog ==
+
+= 0.3.0 =
+* Composant cadastre : bloc Gutenberg « urbizen/cadastre » et shortcode
+  « [urbizen_cadastre] », partageant le même rendu dynamique côté serveur.
+* Leaflet 1.9.4 embarqué localement (BSD 2-Clause, voir
+  assets/vendor/leaflet/LICENSE) : aucun appel à un CDN.
+* Aucune adresse ni parcelle enregistrée dans le contenu de la page :
+  ces données restent dans l'onglet du visiteur.
 
 = 0.1.0 =
 * Amorçage : chargement automatique des classes, contrôle d'environnement,

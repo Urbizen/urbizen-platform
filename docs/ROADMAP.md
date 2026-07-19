@@ -31,15 +31,23 @@ Dernière mise à jour : 19 juillet 2026.
 ## Étape 3 — Composant cadastre
 
 - [x] Auto-hébergement de Leaflet, fin des appels CDN (RGPD) — *19/07/2026*
-- [x] Shortcode `[urbizen_cadastre]` et bloc `urbizen/cadastre`, rendu commun — *19/07/2026*
+- [x] Shortcode `[urbizen_cadastre]` et rendu dynamique commun — *19/07/2026*
+- [~] Bloc Gutenberg `urbizen/cadastre` : `block.json`, `editor.js`,
+      `InspectorControls` et aperçu statique écrits et testés **hors ligne** ;
+      insertion, édition, enregistrement et rechargement **non vérifiés dans un
+      vrai éditeur** — à valider sur une page en brouillon
 - [x] Source de vérité unique dans l'extension, copies supprimées (D-008) — *19/07/2026*
 - [x] Suppression des `innerHTML` et identifiants uniques par instance — *19/07/2026*
-- [x] Bancs d'essai `tests/cadastre/` : 16 contrôles JS, 15 contrôles PHP — *19/07/2026*
+- [x] Licence Leaflet BSD 2-Clause versionnée, source et empreintes documentées — *19/07/2026*
+- [x] Bancs d'essai **simulés** `tests/cadastre/` : 32 contrôles JS (jsdom),
+      36 contrôles PHP (doublures) — *19/07/2026*
+- [ ] **Test WordPress réel** sur page brouillon non indexée : insertion du bloc,
+      réglages, enregistrement, rechargement, rendu public, assets sans 404,
+      essai sur ordinateur et sur mobile
 - [ ] Auto-hébergement des **polices** (Google Fonts encore appelé par le thème)
-- [ ] Validation sur une page de test non indexée, en conditions réelles
 - [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires (étape 4)
-- [ ] Interface d'édition du bloc (`edit.js`) : aujourd'hui les attributs se
-      règlent par le shortcode ou le code, pas encore dans l'éditeur
+
+Légende : `[x]` terminé · `[~]` écrit et testé hors ligne, non validé en réel.
 
 ---
 
@@ -125,7 +133,7 @@ conservant les URL existantes.
 | Mappings Cerfa en `TODO_` | existant | 5 |
 | `POST /api/dp` non authentifié, CORS `*` | existant | 5 |
 | ~~`requirements.txt` et `.env.example` absents~~ | existant | **soldé le 19/07/2026** |
-| Aucun test automatique : `tests/` est vide | existant | 5 |
+| Aucun test du service Python (`tests/cadastre/` existe désormais) | existant | 5 |
 | CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
 | Slug CGV `refund_returns` | héritage WooCommerce | 6 |
 | 393 Mo de médias non optimisés | existant | 6 |

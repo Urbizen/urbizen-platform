@@ -239,7 +239,10 @@
     this.$input.addEventListener("input", onType);
     this.$input.addEventListener("keydown", function (e) { self._onKey(e); });
     this.$input.addEventListener("focus", function () { if (self.suggestions.length) self._openSuggest(); });
-    document.addEventListener("click", function (e) { if (!self.root.contains(e.target)) self._closeSuggest(); });
+    /* Mémorisé pour pouvoir être retiré par destroy() : sans cela, chaque
+       remontage laisserait un écouteur orphelin sur le document. */
+    this._onDocClick = function (e) { if (!self.root.contains(e.target)) self._closeSuggest(); };
+    document.addEventListener("click", this._onDocClick);
 
     this.$toggle.addEventListener("click", function () { self._setBase(!self.baseOrtho); });
     this.$confirm.addEventListener("click", function () { self._confirmCurrent(); });
@@ -273,6 +276,7 @@
   Cadastre.prototype._renderSuggest = function (networkError) {
     while (this.$suggest.firstChild) { this.$suggest.removeChild(this.$suggest.firstChild); }
     this.suggestIndex = -1;
+    this.$input.removeAttribute("aria-activedescendant");
     if (networkError) {
       this.$suggest.appendChild(el("li", "uc-empty",
         "Recherche indisponible : vérifiez votre connexion, puis réessayez."));
@@ -296,7 +300,14 @@
   };
 
   Cadastre.prototype._openSuggest = function () { this.$suggest.hidden = false; this.$input.setAttribute("aria-expanded", "true"); };
-  Cadastre.prototype._closeSuggest = function () { this.$suggest.hidden = true; this.$input.setAttribute("aria-expanded", "false"); this.suggestIndex = -1; };
+  Cadastre.prototype._closeSuggest = function () {
+    this.$suggest.hidden = true;
+    this.$input.setAttribute("aria-expanded", "false");
+    this.suggestIndex = -1;
+    /* Aucune option active : l'attribut doit disparaître, sans quoi les
+       lecteurs d'écran annoncent une option qui n'existe plus. */
+    this.$input.removeAttribute("aria-activedescendant");
+  };
 
   Cadastre.prototype._onKey = function (e) {
     if (this.$suggest.hidden) return;
@@ -309,9 +320,17 @@
   };
   Cadastre.prototype._highlight = function (items) {
     for (var i = 0; i < items.length; i++) items[i].setAttribute("aria-selected", i === this.suggestIndex ? "true" : "false");
+    if (this.suggestIndex < 0) {
+      this.$input.removeAttribute("aria-activedescendant");
+      return;
+    }
     if (this.suggestIndex >= 0) {
       this.$input.setAttribute("aria-activedescendant", this.uid + "-opt-" + this.suggestIndex);
-      items[this.suggestIndex].scrollIntoView({ block: "nearest" });
+      /* scrollIntoView n'existe pas partout (environnements de test, vieux
+         navigateurs) : son absence ne doit pas casser la navigation clavier. */
+      if (typeof items[this.suggestIndex].scrollIntoView === "function") {
+        items[this.suggestIndex].scrollIntoView({ block: "nearest" });
+      }
     }
   };
 
@@ -372,6 +391,10 @@
         this.layers.cadastre = global.L.tileLayer(tileUrl(CONFIG.layers.cadastre, "image/png"), { maxZoom: 20, opacity: 0.9 }).addTo(this.map);
         var self = this;
         this.map.on("click", function (e) { self._queryParcel(e.latlng.lng, e.latlng.lat, true); });
+        /* Une couche IGN qui ne répond pas ne doit pas laisser une carte muette :
+           on prévient une fois, sans masquer ce qui s'affiche déjà. */
+        this.layers.ortho.on("tileerror", function () { self._tileError(); });
+        this.layers.cadastre.on("tileerror", function () { self._tileError(); });
       } catch (err) { this._showError("La carte est momentanément indisponible."); return; }
     } else {
       this.map.setView([lat, lon], 18);
@@ -485,6 +508,32 @@
     if (typeof this.opts.onConfirm === "function") this.opts.onConfirm(this.data);
   };
 
+  /* Signale une seule fois l'indisponibilité des tuiles. */
+  Cadastre.prototype._tileError = function () {
+    if (this._tileErrorShown) { return; }
+    this._tileErrorShown = true;
+    this._setStatus("Le fond de carte ne répond pas. Vous pouvez réessayer plus tard ; la sélection de parcelle reste possible.");
+  };
+
+  /* Démonte proprement l'instance : carte Leaflet, écouteurs, DOM et marqueur
+     de montage. Après appel, le conteneur peut être remonté par autoMount(). */
+  Cadastre.prototype.destroy = function () {
+    if (this.activeGeocode) { try { this.activeGeocode.abort(); } catch (e) {} }
+    if (this.activeParcel) { try { this.activeParcel.abort(); } catch (e) {} }
+    if (this._onDocClick) { document.removeEventListener("click", this._onDocClick); this._onDocClick = null; }
+    if (this.map) { try { this.map.remove(); } catch (e) {} this.map = null; }
+    this.layers = {};
+    this.selLayer = null;
+    this.pointMarker = null;
+    if (this.root) {
+      while (this.root.firstChild) { this.root.removeChild(this.root.firstChild); }
+      this.root.classList.remove("uc-root");
+      this.root.removeAttribute("data-uc-mounted");
+      delete this.root.urbizenCadastre;
+    }
+    return true;
+  };
+
   Cadastre.prototype._setStatus = function (txt) { if (this.$status) this.$status.textContent = txt; };
   Cadastre.prototype._searching = function (on) { if (this.$statusWrap) this.$statusWrap.classList.toggle("is-searching", on); };
   Cadastre.prototype._showError = function (msg) { this.$error.textContent = msg; this.$error.hidden = false; };
@@ -521,13 +570,16 @@
         var n = nodes[i];
         if (n.getAttribute("data-uc-mounted") === "1") { continue; }
         n.setAttribute("data-uc-mounted", "1");
-        mounted.push(new Cadastre(n, {
+        var inst = new Cadastre(n, {
           label:         n.getAttribute("data-label") || undefined,
           placeholder:   n.getAttribute("data-placeholder") || undefined,
           continueLabel: n.getAttribute("data-continue-label") || undefined,
           storageKey:    n.getAttribute("data-storage-key") || undefined,
           mapHeight:     n.getAttribute("data-map-height") || undefined
-        }));
+        });
+        /* Accessible depuis l'hôte : instance.destroy(), lecture de instance.data. */
+        n.urbizenCadastre = inst;
+        mounted.push(inst);
       }
       return mounted;
     }

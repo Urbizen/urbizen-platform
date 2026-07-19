@@ -107,9 +107,75 @@ check("getStored prefixe la cle", UC.getStored("parcel")?.address === "test");
 check("clearStored efface", UC.clearStored("parcel") && UC.getStored("parcel") === null);
 check("clearStored expose dans l'API", typeof UC.clearStored === "function");
 
-/* --- Absence de Leaflet : message visible, pas de plantage --- */
-check("Aucun innerHTML sur donnees d'API",
-  !readFileSync(SRC, "utf8").match(/\.innerHTML\s*=(?!\s*"")/));
+/* --- aria-activedescendant --- */
+fetchMode = "ok";
+await type("12 rue des lilas");
+input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+check("aria-activedescendant pose sur option active",
+  input.getAttribute("aria-activedescendant") !== null);
+input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+check("aria-activedescendant retire a la fermeture",
+  input.getAttribute("aria-activedescendant") === null);
+fetchMode = "empty";
+await type("plus rien");
+check("aria-activedescendant retire quand la liste est vide",
+  input.getAttribute("aria-activedescendant") === null);
+
+/* --- destroy() et remontage --- */
+const inst1 = c1.urbizenCadastre;
+check("Instance accessible depuis le conteneur", typeof inst1?.destroy === "function");
+check("destroy() nettoie le conteneur",
+  inst1.destroy() &&
+  c1.querySelector(".uc-input") === null &&
+  !c1.hasAttribute("data-uc-mounted"));
+const remounted = UC.autoMount();
+check("Remontage possible apres destroy()",
+  remounted.length === 1 && c1.querySelector(".uc-input") !== null);
+check("Toujours aucun identifiant duplique apres remontage", (() => {
+  const ids = [...window.document.querySelectorAll("[id]")].map((n) => n.id);
+  return new Set(ids).size === ids.length;
+})());
+
+/* --- autoMount rappele : pas de double montage --- */
+const before = window.document.querySelectorAll(".uc-input").length;
+UC.autoMount();
+check("autoMount idempotent",
+  window.document.querySelectorAll(".uc-input").length === before);
+
+/* --- sessionStorage indisponible : non bloquant --- */
+const realStorage = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+Object.defineProperty(window, "sessionStorage", {
+  configurable: true,
+  get() { throw new Error("stockage refuse"); }
+});
+check("getStored ne leve pas si le stockage est refuse", UC.getStored("parcel") === null);
+check("clearStored ne leve pas si le stockage est refuse", UC.clearStored("parcel") === false);
+let evenement = false;
+const inst2 = window.document.querySelectorAll("[data-urbizen-cadastre]")[1].urbizenCadastre;
+inst2.root.addEventListener("urbizen:parcel-confirmed", () => { evenement = true; });
+inst2.confirmed = true;
+inst2._continue();
+check("Confirmation emise malgre le stockage indisponible", evenement === true);
+Object.defineProperty(window, "sessionStorage", realStorage);
+
+/* --- Normalisation des cles --- */
+window.sessionStorage.setItem("urbizen:maCle", JSON.stringify({ a: 1 }));
+check("Cle sans prefixe normalisee", UC.getStored("maCle")?.a === 1);
+check("Cle deja prefixee non doublee", UC.getStored("urbizen:maCle")?.a === 1);
+
+/* --- Leaflet absent : message visible, page non bloquee --- */
+const inst3 = window.document.querySelectorAll("[data-urbizen-cadastre]")[1].urbizenCadastre;
+inst3._showMap(-0.57, 44.83);
+check("Leaflet absent : erreur visible et explicite",
+  !inst3.root.querySelector(".uc-error").hidden &&
+  /carte est momentan/i.test(inst3.root.querySelector(".uc-error").textContent));
+check("Leaflet absent : le reste du composant repond",
+  inst3.root.querySelector(".uc-input") !== null);
+
+/* --- Code source --- */
+const src = readFileSync(SRC, "utf8");
+check("Aucun innerHTML sur donnees d'API", !src.match(/\.innerHTML\s*=(?!\s*"")/));
+check("destroy() retire l ecouteur document", /removeEventListener\("click"/.test(src));
 
 console.log("\n" + (fail === 0 ? "TOUS LES CONTROLES PASSENT" : fail + " CONTROLE(S) EN ECHEC"));
 process.exit(fail === 0 ? 0 : 1);

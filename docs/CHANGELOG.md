@@ -7,14 +7,34 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ## [0.3.0] — 19 juillet 2026
 
-Composant cadastre porté dans l'extension. **Rien n'est déployé en production**
-et la page d'accueil publiée n'est pas modifiée.
+Composant cadastre porté dans l'extension, **version du plugin portée à 0.3.0**.
+**Rien n'est déployé en production** et la page d'accueil publiée n'est pas
+modifiée.
+
+> **Statut du bloc Gutenberg.** L'interface d'édition existe et est testée hors
+> ligne : `block.json`, `editor.js`, `InspectorControls`, aperçu statique. Elle
+> n'a **pas encore été ouverte dans un vrai éditeur WordPress** — insertion,
+> modification, enregistrement et rechargement restent à valider sur une page
+> en brouillon. Voir la réserve en fin d'entrée.
 
 ### Ajouté
 - `src/Blocks/CadastreBlock.php` : bloc Gutenberg `urbizen/cadastre` et
   shortcode `[urbizen_cadastre]`, partageant **exactement** le même rendu et le
   même enfilage. Rendu dynamique côté PHP ; `post_content` ne contient jamais
   d'adresse ni de parcelle.
+- `blocks/cadastre/block.json` : **déclaration unique** des cinq attributs.
+  PHP les relit depuis ce fichier, l'éditeur les reçoit de WordPress : aucune
+  valeur par défaut n'est dupliquée.
+- `blocks/cadastre/editor.js` : `registerBlockType` avec `InspectorControls`
+  pour le libellé, le texte d'aide, le bouton Continuer, la clé de stockage et
+  la hauteur de carte, plus un **aperçu statique**. Aucun appel IGN, aucune
+  carte Leaflet dans l'éditeur. `save()` renvoie `null`.
+- `blocks/cadastre/editor.css` : styles de l'aperçu, éditeur uniquement.
+- `assets/vendor/leaflet/LICENSE` : licence **BSD 2-Clause** officielle de
+  Leaflet 1.9.4, et `README.md` précisant version, source, empreintes SHA-256
+  et règle de mise à jour.
+- `Cadastre.prototype.destroy()` : démontage propre — carte Leaflet, écouteur
+  document, DOM et marqueur de montage —, permettant un remontage.
 - `assets/vendor/leaflet/` : Leaflet 1.9.4 embarqué (JS, CSS, images). Plus
   aucun appel à `unpkg.com`.
 - `UrbizenCadastre.autoMount()` : montage automatique des conteneurs
@@ -22,9 +42,9 @@ et la page d'accueil publiée n'est pas modifiée.
 - `UrbizenCadastre.clearStored()` : effacement explicite des données de
   localisation conservées dans l'onglet.
 - Repli `<noscript>` : le composant ne laisse jamais un conteneur muet.
-- `tests/cadastre/` : deux bancs d'essai — comportement JavaScript sous jsdom
-  (16 contrôles) et rendu PHP avec doublures WordPress (15 contrôles). Le
-  répertoire `tests/` n'était pas utilisé jusqu'ici.
+- `tests/cadastre/` : deux bancs d'essai, comportement JavaScript sous jsdom et
+  rendu PHP avec doublures WordPress. Le répertoire `tests/` n'était pas
+  utilisé jusqu'ici.
 - `docs/AI_CONTEXT.md` : section sur les services publics externes, leurs points
   d'entrée et leurs limites.
 
@@ -38,6 +58,25 @@ et la page d'accueil publiée n'est pas modifiée.
   dans `:root`.
 - Messages d'erreur rendus plus explicites : « vérifiez votre connexion »,
   « vérifiez l'orthographe ou précisez la commune ».
+- Version du plugin **0.1.0 → 0.3.0**, en-tête et constante alignées. Les
+  handles CSS et JavaScript portent cette version : la montée de version casse
+  le cache navigateur et LiteSpeed, les anciens assets ne peuvent pas rester
+  servis. Leaflet garde sa propre version, 1.9.4.
+- `aria-activedescendant` désormais **retiré** dès qu'aucune suggestion n'est
+  active — à la fermeture de la liste, quand elle est vide et à chaque
+  reconstruction. Il annonçait auparavant une option disparue.
+- `scrollIntoView` appelé seulement s'il existe : son absence ne casse plus la
+  navigation clavier.
+- Panne d'une couche IGN : message de statut explicite, affiché une seule fois,
+  sans masquer ce qui s'affiche déjà.
+
+### Corrigé
+- **Le bloc n'était pas utilisable dans Gutenberg** : `register_block_type()`
+  côté PHP ne suffit pas, il faut un enregistrement côté éditeur. Sans
+  `block.json` ni script d'éditeur, le bloc n'apparaissait pas dans l'outil
+  d'insertion. C'est l'objet de cette correction.
+- Écouteur `click` posé sur `document` à chaque montage sans jamais être
+  retiré : fuite corrigée par `destroy()`.
 
 ### Sécurité
 - **Suppression de tout `innerHTML`** sur des données d'API ou d'attributs : le
@@ -46,8 +85,23 @@ et la page d'accueil publiée n'est pas modifiée.
 - **Identifiants HTML uniques par instance** : plusieurs composants cohabitent
   sur une page sans casser `for`, `aria-controls` ni `aria-activedescendant`.
 - Attributs assainis et échappés côté PHP, hauteur de carte validée par
-  expression régulière. L'échappement PHP ne remplace pas celui du JavaScript :
-  les deux sont en place.
+  expression régulière **des deux côtés** — l'éditeur avertit, le serveur
+  tranche. L'échappement PHP ne remplace pas celui du JavaScript : les deux
+  sont en place.
+
+### Tests
+- **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu PHP** avec
+  doublures WordPress, tous verts. Couvrent désormais l'enregistrement de
+  l'éditeur, la cohérence des attributs, les versions de handles, les
+  dépendances, l'absence de double enfilage et la licence Leaflet.
+
+### Réserve — ce qui reste à valider en conditions réelles
+Les bancs d'essai sont **simulés** : jsdom n'est pas un navigateur et les
+doublures PHP ne sont pas WordPress. N'ont donc **pas** été vérifiés :
+insertion du bloc depuis l'outil d'insertion, modification via les
+`InspectorControls`, enregistrement puis rechargement de l'éditeur, rendu réel
+sur le site, absence de 404 sur les assets, et comportement sur mobile. Ces
+essais demandent un déploiement sur une page en brouillon non indexée.
 
 ---
 

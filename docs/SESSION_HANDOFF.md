@@ -29,8 +29,15 @@ encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
 
 La branche en cours porte le **composant cadastre** dans l'extension : bloc
 Gutenberg, shortcode, Leaflet embarqué, source de vérité unique. Le code est
-écrit et testé hors ligne, mais **rien n'est déployé** : la production tourne
-toujours sur `urbizen-platform` 0.1.0 sans module cadastre.
+écrit et testé **hors ligne uniquement**. **Rien n'est déployé** : la production
+tourne toujours sur `urbizen-platform` 0.1.0, sans module cadastre.
+
+Point de vérité important : le bloc Gutenberg **n'a jamais été ouvert dans un
+éditeur WordPress réel**. Une première version enregistrait le bloc côté PHP
+seulement — il n'apparaissait donc pas dans l'outil d'insertion. L'interface
+d'édition existe désormais (`block.json`, `editor.js`, `InspectorControls`,
+aperçu statique), mais tant qu'elle n'a pas été essayée sur une page en
+brouillon, le bloc doit être considéré comme **non validé**.
 
 ### Ce qui a été fait
 
@@ -47,8 +54,14 @@ toujours sur `urbizen-platform` 0.1.0 sans module cadastre.
 - Reproductibilité du backend soldée : `requirements.txt`, `.env.example` et
   documentation de lancement local corrigée.
 - Composant cadastre porté dans l'extension : bloc `urbizen/cadastre` et
-  shortcode `[urbizen_cadastre]` au rendu commun, Leaflet 1.9.4 embarqué,
-  `innerHTML` supprimés, identifiants uniques par instance, `clearStored()`.
+  shortcode `[urbizen_cadastre]` au rendu commun, Leaflet 1.9.4 embarqué avec
+  sa licence BSD 2-Clause, `innerHTML` supprimés, identifiants uniques par
+  instance, `clearStored()` et `destroy()`.
+- Interface d'édition Gutenberg ajoutée après revue : `block.json` comme
+  déclaration unique des attributs, `editor.js`, `editor.css`, aperçu statique
+  sans appel IGN ni carte Leaflet.
+- Version du plugin portée à **0.3.0**, handles versionnés pour casser les
+  caches navigateur et LiteSpeed.
 - Premiers tests automatiques du projet : `tests/cadastre/`.
 
 ### État vérifié de la production
@@ -77,23 +90,30 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
   `POST /api/dp` sans champ → 400 avec la liste des champs manquants.
 - Aucun secret dans les fichiers ajoutés : `.env.example` ne contient que des
   noms de variables et des exemples fictifs.
-- Cadastre : 12 fichiers PHP au lint sans erreur ; syntaxe JS validée
-  (`node --check`) ; 16 contrôles JavaScript sous jsdom et 15 contrôles de
-  rendu PHP, tous verts ; aucune référence CDN dans les assets ; images
-  référencées par `leaflet.css` toutes présentes.
+- Cadastre : 12 fichiers PHP au lint sans erreur ; syntaxe JS et `block.json`
+  validés ; **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu
+  PHP** avec doublures, tous verts ; aucune référence CDN ; images de
+  `leaflet.css` toutes présentes.
+- Tous ces contrôles sont **simulés**. jsdom n'est pas un navigateur et les
+  doublures ne sont pas WordPress : ils ne prouvent pas que le bloc s'insère,
+  s'enregistre et se recharge dans l'éditeur.
 
 ### Prochaine étape
 
-**Revue de la PR du cadastre**, puis validation en conditions réelles : déployer
-l'extension, poser le bloc sur une **page en brouillon non indexée**, et
-contrôler sur ordinateur et mobile l'autocomplétion, la carte, la sélection et
-la confirmation de parcelle. Rien de tout cela n'a encore été fait en
-production.
+**Validation du bloc sur une page en brouillon**, selon le protocole de
+déploiement limité décrit dans la PR #6 : sauvegarde, envoi de l'extension
+seule, page brouillon non indexée, contrôles, puis retour arrière immédiat si
+quoi que ce soit dévie. Ce protocole attend une autorisation explicite avant
+toute modification du serveur.
 
-Restent ouverts sur le composant : l'interface d'édition du bloc dans Gutenberg
-(les attributs se règlent aujourd'hui par shortcode ou par code) et
-l'auto-hébergement des polices, encore chargées depuis Google Fonts par le
-thème.
+À vérifier lors de cet essai : présence du bloc dans l'outil d'insertion,
+insertion, réglages via la barre latérale, enregistrement, rechargement de
+l'éditeur, rendu sur le site public, absence de 404 sur les assets,
+autocomplétion, carte, sélection et confirmation de parcelle, sur ordinateur et
+sur mobile.
+
+Reste ouvert par ailleurs : l'auto-hébergement des polices, encore chargées
+depuis Google Fonts par le thème.
 
 ### Interdictions
 
