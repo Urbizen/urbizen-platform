@@ -82,7 +82,8 @@ possibilités : un type de contenu personnalisé, ou des tables dédiées.
 plans et des photographies. `wp-content/uploads` est servi publiquement et ses
 URL sont devinables.
 
-**Décision.** Stockage dans `/home/u328261530/urbizen-storage/`, hors racine web,
+**Décision.** Stockage dans `${URBIZEN_STORAGE_ROOT}` — répertoire personnel du
+compte d'hébergement, voisin de `domains/`, donc hors racine web —
 avec contrôle du type MIME réel, plafonds de taille, empreinte SHA-256, et accès
 par jeton expirant via une route REST authentifiée.
 

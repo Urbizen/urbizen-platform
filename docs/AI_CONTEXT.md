@@ -23,15 +23,27 @@ Lire ensuite [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md), qui fait foi.
 
 ## 2. Accès à la production
 
+Les coordonnées exactes du serveur ne sont **pas versionnées** : ce dépôt est
+public. Elles sont conservées hors Git, dans la mémoire projet de l'assistant et
+dans le gestionnaire de mots de passe. Renseigner ces variables avant usage :
+
 ```bash
-ssh -i ~/.ssh/urbizen_hostinger -p 65002 u328261530@92.113.28.40
+export SSH_USER=…                                  # compte SSH Hostinger
+export SSH_HOST=…                                  # adresse du serveur
+export SSH_PORT=65002
+export WP_ROOT="domains/urbizen.fr/public_html"    # relatif au répertoire personnel
+export URBIZEN_STORAGE_ROOT="urbizen-storage"      # stockage privé, hors racine web
+
+ssh -i ~/.ssh/urbizen_hostinger -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}"
+cd "${WP_ROOT}"
 ```
 
 | Élément | Valeur |
 |---|---|
-| Racine WordPress | `/home/u328261530/domains/urbizen.fr/public_html` |
+| Racine WordPress | `${WP_ROOT}` |
+| Stockage privé | `${URBIZEN_STORAGE_ROOT}` |
 | Sauvegardes | `~/backups/` |
-| Serveur | `fr-int-web1589.main-hosting.eu`, CloudLinux + CageFS |
+| Hébergeur | Hostinger, CloudLinux + CageFS |
 | PHP | 8.3.30 · WP-CLI 2.12.0 · WordPress 7.0.2 · base `wp_` |
 | Site | <https://urbizen.fr> |
 
@@ -44,7 +56,8 @@ identifiants de base de données et les clés de salage.
 
 **Thème** : `hostinger-ai-theme` 2.0.18, thème **FSE** fourni par l'hébergeur,
 mise à jour 2.0.29 disponible, auto-updates actifs via mu-plugin. Le thème enfant
-`urbizen-child` est déployé.
+`urbizen-child` 0.1.0 est déployé et **actif** ; le thème Hostinger est devenu son
+parent.
 
 **Extensions actives notables** : Fluent Forms 6.2.5 (6 formulaires, 4 entrées),
 Fluent SMTP, All in One SEO, LiteSpeed Cache, Kadence Blocks, Google Site Kit,
@@ -168,13 +181,13 @@ refonte des pages, pas avant.
 ```bash
 # 1. Lint PHP — pas de PHP en local, on lint via le serveur
 for f in $(find wordpress -name '*.php'); do
-  ssh -i ~/.ssh/urbizen_hostinger -p 65002 u328261530@92.113.28.40 'php -l' < "$f"
+  ssh -i ~/.ssh/urbizen_hostinger -p "${SSH_PORT}" "${SSH_USER}@${SSH_HOST}" 'php -l' < "$f"
 done
 
 # 2. Déploiement
-rsync -az --delete -e "ssh -i ~/.ssh/urbizen_hostinger -p 65002" \
+rsync -az --delete -e "ssh -i ~/.ssh/urbizen_hostinger -p ${SSH_PORT}" \
   wordpress/urbizen-child/ \
-  u328261530@92.113.28.40:domains/urbizen.fr/public_html/wp-content/themes/urbizen-child/
+  "${SSH_USER}@${SSH_HOST}:${WP_ROOT}/wp-content/themes/urbizen-child/"
 
 # 3. Activation puis purge du cache
 wp theme activate urbizen-child && wp litespeed-purge all

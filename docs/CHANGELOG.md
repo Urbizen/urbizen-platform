@@ -5,6 +5,25 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.2.1] — 19 juillet 2026
+
+### Sécurité
+- Coordonnées du serveur de production retirées de la documentation : le dépôt
+  GitHub est **public**. `docs/AI_CONTEXT.md` et `docs/DECISIONS.md` utilisent
+  désormais les variables `SSH_USER`, `SSH_HOST`, `SSH_PORT`, `WP_ROOT` et
+  `URBIZEN_STORAGE_ROOT`. Les valeurs réelles vivent hors Git.
+
+### Ajouté
+- `docs/SESSION_HANDOFF.md` : passation de session — branche et PR courantes,
+  état réel de la production, travaux terminés, contrôles, points de vigilance,
+  prochaine étape et interdictions.
+
+### Corrigé
+- `docs/AI_CONTEXT.md` : le thème enfant n'est pas seulement déployé, il est
+  **actif** en production.
+
+---
+
 ## [0.2.0] — 19 juillet 2026
 
 ### Corrigé
