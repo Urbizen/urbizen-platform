@@ -222,3 +222,143 @@ Cinq règles encadrent le portage :
   `clearStored()` pour permettre un effacement explicite.
 - Les services IGN sont soumis à quota et le parcellaire n'est mis à jour que
   deux fois par an : la surface cadastrale affichée est **indicative**.
+
+---
+
+## D-009 — Contrat de données entre le cadastre et les formulaires
+
+**Date** : 19 juillet 2026 · **État** : actée
+
+**Contexte.** Le composant cadastre publiait un objet plat de treize clés, non
+versionné, mêlant adresse, coordonnées, références cadastrales et géométrie. Le
+formulaire allait devenir son premier consommateur réel : figer un contrat
+explicite avant qu'un second module ne s'y accroche évitait de le renégocier
+plus tard, sur du code en production.
+
+**Décision.** Un contrat canonique **1.0**, imbriqué et versionné, est la seule
+structure publiée — par l'événement `urbizen:parcel-confirmed` comme par
+`sessionStorage` :
+
+```json
+{
+  "schemaVersion": "1.0",
+  "source": "urbizen-cadastre",
+  "confirmedAt": "",
+  "address":  { "label": "", "houseNumber": "", "street": "", "postcode": "", "city": "", "cityCode": "" },
+  "location": { "latitude": null, "longitude": null },
+  "parcel":   { "communeCode": "", "prefix": "", "section": "", "number": "", "id": "", "surfaceM2": null }
+}
+```
+
+Six règles l'encadrent :
+
+1. **Aucune valeur fabriquée.** Chaîne absente = chaîne vide ; nombre absent ou
+   invalide = `null`. Une donnée que les services ne fournissent pas reste vide.
+2. **`surfaceM2` est une surface cadastrale indicative**, jamais une surface de
+   terrain arpentée. Le champ correspondant reste modifiable et porte une
+   mention visible : un projet peut couvrir plusieurs parcelles, ou une partie
+   seulement de l'une d'elles.
+3. **`confirmedAt` horodate la confirmation par la personne**, pas la réponse de
+   l'API. C'est l'acte de validation qui fait foi.
+4. **`source` décrit Urbizen** (`urbizen-cadastre`), pas le fournisseur externe :
+   le contrat est le nôtre, quelles que soient les API sous-jacentes.
+5. **Une fabrique unique** — `buildContract()` — produit tout ce qui est publié.
+   Aucune structure parallèle n'est maintenue à côté.
+6. **Toutes les chaînes sont bornées** et les nombres validés, des deux côtés du
+   pont.
+
+**La géométrie est exclue du contrat 1.0.** Elle reste dans l'état interne du
+composant, où elle sert au seul tracé de la parcelle sur la carte, mais elle
+n'est ni publiée, ni stockée, ni transmise au formulaire, et aucun champ caché
+ne la porte. Motif : aucun usage identifié en aval — ni le formulaire, ni le
+service Python ne l'exploitent — pour un volume de plusieurs kilo-octets de
+données de localisation précises. La réintroduire exigera un usage démontré et
+une version 1.1 du contrat.
+
+**Les deux codes commune sont conservés séparément.** `address.cityCode` vient
+du géocodeur, `parcel.communeCode` de la parcelle cadastrale. Ils ne sont ni
+fusionnés, ni substitués l'un à l'autre. En cas de divergence, le formulaire
+reste utilisable, aucune valeur n'est inventée, et un état technique non
+bloquant est exposé dans le DOM — jamais dans un journal.
+
+**Aucune propriété plate de compatibilité n'est conservée.** Vérification faite
+avant la bascule : le seul consommateur existant, `frontend/homepage/homepage.js`,
+écoute l'événement pour faire défiler la page et **ne lit aucune propriété** du
+payload. Maintenir des champs plats pour un lecteur inexistant aurait créé une
+seconde source de vérité sans bénéfice. Il n'y a donc rien à déprécier, et
+aucune date de suppression à prévoir.
+
+**Règles de format, sans troncature silencieuse.** Une valeur non conforme est
+**refusée et signalée**, jamais raccourcie en douce :
+
+| Champ | Règle | Justification |
+|---|---|---|
+| `address.postcode` | `^[0-9]{5}$` | code postal français |
+| `address.cityCode`, `parcel.communeCode` | `^(?:[0-9]{5}\|2[AB][0-9]{3})$` | **cas réel vérifié** : le code INSEE de Bastia est `2B033`. La règle « exactement 5 chiffres » aurait rejeté toute la Corse |
+| `parcel.prefix` | `^[0-9]{3}$` | `com_abs`, vaut `000` hors communes fusionnées |
+| `parcel.section` | `^[0-9A-Z]{1,3}$` | sections observées à 2 caractères (`KE`, `KI`), la marge couvre les sections préfixées |
+| `parcel.number` | `^[0-9]{1,4}$` | numéros observés sur 4 chiffres (`0112`) |
+| `parcel.id` | `^[0-9A-Z]{14}$` | `idu` = INSEE (5) + préfixe (3) + section (2) + numéro (4) |
+| `location.latitude` / `longitude` | nombre fini, ±90 / ±180 | bornes terrestres |
+| `parcel.surfaceM2` | nombre fini, **strictement positif**, ≤ 10 000 000 | une parcelle de 0 m² n'existe pas |
+
+Deux transformations restent autorisées parce qu'elles sont **explicites et
+prévisibles** : `trim` sur toutes les chaînes, et passage en majuscules de la
+section, de l'identifiant et des codes commune. Toute autre valeur non conforme
+produit un message compréhensible — sur le champ s'il est visible, dans la zone
+d'état s'il est technique. Un payload dont plus rien n'est exploitable est
+**signalé**, jamais ignoré en silence.
+
+**L'ancien format plat 0.3.0 n'est pas migré.** Une personne dont l'onglet
+contient encore un payload produit par la 0.3.0 verra le formulaire vide : le
+format inconnu est **ignoré**, ni interprété ni transmis, et il lui faudra
+confirmer à nouveau sa parcelle. Rien n'est effacé automatiquement — la clé
+ancienne reste en place jusqu'à la fermeture de l'onglet. Une migration serait
+du code à écrire, à tester et à retirer plus tard pour un cas qui se résout de
+lui-même en une confirmation.
+
+**Conséquences.**
+- `street`, `houseNumber` et le préfixe cadastral (`com_abs`), jusque-là
+  ignorés alors que les API les fournissent, sont désormais captés : le Cerfa
+  distingue numéro et voie.
+- Le formulaire reconstruit le contrat **à partir des champs** au moment de la
+  validation : ce que la personne a corrigé fait foi, pas le contrat d'origine.
+- **La provenance est honnête** : `source` vaut `urbizen-cadastre` si la
+  localisation vient d'une confirmation sur la carte — même corrigée ensuite —
+  et `urbizen-form` si tout a été saisi à la main. `confirmedAt` reste vide dans
+  ce second cas : la validation locale ne crée aucun horodatage, elle n'est pas
+  une confirmation cadastrale.
+- Un futur point de soumission serveur devra **tout revalider**. Les champs
+  masqués viennent du navigateur : ils ne sont pas dignes de confiance.
+
+---
+
+## D-010 — Conservation des données de localisation
+
+**Date** : 19 juillet 2026 · **État** : actée
+
+**Contexte.** L'adresse et la parcelle sont des données personnelles. Elles
+transitent aujourd'hui uniquement par le navigateur, mais la question de leur
+conservation devait être tranchée avant toute soumission serveur.
+
+**Décision.** `sessionStorage` uniquement, **jamais `localStorage`**.
+
+- La portée est **l'onglet courant** : les données disparaissent normalement à
+  sa fermeture. Aucune durée en heures ou en jours n'est annoncée — ce serait
+  inventer une garantie que le mécanisme ne donne pas.
+- La clé est **préfixée `urbizen:`** et configurable par bloc. Un formulaire
+  lit **la seule clé qu'on lui a désignée** ; parcourir l'ensemble des clés
+  pour choisir une parcelle au hasard est interdit.
+- **Une action explicite d'effacement** est offerte à la personne, dans le
+  formulaire comme par l'API `UrbizenCadastre.clearStored()`.
+- **Ni le préremplissage, ni la validation locale n'effacent quoi que ce soit** :
+  la personne doit pouvoir revenir en arrière et corriger son adresse.
+- Un effacement automatique ne sera envisagé qu'**après une soumission serveur
+  confirmée comme réussie**.
+
+**Conséquences.**
+- Aucune donnée personnelle ne quitte le navigateur en version 0.4.0.
+- Aucune donnée personnelle n'est écrite dans un journal, ni côté navigateur,
+  ni côté serveur : les diagnostics n'exposent que des codes d'erreur.
+- La politique de confidentialité devra mentionner ce stockage local dès que le
+  composant sera publié sur une page réelle.

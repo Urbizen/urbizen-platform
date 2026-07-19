@@ -1,0 +1,31 @@
+/* Aperçu statique du bloc formulaire — éditeur uniquement. */
+.urbizen-form-preview {
+	border: 1px solid var(--u-line, #C9D3DD);
+	border-radius: var(--u-radius, 4px);
+	background: var(--u-surface, #FBFCFD);
+	padding: 16px;
+}
+.urbizen-form-preview-title {
+	font-family: var(--u-font-title, "Space Grotesk", system-ui, sans-serif);
+	font-size: 17px; margin-bottom: 10px;
+}
+.urbizen-form-preview-summary {
+	border-left: 3px solid var(--u-brand, #128A5A);
+	background: var(--u-brand-sf, #E4F5EC);
+	padding: 8px 10px; font-size: 13px; margin-bottom: 14px;
+}
+.urbizen-form-preview-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.urbizen-form-preview-field {
+	border: 1px solid var(--u-line-strong, #9FADBC);
+	border-radius: var(--u-radius, 4px);
+	background: #fff; padding: 10px 12px;
+	font-size: 13px; color: var(--u-ink-faint, #8791A6);
+}
+.urbizen-form-preview-field:first-child { grid-column: 1 / -1; }
+.urbizen-form-preview-note { margin-top: 10px; font-size: 12px; color: var(--u-ink-soft, #55617A); }
+.urbizen-form-preview-actions { margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.urbizen-form-preview-btn {
+	display: inline-block; padding: 10px 16px; border-radius: var(--u-radius, 4px);
+	background: var(--u-brand, #128A5A); color: #fff; font-size: 14px; opacity: .55;
+}
+.urbizen-form-preview-hint { font-family: var(--u-font-mono, ui-monospace, monospace); font-size: 12px; color: var(--u-ink-faint, #8791A6); }

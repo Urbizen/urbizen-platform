@@ -44,7 +44,8 @@ Dernière mise à jour : 19 juillet 2026.
 - [x] **Test WordPress réel** sur page brouillon non indexée — *19/07/2026* :
       13 contrôles passés, aucune erreur, aucun 404 (voir DEPLOY_CADASTRE.md)
 - [ ] Auto-hébergement des **polices** (Google Fonts encore appelé par le thème)
-- [ ] Événement `urbizen:parcel-confirmed` consommé par les formulaires (étape 4)
+- [x] Événement `urbizen:parcel-confirmed` consommé par un formulaire — *19/07/2026*
+- [x] Contrat de données canonique 1.0, versionné et documenté (D-009) — *19/07/2026*
 
 Légende : `[x]` terminé et vérifié · `[~]` écrit, non validé en conditions réelles.
 
@@ -52,7 +53,12 @@ Légende : `[x]` terminé et vérifié · `[~]` écrit, non validé en condition
 
 ## Étape 4 — Moteur de formulaires
 
-- [ ] Définitions déclaratives versionnées dans `src/Forms/definitions/`
+- [x] Définitions déclaratives versionnées dans `src/Forms/definitions/` — *19/07/2026*
+- [x] Formulaire de localisation, bloc et shortcode, reprise du cadastre — *19/07/2026*
+- [~] Validation : **locale uniquement** en 0.4.0. La validation serveur reste
+      entièrement à écrire, et devra tout revalider sans faire confiance aux
+      champs masqués
+- [ ] **Test WordPress réel** du formulaire sur la page brouillon 1157
 - [ ] Rendu accessible : labels, `aria-describedby`, navigation clavier
 - [ ] Validation serveur, nonces, limitation de débit, honeypot et délai minimal
 - [ ] Tables `wp_urbizen_submissions`, `_submission_fields`, `_files`, `_log`

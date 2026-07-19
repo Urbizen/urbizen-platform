@@ -3,7 +3,7 @@ Contributors: urbizen
 Requires at least: 6.5
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 0.3.0
+Stable tag: 0.4.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
@@ -36,11 +36,19 @@ Le sens des dépendances est unique : thème -> extension -> service Python.
 
 == État actuel ==
 
-Version 0.3.0 — composant cadastre (étape 2). L'extension ne crée toujours
+Version 0.4.0 — composant cadastre et premier formulaire (étapes 2 et 3). L'extension ne crée toujours
 aucune table, aucune option et aucun fichier ; elle n'expose ni formulaire ni
 route REST. Les modules sont ajoutés un par un, avec vérification à chaque étape.
 
 == Changelog ==
+
+= 0.4.0 =
+* Contrat de données canonique 1.0 entre le cadastre et les formulaires :
+  structure imbriquée, versionnée, sans géométrie.
+* Bloc « urbizen/formulaire » et shortcode « [urbizen_formulaire] » :
+  formulaire de localisation reprenant la parcelle confirmée.
+* Validation locale uniquement : aucune donnée n'est transmise à un serveur,
+  et les données de localisation restent dans l'onglet du visiteur.
 
 = 0.3.0 =
 * Composant cadastre : bloc Gutenberg « urbizen/cadastre » et shortcode

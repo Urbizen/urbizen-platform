@@ -17,6 +17,14 @@
    est construit par createElement / textContent / setAttribute. L'échappement
    PHP côté serveur ne dispense pas de cette règle.
 
+   ── Contrat de données ──
+   La confirmation publie le contrat canonique 1.0 (voir docs/DECISIONS.md,
+   D-009) : { schemaVersion, source, confirmedAt, address, location, parcel }.
+   La géométrie de la parcelle en est EXCLUE : elle reste en interne, pour le
+   seul tracé sur la carte. Une fabrique unique — buildContract() — produit
+   tout ce qui est publié : événement et sessionStorage. Aucune structure
+   parallèle n'est maintenue.
+
    ── Vie privée ──
    L'adresse et la parcelle restent dans l'onglet du navigateur (sessionStorage,
    clé préfixée et configurable). Rien n'est envoyé à un serveur Urbizen ; seuls
@@ -65,13 +73,69 @@
     return key.indexOf(CONFIG.storagePrefix) === 0 ? key : CONFIG.storagePrefix + key;
   }
 
-  /* Modèle de données conservé (schéma fixé par la spécification) */
+  /* Version du contrat de données publié (voir D-009). */
+  var SCHEMA_VERSION = "1.0";
+  var CONTRACT_SOURCE = "urbizen-cadastre";
+
+  /* Longueurs maximales : bornent ce qui vient d'un service externe. */
+  var MAX_LEN = { label: 300, street: 200, houseNumber: 20, postcode: 10, city: 120, code: 10, section: 10, number: 10, id: 20, prefix: 10 };
+
+  /* État interne de l'instance. La géométrie y reste — elle sert au tracé sur
+     la carte — mais elle est HORS du contrat 1.0 : elle n'est ni publiée, ni
+     stockée, ni transmise au formulaire. */
   function emptyData() {
     return {
-      address: "", postcode: "", city: "", cityCode: "",
+      label: "", houseNumber: "", street: "", postcode: "", city: "", cityCode: "",
       longitude: null, latitude: null,
-      cadastralSection: "", cadastralNumber: "", cadastralId: "",
-      area: null, geometry: null, source: "", retrievedAt: ""
+      parcelCommuneCode: "", parcelPrefix: "", section: "", number: "", parcelId: "",
+      surfaceM2: null,
+      geometry: null,          // hors contrat 1.0, usage interne (tracé)
+      confirmedAt: ""
+    };
+  }
+
+  /* Normalisation : chaîne bornée, jamais nulle. */
+  function str(v, max) {
+    if (v == null) { return ""; }
+    var s = String(v).trim();
+    return max && s.length > max ? s.slice(0, max) : s;
+  }
+
+  /* Normalisation : nombre fini, sinon null. Aucune valeur n'est inventée. */
+  function num(v) {
+    if (v === null || v === undefined || v === "") { return null; }
+    var n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /* Fabrique UNIQUE du contrat canonique. Toute donnée publiée par le
+     composant — événement comme sessionStorage — passe par ici. Aucune
+     structure parallèle n'est maintenue à côté. */
+  function buildContract(d) {
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      source: CONTRACT_SOURCE,
+      confirmedAt: str(d.confirmedAt, 40),
+      address: {
+        label:       str(d.label, MAX_LEN.label),
+        houseNumber: str(d.houseNumber, MAX_LEN.houseNumber),
+        street:      str(d.street, MAX_LEN.street),
+        postcode:    str(d.postcode, MAX_LEN.postcode),
+        city:        str(d.city, MAX_LEN.city),
+        cityCode:    str(d.cityCode, MAX_LEN.code)
+      },
+      location: {
+        latitude:  num(d.latitude),
+        longitude: num(d.longitude)
+      },
+      parcel: {
+        communeCode: str(d.parcelCommuneCode, MAX_LEN.code),
+        prefix:      str(d.parcelPrefix, MAX_LEN.prefix),
+        section:     str(d.section, MAX_LEN.section),
+        number:      str(d.number, MAX_LEN.number),
+        id:          str(d.parcelId, MAX_LEN.id),
+        surfaceM2:   num(d.surfaceM2)
+      }
     };
   }
 
@@ -244,6 +308,18 @@
     this._onDocClick = function (e) { if (!self.root.contains(e.target)) self._closeSuggest(); };
     document.addEventListener("click", this._onDocClick);
 
+    /* Demande de correction d'adresse émise par un formulaire. Couplage par
+       événement et par clé de stockage : aucun identifiant HTML fixe, aucun
+       appel à une méthode privée depuis l'extérieur. Une demande sans clé
+       s'applique à toutes les instances ; avec clé, à la seule instance
+       correspondante. */
+    this._onEditRequest = function (e) {
+      var cle = e && e.detail && e.detail.storageKey;
+      if (cle && storageKeyFor(cle) !== self.storageKey) { return; }
+      self.requestEdit();
+    };
+    document.addEventListener("urbizen:cadastre-edit-requested", this._onEditRequest);
+
     this.$toggle.addEventListener("click", function () { self._setBase(!self.baseOrtho); });
     this.$confirm.addEventListener("click", function () { self._confirmCurrent(); });
     this.$reject.addEventListener("click", function () { self._rejectParcel(); });
@@ -357,12 +433,13 @@
         } else { // repli sur les coordonnées de l'autocomplétion
           lon = s.x; lat = s.y;
         }
-        self.data.address = p.label || s.fulltext || "";
+        self.data.label = p.label || s.fulltext || "";
+        self.data.houseNumber = p.housenumber || "";   // absent hors adresse au numéro
+        self.data.street = p.street || s.street || "";
         self.data.postcode = p.postcode || s.zipcode || "";
         self.data.city = p.city || s.city || "";
         self.data.cityCode = p.citycode || "";
         self.data.longitude = lon; self.data.latitude = lat;
-        self.data.source = "geoplateforme";
         self._showMap(lon, lat);
         self._queryParcel(lon, lat);
       })
@@ -371,7 +448,8 @@
         // on tente quand même la carte avec les coords de l'autocomplétion
         if (s.x != null && s.y != null) {
           self.data.longitude = s.x; self.data.latitude = s.y;
-          self.data.address = s.fulltext || ""; self.data.city = s.city || ""; self.data.postcode = s.zipcode || "";
+          self.data.label = s.fulltext || ""; self.data.city = s.city || "";
+          self.data.postcode = s.zipcode || ""; self.data.street = s.street || "";
           self._showMap(s.x, s.y); self._queryParcel(s.x, s.y);
         } else {
           self._showError("Adresse introuvable. Réessayez ou saisissez une autre adresse.");
@@ -467,14 +545,20 @@
   Cadastre.prototype._confirmCurrent = function () {
     if (!this.current) return;
     var p = this.current.properties || {};
-    this.data.cadastralSection = p.section || "";
-    this.data.cadastralNumber = p.numero || "";
-    this.data.cadastralId = p.idu || p.id || "";
-    this.data.area = (p.contenance != null ? p.contenance : null);
+    this.data.section = p.section || "";
+    this.data.number = p.numero || "";
+    this.data.parcelId = p.idu || p.id || "";
+    this.data.surfaceM2 = (p.contenance != null ? p.contenance : null);
+    this.data.parcelPrefix = p.com_abs || "";
+    /* Code commune de la PARCELLE, distinct de celui de l'adresse : les deux
+       sources sont indépendantes et ne doivent jamais se remplacer l'une
+       l'autre. Une divergence est signalée par le formulaire, pas corrigée. */
+    this.data.parcelCommuneCode = p.code_insee || "";
+    /* La géométrie reste en interne pour le tracé — hors contrat 1.0. */
     this.data.geometry = this.current.geometry || null;
     if (!this.data.city && p.nom_com) this.data.city = p.nom_com;
-    if (!this.data.cityCode && p.code_insee) this.data.cityCode = p.code_insee;
-    this.data.retrievedAt = new Date().toISOString();
+    /* Horodatage de LA CONFIRMATION par la personne, pas de la réponse API. */
+    this.data.confirmedAt = new Date().toISOString();
     this._setConfirmed(true);
     this._setStatus("Parcelle confirmée.");
   };
@@ -502,10 +586,32 @@
   /* ----- Continuer : persiste + émet l'événement + laisse l'hôte réagir ----- */
   Cadastre.prototype._continue = function () {
     if (!this.confirmed) return;
-    try { sessionStorage.setItem(this.storageKey, JSON.stringify(this.data)); } catch (e) { /* stockage indisponible : non bloquant */ }
-    var evt = new CustomEvent("urbizen:parcel-confirmed", { bubbles: true, detail: this.data });
+    /* Une seule structure publiée : le contrat canonique. Ni copie plate, ni
+       géométrie. Vérifié : aucun consommateur ne lisait l'ancien format. */
+    var contrat = buildContract(this.data);
+    contrat.storageKey = this.storageKey;   // permet un ciblage déterministe
+    try { sessionStorage.setItem(this.storageKey, JSON.stringify(contrat)); }
+    catch (e) { /* stockage indisponible : non bloquant, l'événement part quand même */ }
+    var evt = new CustomEvent("urbizen:parcel-confirmed", { bubbles: true, detail: contrat });
     this.root.dispatchEvent(evt);
-    if (typeof this.opts.onConfirm === "function") this.opts.onConfirm(this.data);
+    if (typeof this.opts.onConfirm === "function") this.opts.onConfirm(contrat);
+  };
+
+  /* Expose le contrat courant sans le publier (lecture par l'hôte). */
+  Cadastre.prototype.getContract = function () {
+    return buildContract(this.data);
+  };
+
+  /* Le formulaire demande une correction d'adresse : on redonne la main, sans
+     rien effacer tant qu'une nouvelle parcelle n'est pas confirmée. */
+  Cadastre.prototype.requestEdit = function () {
+    if (!this.$input) { return false; }
+    if (typeof this.root.scrollIntoView === "function") {
+      this.root.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    try { this.$input.focus(); this.$input.select(); } catch (e) {}
+    this._setStatus("Modifiez l’adresse, puis confirmez à nouveau votre parcelle.");
+    return true;
   };
 
   /* Signale une seule fois l'indisponibilité des tuiles. */
@@ -521,6 +627,7 @@
     if (this.activeGeocode) { try { this.activeGeocode.abort(); } catch (e) {} }
     if (this.activeParcel) { try { this.activeParcel.abort(); } catch (e) {} }
     if (this._onDocClick) { document.removeEventListener("click", this._onDocClick); this._onDocClick = null; }
+    if (this._onEditRequest) { document.removeEventListener("urbizen:cadastre-edit-requested", this._onEditRequest); this._onEditRequest = null; }
     if (this.map) { try { this.map.remove(); } catch (e) {} this.map = null; }
     this.layers = {};
     this.selLayer = null;

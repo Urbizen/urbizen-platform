@@ -50,3 +50,6 @@ backups/
 
 # Reglages locaux de l outillage (machine de developpement)
 .claude/settings.local.json
+
+# Fixture de test régénérée à chaque exécution (tests/cadastre/run-all.sh)
+tests/cadastre/fixture.html
