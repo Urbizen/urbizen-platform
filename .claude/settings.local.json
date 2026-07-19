@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed -i '' 's|^wordpress/\\\\*\\\\*/vendor/$|wordpress/urbizen-platform/vendor/|' .gitignore)",
+      "Bash(git add *)",
+      "Bash(git check-ignore *)",
+      "Bash(echo \"leaflet ignoré ? exit=$?\")",
+      "Bash(echo \"exit=$? \\(1 = non ignoré, correct\\)\")"
+    ]
+  }
+}

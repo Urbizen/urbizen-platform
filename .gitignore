@@ -32,3 +32,13 @@ wp-config.php
 # Dépendances
 node_modules/
 vendor/
+
+# WordPress — dependances et exports
+wordpress/urbizen-platform/vendor/
+*.sql
+*.sql.gz
+*.tar.gz
+*.json.gpg
+backups/
+!wordpress/urbizen-platform/assets/vendor/
+!wordpress/urbizen-platform/assets/vendor/**
