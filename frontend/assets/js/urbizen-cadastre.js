@@ -145,6 +145,7 @@
     this.$mapWrap = this.root.querySelector(".uc-map-wrap");
     this.$mapEl   = this.root.querySelector(".uc-map");
     this.$status  = this.root.querySelector(".uc-status-txt");
+    this.$statusWrap = this.root.querySelector(".uc-status");
     this.$toggle  = this.root.querySelector(".uc-toggle");
     this.$parcel  = this.root.querySelector(".uc-parcel");
     this.$parcelRef = this.root.querySelector(".uc-parcel-ref");
@@ -316,8 +317,10 @@
     var url = CONFIG.parcelle + "?source_ign=PCI&geom=" + geom;
     var self = this;
     this._setStatus("Recherche de la parcelle…");
+    this._searching(true);
     fetchJson(url, this.activeParcel.signal)
       .then(function (fc) {
+        self._searching(false);
         if (!fc || !fc.features || !fc.features.length) {
           self._setStatus("Aucune parcelle ici — zoomez et cliquez sur votre terrain.");
           return;
@@ -326,6 +329,7 @@
       })
       .catch(function (err) {
         if (err.name === "AbortError") return;
+        self._searching(false);
         self._setStatus("Lecture de la parcelle impossible. Réessayez.");
       });
   };
@@ -393,6 +397,7 @@
   };
 
   Cadastre.prototype._setStatus = function (txt) { if (this.$status) this.$status.textContent = txt; };
+  Cadastre.prototype._searching = function (on) { if (this.$statusWrap) this.$statusWrap.classList.toggle("is-searching", on); };
   Cadastre.prototype._showError = function (msg) { this.$error.textContent = msg; this.$error.hidden = false; };
   Cadastre.prototype._hideError = function () { this.$error.hidden = true; };
 

@@ -130,3 +130,8 @@
   .uc-parcel { flex-direction: column; align-items: flex-start; }
   .uc-parcel-actions { align-items: flex-start; width: 100%; }
 }
+
+/* État "recherche en cours" : pulsation douce du repère de statut */
+.uc-status.is-searching .uc-dot { animation: uc-pulse .9s ease-in-out infinite; }
+@keyframes uc-pulse { 0%, 100% { opacity: .35; transform: scale(.75); } 50% { opacity: 1; transform: scale(1.2); } }
+@media (prefers-reduced-motion: reduce) { .uc-status.is-searching .uc-dot { animation: none; } }
