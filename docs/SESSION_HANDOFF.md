@@ -15,10 +15,11 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 | Élément | Valeur |
 |---|---|
-| Branche courante | `feature/cadastre-block` |
-| Pull Request courante | ouverte vers `main`, **en attente de revue — ne pas merger** |
+| Branche courante | `feature/form-cadastre-integration` |
+| Pull Request courante | **à ouvrir** vers `main` |
 | Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) fusionnée — merge `5989ba9` |
 | Reproductibilité backend | PR [#5](https://github.com/Urbizen/urbizen-platform/pull/5) fusionnée — merge `8214ae6` |
+| Composant cadastre | PR [#6](https://github.com/Urbizen/urbizen-platform/pull/6) fusionnée — merge `639e131` |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
 
 ### Où en est le projet
@@ -27,12 +28,13 @@ L'étape 1 de l'intégration WordPress est **terminée, fusionnée dans `main` e
 production**. Le socle est posé — thème enfant et extension — mais il ne porte
 encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
 
-La branche en cours porte le **composant cadastre** dans l'extension : bloc
-Gutenberg, shortcode, Leaflet embarqué, source de vérité unique. L'extension est
-**déployée en production en 0.3.0** et le composant a été **validé en conditions
-réelles** le 19/07/2026, sur une page de test en brouillon non indexé.
+Le composant cadastre est **fusionné dans `main` et déployé en production en
+0.3.0**, validé en conditions réelles le 19/07/2026.
 
-La PR #6 reste **ouverte, non fusionnée**, en attente de décision.
+La branche en cours prépare la **0.4.0** : contrat de données canonique 1.0 et
+premier formulaire Urbizen, qui reprend la localisation confirmée. **Rien n'est
+déployé** — la production reste en 0.3.0 — et **aucune donnée ne quitte le
+navigateur** : la validation est locale.
 
 ### Ce qui a été fait
 
@@ -65,7 +67,7 @@ La PR #6 reste **ouverte, non fusionnée**, en attente de décision.
 |---|---|
 | WordPress · PHP · WP-CLI | 7.0.2 fr_FR · 8.3.30 · 2.12.0 |
 | Thème actif | `urbizen-child` 0.1.0 (parent `hostinger-ai-theme` 2.0.18) — inchangé |
-| Extension Urbizen | `urbizen-platform` **0.3.0**, active, module cadastre chargé |
+| Extension Urbizen | `urbizen-platform` **0.3.0**, active, module cadastre chargé (la 0.4.0 n'est **pas** déployée) |
 | Page de test | ID 1157, **brouillon**, non indexée, à supprimer après revue |
 | Rendu | validé identique — captures 1440 px et 390 px, empreintes SHA-256 égales |
 | Réponse HTTP | 200 |
@@ -90,6 +92,10 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
   validés ; **32 contrôles JavaScript** sous jsdom et **36 contrôles de rendu
   PHP** avec doublures, tous verts ; aucune référence CDN ; images de
   `leaflet.css` toutes présentes.
+- **0.4.0 (branche en cours)** : 74 contrôles JavaScript et 39 contrôles de
+  rendu PHP pour le formulaire, plus 32 + 36 pour le cadastre en
+  non-régression — **181 au total, tous verts**. Ces contrôles sont **simulés** : le formulaire n'a pas encore été
+  ouvert dans un vrai éditeur ni essayé sur le site.
 - **Test WordPress réel du 19/07/2026** : 13 contrôles passés dans l'éditeur et
   sur le site public — insertion, réglages, enregistrement, rechargement sans
   erreur de validation, rendu, absence de 404, autocomplétion IGN, parcelle
@@ -98,15 +104,17 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
 
 ### Prochaine étape
 
-**Décision sur la PR #6**, techniquement prête et validée en production. Puis,
-après fusion, suppression de la page de test 1157.
+**Revue de la 0.4.0**, puis validation réelle du formulaire sur la page de test
+1157, conservée à cet effet : insertion du bloc formulaire à côté du bloc
+cadastre, reprise de la localisation, correction d'adresse, effacement.
 
-Ensuite, étape 4 : moteur de formulaires, qui consommera l'événement
-`urbizen:parcel-confirmed` émis par le cadastre.
+Ensuite, la **validation serveur** : c'est le vrai chantier suivant. La 0.4.0
+valide uniquement côté navigateur ; toute soumission devra revalider
+l'intégralité des champs, sans faire confiance aux champs masqués.
 
-Restent ouverts sur le composant : l'auto-hébergement des polices (Google Fonts
-est encore appelé par le thème) et, à terme, la reprise du composant dans les
-pages publiques — aucune page publiée ne l'utilise à ce jour.
+Restent ouverts : l'auto-hébergement des polices (Google Fonts est encore
+appelé par le thème) et la reprise du composant dans les pages publiques —
+aucune page publiée ne l'utilise à ce jour.
 
 ### Interdictions
 

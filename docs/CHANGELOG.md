@@ -5,6 +5,70 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.4.0] — 19 juillet 2026
+
+Connexion du composant cadastre au futur formulaire Urbizen. **Rien n'est
+déployé** : la production reste en 0.3.0. Aucune requête réseau n'est émise par
+cette version — la validation est entièrement locale.
+
+### Ajouté
+- **Contrat de données canonique 1.0** (D-009) : structure imbriquée et
+  versionnée `{ schemaVersion, source, confirmedAt, address, location, parcel }`,
+  produite par une fabrique unique et publiée à la fois par l'événement
+  `urbizen:parcel-confirmed` et par `sessionStorage`.
+- `src/Forms/FormDefinition.php`, `FormRegistry.php`, `Renderer.php` et la
+  définition `definitions/localisation.php` : formulaire déclaratif, 6 champs
+  visibles et 8 champs techniques masqués mais inspectables.
+- `src/Blocks/FormBlock.php` : bloc `urbizen/formulaire` et shortcode
+  `[urbizen_formulaire]`, rendu dynamique commun, attributs `formType`,
+  `storageKey` et `formId`.
+- `assets/js/urbizen-form.js` : pont cadastre → formulaire, **sans dépendance**
+  au script du cadastre. Reprise par événement **et** par `sessionStorage`, donc
+  indifférente à l'ordre de montage.
+- `assets/css/urbizen-form.css`, `blocks/formulaire/{block.json,editor.js,editor.css}`.
+- Événement `urbizen:location-form-validated` : le contrat validé est publié
+  dans `event.detail`, à charge de l'hôte d'en faire quelque chose.
+- Événement `urbizen:cadastre-edit-requested` : le bouton « Modifier l'adresse »
+  redonne la main au cadastre **par événement**, sans appeler de méthode privée
+  ni dépendre d'un identifiant HTML fixe.
+- `UrbizenCadastre.getContract()` et `Cadastre.requestEdit()`.
+- `tests/cadastre/test-form.mjs` (**74 contrôles**) et `test-form-render.php`
+  (**39 contrôles**). Suite complète du dépôt : **181 contrôles**, tous verts.
+
+### Modifié
+- Le composant cadastre capte désormais `street`, `houseNumber` et le préfixe
+  cadastral (`com_abs`), que les API fournissaient déjà et qu'il ignorait.
+- `confirmedAt` horodate la **confirmation par la personne**, non la réponse de
+  l'API — l'ancien `retrievedAt` mélangeait les deux.
+- Version du plugin **0.3.0 → 0.4.0**, handles et `block.json` alignés.
+
+### Sécurité et vie privée
+- **La géométrie est exclue du contrat 1.0** : ni publiée, ni stockée, ni
+  transmise, ni portée par un champ caché. Elle reste en interne pour le seul
+  tracé sur la carte.
+- **Les deux codes commune restent séparés** : celui du géocodeur et celui de la
+  parcelle. Une divergence est signalée sans être corrigée, et aucune valeur
+  n'est inventée.
+- Refus de la pollution de prototype : `__proto__`, `constructor` et `prototype`
+  ne sont jamais traversés. Seuls 17 chemins connus sont lus — le payload ne
+  choisit jamais ce qui est écrit.
+- Toutes les chaînes sont bornées, tous les nombres validés, les coordonnées
+  hors bornes terrestres rejetées.
+- **Aucune donnée personnelle en console**, y compris en cas d'erreur : les
+  diagnostics n'exposent que des codes.
+- Aucun `fetch`, `XMLHttpRequest`, `sendBeacon` ni soumission HTML : vérifié par
+  test, sur le comportement **et** sur le code source.
+- Conservation documentée (D-010) : `sessionStorage` seul, portée de l'onglet,
+  aucune durée inventée, effacement explicite, et **ni la reprise ni la
+  validation n'effacent** quoi que ce soit.
+
+### Limites assumées
+Aucune soumission serveur, aucune route REST, aucune table, aucun nonce, aucun
+envoi au service Python. Aucun champ demandeur, aucune pièce jointe. Les
+formulaires DP et PCMI complets restent à l'étape suivante.
+
+---
+
 ## [0.3.0] — 19 juillet 2026
 
 Composant cadastre porté dans l'extension, **version du plugin portée à 0.3.0**,

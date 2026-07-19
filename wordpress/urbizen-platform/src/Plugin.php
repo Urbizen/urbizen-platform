@@ -8,6 +8,7 @@
 namespace Urbizen\Platform;
 
 use Urbizen\Platform\Blocks\CadastreBlock;
+use Urbizen\Platform\Blocks\FormBlock;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,7 +82,7 @@ final class Plugin {
 	 *
 	 * Ordre d'arrivée prévu :
 	 *   1. Blocks\CadastreBlock  — composant cadastre          ← étape 2, actif
-	 *   2. Forms\FormRegistry    — moteur de formulaires
+	 *   2. Blocks\FormBlock      — formulaires déclaratifs     ← étape 3, actif
 	 *   3. Http\RestController   — réception des soumissions
 	 *   4. Files\UploadHandler   — pièces jointes
 	 *   5. Backend\PythonClient  — transmission au service de génération
@@ -92,8 +93,9 @@ final class Plugin {
 	 */
 	private function register_modules(): void {
 		CadastreBlock::register();
+		FormBlock::register();
 
-		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : module cadastre actif (étape 2).' );
+		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : modules cadastre et formulaires actifs.' );
 	}
 
 	/**

@@ -193,7 +193,46 @@ chargé depuis un CDN : aucune adresse IP de visiteur ne part chez un tiers.
 
 ---
 
-## 6. Règles de travail non négociables
+## 6. Contrat de données cadastre → formulaire
+
+Le composant cadastre publie un **contrat canonique 1.0**, imbriqué et
+versionné (D-009). C'est la seule structure publiée : événement
+`urbizen:parcel-confirmed` et `sessionStorage` portent le même objet, produit
+par une fabrique unique.
+
+```
+schemaVersion  "1.0"
+source         "urbizen-cadastre"        décrit Urbizen, pas le fournisseur
+confirmedAt    ISO 8601                  confirmation par la personne
+address        label, houseNumber, street, postcode, city, cityCode
+location       latitude, longitude       nombres finis, ou null
+parcel         communeCode, prefix, section, number, id, surfaceM2
+```
+
+Cinq points à ne pas oublier :
+
+1. **Pas de géométrie.** Exclue du contrat 1.0, faute d'usage en aval. Elle
+   reste en interne pour le tracé sur la carte.
+2. **Deux codes commune distincts** : `address.cityCode` vient du géocodeur,
+   `parcel.communeCode` de la parcelle. Jamais fusionnés, jamais substitués.
+   Une divergence est signalée, pas corrigée.
+3. **`surfaceM2` est indicative** : surface cadastrale, pas surface de terrain.
+   Un projet peut couvrir plusieurs parcelles.
+4. **Aucune valeur fabriquée** : chaîne vide ou `null`, jamais un repli inventé.
+5. **Aucune propriété plate** n'est conservée : vérifié, aucun consommateur ne
+   lisait l'ancien format.
+
+Le formulaire lit **la seule clé de stockage qu'on lui a désignée**. Parcourir
+les clés `urbizen:*` pour choisir une parcelle au hasard est interdit.
+
+En version 0.4.0, **aucune donnée ne quitte le navigateur** : la validation est
+locale et publie `urbizen:location-form-validated`. Le futur point de
+soumission serveur devra tout revalider — les champs masqués viennent du
+navigateur.
+
+---
+
+## 7. Règles de travail non négociables
 
 1. **Sauvegarder avant d'agir** : base et fichiers, intégrité vérifiée.
 2. **Vérifier après chaque action** : voir le protocole du plan directeur, §7.
@@ -206,7 +245,7 @@ chargé depuis un CDN : aucune adresse IP de visiteur ne part chez un tiers.
 
 ---
 
-## 7. Boucle de vérification après déploiement
+## 8. Boucle de vérification après déploiement
 
 ```bash
 # 1. Lint PHP — pas de PHP en local, on lint via le serveur
@@ -231,7 +270,7 @@ wp theme activate hostinger-ai-theme && wp litespeed-purge all
 
 ---
 
-## 8. Cartographie du dépôt
+## 9. Cartographie du dépôt
 
 ```
 backend/dp-service/      service Python : Cerfa, notice, bordereau, assemblage PDF
@@ -242,15 +281,16 @@ wordpress/urbizen-child/     thème enfant : rendu et gabarits
 wordpress/urbizen-platform/  extension : toute la logique métier
   assets/js|css/             composant cadastre — SOURCE DE VÉRITÉ UNIQUE (D-008)
   assets/vendor/leaflet/     Leaflet 1.9.4 embarqué, jamais de CDN
-  src/Blocks/                bloc Gutenberg et shortcode
+  src/Blocks/                blocs Gutenberg et shortcodes (cadastre, formulaire)
+  src/Forms/                 définitions déclaratives et rendu des formulaires
 docs/                    documentation du projet
-tests/cadastre/          bancs d'essai du composant (JS avec jsdom, rendu PHP)
+tests/cadastre/          bancs d'essai : cadastre, formulaire, rendu PHP
 scripts/                 à créer
 ```
 
 ---
 
-## 9. Points ouverts connus
+## 10. Points ouverts connus
 
 - Les mappings Cerfa de `backend/dp-service/cerfa.py` sont tous en `TODO_` :
   aucun champ n'est réellement rempli aujourd'hui.
