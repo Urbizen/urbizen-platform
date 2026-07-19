@@ -26,6 +26,11 @@ _pc_notice.pdf
 *_dossier.pdf
 *_notice.pdf
 
+# Backend — Cerfa officiels et sorties de l'inspecteur de champs
+# Téléchargés depuis service-public.gouv.fr, régénérables : hors dépôt.
+backend/dp-service/cerfa_*.pdf
+backend/dp-service/champs_*.txt
+
 # WordPress
 wp-config.php
 

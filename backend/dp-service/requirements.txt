@@ -1,0 +1,23 @@
+# Dépendances du microservice de constitution des dossiers d'urbanisme.
+# Installation :  pip install -r requirements.txt
+#
+# Versions minimales éprouvées, majeure figée : on accepte les correctifs de
+# sécurité sans subir de rupture d'API. Testé sous Python 3.11 à 3.13.
+
+# --- API HTTP ---
+Flask>=3.0,<4.0                # app.py : routes /api/health et /api/dp
+Flask-Cors>=4.0,<7.0           # app.py : CORS restreint au domaine WordPress
+
+# --- Documents ---
+pypdf>=4.2,<7.0                # cerfa.py, documents.py : lecture, remplissage
+                               # des AcroForm et assemblage des PDF
+reportlab>=4.1,<5.0            # documents.py : notice, bordereau, police DejaVu
+
+# --- Pièces jointes images ---
+pillow>=10.3,<13.0             # app.py : conversion des photos en pages PDF
+
+# --- Serveur de production (au choix selon la plateforme) ---
+waitress>=3.0,<4.0             # Windows :  waitress-serve --port=8000 app:app
+# gunicorn>=22.0,<24.0         # Linux   :  gunicorn -w 2 -b 127.0.0.1:8000 app:app
+#                              # à décommenter sur Linux uniquement (non
+#                              # installable sous Windows).

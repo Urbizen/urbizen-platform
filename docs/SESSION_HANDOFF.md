@@ -15,16 +15,20 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 | Élément | Valeur |
 |---|---|
-| Branche | `feature/wordpress-integration` |
-| Pull Request | [#4](https://github.com/Urbizen/urbizen-platform/pull/4) → `main` |
-| Commits | `5f2d49a`, `6162a8e`, `a199238`, `00ad5cb`, `4317b69`, plus l'anonymisation |
+| Branche courante | `fix/backend-reproductibilite` |
+| Pull Request courante | ouverte vers `main`, **en attente de revue** |
+| Socle WordPress | PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4) **fusionnée** — merge `5989ba9` |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
 
 ### Où en est le projet
 
-L'étape 1 de l'intégration WordPress est **terminée et en production**. Le socle
-est posé — thème enfant et extension — mais il ne porte encore **aucune logique
-métier** : ni formulaire, ni cadastre, ni route REST.
+L'étape 1 de l'intégration WordPress est **terminée, fusionnée dans `main` et en
+production**. Le socle est posé — thème enfant et extension — mais il ne porte
+encore **aucune logique métier** : ni formulaire, ni cadastre, ni route REST.
+
+La branche en cours ne touche qu'à la **reproductibilité du backend Python** :
+dépendances, configuration et documentation de lancement. Aucune logique métier
+n'est modifiée, aucune ligne de production n'est touchée.
 
 ### Ce qui a été fait
 
@@ -38,6 +42,8 @@ métier** : ni formulaire, ni cadastre, ni route REST.
 - Audit complet du WordPress de production, en lecture seule.
 - Anonymisation des coordonnées serveur dans la documentation : **le dépôt GitHub
   est public**, compte et adresse ne doivent jamais y figurer.
+- Reproductibilité du backend soldée : `requirements.txt`, `.env.example` et
+  documentation de lancement local corrigée.
 
 ### État vérifié de la production
 
@@ -60,6 +66,11 @@ Sauvegardes disponibles dans `~/backups/` : base et fichiers du 19/07/2026.
 - Aucun effet de bord non documenté : ni `add_option`, ni `dbDelta`, ni
   `CREATE TABLE`, ni écriture de fichier, ni appel réseau.
 - Rendu comparé avant/après activation : identique.
+- Backend : installation des dépendances validée dans un venv neuf (Python 3.13),
+  imports `documents`, `cerfa` et `app` opérationnels, `GET /api/health` → 200,
+  `POST /api/dp` sans champ → 400 avec la liste des champs manquants.
+- Aucun secret dans les fichiers ajoutés : `.env.example` ne contient que des
+  noms de variables et des exemples fictifs.
 
 ### Prochaine étape
 
