@@ -144,9 +144,39 @@ check( 'JavaScript : aucun montage manuel du cadastre', ! str_contains( $js, 'Ur
 check( 'JavaScript : comportements de la maquette conservés',
 	str_contains( $js, 'urbizen:parcel-confirmed' ) && str_contains( $js, 'js-start' ) && str_contains( $js, 'burger' ) );
 
-$css = file_get_contents( $theme . '/assets/css/urbizen-homepage.css' );
+$css     = file_get_contents( $theme . '/assets/css/urbizen-homepage.css' );
+$css_ref = file_get_contents( $racine . '/frontend/homepage/homepage.css' );
+
 check( 'CSS : aucun !important ajouté',
-	substr_count( $css, '!important' ) === substr_count( file_get_contents( $racine . '/frontend/homepage/homepage.css' ), '!important' ) );
+	substr_count( $css, '!important' ) === substr_count( $css_ref, '!important' ) );
+
+// `:root` désigne <html>, un ancêtre de la portée : le préfixer produit un
+// sélecteur qui ne peut jamais correspondre. C'est ce défaut qui avait rendu
+// muette la règle `--u-pad: 18px` et décalé de 10 px la rupture mobile.
+check( 'CSS : aucun sélecteur mort « .urbizen-accueil :root »',
+	! str_contains( $css, '.urbizen-accueil :root' ) );
+check( 'CSS : aucun sélecteur mort « .urbizen-accueil body »',
+	! str_contains( $css, '.urbizen-accueil body' ) );
+
+// La règle décisive du responsive mobile doit exister, portée par le conteneur.
+check( 'CSS : la media query 420px porte --u-pad sur le conteneur',
+	(bool) preg_match(
+		'/@media\s*\(max-width:\s*420px\)\s*\{[^}]*\.urbizen-accueil\s*\{[^}]*--u-pad:\s*18px/',
+		$css
+	) );
+
+// Déclarations : mêmes couples propriété/valeur, dans le même ordre trié.
+$decls = static function ( $source ) {
+	$sans = preg_replace( '#/\*.*?\*/#s', '', $source );
+	preg_match_all( '/([-a-z]+)\s*:\s*([^;{}]+)[;}]/', $sans, $m, PREG_SET_ORDER );
+	$out = array_map( static fn( $x ) => trim( $x[1] ) . ':' . trim( $x[2] ), $m );
+	sort( $out );
+	return $out;
+};
+$d_ref = $decls( $css_ref );
+$d_css = $decls( $css );
+check( 'CSS : 541 déclarations conservées', 541 === count( $d_ref ) && 541 === count( $d_css ) );
+check( 'CSS : aucune valeur de propriété modifiée', $d_ref === $d_css );
 
 $fonts = file_get_contents( $theme . '/assets/css/urbizen-fonts.css' );
 check( 'Polices : aucune référence à Google', ! preg_match( '#url\([^)]*(googleapis|gstatic)#', $fonts ) );

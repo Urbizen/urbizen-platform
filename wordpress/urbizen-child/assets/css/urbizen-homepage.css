@@ -1,12 +1,19 @@
 /* ============================================================================
    urbizen-homepage.css — styles de la page d'accueil Urbizen.
 
-   Copie de frontend/homepage/homepage.css, portée sous `.urbizen-accueil`
-   pour cohabiter avec les styles du thème parent et de Kadence Blocks.
-   AUCUNE valeur graphique n'est modifiée : seuls les sélecteurs changent.
-   Le reset `*` est lui aussi borné à la portée, pour ne pas déborder sur
-   l'administration ni sur les autres pages. Seul `html { scroll-behavior }`
-   reste global : c'est un comportement du document, pas un style de page.
+   Fichier GÉNÉRÉ par scripts/scope-css.py depuis frontend/homepage/homepage.css.
+   Ne pas modifier à la main : régénérer.
+
+   Le CSS est porté sous `.urbizen-accueil` pour cohabiter avec les styles du
+   thème parent et de Kadence Blocks. AUCUNE valeur graphique n'est modifiée :
+   seuls les sélecteurs changent. Le reset `*` est lui aussi borné à la portée,
+   pour ne pas déborder sur l'administration ni sur les autres pages. Seul
+   `html { scroll-behavior }` reste global : c'est un comportement du document.
+
+   `:root` et `body` deviennent `.urbizen-accueil` : les préfixer donnerait un
+   sélecteur impossible à satisfaire, et les variables qu'ils déclarent
+   seraient perdues.
+
    Dépend de urbizen-tokens.css et urbizen-fonts.css.
    ========================================================================== */
 
@@ -235,7 +242,7 @@ html { scroll-behavior: smooth; }
    Affinages mobile (petits écrans / iPhone, dès 320px)
    ============================================================ */
 @media (max-width: 420px) {
-  .urbizen-accueil :root { --u-pad: 18px; }
+  .urbizen-accueil { --u-pad: 18px; }
   .urbizen-accueil main section { padding: 44px 0; }
   .urbizen-accueil .hero { padding: 30px 0 26px; }
   .urbizen-accueil .hero h1 { margin: 12px 0; }
