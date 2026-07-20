@@ -30,11 +30,65 @@ foreach (
 		'src/Privacy/Retention.php',
 		'src/Admin/SubmissionsAdmin.php',
 		'src/Http/SubmissionResult.php',
+		'src/Files/UploadPolicy.php',
+		'src/Files/UploadNormalizer.php',
+		'src/Files/Storage.php',
+		'src/Files/SignedLink.php',
+		'src/Files/FileCleaner.php',
 		'src/Http/SubmissionController.php',
+		'src/Http/FileDownloadController.php',
 	) as $fichier
 ) {
 	require_once URBIZEN_PLATFORM_DIR . $fichier;
 }
+
+/**
+ * Racine privée d'essai, hors de l'« ABSPATH » de la doublure.
+ *
+ * La doublure fixe ABSPATH au répertoire des bancs ; un répertoire du dossier
+ * temporaire du système est donc bien à l'extérieur, comme en production.
+ */
+define( 'URBIZEN_TEST_STORAGE', sys_get_temp_dir() . '/urbizen-b2-' . getmypid() );
+
+add_filter( 'urbizen_private_storage_dir', static fn() => URBIZEN_TEST_STORAGE );
+
+/**
+ * Efface tout ce qu'un banc a pu écrire sur le disque.
+ *
+ * Outre la racine d'essai, on balaie les emplacements qu'un scénario de refus
+ * ou une classe mutée pourrait créer : un banc ne doit jamais laisser de
+ * fichier dans le dépôt, fût-ce en démontrant qu'un chemin est interdit.
+ */
+function urbizen_test_menage(): void {
+	$cibles = array(
+		URBIZEN_TEST_STORAGE,
+		dirname( rtrim( ABSPATH, '/' ) ) . '/private',
+		rtrim( ABSPATH, '/' ) . '/mutant-public',
+		rtrim( ABSPATH, '/' ) . '/faux-prive',
+		rtrim( ABSPATH, '/' ) . '/interdit',
+	);
+
+	foreach ( $cibles as $racine ) {
+		if ( ! is_dir( $racine ) ) {
+			continue;
+		}
+
+		$it = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $racine, FilesystemIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::CHILD_FIRST
+		);
+
+		foreach ( $it as $f ) {
+			$f->isDir() ? @rmdir( $f->getPathname() ) : @unlink( $f->getPathname() );
+		}
+
+		@rmdir( $racine );
+	}
+}
+
+register_shutdown_function( 'urbizen_test_menage' );
+
+require_once __DIR__ . '/fixtures.php';
 
 $GLOBALS['fail'] = 0;
 

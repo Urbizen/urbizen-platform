@@ -55,6 +55,7 @@ final class SubmissionsAdmin {
 			'title'             => __( 'Référence', 'urbizen-platform' ),
 			'urbizen_form_type' => __( 'Formulaire', 'urbizen-platform' ),
 			'urbizen_status'    => __( 'Statut', 'urbizen-platform' ),
+			'urbizen_files'     => __( 'Documents', 'urbizen-platform' ),
 			'urbizen_created'   => __( 'Reçue le', 'urbizen-platform' ),
 		);
 	}
@@ -82,10 +83,47 @@ final class SubmissionsAdmin {
 				echo esc_html( self::status_label( (string) get_post_meta( $post_id, '_urbizen_status', true ) ) );
 				break;
 
+			case 'urbizen_files':
+				// Un décompte et une taille : ni nom de document, ni lien, ni
+				// chemin. Une liste s'imprime, se capture et se partage.
+				$nombre = (int) get_post_meta( $post_id, '_urbizen_files_count', true );
+				$taille = (int) get_post_meta( $post_id, '_urbizen_files_total_size', true );
+				$etat   = (string) get_post_meta( $post_id, '_urbizen_files_status', true );
+
+				echo esc_html(
+					0 === $nombre
+						? self::files_label( $etat )
+						: sprintf(
+							/* translators: 1: nombre de documents, 2: taille lisible. */
+							_n( '%1$d document (%2$s)', '%1$d documents (%2$s)', $nombre, 'urbizen-platform' ),
+							$nombre,
+							size_format( $taille )
+						)
+				);
+				break;
+
 			case 'urbizen_created':
 				echo esc_html( (string) get_post_meta( $post_id, '_urbizen_created_at_gmt', true ) );
 				break;
 		}
+	}
+
+	/**
+	 * Libellé lisible d'un état de documents.
+	 *
+	 * @param string $status État interne.
+	 * @return string
+	 */
+	public static function files_label( string $status ): string {
+		$libelles = array(
+			'none'    => __( 'Aucun', 'urbizen-platform' ),
+			'pending' => __( 'En cours', 'urbizen-platform' ),
+			'stored'  => __( 'Aucun', 'urbizen-platform' ),
+			'failed'  => __( 'Échec', 'urbizen-platform' ),
+			'deleted' => __( 'Effacés', 'urbizen-platform' ),
+		);
+
+		return $libelles[ $status ] ?? '—';
 	}
 
 	/**

@@ -19,6 +19,7 @@
 
 namespace Urbizen\Platform\Privacy;
 
+use Urbizen\Platform\Files\Storage;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
@@ -207,7 +208,7 @@ final class Retention {
 	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return array{demandes:int,jetons:int,creneaux:int,references:int}
+	 * @return array{demandes:int,jetons:int,creneaux:int,references:int,staging:int}
 	 */
 	public static function run_daily( ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
@@ -217,16 +218,20 @@ final class Retention {
 			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
 			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
 			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
+			// Ne nettoie que le staging. Un document final n'est jamais
+			// supprimé au motif qu'une métadonnée semble manquante.
+			'staging'    => Storage::cleanup_staging( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(
-					'ménage : %d jeton(s), %d créneau(x), %d réservation(s) de référence',
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging',
 					$bilan['jetons'],
 					$bilan['creneaux'],
-					$bilan['references']
+					$bilan['references'],
+					$bilan['staging']
 				)
 			);
 		}

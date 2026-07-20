@@ -501,3 +501,29 @@ class WPDB_Double {
 }
 
 $GLOBALS['wpdb'] = new WPDB_Double();
+
+// ------------------------------------------------------------- divers ------
+function nocache_headers() {}
+function status_header( $code ) { $GLOBALS['wpd_status'] = $code; }
+function admin_url( $chemin = '' ) { return 'https://exemple.test/wp-admin/' . ltrim( $chemin, '/' ); }
+function size_format( $octets, $decimales = 0 ) { return round( $octets / 1024 ) . ' KB'; }
+function _n( $singulier, $pluriel, $nombre, $domaine = '' ) { return $nombre > 1 ? $pluriel : $singulier; }
+
+/**
+ * Contrôle croisé du type de fichier, doublure de WordPress.
+ *
+ * Reproduit le comportement réel : le type est déduit du **contenu**, jamais
+ * de ce que déclare l'appelant, et l'extension proposée doit y correspondre.
+ */
+function wp_check_filetype_and_ext( $fichier, $nom, $mimes = null ) {
+	$reel = \Urbizen\Platform\Files\UploadPolicy::detect_mime( $fichier );
+	$ext  = strtolower( (string) pathinfo( $nom, PATHINFO_EXTENSION ) );
+
+	$attendus = \Urbizen\Platform\Files\UploadPolicy::TYPES;
+
+	if ( ! isset( $attendus[ $ext ] ) || $attendus[ $ext ] !== $reel ) {
+		return array( 'ext' => false, 'type' => false, 'proper_filename' => false );
+	}
+
+	return array( 'ext' => $ext, 'type' => $reel, 'proper_filename' => false );
+}

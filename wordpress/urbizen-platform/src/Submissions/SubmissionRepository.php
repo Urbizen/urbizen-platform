@@ -64,6 +64,7 @@ final class SubmissionRepository {
 	 * @var array<int, string>
 	 */
 	public const REQUIRED_META = array(
+		'_urbizen_files',
 		'_urbizen_reference',
 		'_urbizen_form_type',
 		'_urbizen_schema_version',
@@ -92,6 +93,8 @@ final class SubmissionRepository {
 	 * @return array{ok:bool,code:string,id:int,reference:string}
 	 */
 	public static function create( array $clean, array $pricing, array $context = array() ): array {
+		$finaliser = ! array_key_exists( 'finalize', $context ) || false !== $context['finalize'];
+
 		$form_type   = isset( $context['form_type'] ) ? (string) $context['form_type'] : 'conception';
 		$source_path = isset( $context['source_path'] ) ? (string) $context['source_path'] : '';
 		$now         = isset( $context['now'] ) ? (int) $context['now'] : time();
@@ -139,7 +142,10 @@ final class SubmissionRepository {
 			'_urbizen_consent_at_gmt'      => ! empty( $clean['rgpd'] ) ? $horodatage : '',
 			'_urbizen_source_path'         => $source_path,
 			'_urbizen_mail_status'         => 'not_started',
-			'_urbizen_files_status'        => 'not_started',
+			// `none` tant qu'aucun document n'a été déposé ; `pending` pendant
+			// le traitement d'un lot, puis `stored` à la finalisation.
+			'_urbizen_files_status'        => isset( $context['files_status'] ) ? (string) $context['files_status'] : 'none',
+			'_urbizen_files'               => wp_json_encode( array() ),
 		);
 
 		foreach ( $meta as $cle => $valeur ) {
@@ -165,10 +171,12 @@ final class SubmissionRepository {
 			return self::echec( 'persistence_failed' );
 		}
 
-		// La référence est désormais attribuée pour de bon.
-		self::confirm_reference( $reference, $id, $now );
-
-		Logger::info( sprintf( 'demande %s enregistrée (#%d, %s)', $reference, $id, $form_type ) );
+		// La référence n'est attribuée définitivement qu'à la finalisation :
+		// tant que des documents restent à déplacer, la demande n'est pas
+		// complète, et son numéro ne doit pas être consommé.
+		if ( $finaliser ) {
+			self::finalize( $id, $reference, (string) $meta['_urbizen_files_status'], $now );
+		}
 
 		return array(
 			'ok'        => true,
@@ -176,6 +184,86 @@ final class SubmissionRepository {
 			'id'        => $id,
 			'reference' => $reference,
 		);
+	}
+
+	/**
+	 * Achève une demande : documents en place, référence attribuée pour de bon.
+	 *
+	 * @param int    $id           Identifiant de la demande.
+	 * @param string $reference    Référence.
+	 * @param string $files_status État final des documents.
+	 * @param int    $now          Horodatage.
+	 * @return bool
+	 */
+	public static function finalize( int $id, string $reference, string $files_status, int $now ): bool {
+		if ( ! update_post_meta( $id, '_urbizen_files_status', $files_status ) ) {
+			return false;
+		}
+
+		self::confirm_reference( $reference, $id, $now );
+
+		Logger::info(
+			sprintf(
+				'demande %s enregistrée (#%d, documents : %s)',
+				$reference,
+				$id,
+				$files_status
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Écrit les métadonnées des documents.
+	 *
+	 * @param int                              $id    Demande.
+	 * @param array<int, array<string, mixed>> $files Métadonnées validées.
+	 * @return bool
+	 */
+	public static function set_files( int $id, array $files ): bool {
+		$total = 0;
+
+		foreach ( $files as $f ) {
+			$total += (int) ( $f['size'] ?? 0 );
+		}
+
+		// Les trois écritures sont solidaires : un décompte non écrit rendrait
+		// la liste et son résumé incohérents, ce qui se verrait plus tard sans
+		// qu'on sache pourquoi.
+		$ecritures = array(
+			'_urbizen_files'            => (string) wp_json_encode( array_values( $files ) ),
+			'_urbizen_files_count'      => count( $files ),
+			'_urbizen_files_total_size' => $total,
+		);
+
+		foreach ( $ecritures as $cle => $valeur ) {
+			if ( ! update_post_meta( $id, $cle, $valeur ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Supprime une demande inachevée et libère sa référence.
+	 *
+	 * Une demande abandonnée en cours de route ne doit rien laisser : ni post
+	 * partiel, ni numéro consommé.
+	 *
+	 * @param int    $id        Demande.
+	 * @param string $reference Référence.
+	 * @return void
+	 */
+	public static function discard( int $id, string $reference ): void {
+		if ( $id > 0 ) {
+			wp_delete_post( $id, true );
+		}
+
+		if ( '' !== $reference ) {
+			self::release_reference( $reference );
+		}
 	}
 
 	/**
@@ -396,9 +484,22 @@ final class SubmissionRepository {
 			'source_path'     => (string) get_post_meta( $id, '_urbizen_source_path', true ),
 			'mail_status'     => (string) get_post_meta( $id, '_urbizen_mail_status', true ),
 			'files_status'    => (string) get_post_meta( $id, '_urbizen_files_status', true ),
+			'files'           => self::decode_files( $id ),
 			'payload'         => is_array( $payload ) ? $payload : array(),
 			'pricing'         => is_array( $pricing ) ? $pricing : array(),
 		);
+	}
+
+	/**
+	 * Documents d'une demande.
+	 *
+	 * @param int $id Demande.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function decode_files( int $id ): array {
+		$brut = json_decode( (string) get_post_meta( $id, '_urbizen_files', true ), true );
+
+		return is_array( $brut ) ? $brut : array();
 	}
 
 	/**

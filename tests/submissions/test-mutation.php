@@ -216,40 +216,50 @@ check( '8 · le dépôt donne la même clé quel que soit l’en-tête',
 	RateLimiter::key( 'conception', $menteur ) === RateLimiter::key( 'conception', $s ) );
 check( '8 · muté, le compartiment change avec l’en-tête', $r::key( 'conception', $menteur ) !== $r::key( 'conception', $s ) );
 
-// ========================= 9 · les fichiers sont silencieusement ignorés ====
+// ============ 9 · les documents sont silencieusement ignorés ===============
+// B2 traite réellement les documents. La mutation neutralise la validation de
+// politique : un format interdit passerait alors sans être vu.
 $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
-	array( 'if ( self::has_files( $files ) ) {' => 'if ( false ) {' )
+	array(
+		'			$politique = UploadPolicy::validate( $normalisation[\'files\'] );
+
+			if ( ! $politique[\'ok\'] ) {
+				return $renoncer( $politique[\'code\'] );
+			}' => '			$politique = UploadPolicy::validate( $normalisation[\'files\'] );
+			$politique = array( \'ok\' => true, \'code\' => \'success\', \'files\' => array(), \'block\' => \'\' );',
+	)
 );
 
-$fichier = array(
+$svg = tempnam( sys_get_temp_dir(), 'urb' );
+file_put_contents( $svg, '<svg xmlns="http://www.w3.org/2000/svg"><text>x</text></svg>' );
+
+$lot_svg = array(
 	'croquis_plans' => array(
-		'name'     => array( 'plan.pdf' ),
-		'tmp_name' => array( '/tmp/phpfictif' ),
+		'name'     => array( 'dessin.svg' ),
+		'type'     => array( 'image/svg+xml' ),
+		'tmp_name' => array( $svg ),
 		'error'    => array( UPLOAD_ERR_OK ),
-		'size'     => array( 1024 ),
+		'size'     => array( filesize( $svg ) ),
 	),
 );
 
 neuf();
-check( '9 · refus retiré → un fichier passe en silence', $c::process( soumission(), $fichier, serveur(), wpd_now() )->is_success() );
+check( '9 · validation neutralisée → un SVG passe en silence', $c::process( soumission(), $lot_svg, serveur(), wpd_now() )->is_success() );
 
 neuf();
-check( '9 · le dépôt refuse explicitement',
-	SubmissionResult::FILES_NOT_SUPPORTED_YET === traiter( soumission(), $fichier )->code() );
+check( '9 · le dépôt refuse le SVG', 'upload_invalid_extension' === traiter( soumission(), $lot_svg )->code() );
 
 // ============================ 10 · un prix client est stocké ================
 $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
 	array(
-		'$creation = SubmissionRepository::create(
-			$validation[\'clean\'],
-			$pricing,' => '$pricing["total"] = isset( $post["urbizen_total"] ) ? (int) $post["urbizen_total"] : $pricing["total"];
-		$creation = SubmissionRepository::create(
-			$validation[\'clean\'],
-			$pricing,',
+		'		// --- 12 · demande créée, mais pas encore finalisée ---' =>
+		'		$pricing["total"] = isset( $post["urbizen_total"] ) ? (int) $post["urbizen_total"] : $pricing["total"];
+
+		// --- 12 · demande créée, mais pas encore finalisée ---',
 	)
 );
 
@@ -272,7 +282,7 @@ check( '10 · le total soumis n’apparaît nulle part',
 $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
-	array( "\$validation['clean'],\n\t\t\t\$pricing," => "\$post,\n\t\t\t\$pricing," )
+	array( "			\$validation['clean'],\n			\$pricing," => "			\$post,\n			\$pricing," )
 );
 
 neuf();
@@ -406,10 +416,10 @@ $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
 	array(
-		'		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---' =>
-		'		wp_mail( \'contact@exemple.test\', \'Nouvelle demande\', $creation[\'reference\'] );
+		'		// --- 15 · la demande existe : le jeton et le créneau sont acquis ---' =>
+		'		wp_mail( \'contact@exemple.test\', \'Nouvelle demande\', $reference );
 
-		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---',
+		// --- 15 · la demande existe : le jeton et le créneau sont acquis ---',
 	)
 );
 
@@ -1038,5 +1048,558 @@ wpd_reset();
 Retention::acquire_lock( wpd_now() );
 
 check( '36 · le dépôt n’autoloade pas le verrou', 'no' === wpd_autoload( Retention::LOCK_OPTION ) );
+
+// ======================================================================
+// MUTATIONS B2 : DOCUMENTS PRIVÉS
+// ======================================================================
+
+use Urbizen\Platform\Files\FileCleaner;
+use Urbizen\Platform\Files\SignedLink;
+use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Files\UploadNormalizer as N;
+use Urbizen\Platform\Files\UploadPolicy as P;
+
+/**
+ * Repart d'un état propre, stockage compris.
+ */
+function neuf_fichiers(): void {
+	wpd_reset();
+	wpd_clear_filter( 'urbizen_private_storage_dir' );
+	add_filter( 'urbizen_private_storage_dir', static fn() => URBIZEN_TEST_STORAGE );
+	SubmissionPostType::register_post_type();
+	fx_vide_stockage();
+	Storage::reset();
+}
+
+/** Lot d'un document. */
+function un_doc( string $bloc, string $nom, string $chemin ): array {
+	return fx_files( $bloc, array( array( $nom, $chemin ) ) );
+}
+
+/** Motifs des deux barrières de contrôle de type, mutés séparément. */
+$concordance = "		if ( self::mime_for( \$extension ) !== \$reel ) {
+			return self::refus_un( 'upload_invalid_mime' );
+		}";
+
+$croise = "		if ( function_exists( 'wp_check_filetype_and_ext' ) ) {
+			\$wp = wp_check_filetype_and_ext( \$chemin, 'fichier.' . \$extension, self::wp_mimes() );
+
+			if ( empty( \$wp['ext'] ) || empty( \$wp['type'] ) ) {
+				return self::refus_un( 'upload_invalid_mime' );
+			}
+
+			if ( strtolower( (string) \$wp['ext'] ) !== \$extension || (string) \$wp['type'] !== \$reel ) {
+				return self::refus_un( 'upload_invalid_mime' );
+			}
+		}";
+
+// ====== 37 · un bloc inconnu est accepté ===================================
+$n = mutant(
+	'src/Files/UploadNormalizer.php',
+	'UploadNormalizer',
+	array(
+		'			if ( ! UploadPolicy::is_block( $bloc ) ) {
+				$ignores[] = $bloc;
+				continue;
+			}' => '			// filtre de bloc retiré.',
+	)
+);
+
+$brut = array( 'factures' => array( 'name' => 'f.pdf', 'type' => '', 'tmp_name' => fx_pdf(), 'error' => UPLOAD_ERR_OK, 'size' => 1 ) );
+
+check( '37 · filtre retiré → un bloc inconnu entre dans le lot', 1 === count( $n::normalize( $brut )['files'] ) );
+check( '37 · le dépôt l’écarte', array() === N::normalize( $brut )['files'] );
+check( '37 · et le nomme', array( 'factures' ) === N::normalize( $brut )['ignored'] );
+
+// ====== 38 · la limite par bloc est retirée ================================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'			if ( $par_bloc[ $bloc ] > self::max_per_block() ) {
+				return self::refus( \'upload_count_exceeded\', $bloc );
+			}' => '			// limite par bloc retirée.',
+	)
+);
+
+check( '38 · limite retirée → onze documents dans un bloc passent', $pol::validate( lot_m( 'photos', 11 ) )['ok'] );
+check( '38 · le dépôt refuse le onzième', 'upload_count_exceeded' === P::validate( lot_m( 'photos', 11 ) )['code'] );
+
+// ====== 39 · la limite totale est retirée ==================================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'		if ( count( $lot ) > self::max_total() ) {
+			return self::refus( \'upload_count_exceeded\' );
+		}' => '		// limite totale retirée.',
+	)
+);
+
+$vingt_et_un = array_merge( lot_m( 'photos', 10 ), lot_m( 'croquis_plans', 10 ), lot_m( 'urbanisme', 1 ) );
+
+check( '39 · limite totale retirée → vingt-et-un documents passent', $pol::validate( $vingt_et_un )['ok'] );
+check( '39 · le dépôt refuse le vingt-et-unième', 'upload_count_exceeded' === P::validate( $vingt_et_un )['code'] );
+
+// ====== 40 · la taille par fichier n'est plus vérifiée =====================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'		if ( $taille > self::max_file_size() ) {
+			return self::refus_un( \'upload_too_large\' );
+		}' => '		// contrôle de taille retiré.',
+	)
+);
+
+$enorme = array( 'block' => 'photos', 'name' => 'g.pdf', 'tmp_name' => fx_pdf_taille( P::MAX_FILE_SIZE + 4096 ), 'error' => UPLOAD_ERR_OK );
+
+check( '40 · contrôle retiré → un fichier de plus de 10 Mio passe', $pol::validate_one( $enorme )['ok'] );
+check( '40 · le dépôt le refuse', 'upload_too_large' === P::validate_one( $enorme )['code'] );
+
+// ====== 41 · la taille totale n'est plus vérifiée ==========================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'			if ( $total > self::max_total_size() ) {
+				return self::refus( \'upload_total_size_exceeded\', $bloc );
+			}' => '			// contrôle du cumul retiré.',
+	)
+);
+
+$cumul = array();
+
+for ( $i = 0; $i < 20; $i++ ) {
+	$cumul[] = array( 'block' => 0 === $i % 2 ? 'photos' : 'urbanisme', 'name' => "c$i.pdf", 'tmp_name' => fx_pdf_taille( 2097152 ), 'error' => UPLOAD_ERR_OK );
+}
+
+check( '41 · contrôle retiré → 40 Mio cumulés passent', $pol::validate( $cumul )['ok'] );
+check( '41 · le dépôt refuse le cumul', 'upload_total_size_exceeded' === P::validate( $cumul )['code'] );
+
+// ====== 42 · le type réel n'est plus vérifié ===============================
+// Un fichier est gardé par DEUX barrières : la concordance extension/contenu
+// calculée ici, et le contrôle croisé de WordPress. On les mesure séparément —
+// c'est la seule façon de savoir laquelle protège.
+$deguise = array( 'block' => 'photos', 'name' => 'photo.jpg', 'tmp_name' => fx_php(), 'error' => UPLOAD_ERR_OK );
+
+$sans_concordance = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array( $concordance => '		// concordance retirée.' ) );
+$sans_croise      = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array( $croise => '		// contrôle croisé retiré.' ) );
+$sans_rien        = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array( $concordance => '', $croise => '' ) );
+
+check( '42 · concordance retirée → le contrôle croisé protège encore', 'upload_invalid_mime' === $sans_concordance::validate_one( $deguise )['code'] );
+check( '42 · contrôle croisé retiré → la concordance protège encore', 'upload_invalid_mime' === $sans_croise::validate_one( $deguise )['code'] );
+check( '42 · LES DEUX RETIRÉES → un PHP renommé en JPG passe', $sans_rien::validate_one( $deguise )['ok'] );
+check( '42 · le dépôt le refuse', 'upload_invalid_mime' === P::validate_one( $deguise )['code'] );
+
+// ====== 43 · le type annoncé par le navigateur devient fiable ==============
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'		$reel = self::detect_mime( $chemin );' => '		$reel = isset( $doc[\'type\'] ) ? (string) $doc[\'type\'] : self::detect_mime( $chemin );',
+		$croise => '		// contrôle croisé retiré.',
+	)
+);
+
+$menteur = array( 'block' => 'photos', 'name' => 'photo.jpg', 'tmp_name' => fx_php(), 'error' => UPLOAD_ERR_OK, 'type' => 'image/jpeg' );
+
+check( '43 · type annoncé cru → un PHP passe pour une image', $pol::validate_one( $menteur )['ok'] );
+check( '43 · le dépôt ignore le type annoncé', 'upload_invalid_mime' === P::validate_one( $menteur )['code'] );
+
+// ====== 44 · SVG devient accepté ===========================================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		"		'webp' => 'image/webp',
+	);" => "		'webp' => 'image/webp',
+		'svg'  => 'image/svg+xml',
+	);",
+		$croise => '		// contrôle croisé retiré : il ignore le nouveau format.',
+	)
+);
+
+$svg = array( 'block' => 'photos', 'name' => 'd.svg', 'tmp_name' => fx_svg(), 'error' => UPLOAD_ERR_OK );
+
+check( '44 · SVG ajouté au catalogue → il est accepté', $pol::validate_one( $svg )['ok'] );
+check( '44 · le dépôt refuse le SVG', 'upload_invalid_extension' === P::validate_one( $svg )['code'] );
+
+// ====== 45 · un fichier vide passe =========================================
+$pol = mutant(
+	'src/Files/UploadPolicy.php',
+	'UploadPolicy',
+	array(
+		'		if ( $taille <= 0 ) {
+			return self::refus_un( \'upload_empty_file\' );
+		}' => '		// contrôle du fichier vide retiré.',
+	)
+);
+
+$vide = array( 'block' => 'photos', 'name' => 'v.pdf', 'tmp_name' => fx_vide(), 'error' => UPLOAD_ERR_OK );
+
+check( '45 · contrôle retiré → un fichier vide franchit le contrôle de taille',
+	'upload_empty_file' !== $pol::validate_one( $vide )['code'] );
+check( '45 · le dépôt refuse le fichier vide', 'upload_empty_file' === P::validate_one( $vide )['code'] );
+
+// ====== 46 · le stockage peut se faire sous ABSPATH ========================
+$st = mutant(
+	'src/Files/Storage.php',
+	'Storage',
+	array(
+		'		if ( self::is_inside( $candidat, self::public_root() ) ) {
+			return self::indisponible( \'chemin situé dans la racine publique\' );
+		}' => '		// contrôle avant création retiré.',
+		'		if ( self::is_inside( $reel, self::public_root() ) ) {
+			return self::indisponible( \'chemin résolu dans la racine publique\' );
+		}' => '		// contrôle après résolution retiré.',
+	)
+);
+
+wpd_reset();
+wpd_clear_filter( 'urbizen_private_storage_dir' );
+add_filter( 'urbizen_private_storage_dir', static fn() => rtrim( ABSPATH, '/' ) . '/mutant-public' );
+$st::reset();
+
+check( '46 · contrôle retiré → LE STOCKAGE ATTERRIT DANS LA RACINE PUBLIQUE', null !== $st::root() );
+
+Storage::reset();
+check( '46 · le dépôt refuse', null === Storage::root() );
+
+@rmdir( rtrim( ABSPATH, '/' ) . '/mutant-public' );
+neuf_fichiers();
+
+// ====== 47 · le nom d'origine devient le nom physique ======================
+$st = mutant(
+	'src/Files/Storage.php',
+	'Storage',
+	array(
+		"			\$nom    = \$reference . '-' . \$bloc . '-' . \$file['id'] . '.' . \$file['extension'];" =>
+		"			\$nom    = \$file['original_name'];",
+	)
+);
+
+$staging = $st::open_staging();
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$depose  = $st::stage( (string) $staging, $valide['file'], 0 );
+$meta_m  = $st::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
+
+check( '47 · muté → le nom d’origine devient le nom physique', str_contains( (string) $meta_m[0]['stored_name'], 'Secret Client' ) );
+
+neuf_fichiers();
+$staging = Storage::open_staging();
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$depose  = Storage::stage( (string) $staging, $valide['file'], 0 );
+$meta_s  = Storage::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
+
+check( '47 · le dépôt emploie un nom technique', ! str_contains( (string) $meta_s[0]['stored_name'], 'Secret' ) );
+check( '47 · au format attendu', 1 === preg_match( '/^URB-2026-0001-photos-[0-9a-f]{32}\.pdf$/', (string) $meta_s[0]['stored_name'] ) );
+
+// ====== 48 · un ../ sort de la racine ======================================
+$st = mutant(
+	'src/Files/Storage.php',
+	'Storage',
+	array(
+		"		foreach ( explode( '/', \$relative ) as \$segment ) {
+			if ( '' === \$segment || '.' === \$segment || '..' === \$segment ) {
+				return null;
+			}
+		}" => '		// contrôle des segments retiré.',
+		'		if ( false === $reel || ! self::is_inside( $reel, $racine ) ) {
+			return null;
+		}' => '		if ( false === $reel ) {
+			return null;
+		}',
+	)
+);
+
+// Une cible réelle hors de la racine, atteignable par remontée.
+$dehors = fx_write( 'contenu hors racine' );
+$remontee = str_repeat( '../', 12 ) . ltrim( $dehors, '/' );
+
+check( '48 · contrôle retiré → une remontée sort de la racine', null !== $st::resolve( $remontee ) );
+check( '48 · le dépôt refuse toute remontée', null === Storage::resolve( $remontee ) );
+check( '48 · le dépôt refuse un chemin absolu', null === Storage::resolve( '/etc/passwd' ) );
+
+// ====== 49 · un lien symbolique est suivi =================================
+$st = mutant(
+	'src/Files/Storage.php',
+	'Storage',
+	array(
+		'		if ( is_link( $chemin ) ) {
+			return null;
+		}' => '		// contrôle du lien symbolique retiré.',
+	)
+);
+
+neuf_fichiers();
+$dossier = URBIZEN_TEST_STORAGE . '/conception/URB-2026-0001/photos';
+@mkdir( $dossier, 0700, true );
+// La cible est DANS la racine : le confinement ne s'y oppose pas, et seul le
+// refus des liens symboliques protège encore. C'est ce qu'on veut isoler.
+$cible = $dossier . '/reel.pdf';
+file_put_contents( $cible, '%PDF-1.4' );
+
+if ( @symlink( $cible, $dossier . '/lien.pdf' ) ) {
+	$rel = 'conception/URB-2026-0001/photos/lien.pdf';
+	check( '49 · contrôle retiré → LE LIEN SYMBOLIQUE EST SUIVI', null !== $st::resolve( $rel ) );
+	check( '49 · le dépôt le refuse', null === Storage::resolve( $rel ) );
+	@unlink( $dossier . '/lien.pdf' );
+} else {
+	check( '49 · lien symbolique : impossible sur ce système, contrôle ignoré', true );
+}
+
+// ====== 50 · un échec laisse du staging ===================================
+$c = mutant(
+	'src/Http/SubmissionController.php',
+	'SubmissionController',
+	array( '			Storage::discard_staging( $staging );' => '			// staging conservé.' )
+);
+
+neuf_fichiers();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_files';
+$c::process( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '50 · nettoyage retiré → un staging subsiste après échec', fx_compte_staging() > 0 );
+
+neuf_fichiers();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_files';
+traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '50 · le dépôt ne laisse aucun staging', 0 === fx_compte_staging() );
+
+// ====== 51 · un échec laisse un post partiel ==============================
+$c = mutant(
+	'src/Http/SubmissionController.php',
+	'SubmissionController',
+	array(
+		'			if ( $id > 0 || \'\' !== $reference ) {
+				SubmissionRepository::discard( $id, $reference );
+			}' => '			// abandon de la demande partielle retiré.',
+	)
+);
+
+// La panne doit survenir APRÈS la création de la demande : on fait échouer le
+// décompte, écrit par set_files et non par create().
+neuf_fichiers();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_files_count';
+$c::process( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '51 · abandon retiré → une demande partielle subsiste', 1 === count( $GLOBALS['wpd_posts'] ) );
+check( '51 · avec files_status resté à pending', 'pending' === get_post_meta( array_key_first( $GLOBALS['wpd_posts'] ), '_urbizen_files_status', true ) );
+
+neuf_fichiers();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_files_count';
+traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '51 · le dépôt ne laisse aucune demande', array() === $GLOBALS['wpd_posts'] );
+
+// ====== 52 · une référence est attribuée avant finalisation ===============
+// La propriété se mesure au moment exact de la création, avant que les
+// documents ne soient en place : une soumission en échec masquerait le défaut,
+// puisque le chemin d'abandon libère ensuite la réservation.
+$jeu_52 = \Urbizen\Platform\Forms\Validator::validate(
+	\Urbizen\Platform\Forms\FormRegistry::get( 'conception' ),
+	array( 'nature' => 'maison', 'situation' => 'terrain_nu', 'a_terrain' => 'non', 'nom' => 'Camille Fictif', 'email' => 'camille@exemple.test', 'rgpd' => '1' )
+);
+
+/**
+ * État de la réservation d'une référence.
+ *
+ * @param string $reference Référence.
+ * @return string
+ */
+function etat_reservation( string $reference ): string {
+	return (string) ( get_option( SubmissionRepository::RESERVATION_PREFIX . $reference )['state'] ?? 'absente' );
+}
+
+$d = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( '		$finaliser = ! array_key_exists( \'finalize\', $context ) || false !== $context[\'finalize\'];' => '		$finaliser = true;' )
+);
+
+neuf_fichiers();
+$cm = $d::create( $jeu_52['clean'], $jeu_52['pricing'], array( 'now' => wpd_now(), 'files_status' => 'pending', 'finalize' => false ) );
+
+check( '52 · finalisation forcée → la référence est attribuée alors que les documents manquent',
+	'attributed' === etat_reservation( (string) $cm['reference'] ) );
+check( '52 · alors que files_status vaut encore pending',
+	'pending' === get_post_meta( (int) $cm['id'], '_urbizen_files_status', true ) );
+
+neuf_fichiers();
+$cs = SubmissionRepository::create( $jeu_52['clean'], $jeu_52['pricing'], array( 'now' => wpd_now(), 'files_status' => 'pending', 'finalize' => false ) );
+
+check( '52 · le dépôt laisse la référence simplement réservée', 'reserved' === etat_reservation( (string) $cs['reference'] ) );
+
+SubmissionRepository::finalize( (int) $cs['id'], (string) $cs['reference'], 'stored', wpd_now() );
+
+check( '52 · elle n’est attribuée qu’à la finalisation', 'attributed' === etat_reservation( (string) $cs['reference'] ) );
+
+// ====== 53 · le nom d'origine apparaît dans le journal ====================
+$c = mutant(
+	'src/Http/SubmissionController.php',
+	'SubmissionController',
+	array(
+		"					'demande %s : %d document(s), %d octets'," =>
+		"					'demande %s : %d document(s), %d octets [' . implode( ',', array_column( \$metadonnees, 'original_name' ) ) . ']',",
+	)
+);
+
+neuf_fichiers();
+$c::process( soumission(), un_doc( 'photos', 'Secret Client.pdf', fx_copie( fx_pdf() ) ), serveur(), wpd_now() );
+
+check( '53 · muté → le nom d’origine entre dans le journal', str_contains( journal(), 'Secret Client' ) );
+
+neuf_fichiers();
+traiter( soumission(), un_doc( 'photos', 'Secret Client.pdf', fx_copie( fx_pdf() ) ) );
+
+check( '53 · le dépôt ne journalise aucun nom', ! str_contains( journal(), 'Secret Client' ) );
+
+// ====== 54 · le chemin absolu est stocké ==================================
+$st = mutant(
+	'src/Files/Storage.php',
+	'Storage',
+	array( "				'relative_path' => \$relatif . '/' . \$nom," => "				'relative_path' => \$final," )
+);
+
+neuf_fichiers();
+$staging = $st::open_staging();
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$depose  = $st::stage( (string) $staging, $valide['file'], 0 );
+$meta_m  = $st::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
+
+check( '54 · muté → le chemin absolu se retrouve en métadonnée', str_starts_with( (string) $meta_m[0]['relative_path'], '/' ) );
+
+neuf_fichiers();
+$staging = Storage::open_staging();
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$depose  = Storage::stage( (string) $staging, $valide['file'], 0 );
+$meta_s  = Storage::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
+
+check( '54 · le dépôt ne stocke qu’un chemin relatif', ! str_starts_with( (string) $meta_s[0]['relative_path'], '/' ) );
+check( '54 · sans la racine privée', ! str_contains( (string) $meta_s[0]['relative_path'], URBIZEN_TEST_STORAGE ) );
+
+// ====== 55 · une signature expirée passe ==================================
+$sl = mutant(
+	'src/Files/SignedLink.php',
+	'SignedLink',
+	array(
+		'		if ( $expires <= 0 || $now > $expires ) {
+			return self::refus();
+		}' => '		// contrôle d\'expiration retiré.',
+	)
+);
+
+$params_m = array( 'action' => 'urbizen_file', 'v' => 1, 'submission' => 7, 'file' => str_repeat( 'a', 32 ), 'expires' => wpd_now() - 10 );
+$params_m['signature'] = ( function () use ( $params_m ) {
+	return hash_hmac( 'sha256', implode( '|', array( 1, 7, $params_m['file'], $params_m['expires'] ) ), wp_salt( 'auth' ) . '|urbizen-signed-link' );
+} )();
+
+check( '55 · contrôle retiré → un lien expiré passe', $sl::verify( $params_m, wpd_now() )['ok'] );
+check( '55 · le dépôt refuse le lien expiré', ! SignedLink::verify( $params_m, wpd_now() )['ok'] );
+
+// ====== 56 · une signature modifiée passe =================================
+$sl = mutant(
+	'src/Files/SignedLink.php',
+	'SignedLink',
+	array(
+		'		if ( ! hash_equals( self::sign( $submission, $file, $expires ), $signature ) ) {
+			return self::refus();
+		}' => '		// vérification de signature retirée.',
+	)
+);
+
+$faux = array( 'action' => 'urbizen_file', 'v' => 1, 'submission' => 7, 'file' => str_repeat( 'a', 32 ), 'expires' => wpd_now() + 1000, 'signature' => 'nimportequoi' );
+
+check( '56 · vérification retirée → une signature quelconque passe', $sl::verify( $faux, wpd_now() )['ok'] );
+check( '56 · le dépôt la refuse', ! SignedLink::verify( $faux, wpd_now() )['ok'] );
+
+// ====== 57 · le téléchargement révèle l'existence d'une demande ===========
+neuf_fichiers();
+$r   = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$lu  = SubmissionRepository::get( $r->id() );
+$url = SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() );
+parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $ok_params );
+
+$existe    = \Urbizen\Platform\Http\FileDownloadController::locate( array_merge( $ok_params, array( 'signature' => str_repeat( '0', 64 ) ) ), wpd_now() );
+$inexiste  = \Urbizen\Platform\Http\FileDownloadController::locate( array_merge( $ok_params, array( 'submission' => 999999, 'signature' => str_repeat( '0', 64 ) ) ), wpd_now() );
+
+check( '57 · une demande existante et une inexistante donnent le même résultat', $existe === $inexiste && null === $existe );
+check( '57 · un lien valide fonctionne', null !== \Urbizen\Platform\Http\FileDownloadController::locate( $ok_params, wpd_now() ) );
+
+// ====== 58 · les fichiers ne sont plus supprimés avec la demande ==========
+$fc = mutant(
+	'src/Files/FileCleaner.php',
+	'FileCleaner',
+	array( '		$effaces = Storage::delete_files( $reference, $files );' => '		$effaces = 0;' )
+);
+
+neuf_fichiers();
+$fc::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '58 · effacement retiré → LE DOCUMENT SURVIT À LA DEMANDE', 1 === fx_compte_fichiers() );
+
+neuf_fichiers();
+FileCleaner::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '58 · le dépôt efface le document avec la demande', 0 === fx_compte_fichiers() );
+
+// ====== 59 · une réservation attribuée part avec les fichiers =============
+$fc = mutant(
+	'src/Files/FileCleaner.php',
+	'FileCleaner',
+	array(
+		'		Logger::info( sprintf( \'demande %s : %d document(s) effacé(s)\', $reference, $effaces ) );' =>
+		'		delete_option( \'urbizen_ref_\' . $reference );',
+	)
+);
+
+neuf_fichiers();
+$fc::register();
+$r   = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$ref = $r->reference();
+update_post_meta( $r->id(), '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '59 · muté → la réservation attribuée part avec les fichiers',
+	null === get_option( SubmissionRepository::RESERVATION_PREFIX . $ref, null ) );
+
+neuf_fichiers();
+FileCleaner::register();
+$r   = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$ref = $r->reference();
+update_post_meta( $r->id(), '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '59 · le dépôt conserve la réservation attribuée',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $ref )['state'] ?? '' ) );
+
+/**
+ * Lot de documents pour les mutations de politique.
+ *
+ * @param string $bloc   Bloc.
+ * @param int    $nombre Nombre.
+ * @return array<int, array<string, mixed>>
+ */
+function lot_m( string $bloc, int $nombre ): array {
+	$out = array();
+
+	for ( $i = 0; $i < $nombre; $i++ ) {
+		$out[] = array( 'block' => $bloc, 'name' => "m$i.pdf", 'tmp_name' => fx_pdf(), 'error' => UPLOAD_ERR_OK );
+	}
+
+	return $out;
+}
 
 verdict();

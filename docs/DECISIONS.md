@@ -772,3 +772,145 @@ de `option_name`.
   repasse et constate que la tâche existe. Le nombre d'appels réels à
   `wp_schedule_event` est mesuré, et vaut exactement 1.
 - Le verrou ne contient qu'une échéance. Aucune donnée personnelle.
+
+---
+
+## D-022 — Les documents vivent hors de la racine publique
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Croquis, photographies et relevés d'un projet sont des données
+personnelles. La solution courante — un dossier de `wp-content/uploads` au nom
+imprévisible — ne protège rien : un nom fuit par les journaux du serveur, par
+le `Referer`, par une sauvegarde mal placée, par un listing mal configuré. La
+seule barrière solide est qu'**aucun chemin d'URL ne mène au fichier**.
+
+**Décision.** Les documents sont stockés **hors de la racine publique**.
+
+L'emplacement est déduit de l'installation, jamais inscrit en dur : le parent
+de `ABSPATH`, soit `<parent>/private/urbizen-conception`. Sur l'hébergement
+actuel, cela donne un répertoire frère de `public_html` — que l'hébergeur
+lui-même signale comme non servi.
+
+Trois garde-fous entourent la résolution :
+
+1. un chemin situé sous `ABSPATH` est **refusé avant toute création** — le
+   refuser après l'avoir créé laisserait un répertoire dans l'arbre servi ;
+2. un second contrôle après `realpath()` couvre le cas d'un lien symbolique
+   qui ramènerait un chemin d'apparence privée dans la racine publique ;
+3. le répertoire doit être inscriptible.
+
+**En l'absence d'emplacement sûr, le stockage refuse.** Il ne se replie
+**jamais** sur `wp-content/uploads` : une soumission refusée se corrige, un
+document exposé ne se reprend pas. Le code interne est `storage_unavailable`.
+
+Répertoires en `0700`, fichiers en `0600`. Un `index.php` et un `.htaccess`
+sont posés en défense complémentaire — jamais comme protection principale.
+
+**Conséquences.**
+- Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`
+  déposerait le fichier derrière une URL publique. Un banc balaie tout le
+  plugin pour le vérifier.
+- Le seul accès est un lien signé, servi par un contrôleur dédié.
+- Le chemin de stockage est configurable par la constante
+  `URBIZEN_PRIVATE_STORAGE_DIR` et par le filtre
+  `urbizen_private_storage_dir`, mais aucun réglage ne permet de contourner le
+  refus des chemins publics.
+
+---
+
+## D-023 — Extension et contenu doivent concorder
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** `$_FILES['type']` est une **déclaration du navigateur**. Un
+attaquant l'écrit ce qu'il veut. Une extension seule ne vaut pas mieux :
+`photo.jpg` peut contenir du PHP.
+
+**Décision.** Un document n'est accepté que si **trois** choses concordent :
+une extension de la liste blanche, un type réel lu dans le contenu par
+`finfo`, et le contrôle croisé de WordPress.
+
+Formats acceptés : PDF, JPG, JPEG, PNG, WEBP. Refusés : SVG, GIF, HEIC,
+bureautique, archives, exécutables, HTML, JavaScript, PHP, fichiers sans
+extension, extensions doubles trompeuses.
+
+Seule la **dernière** extension compte : `facture.pdf.php` a pour extension
+`php`, et c'est bien ainsi qu'un serveur l'exécuterait.
+
+Limites : 10 documents par bloc, 20 au total, 10 Mio par document, 25 Mio
+cumulés — en octets réels, alignés sur `max_file_uploads` mesuré à 20.
+
+**Conséquences.**
+- Le banc de mutation mesure les deux barrières de type **séparément** :
+  retirer la concordance laisse le contrôle croisé protéger, retirer le
+  contrôle croisé laisse la concordance protéger, retirer les deux laisse
+  passer un PHP renommé en JPG.
+- La taille retenue est celle **du fichier sur le disque**, jamais celle
+  annoncée.
+
+---
+
+## D-024 — Le traitement des documents est transactionnel
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-014] et [D-017]
+
+**Contexte.** Une soumission avec documents enchaîne une dizaine d'opérations
+dont chacune peut échouer. Sans discipline, une panne au milieu laisse un
+fichier sans demande, ou une demande annonçant des documents absents.
+
+**Décision.** Deux temps, et un abandon complet à la moindre panne.
+
+Les fichiers passent d'abord dans un **staging** identifié au hasard, avant
+qu'une seule ligne ne soit écrite en base. Ils ne sont déplacés sous la
+référence qu'une fois la demande créée. La demande, elle, naît en état
+`pending` avec sa référence **simplement réservée** : elle n'est
+**attribuée** qu'à la finalisation, quand tout est en place.
+
+Invariants tenus, chacun éprouvé par un scénario de panne dédié : aucun
+fichier permanent sans demande, aucune demande annoncée réussie avec des
+documents incomplets, aucune référence attribuée avant la finalisation, aucun
+staging résiduel, aucun jeton ni créneau consommé par un échec corrigible.
+
+**Conséquences.**
+- `files_status` suit le cycle `none` · `pending` · `stored` · `deleted`.
+- Les documents sont effacés **avec** la demande, par le hook
+  `urbizen_before_submission_delete` déclenché tant qu'elle existe encore.
+- La réservation `attributed` survit à l'effacement des documents, comme elle
+  survit à celui des données personnelles (D-020).
+- Le nettoyage quotidien ne touche **que** le staging. Un document final n'est
+  jamais supprimé au motif qu'une métadonnée semble manquante : en cas de
+  doute, on conserve et on signale.
+
+---
+
+## D-025 — Les liens de téléchargement sont signés et temporaires
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Les documents étant hors de toute URL, il faut un moyen d'y
+donner accès — notamment depuis un courriel ouvert sans session WordPress.
+
+**Décision.** Un lien HMAC, valable **14 jours**, régénérable.
+
+La signature couvre tous les champs : version du schéma, demande, document,
+échéance. Modifier l'un d'eux invalide le lien. On ne peut ni prolonger une
+échéance, ni glisser vers le document d'une autre demande.
+
+L'URL ne porte **aucune** information métier : ni chemin, ni nom de fichier,
+ni nom de personne, ni adresse, ni empreinte. Une URL se retrouve dans
+l'historique du navigateur, dans les journaux du serveur et dans le `Referer`
+envoyé au site suivant.
+
+**Toute défaillance produit la même réponse** — un 404 identique. Signature
+fausse, lien expiré, demande inexistante, document effacé : distinguer les cas
+révélerait qu'une demande existe, et un identifiant de demande est un entier
+qu'on essaie en quelques secondes.
+
+**Conséquences.**
+- Le contrôleur reconstruit le chemin par `Storage`, qui refuse toute sortie
+  de la racine privée, tout lien symbolique et tout chemin inexistant.
+- Le nom proposé au téléchargement est débarrassé des retours chariot, des
+  guillemets et de tout chemin : il entre dans un en-tête HTTP.
+- Aucun lien n'est affiché ni envoyé en PR B2. La PR B3 les emploiera dans le
+  courriel administrateur.

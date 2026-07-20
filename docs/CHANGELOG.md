@@ -5,6 +5,71 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.7.0] — 20 juillet 2026
+
+Validation et stockage privé des documents joints à une demande.
+
+> **Aucun effet public.** Aucun formulaire n'est rendu, aucune page n'est
+> créée, aucun courriel n'est envoyé, aucun champ de dépôt n'est visible sur le
+> site. Les liens signés sont générables, mais ne sont affichés ni envoyés à
+> personne. Le site est strictement inchangé.
+
+### Ajouté
+- `src/Files/UploadPolicy.php` : source unique de la politique — cinq blocs,
+  cinq formats, correspondances extension/type réel, 10 documents par bloc,
+  20 au total, 10 Mio par document, 25 Mio cumulés (D-023).
+- `src/Files/UploadNormalizer.php` : aplatissement contrôlé de `$_FILES`. Une
+  structure malformée est **refusée**, jamais réparée en silence. Aucun chemin
+  transmis par le navigateur ne subsiste.
+- `src/Files/Storage.php` : stockage **hors de la racine publique**, staging
+  transactionnel, noms techniques imprévisibles, refus de toute sortie de la
+  racine privée et de tout lien symbolique (D-022).
+- `src/Files/SignedLink.php` : liens HMAC de 14 jours, régénérables, sans
+  aucune donnée métier dans l'URL (D-025).
+- `src/Files/FileCleaner.php` : effacement des documents **avec** la demande,
+  branché sur `urbizen_before_submission_delete` et sur `before_delete_post`.
+- `src/Http/FileDownloadController.php` : diffusion par flux, en-têtes de
+  sécurité, réponse générique identique pour toute défaillance.
+- `tests/submissions/test-documents.php` (130 contrôles),
+  `test-transaction.php` (141), `fixtures.php` : fichiers d'essai portant de
+  **véritables signatures de format**, pour que `finfo` réagisse comme en
+  production.
+
+### Modifié
+- `SubmissionController` : le refus provisoire `files_not_supported_yet` cède
+  la place au pipeline réel. Les défenses de B1 et leurs garanties d'atomicité
+  sont conservées à l'identique.
+- `SubmissionRepository` : création en deux temps. La référence n'est
+  **attribuée** qu'à la finalisation ; `finalize()`, `set_files()` et
+  `discard()` complètent l'API (D-024).
+- `Retention` : la tâche quotidienne nettoie aussi les stagings abandonnés.
+- `SubmissionsAdmin` : une colonne « Documents » — un décompte et une taille,
+  jamais un nom ni un lien.
+- Version 0.7.0, alignée dans les deux `block.json`. Aucune autre clé ne change.
+
+### États des documents
+`none` sans document · `pending` pendant le traitement · `stored` une fois en
+place · `deleted` après effacement.
+
+### Volontairement absent
+- Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.
+- Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`
+  déposerait le fichier derrière une URL publique.
+- Aucun rendu public : le garde-fou du `Renderer` reste actif.
+
+### Inchangé
+- `src/Forms/` n'est pas touché ; `localisation` rend le même HTML.
+- Les 583 contrôles de B1, les 260 de la PR A, les 175 du formulaire et du
+  cadastre et les 367 de la page d'accueil passent **sans assouplissement**.
+
+### À venir
+- **PR B3** — courriels : notification à `contact@urbizen.fr` avec les liens
+  signés, confirmation au client, `Reply-To` sur l'adresse validée.
+- **PR C** — interface publique en six étapes, champs de dépôt visibles,
+  traduction des codes internes en messages compréhensibles.
+
+---
+
 ## [0.6.0] — 20 juillet 2026
 
 Réception, protection et conservation des demandes de conception.
@@ -106,6 +171,11 @@ Toutes portent `autoload = false`. Aucune ne contient de donnée personnelle.
   `Validator` sont fonctionnellement identiques.
 - Les 260 contrôles de la PR A, les 175 du formulaire et du cadastre, et les
   367 de la page d'accueil passent **sans le moindre assouplissement**.
+
+> **Correction documentaire.** La sauvegarde `urbizen-platform-20260720-201312`
+> réalisée avant le déploiement de cette version contient la **0.5.0**. La
+> restaurer ramène donc le plugin en 0.5.0, et non en 0.4.0 comme l'indiquait
+> par erreur le compte rendu de déploiement.
 
 ### À venir
 - **PR B2** — fichiers : politique de dépôt, stockage hors racine web, liens
