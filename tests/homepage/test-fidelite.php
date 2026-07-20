@@ -175,7 +175,11 @@ $decls = static function ( $source ) {
 };
 $d_ref = $decls( $css_ref );
 $d_css = $decls( $css );
-check( 'CSS : 541 déclarations conservées', 541 === count( $d_ref ) && 541 === count( $d_css ) );
+// Le nombre de déclarations n'est pas figé : la maquette évolue. Ce qui doit
+// rester vrai, c'est que le fichier généré en contient exactement autant que sa
+// source — le scoping ne touche qu'aux sélecteurs.
+check( 'CSS : autant de déclarations que la maquette (' . count( $d_ref ) . ')',
+	count( $d_ref ) === count( $d_css ) && count( $d_ref ) > 0 );
 check( 'CSS : aucune valeur de propriété modifiée', $d_ref === $d_css );
 
 $fonts = file_get_contents( $theme . '/assets/css/urbizen-fonts.css' );

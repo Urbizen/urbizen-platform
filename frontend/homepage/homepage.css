@@ -184,13 +184,16 @@ main section { padding: clamp(52px, 8vw, 88px) 0; }
 @media (max-width: 700px) { .pourquoi-grid { grid-template-columns: 1fr; } }
 
 /* --- Section 9 : exemples --- */
-.exemple-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-.exemple { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 22px 20px; position: relative; }
+.exemple-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.exemple { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 20px 20px; position: relative; display: flex; align-items: center; gap: 16px; }
+.exemple-txt { flex: 1; min-width: 0; }
+.exemple-img { flex: none; width: 100px; }
+.exemple-img svg { width: 100%; height: auto; display: block; }
 .demo-flag { display: inline-block; font-family: var(--u-font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--u-ink-faint); border: 1px solid var(--u-line); border-radius: 3px; padding: 2px 7px; margin-bottom: 12px; }
 .exemple h3 { font-size: 16px; margin-bottom: 10px; }
 .exemple .mono { font-size: 12.5px; color: var(--u-ink-soft); display: block; }
-@media (max-width: 860px) { .exemple-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 460px) { .exemple-grid { grid-template-columns: 1fr; } }
+@media (max-width: 860px) { .exemple-grid { grid-template-columns: 1fr; } }
+@media (max-width: 460px) { .exemple-img { width: 84px; } }
 
 /* --- Section 10 : avis --- */
 .avis { background: var(--u-surface-2); border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
