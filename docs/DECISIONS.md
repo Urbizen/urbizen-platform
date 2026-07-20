@@ -473,3 +473,114 @@ accentuées, espacées, construites à partir de libellés affichés.
 - Le banc de mutation mesure les deux barrières **séparément** : retirer l'une
   laisse l'autre protéger, retirer les deux laisse entrer les clés arbitraires.
 - La même discipline s'appliquera à toute famille dynamique future.
+
+---
+
+## D-014 — La demande est écrite avant toute action externe
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Une soumission déclenche plusieurs effets : enregistrement,
+notification à Urbizen, confirmation au client, et plus tard transmission au
+service de génération. L'ordre de ces effets détermine ce qu'on perd quand l'un
+d'eux échoue.
+
+Le schéma naturel — valider, envoyer un courriel, et considérer que c'est fait —
+fait reposer tout le dossier sur la délivrabilité d'un SMTP. Une panne de
+Fluent SMTP, un rejet du destinataire, une adresse en quarantaine, et le
+prospect disparaît sans laisser de trace.
+
+**Décision.** La demande est **enregistrée en base avant tout appel externe**.
+
+- Le courriel devient une **notification**, jamais le support de la demande.
+- Un échec d'envoi est un incident réparable : la demande existe, elle est
+  consultable, et l'envoi sera rejouable.
+- Les métadonnées `_urbizen_mail_status` et `_urbizen_files_status` valent
+  `not_started` en PR B1 et porteront l'état réel dès les PR B2 et B3.
+- Si une métadonnée obligatoire ne peut pas être écrite, la demande
+  partiellement créée est **supprimée** et l'échec est annoncé. Une demande
+  amputée est pire qu'une absence de demande : elle laisse croire que le
+  dossier est en main.
+
+**Conséquences.**
+- Aucune table SQL n'est créée. Une demande est un contenu WordPress privé,
+  pas un schéma parallèle à maintenir et à migrer.
+- `SubmissionRepository` est la **seule** couche autorisée à écrire une demande.
+- La référence `URB-AAAA-NNNN` est attribuée par un compteur en option, mais
+  l'unicité est vérifiée en base : deux soumissions simultanées se décalent au
+  lieu de s'écraser.
+
+---
+
+## D-015 — Trois signaux anti-robot, aucun ne conservant d'adresse IP
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Un formulaire public reçoit des robots. Un seul garde-fou se
+contourne ; il en faut plusieurs, indépendants. Mais la lutte contre le spam ne
+justifie pas de constituer un fichier d'adresses IP.
+
+**Décision.** Trois signaux, et **aucune adresse conservée**.
+
+1. **Nonce WordPress**, action `urbizen_conception_submit`.
+2. **Pot de miel** `company_website` : refus silencieux si rempli. Rien de ce
+   qu'un robot a écrit n'est journalisé — ni la valeur, ni le nom du champ.
+3. **Jeton signé** : identifiant aléatoire, heure d'émission, signature HMAC sur
+   un sel WordPress. Le serveur en déduit le temps écoulé — un horodatage
+   envoyé par le navigateur se falsifie en une ligne de JavaScript. Délai
+   minimal 3 secondes, validité 24 heures, usage unique.
+
+Le jeton consommé n'est mémorisé que sous forme de **condensat non réversible**,
+dans un transient. Ni le jeton brut, ni sa signature, ni son identifiant
+n'apparaissent en base.
+
+**La limitation de débit ne conserve pas davantage.** Cinq soumissions par heure
+et par origine, la clé du compteur étant un HMAC de l'adresse. Il permet de
+reconnaître deux requêtes de la même origine, jamais de retrouver cette origine.
+
+**Aucun en-tête de proxy n'est cru sur parole.** `X-Forwarded-For`, `X-Real-IP`
+et `Client-IP` sont envoyés par le client : les accepter d'office offrirait un
+contournement trivial de la limite. La source est `REMOTE_ADDR`. Un hébergement
+derrière un proxy de confiance peut désigner un en-tête par le filtre
+`urbizen_trusted_proxy_header` — décision explicite, jamais un défaut.
+
+**Conséquences.**
+- Les codes de refus sont **internes**. Expliquer à un robot pourquoi il a été
+  refusé, c'est l'aider : la réponse publique reste générique.
+- La comparaison de signature passe par `hash_equals()` : une comparaison naïve
+  laisse fuir la signature attendue par mesure du temps de réponse.
+- Le banc de mutation mesure chaque signal séparément.
+
+---
+
+## D-016 — Conservation limitée à 365 jours, sauf dossier client
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Une demande contient des données personnelles : nom, adresse
+électronique, téléphone, localisation, description d'un projet. La conserver
+indéfiniment n'est ni nécessaire, ni licite.
+
+**Décision.** Purge quotidienne, **365 jours après le dernier contact**.
+
+- Les états `received` et `closed` sont purgeables.
+- L'état `converted` — la demande est devenue un dossier client — n'est
+  **jamais** touché par ce mécanisme. Il relève d'une politique contractuelle et
+  comptable distincte, à définir séparément.
+- La durée vit à un seul endroit, ajustable par le filtre
+  `urbizen_retention_days`. Une durée recopiée à trois endroits est une durée
+  qu'on finit par ne plus respecter.
+- Une durée nulle ou négative est ramenée à un jour : un filtre mal écrit ne
+  doit pas pouvoir tout effacer au premier passage.
+- Le hook `urbizen_before_submission_delete` est déclenché **avant** la
+  suppression, la demande existant encore. La PR B2 s'y branchera pour effacer
+  les fichiers : après, plus rien ne permettrait de les retrouver.
+
+**Conséquences.**
+- Une seconde barrière relit l'état de chaque demande avant de la supprimer :
+  une requête de métadonnées mal interprétée ne doit pas pouvoir emporter un
+  dossier client.
+- La purge traite au plus 200 demandes par passage, pour ne jamais faire expirer
+  une tâche planifiée. Le reliquat part au passage suivant.
+- La tâche est programmée à l'activation et retirée à la désactivation, sous le
+  nom `urbizen_purge_expired` que le `Deactivator` déprogrammait déjà.

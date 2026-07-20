@@ -7,6 +7,8 @@
 
 namespace Urbizen\Platform;
 
+use Urbizen\Platform\Privacy\Retention;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -37,12 +39,13 @@ final class Activator {
 			);
 		}
 
+		// Purge RGPD quotidienne. Aucune table n'est créée : les demandes sont
+		// des contenus WordPress privés, pas un schéma parallèle à maintenir.
+		Retention::schedule();
+
 		/*
 		 * À implémenter aux étapes suivantes :
-		 *   - création des tables wp_urbizen_submissions / _submission_fields /
-		 *     _files / _log via dbDelta() ;
-		 *   - création du répertoire de stockage privé hors racine web ;
-		 *   - enregistrement de la tâche planifiée de purge RGPD ;
+		 *   - création du répertoire de stockage privé hors racine web (B2) ;
 		 *   - déclaration des capabilities urbizen_manage_dossiers.
 		 */
 	}

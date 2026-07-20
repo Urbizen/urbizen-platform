@@ -5,6 +5,71 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.6.0] — 20 juillet 2026
+
+Réception, protection et conservation des demandes de conception.
+
+> **Aucun effet public.** Aucun formulaire n'est rendu, aucune page n'est
+> créée, aucun courriel n'est envoyé, aucun fichier n'est reçu. L'action
+> `admin-post` existe, mais aucune page publique n'en produit le nonce ni le
+> jeton. Le site est strictement inchangé.
+
+### Ajouté
+- `src/Http/SubmissionController.php` : réception par `admin-post.php`, en
+  `multipart/form-data`, **sans dépendance à JavaScript**. Quatorze contrôles
+  dans un ordre imposé — les refus les moins coûteux d'abord.
+- `src/Http/SubmissionResult.php` : objet de valeur immuable, quatorze codes
+  internes, jamais montrés au prospect.
+- `src/Security/AntiSpam.php` : jeton signé HMAC, délai minimal de 3 secondes
+  mesuré **par le serveur**, validité de 24 heures, usage unique. Le jeton
+  consommé n'est mémorisé que par un condensat non réversible (D-015).
+- `src/Security/RateLimiter.php` : 5 soumissions par heure et par origine.
+  **Aucune adresse IP n'est conservée** — ni en base, ni en transient, ni dans
+  un journal. Les en-têtes de proxy ne sont jamais crus sur parole.
+- `src/Submissions/SubmissionPostType.php` : type de contenu `urbizen_demande`,
+  privé, hors recherche, hors REST, sans permalien. Toutes les capacités sont
+  ramenées à `manage_options`, sans héritage de celles des articles.
+- `src/Submissions/SubmissionRepository.php` : seule couche autorisée à écrire
+  une demande. Douze métadonnées, retour arrière si l'une échoue (D-014).
+- `src/Privacy/Retention.php` : purge quotidienne à 365 jours, **jamais** un
+  dossier client, hook `urbizen_before_submission_delete` pour la PR B2 (D-016).
+- `src/Admin/SubmissionsAdmin.php` : liste réservée aux administrateurs —
+  référence, formulaire, statut, date. **Aucune donnée personnelle.**
+- `tests/submissions/` : six bancs, **361 contrôles**, dont **50 mutations**.
+  Doublure WordPress complète à horloge pilotable.
+
+### Modifié
+- `Plugin.php` enregistre le type de contenu, le contrôleur et la rétention ;
+  la liste d'administration n'est chargée qu'en administration.
+- `Activator.php` programme la purge quotidienne. **Aucune table SQL créée.**
+- `Deactivator.php` référence `Retention::HOOK` plutôt qu'une chaîne : renommer
+  la tâche sans renommer ici laisserait un événement orphelin.
+- Version 0.6.0, alignée dans les deux `block.json`. Aucune autre clé ne change.
+
+### Volontairement absent
+- Aucun envoi de courriel : un banc le vérifie sur l'ensemble du plugin.
+- Aucune réception de fichier : toute pièce jointe est refusée explicitement
+  avec le code `files_not_supported_yet`, jamais ignorée en silence.
+- Aucun rendu public : le garde-fou du `Renderer` reste actif.
+
+### Inchangé
+- `src/Forms/` n'est pas touché : `localisation` rend le même HTML, la
+  définition `conception` conserve ses 6 étapes et ses 45 champs, `Pricing` et
+  `Validator` sont fonctionnellement identiques.
+- Les 260 contrôles de la PR A, les 175 du formulaire et du cadastre, et les
+  367 de la page d'accueil passent **sans le moindre assouplissement**.
+
+### À venir
+- **PR B2** — fichiers : politique de dépôt, stockage hors racine web, liens
+  signés de 14 jours régénérables, branchement sur
+  `urbizen_before_submission_delete`.
+- **PR B3** — courriels : notification à `contact@urbizen.fr`, confirmation au
+  client, `Reply-To` sur l'adresse validée.
+- **PR C** — interface publique en six étapes, génération du nonce et du jeton,
+  page en brouillon.
+
+---
+
 ## [0.5.0] — 20 juillet 2026
 
 Socle métier du troisième service Urbizen : **Conception de plans sur mesure**.

@@ -7,8 +7,12 @@
 
 namespace Urbizen\Platform;
 
+use Urbizen\Platform\Admin\SubmissionsAdmin;
 use Urbizen\Platform\Blocks\CadastreBlock;
 use Urbizen\Platform\Blocks\FormBlock;
+use Urbizen\Platform\Http\SubmissionController;
+use Urbizen\Platform\Privacy\Retention;
+use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -81,13 +85,15 @@ final class Plugin {
 	 * Enregistre les modules métier.
 	 *
 	 * Ordre d'arrivée prévu :
-	 *   1. Blocks\CadastreBlock  — composant cadastre          ← étape 2, actif
-	 *   2. Blocks\FormBlock      — formulaires déclaratifs     ← étape 3, actif
-	 *   3. Http\RestController   — réception des soumissions
-	 *   4. Files\UploadHandler   — pièces jointes
-	 *   5. Backend\PythonClient  — transmission au service de génération
-	 *   6. Privacy\*             — rétention et droits RGPD
-	 *   7. Admin\*               — consultation des demandes
+	 *   1. Blocks\CadastreBlock         — composant cadastre        ← actif
+	 *   2. Blocks\FormBlock             — formulaires déclaratifs   ← actif
+	 *   3. Submissions\SubmissionPostType — conservation des demandes ← actif
+	 *   4. Http\SubmissionController    — réception des soumissions ← actif
+	 *   5. Privacy\Retention            — purge à 365 jours         ← actif
+	 *   6. Admin\SubmissionsAdmin       — liste des demandes        ← actif
+	 *   7. Files\UploadPolicy           — pièces jointes            ← PR B2
+	 *   8. Mail\Mailer                  — notifications             ← PR B3
+	 *   9. Backend\PythonClient         — génération documentaire
 	 *
 	 * @return void
 	 */
@@ -95,7 +101,17 @@ final class Plugin {
 		CadastreBlock::register();
 		FormBlock::register();
 
-		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : modules cadastre et formulaires actifs.' );
+		// La conservation des demandes précède leur réception : le type de
+		// contenu doit exister avant qu'une soumission cherche à l'écrire.
+		SubmissionPostType::register();
+		SubmissionController::register();
+		Retention::register();
+
+		if ( is_admin() ) {
+			SubmissionsAdmin::register();
+		}
+
+		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : cadastre, formulaires et réception des demandes actifs.' );
 	}
 
 	/**
