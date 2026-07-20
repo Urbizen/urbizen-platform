@@ -71,6 +71,21 @@ foreach ( $sources as $nom => $chemin ) {
 		'DP6 : arbre'                => '<circle cx="386" cy="278" r="13"',
 	);
 
+	// Le faîtage relie le sommet du pignon avant au sommet arrière de la
+	// toiture. Sans lui, les deux pans menthe — tous deux en stroke="none" —
+	// se rejoignaient sans aucune ligne, et l'œil butait sur l'arête absente.
+	check( "[$nom] DP6 : le faîtage est tracé", 1 === substr_count( $p, 'M320 246 L360 252' ) );
+	check( "[$nom] DP6 : le faîtage est dans le tracé animé, pas ailleurs",
+		(bool) preg_match( '#class="hp-draw hp-dr4"[^>]*M320 246 L360 252#', $p ) );
+	// Retirer le segment doit redonner exactement le tracé d'avant : aucune
+	// autre coordonnée du DP6 n'a bougé.
+	check( "[$nom] DP6 : aucune autre coordonnée du tracé n'a changé",
+		preg_match( '#<path class="hp-draw hp-dr4"[^>]*d="([^"]*)"#', $p, $m )
+		&& 'M300 302 L300 264 L340 264 L340 302 M340 264 L360 252 L360 290 '
+		 . 'M296 264 L320 246 L344 264 M344 264 L360 252 '
+		 . 'M373 279 a13 13 0 1 0 26 0 a13 13 0 1 0 -26 0'
+		   === str_replace( 'M320 246 L360 252 ', '', $m[1] ) );
+
 	$manque = array();
 	foreach ( $attendus as $intitule => $motif ) {
 		if ( ! str_contains( $p, $motif ) ) { $manque[] = $intitule; }
@@ -95,6 +110,10 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] aucune couche .hp-det", ! str_contains( $p, 'hp-det' ) && ! str_contains( $p, 'hp-td' ) );
 	check( "[$nom] chaque tracé porte pathLength", 4 === substr_count( $p, 'pathLength="1"' ) );
 	check( "[$nom] viewBox inchangé", str_contains( $p, 'viewBox="0 0 440 360"' ) );
+	// Le faîtage est un segment ajouté à un tracé existant, pas un élément de
+	// plus : ni SVG ni <path> supplémentaire.
+	check( "[$nom] 13 <path> dans la planche, aucun ajouté",
+		13 === preg_match_all( '#<path #', $p ) );
 }
 
 // ------------------------------------------------------------- le CSS ------
