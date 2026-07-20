@@ -51,6 +51,22 @@ final class Retention {
 	public const DEFAULT_DAYS = 365;
 
 	/**
+	 * Verrou de programmation de la tâche.
+	 *
+	 * Nom fixe : il n'y a qu'une tâche à programmer, donc qu'un verrou.
+	 */
+	public const LOCK_OPTION = 'urbizen_cron_lock';
+
+	/**
+	 * Durée de vie du verrou, en secondes.
+	 *
+	 * Très courte : la section protégée se réduit à une lecture et une écriture.
+	 * Un arrêt brutal au milieu ne doit pas empêcher la programmation pour
+	 * toujours — au pire, la requête suivante reprend le verrou périmé.
+	 */
+	public const LOCK_TTL = 30;
+
+	/**
 	 * Nombre maximal de demandes traitées par passage.
 	 *
 	 * Une purge ne doit jamais faire expirer une tâche planifiée. Le reliquat
@@ -71,25 +87,107 @@ final class Retention {
 	 * @return void
 	 */
 	public static function register(): void {
-		add_action( self::HOOK, array( self::class, 'run_daily' ) );
-		add_action( 'init', array( self::class, 'ensure_scheduled' ) );
+		// Zéro argument déclaré des deux côtés : `do_action()` transmet une
+		// chaîne vide quand il n'a rien à passer, et un paramètre typé `?int`
+		// la refuserait. Le déclarer évite ce piège classique.
+		add_action( self::HOOK, array( self::class, 'run_daily' ), 10, 0 );
+		add_action( 'init', array( self::class, 'ensure_scheduled' ), 10, 0 );
 	}
 
 	/**
 	 * Programme la tâche quotidienne si elle ne l'est pas déjà.
 	 *
-	 * Idempotente : `wp_next_scheduled()` interroge le tableau des tâches, déjà
-	 * chargé en mémoire. Cent appels successifs ne créent qu'une tâche.
+	 * Sans paramètre : `do_action()` transmet une chaîne vide quand il n'a rien
+	 * à passer, et un paramètre typé la refuserait.
 	 *
 	 * @return void
 	 */
 	public static function ensure_scheduled(): void {
+		self::ensure_scheduled_at( time() );
+	}
+
+	/**
+	 * Programme la tâche, à un instant donné.
+	 *
+	 * `wp_next_scheduled()` puis `wp_schedule_event()` est un « lire puis
+	 * écrire » : deux requêtes arrivant ensemble juste après une mise à jour
+	 * ne trouvent ni l'une ni l'autre de tâche, et en programment deux. Le
+	 * premier contrôle reste, comme chemin rapide sans écriture ; la
+	 * programmation elle-même se fait sous **verrou atomique**, et le contrôle
+	 * est refait une fois le verrou tenu.
+	 *
+	 * @param int $now Horodatage courant.
+	 * @return void
+	 */
+	public static function ensure_scheduled_at( int $now ): void {
+		// Chemin rapide : dans l'immense majorité des requêtes, la tâche existe
+		// déjà et rien n'est écrit.
+		if ( false !== wp_next_scheduled( self::HOOK ) ) {
+			return;
+		}
+
+		if ( ! self::acquire_lock( $now ) ) {
+			// Une autre requête s'en occupe. Elle aboutira ; celle-ci n'a rien
+			// à faire, et surtout rien à programmer.
+			return;
+		}
+
+		self::schedule_now();
+		self::release_lock();
+	}
+
+	/**
+	 * Programme la tâche. Suppose le verrou détenu.
+	 *
+	 * Le contrôle est refait ici : entre le chemin rapide et l'obtention du
+	 * verrou, une autre requête a pu programmer.
+	 *
+	 * @return void
+	 */
+	public static function schedule_now(): void {
 		if ( false !== wp_next_scheduled( self::HOOK ) ) {
 			return;
 		}
 
 		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
 		Logger::info( 'rétention : tâche quotidienne programmée' );
+	}
+
+	/**
+	 * Prend le verrou de programmation.
+	 *
+	 * @param int $now Horodatage courant.
+	 * @return bool Vrai si le verrou est acquis.
+	 */
+	public static function acquire_lock( int $now ): bool {
+		$existant = get_option( self::LOCK_OPTION, null );
+
+		if ( is_array( $existant ) ) {
+			if ( $now < (int) ( $existant['expires'] ?? 0 ) ) {
+				return false;
+			}
+
+			// Verrou périmé : une requête interrompue l'a laissé derrière elle.
+			delete_option( self::LOCK_OPTION );
+		}
+
+		return (bool) add_option(
+			self::LOCK_OPTION,
+			array( 'expires' => $now + self::LOCK_TTL ),
+			'',
+			false
+		);
+	}
+
+	/**
+	 * Rend le verrou.
+	 *
+	 * En fonctionnement normal, aucun verrou ne subsiste dans `wp_options`.
+	 *
+	 * @return void
+	 */
+	public static function release_lock(): void {
+		delete_option( self::LOCK_OPTION );
 	}
 
 	/**

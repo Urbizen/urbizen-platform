@@ -35,7 +35,7 @@ Réception, protection et conservation des demandes de conception.
   dossier client, hook `urbizen_before_submission_delete` pour la PR B2 (D-016).
 - `src/Admin/SubmissionsAdmin.php` : liste réservée aux administrateurs —
   référence, formulaire, statut, date. **Aucune donnée personnelle.**
-- `tests/submissions/` : sept bancs, **495 contrôles**, dont **79 mutations**.
+- `tests/submissions/` : huit bancs, **583 contrôles**, dont **97 mutations**.
   Doublure WordPress complète à horloge pilotable.
 
 ### Modifié
@@ -66,6 +66,33 @@ Réception, protection et conservation des demandes de conception.
   `autoload = false`.
 - `src/Support/OptionsScan.php` : recherche d'options par préfixe interne,
   seule requête directe du plugin, bornée aux préfixes `urbizen_`.
+
+### Pérennité et verrouillage (seconde revue de la PR #18)
+- **Registre permanent des références** : une réservation `attributed` n'est
+  supprimée par rien — ni le nettoyage, ni la rétention, ni la suppression de la
+  demande. Effacer les données personnelles d'une demande ne réautorise jamais
+  l'usage de son numéro (D-020).
+- **Verrou atomique du cron** : `add_option( 'urbizen_cron_lock' )` protège la
+  séquence « vérifier puis programmer ». Expiration de 30 secondes, reprise d'un
+  verrou périmé, libération immédiate — aucun verrou ne subsiste en
+  fonctionnement normal (D-021).
+- La doublure WordPress des bancs reproduit désormais fidèlement `do_action()` :
+  chaîne vide quand aucun argument n'est transmis, et plafonnement par
+  `accepted_args`. Elle a immédiatement révélé qu'un abonné à
+  `urbizen_before_submission_delete` doit déclarer ses deux arguments.
+
+### Tableau des options techniques
+
+| Préfixe | Ressource | Durée | Supprimée | Contenu |
+|---|---|---|---|---|
+| `urbizen_tok_` | jeton réservé ou consommé | 24 h | oui | état, échéance |
+| `urbizen_rl_` | créneau de débit | 1 h | oui | état, échéance |
+| `urbizen_ref_` *(reserved)* | référence en attente | échec ou 1 h | oui | état, date, `post` à 0 |
+| `urbizen_ref_` *(attributed)* | référence attribuée | **permanente** | **non** | état, date, identifiant |
+| `urbizen_cron_lock` | verrou de programmation | 30 s | oui | échéance |
+| `urbizen_reference_sequence` | compteur accélérateur | permanente | non | rangs par année |
+
+Toutes portent `autoload = false`. Aucune ne contient de donnée personnelle.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc le vérifie sur l'ensemble du plugin.

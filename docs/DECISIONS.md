@@ -696,3 +696,79 @@ mémoire. Cent chargements ne créent qu'une tâche.
 - La même tâche quotidienne assure le ménage des réservations techniques.
   Une réservation **attribuée** n'est jamais supprimée : la référence appartient
   à une demande et ne doit pas pouvoir resservir.
+
+---
+
+## D-020 — Données personnelles effaçables, registre des références permanent
+
+**Date** : 20 juillet 2026 · **État** : actée · **Précise** [D-016] et [D-017]
+
+**Contexte.** La revue a relevé une contradiction dans un compte rendu : une
+réservation attribuée était présentée à la fois comme jamais supprimée et comme
+libérée par la purge à 365 jours. Vérification faite, **le code était correct** —
+c'était la prose qui ne l'était pas. Mais l'ambiguïté méritait d'être tranchée
+et inscrite.
+
+**Décision.** Deux natures de données, deux régimes.
+
+**Les données personnelles** — nom, adresse électronique, téléphone, adresse du
+terrain, description du projet — vivent dans la demande, contenu WordPress
+privé. Elles sont **effacées 365 jours après le dernier contact**, sauf dossier
+client. C'est la limitation de conservation.
+
+**Le registre des références attribuées** est autre chose. Une option
+`urbizen_ref_URB-AAAA-NNNN` portant l'état `attributed` est un **registre
+technique permanent d'unicité**. Elle ne contient aucune donnée personnelle :
+un état, une date technique d'attribution, l'identifiant du contenu WordPress.
+Rien d'autre — ni nom, ni adresse, ni charge utile, ni adresse IP, ni fichier.
+
+Elle n'est supprimée par **rien** : ni le nettoyage quotidien, ni la rétention,
+ni la suppression de la demande. Sans elle, un numéro déjà communiqué à un
+client pourrait être réattribué à un autre dossier des années plus tard — une
+confusion que rien ne permettrait ensuite de démêler.
+
+**Conséquences.**
+- Effacer les données personnelles d'une demande **ne réautorise pas** l'usage
+  de son numéro. Le pire des cas est éprouvé : demande supprimée, compteur remis
+  à zéro, caches purgés — la référence n'est toujours pas réattribuée.
+- Une réservation `reserved` reste, elle, temporaire : libérée si la persistance
+  échoue, supprimée si elle est abandonnée depuis plus d'une heure.
+- Le nettoyage ne touche **que** l'état `reserved`. Une valeur devenue illisible
+  est conservée : garder une ligne inutile coûte une ligne, en supprimer une à
+  tort rouvre une référence déjà donnée.
+- Une ligne d'option par référence attribuée. Le volume suit celui des demandes
+  réelles, et chaque ligne porte `autoload = false`.
+
+---
+
+## D-021 — La programmation du cron est protégée par un verrou atomique
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-019]
+
+**Contexte.** `wp_next_scheduled()` puis `wp_schedule_event()` est un « lire
+puis écrire », exactement le motif écarté ailleurs. Juste après une mise à jour,
+deux requêtes simultanées ne trouvent ni l'une ni l'autre de tâche, et en
+programment deux. La démonstration d'idempotence portait sur des chargements
+**successifs** ; elle ne disait rien de la concurrence.
+
+**Décision.** Un verrou atomique, sur la même primitive que le reste : l'unicité
+de `option_name`.
+
+- **Chemin rapide** : si la tâche existe, on sort sans rien écrire. C'est le cas
+  de l'immense majorité des requêtes — aucun verrou n'est même posé.
+- **Sinon** : `add_option( 'urbizen_cron_lock', …, '', false )`. Une seule
+  requête l'obtient ; les autres renoncent sans programmer.
+- Le contrôle est **refait sous verrou** : entre le chemin rapide et
+  l'obtention, une autre requête a pu programmer.
+- Le verrou expire au bout de **30 secondes**. La section protégée se réduit à
+  une lecture et une écriture ; un arrêt brutal au milieu ne doit pas empêcher
+  la programmation pour toujours. Un verrou manifestement périmé est repris.
+- Il est rendu immédiatement après. En fonctionnement normal, **aucun verrou ne
+  subsiste** dans `wp_options`.
+
+**Conséquences.**
+- L'entrelacement est éprouvé de façon déterministe : A tient le verrou, B
+  s'exécute entièrement et ne programme rien, A termine et rend le verrou, B
+  repasse et constate que la tâche existe. Le nombre d'appels réels à
+  `wp_schedule_event` est mesuré, et vaut exactement 1.
+- Le verrou ne contient qu'une échéance. Aucune donnée personnelle.

@@ -166,7 +166,7 @@ final class SubmissionRepository {
 		}
 
 		// La référence est désormais attribuée pour de bon.
-		self::confirm_reference( $reference, $id );
+		self::confirm_reference( $reference, $id, $now );
 
 		Logger::info( sprintf( 'demande %s enregistrée (#%d, %s)', $reference, $id, $form_type ) );
 
@@ -277,15 +277,33 @@ final class SubmissionRepository {
 	/**
 	 * Marque une réservation comme définitivement attribuée.
 	 *
+	 * Elle devient un **registre technique permanent**. Une référence attribuée
+	 * ne doit jamais resservir, y compris longtemps après que la demande a
+	 * disparu : c'est la seule chose qui empêche qu'un vieux numéro soit
+	 * réattribué à un autre dossier.
+	 *
+	 * Cette distinction est le cœur de la conservation Urbizen :
+	 *
+	 * - les **données personnelles** de la demande sont effacées après 365
+	 *   jours, comme le veut la limitation de conservation ;
+	 * - le **registre des références déjà attribuées** survit, parce qu'il ne
+	 *   contient aucune donnée personnelle et sert uniquement d'unicité.
+	 *
+	 * Contenu : un état, une date technique, et l'identifiant du contenu
+	 * WordPress. Ni nom, ni adresse, ni téléphone, ni charge utile, ni adresse
+	 * IP, ni fichier.
+	 *
 	 * @param string $reference Référence.
 	 * @param int    $post_id   Demande associée.
+	 * @param int    $now       Horodatage d'attribution.
 	 * @return void
 	 */
-	public static function confirm_reference( string $reference, int $post_id ): void {
+	public static function confirm_reference( string $reference, int $post_id, int $now ): void {
 		update_option(
 			self::RESERVATION_PREFIX . $reference,
 			array(
 				'state' => 'attributed',
+				'at'    => gmdate( 'Y-m-d H:i:s', $now ),
 				'post'  => $post_id,
 			),
 			false
@@ -310,13 +328,11 @@ final class SubmissionRepository {
 		foreach ( OptionsScan::names( self::RESERVATION_PREFIX ) as $cle ) {
 			$valeur = get_option( $cle, null );
 
-			if ( ! is_array( $valeur ) ) {
-				delete_option( $cle );
-				++$liberees;
-				continue;
-			}
-
-			if ( 'reserved' !== ( $valeur['state'] ?? '' ) ) {
+			// Seul l'état `reserved` est nettoyable. Tout le reste — `attributed`
+			// comme une valeur devenue illisible — est conservé : en cas de
+			// doute, garder une entrée inutile coûte une ligne ; en supprimer
+			// une à tort rouvre une référence déjà donnée à un client.
+			if ( ! is_array( $valeur ) || 'reserved' !== ( $valeur['state'] ?? '' ) ) {
 				continue;
 			}
 

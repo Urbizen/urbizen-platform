@@ -81,10 +81,12 @@ wpd_reset();
 SubmissionPostType::register_post_type();
 
 $vus = array();
+// Deux arguments déclarés : le hook en transmet deux, et WordPress plafonne
+// ce qu'il transmet au nombre déclaré. La PR B2 devra faire de même.
 add_action( Retention::BEFORE_DELETE, static function ( $id, $ref ) use ( &$vus ) {
 	// La demande doit exister encore : sinon impossible de retrouver ses fichiers.
 	$vus[] = array( 'ref' => $ref, 'existe_encore' => null !== get_post( $id ) );
-} );
+}, 10, 2 );
 
 demande( 'received', 400 );
 Retention::purge( wpd_now() );

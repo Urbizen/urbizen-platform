@@ -665,7 +665,7 @@ check( '24 · le dépôt libère la référence',
 $p = mutant(
 	'src/Privacy/Retention.php',
 	'Retention',
-	array( "		add_action( 'init', array( self::class, 'ensure_scheduled' ) );" => '		// programmation retirée du chargement.' )
+	array( "		add_action( 'init', array( self::class, 'ensure_scheduled' ), 10, 0 );" => '		// programmation retirée du chargement.' )
 );
 
 wpd_reset();
@@ -813,5 +813,230 @@ for ( $i = 1; $i <= 6; $i++ ) {
 
 check( '29 · le dépôt en crée exactement cinq', 5 === $creees );
 check( '29 · cinq demandes en base', 5 === count( $GLOBALS['wpd_posts'] ) );
+
+// ======================================================================
+// MUTATIONS DE LA SECONDE REVUE : REGISTRE ET VERROU
+// ======================================================================
+
+// ====== 30 · une réservation attribuée redevient supprimable ================
+$d = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array(
+		"			if ( ! is_array( \$valeur ) || 'reserved' !== ( \$valeur['state'] ?? '' ) ) {
+				continue;
+			}" => '			// filtre d\'état retiré : tout devient nettoyable.',
+	)
+);
+
+$jeu_m = \Urbizen\Platform\Forms\Validator::validate(
+	\Urbizen\Platform\Forms\FormRegistry::get( 'conception' ),
+	array( 'nature' => 'maison', 'situation' => 'terrain_nu', 'a_terrain' => 'non', 'nom' => 'Camille Fictif', 'email' => 'camille@exemple.test', 'rgpd' => '1' )
+);
+
+neuf();
+$c_mute = SubmissionRepository::create( $jeu_m['clean'], $jeu_m['pricing'], array( 'now' => wpd_now() ) );
+$d::cleanup_abandoned_references( wpd_now() + 999999 );
+
+check( '30 · filtre d’état retiré → la réservation attribuée est supprimée',
+	null === get_option( SubmissionRepository::RESERVATION_PREFIX . $c_mute['reference'], null ) );
+
+// Conséquence directe : la référence redevient réattribuable.
+wp_delete_post( $c_mute['id'], true );
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+
+check( '30 · muté → un ancien numéro est réattribué',
+	$c_mute['reference'] === SubmissionRepository::next_reference( wpd_now() ) );
+
+neuf();
+$c_sain = SubmissionRepository::create( $jeu_m['clean'], $jeu_m['pricing'], array( 'now' => wpd_now() ) );
+SubmissionRepository::cleanup_abandoned_references( wpd_now() + 999999 );
+
+check( '30 · le dépôt conserve la réservation attribuée',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $c_sain['reference'] )['state'] ?? '' ) );
+
+wp_delete_post( $c_sain['id'], true );
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+
+check( '30 · le dépôt ne réattribue jamais un ancien numéro',
+	$c_sain['reference'] !== SubmissionRepository::next_reference( wpd_now() ) );
+
+// ====== 31 · la rétention emporte le registre avec la demande ==============
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'			do_action( self::BEFORE_DELETE, $id, $reference );' =>
+		'			do_action( self::BEFORE_DELETE, $id, $reference );
+			delete_option( \'urbizen_ref_\' . $reference );',
+	)
+);
+
+neuf();
+$c_mute = SubmissionRepository::create( $jeu_m['clean'], $jeu_m['pricing'], array( 'now' => wpd_now() ) );
+update_post_meta( $c_mute['id'], '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+$p::purge( wpd_now() );
+
+check( '31 · rétention modifiée → le registre est emporté avec la demande',
+	null === get_option( SubmissionRepository::RESERVATION_PREFIX . $c_mute['reference'], null ) );
+
+neuf();
+$c_sain = SubmissionRepository::create( $jeu_m['clean'], $jeu_m['pricing'], array( 'now' => wpd_now() ) );
+update_post_meta( $c_sain['id'], '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '31 · le dépôt purge la demande', null === get_post( $c_sain['id'] ) );
+check( '31 · mais conserve le registre',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $c_sain['reference'] )['state'] ?? '' ) );
+
+// ====== 32 · le verrou atomique est supprimé ===============================
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'		if ( ! self::acquire_lock( $now ) ) {
+			// Une autre requête s\'en occupe. Elle aboutira ; celle-ci n\'a rien
+			// à faire, et surtout rien à programmer.
+			return;
+		}
+
+		self::schedule_now();
+		self::release_lock();' => '		self::schedule_now();',
+	)
+);
+
+// La propriété mesurée : pendant que A tient le verrou — donc entre son
+// contrôle et son écriture — B ne doit RIEN programmer.
+wpd_reset();
+Retention::acquire_lock( wpd_now() );
+$p::ensure_scheduled_at( wpd_now() );
+
+check( '32 · verrou retiré → B programme pendant que A travaille',
+	1 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+wpd_reset();
+Retention::acquire_lock( wpd_now() );
+Retention::ensure_scheduled_at( wpd_now() );
+
+check( '32 · le dépôt : B ne programme rien pendant que A travaille',
+	0 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+Retention::schedule_now();
+Retention::release_lock();
+
+check( '32 · au total, une seule programmation', 1 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+// ====== 33 · retour à un simple lire-puis-écrire ===========================
+// Un « lire puis écrire » ne peut pas être atomique : dans une vraie course,
+// les deux requêtes lisent avant que l'une n'écrive. La mutation retire donc
+// la lecture ET l'ajout atomique, ce qui reproduit fidèlement l'état où aucune
+// des deux ne voit le verrou de l'autre.
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'		$existant = get_option( self::LOCK_OPTION, null );
+
+		if ( is_array( $existant ) ) {
+			if ( $now < (int) ( $existant[\'expires\'] ?? 0 ) ) {
+				return false;
+			}
+
+			// Verrou périmé : une requête interrompue l\'a laissé derrière elle.
+			delete_option( self::LOCK_OPTION );
+		}
+
+		return (bool) add_option(
+			self::LOCK_OPTION,
+			array( \'expires\' => $now + self::LOCK_TTL ),
+			\'\',
+			false
+		);' =>
+		'		update_option( self::LOCK_OPTION, array( \'expires\' => $now + self::LOCK_TTL ), false );
+
+		return true;',
+	)
+);
+
+wpd_reset();
+
+check( '33 · sans add_option → deux requêtes obtiennent le verrou',
+	$p::acquire_lock( wpd_now() ) && $p::acquire_lock( wpd_now() ) );
+
+wpd_reset();
+
+check( '33 · le dépôt n’en laisse passer qu’une',
+	Retention::acquire_lock( wpd_now() ) && ! Retention::acquire_lock( wpd_now() ) );
+
+// ====== 34 · un verrou sans expiration =====================================
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'			if ( $now < (int) ( $existant[\'expires\'] ?? 0 ) ) {
+				return false;
+			}
+
+			// Verrou périmé : une requête interrompue l\'a laissé derrière elle.
+			delete_option( self::LOCK_OPTION );' => '			return false;',
+	)
+);
+
+wpd_reset();
+$p::acquire_lock( wpd_now() );
+$p::ensure_scheduled_at( wpd_now() + 100000 );
+
+check( '34 · verrou sans expiration → un arrêt brutal bloque à jamais la programmation',
+	0 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+wpd_reset();
+Retention::acquire_lock( wpd_now() );
+Retention::ensure_scheduled_at( wpd_now() + Retention::LOCK_TTL + 1 );
+
+check( '34 · le dépôt reprend un verrou périmé', 1 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+// ====== 35 · le verrou reste après succès ==================================
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array( '		self::release_lock();' => '		// libération retirée.' )
+);
+
+wpd_reset();
+$p::ensure_scheduled_at( wpd_now() );
+
+check( '35 · libération retirée → un verrou subsiste dans wp_options',
+	null !== get_option( Retention::LOCK_OPTION, null ) );
+
+wpd_reset();
+Retention::ensure_scheduled_at( wpd_now() );
+
+check( '35 · le dépôt ne laisse aucun verrou', null === get_option( Retention::LOCK_OPTION, null ) );
+
+// ====== 36 · le verrou passe en autoload=true ==============================
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'			array( \'expires\' => $now + self::LOCK_TTL ),
+			\'\',
+			false
+		);' =>
+		'			array( \'expires\' => $now + self::LOCK_TTL ),
+			\'\',
+			true
+		);',
+	)
+);
+
+wpd_reset();
+$p::acquire_lock( wpd_now() );
+
+check( '36 · muté → le verrou devient autoloadé', 'yes' === wpd_autoload( Retention::LOCK_OPTION ) );
+
+wpd_reset();
+Retention::acquire_lock( wpd_now() );
+
+check( '36 · le dépôt n’autoloade pas le verrou', 'no' === wpd_autoload( Retention::LOCK_OPTION ) );
 
 verdict();

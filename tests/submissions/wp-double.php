@@ -87,15 +87,41 @@ function apply_filters( $hook, $valeur, ...$extra ) {
 }
 
 function add_action( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_actions'][ $hook ][] = $callback;
+	$GLOBALS['wpd_actions'][ $hook ][] = array( 'cb' => $callback, 'n' => (int) $args );
 	return true;
 }
 
+/**
+ * Déclenche une action, **fidèlement** à WordPress.
+ *
+ * Deux subtilités reproduites, parce qu'elles cassent du code réel :
+ *
+ * 1. `do_action()` sans argument transmet une chaîne vide — un rappel déclaré
+ *    avec `?int $now = null` reçoit alors `''` et lève une TypeError ;
+ * 2. le nombre d'arguments transmis est plafonné par `accepted_args`.
+ */
 function do_action( $hook, ...$args ) {
 	$GLOBALS['wpd_done'][] = array( 'hook' => $hook, 'args' => $args );
 
-	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $callback ) {
-		$callback( ...$args );
+	if ( array() === $args ) {
+		$args = array( '' );
+	}
+
+	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+		$entree['cb']( ...array_slice( $args, 0, $entree['n'] ) );
+	}
+}
+
+/**
+ * Déclenche une action avec un tableau d'arguments, comme le fait wp-cron.
+ *
+ * Contrairement à `do_action()`, aucune chaîne vide n'est ajoutée.
+ */
+function do_action_ref_array( $hook, $args ) {
+	$GLOBALS['wpd_done'][] = array( 'hook' => $hook, 'args' => $args );
+
+	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+		$entree['cb']( ...array_slice( (array) $args, 0, $entree['n'] ) );
 	}
 }
 
