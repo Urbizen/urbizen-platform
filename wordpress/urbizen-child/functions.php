@@ -184,9 +184,27 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
 /**
  * La page affichée utilise-t-elle le gabarit de l'accueil Urbizen ?
  *
+ * Deux gabarits rendent cette page, pour une raison tenant à la hiérarchie de
+ * WordPress : pour la page d'accueil du site, `front-page` est consulté AVANT
+ * le gabarit personnalisé de la page, qui n'est donc jamais atteint. Le thème
+ * enfant fournit les deux fichiers, copies strictes l'une de l'autre :
+ *
+ *   - `templates/front-page.html`          → l'accueil du site ;
+ *   - `templates/page-accueil-urbizen.html` → toute autre page qui l'assigne,
+ *     dont la page brouillon de recette et les prévisualisations.
+ *
+ * La détection couvre les deux cas. `is_front_page()` est exactement la
+ * condition d'emploi de `front-page.html` : dès lors que le fichier existe
+ * dans le thème enfant, il est en tête de la hiérarchie de l'accueil.
+ *
  * @return bool
  */
 function urbizen_child_est_accueil_urbizen() {
+	// Accueil du site : rendu par templates/front-page.html.
+	if ( is_front_page() ) {
+		return true;
+	}
+
 	if ( ! is_singular() ) {
 		return false;
 	}
