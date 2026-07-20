@@ -362,3 +362,114 @@ conservation devait être tranchée avant toute soumission serveur.
   ni côté serveur : les diagnostics n'exposent que des codes d'erreur.
 - La politique de confidentialité devra mentionner ce stockage local dès que le
   composant sera publié sur une page réelle.
+
+---
+
+## D-011 — Extension additive de FormDefinition
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Le moteur de formulaires connaissait trois types de champs —
+`text`, `number`, `hidden` — un seul formulaire d'un seul tenant, et aucune
+notion d'étape, de condition ni de liste fermée. Le service « Conception de
+plans sur mesure » exige six étapes, neuf types de champs, des branches
+conditionnelles, une famille de champs dynamiques et un calcul tarifaire.
+
+Deux voies s'offraient : écrire un second moteur à côté du premier, ou étendre
+celui qui existe.
+
+**Décision.** Le moteur unique est étendu, et **toute extension est additive**.
+
+- Un formulaire qui ne déclare pas `steps` se charge exactement comme avant.
+  `localisation` n'a subi aucune modification fonctionnelle : son HTML rendu est
+  **identique au bit près** à celui de la version précédente, ce que le banc
+  d'essai vérifie par comparaison d'empreintes.
+- Les six types ajoutés — `radio`, `checkbox`, `select`, `textarea`, `file`,
+  `consent` — ne retirent rien aux trois existants.
+- Les clés de champ forment une **liste blanche**. Une clé inconnue est écartée
+  et **nommée** : une faute de frappe dans une définition doit se voir.
+- Une définition fautive ne provoque **jamais d'écran fatal**. Les champs
+  invalides sont écartés, la raison est consignée dans `errors()` et journalisée
+  par le registre. Les bancs d'essai lisent la même liste.
+
+**Le mot `step` ne peut plus porter deux sens.** Il désignait l'incrément HTML
+d'un champ numérique ; il désigne désormais l'étape d'appartenance. L'incrément
+prend le nom distinct `increment`. C'est la seule modification apportée à
+`localisation.php` et à `Renderer.php`, et elle est neutre : le HTML produit est
+inchangé.
+
+**Conséquences.**
+- `Renderer` refuse de rendre un formulaire déclarant des étapes : il poserait
+  tous les champs à plat, sans distinguer un bouton radio d'un champ texte. Ce
+  garde-fou disparaîtra quand `StepRenderer` existera (PR C).
+- Le registre reste une **liste blanche en dur**. Aucune valeur reçue du
+  navigateur ne peut désigner un fichier de définition arbitraire.
+- Les 175 contrôles existants du formulaire et du cadastre passent inchangés,
+  sans le moindre assouplissement.
+
+---
+
+## D-012 — Le prix est une décision serveur
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Le formulaire de conception affiche un prix indicatif qui varie
+selon les options cochées. Un total calculé dans le navigateur est une donnée
+que le visiteur contrôle entièrement.
+
+**Décision.** `src/Forms/Pricing.php` est la **source unique** des montants.
+
+- Le navigateur peut afficher un total pour informer ; il n'en est jamais la
+  source. Un montant reçu d'un formulaire est **ignoré sans exception** : seuls
+  les identifiants d'options sont lus, et le total est recalculé côté serveur.
+- Un identifiant inconnu est écarté et journalisé, jamais interprété.
+- `pack_ftc` **remplace** `facades`, `toiture` et `coupe`. La suppression a lieu
+  **avant** le calcul : le total ne peut pas les cumuler.
+- Les prestations sur devis ne sont **jamais** additionnées. Elles lèvent un
+  indicateur et sortent du calcul.
+- **La remise de 200 € sur un futur permis n'existe pas dans le calcul.** Ce
+  n'est pas une réduction du prix de la conception mais un avantage sur une
+  prestation ultérieure. Aucune fonction ne la soustrait, aucun montant n'en est
+  dérivé, et le banc de mutation le prouve en montrant qu'une soustraction
+  ajoutée fait tomber les contrôles.
+- `modifs_sup` figure au catalogue mais **n'est pas exposée** dans la définition
+  initiale : la série supplémentaire se propose à la livraison, quand le besoin
+  est constaté, et non au moment de la commande.
+
+**Conséquences.**
+- Le catalogue serveur : base 449 €, façades 149 €, toiture 99 €, coupe 99 €,
+  pack 299 €, plan de masse 149 €, 3D simple 149 €, série supplémentaire 99 €.
+- Trois prestations sur devis : insertion 3D, projet complexe, demande
+  particulière.
+- La grille tarifaire de l'accueil emploie déjà 449 € et 649 € pour des
+  prestations de permis de construire. Ces montants gardent leur sens propre :
+  la distinction repose entièrement sur des **intitulés explicites**, point de
+  vigilance à tenir dans toute rédaction commerciale ultérieure.
+
+---
+
+## D-013 — Aucune clé dynamique ne vient du navigateur
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Le prototype UX générait des noms de champs dans le navigateur :
+`surf[Chambre 1]`, `surf[Salle de bain 1]`, `surf[Séjour]` — clés arbitraires,
+accentuées, espacées, construites à partir de libellés affichés.
+
+**Décision.** Le serveur **reconstruit** la liste des surfaces attendues.
+
+- Les identifiants sont stables et sans accent : `sejour`, `chambre_1`,
+  `sdb_1`, `terrasse_couverte`… Ce sont des clés de tableau et des noms de
+  champs HTML, jamais des libellés.
+- La définition arrête l'ensemble des **39 clés possibles**. La validation
+  reconstruit ensuite, à partir des compteurs et des cases cochées, la liste des
+  clés réellement **attendues**. Une clé doit franchir les deux barrières.
+- Toute autre clé est **écartée et nommée**, sans erreur bloquante : un visiteur
+  qui change d'avis ne doit pas être bloqué par une valeur restée dans le
+  document.
+- Le libellé lisible est reconstitué côté serveur. Il ne transite jamais.
+
+**Conséquences.**
+- Le banc de mutation mesure les deux barrières **séparément** : retirer l'une
+  laisse l'autre protéger, retirer les deux laisse entrer les clés arbitraires.
+- La même discipline s'appliquera à toute famille dynamique future.

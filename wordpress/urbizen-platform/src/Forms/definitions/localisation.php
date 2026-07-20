@@ -72,7 +72,7 @@ return array(
 			'from'      => 'parcel.surfaceM2',
 			'unit'      => 'm²',
 			'min'       => 0,
-			'step'      => 1,
+			'increment' => 1,
 			'required'  => false,
 			'note'      => __(
 				'Surface cadastrale indicative. Vérifiez-la si le projet concerne plusieurs parcelles ou seulement une partie du terrain.',

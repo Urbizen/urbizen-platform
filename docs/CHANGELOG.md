@@ -5,6 +5,65 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.5.0] — 20 juillet 2026
+
+Socle métier du troisième service Urbizen : **Conception de plans sur mesure**.
+
+> **Aucun effet public.** Cette version ne rend aucun formulaire, ne crée aucune
+> page, n'ajoute aucune route et n'envoie aucun courriel. Elle pose la structure
+> déclarative, la validation serveur et le catalogue tarifaire dont dépendront
+> les étapes suivantes. Le site public est strictement inchangé.
+
+### Ajouté
+- **Six types de champs** dans `FormDefinition` : `radio`, `checkbox`, `select`,
+  `textarea`, `file`, `consent`, en plus de `text`, `number` et `hidden`.
+- **Étapes déclaratives** : clé `steps[]`, chaque champ portant son `step`.
+- **Affichage conditionnel** déclaratif par `visible_if`, réévalué côté serveur.
+- **Liste blanche des clés de champ** : une clé inconnue est écartée et nommée.
+- **Anomalies contrôlables** : `FormDefinition::errors()` et `is_valid()`. Une
+  définition fautive ne provoque aucun écran fatal ; le registre journalise.
+- `src/Forms/definitions/conception.php` : six étapes — programme, pièces,
+  terrain, style et options, documents, contact — 40 champs, 39 clés de surface.
+- `src/Forms/Validator.php` : validation serveur intégrale — requis, listes
+  fermées, bornes, longueurs, normalisation, neutralisation des retours chariot
+  dans les champs d'en-tête de courriel, branches conditionnelles, liste blanche
+  des surfaces dynamiques, erreurs structurées par identifiant de champ.
+- `src/Forms/Pricing.php` : catalogue tarifaire serveur, exclusivité du pack,
+  prestations sur devis tenues hors du calcul (D-012).
+- `tests/conception/` : quatre bancs, **260 contrôles**, dont **39 mutations**
+  prouvant que chaque règle cassée fait bien tomber son contrôle.
+
+### Modifié
+- `FormRegistry::KNOWN` accueille `conception`. La liste blanche en dur est
+  conservée : aucune valeur du navigateur ne peut désigner un fichier arbitraire.
+- `Renderer` **refuse** de rendre un formulaire déclarant des étapes, tant que
+  `StepRenderer` n'existe pas. Garde-fou temporaire, retiré en PR C.
+- Le mot `step` désigne désormais l'étape d'appartenance ; l'incrément HTML des
+  champs numériques prend le nom `increment` (D-011). Seule conséquence sur
+  `localisation.php` et `Renderer.php` — le HTML rendu est **identique au bit
+  près**, vérifié par comparaison d'empreintes SHA-256 avec la version
+  précédente.
+
+### Inchangé
+- `localisation` : 14 champs, 6 visibles, 8 techniques, mêmes types, mêmes
+  contraintes, même rendu.
+- `assets/js/urbizen-form.js`, le composant cadastre, le thème enfant, la page
+  d'accueil, les pages Déclaration préalable et Permis de construire, les menus,
+  le pied de page, Fluent Forms.
+- Les 175 contrôles du formulaire et du cadastre, et les 367 contrôles de la
+  page d'accueil, passent **sans le moindre assouplissement**.
+
+### À venir
+- **PR B1** — soumission : `admin-post`, nonce, pot de miel, limitation de
+  débit, type de contenu privé `urbizen_demande`.
+- **PR B2** — fichiers : politique de dépôt, stockage hors racine web, liens
+  signés de 14 jours régénérables.
+- **PR B3** — courriels : notification à `contact@urbizen.fr`, confirmation au
+  client, `Reply-To` sur l'adresse validée.
+- **PR C** — interface publique en six étapes, page en brouillon.
+
+---
+
 ## [0.4.0] — 19 juillet 2026
 
 Connexion du composant cadastre au premier formulaire Urbizen. Aucune requête
