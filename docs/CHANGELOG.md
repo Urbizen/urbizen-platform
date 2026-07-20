@@ -35,7 +35,7 @@ Réception, protection et conservation des demandes de conception.
   dossier client, hook `urbizen_before_submission_delete` pour la PR B2 (D-016).
 - `src/Admin/SubmissionsAdmin.php` : liste réservée aux administrateurs —
   référence, formulaire, statut, date. **Aucune donnée personnelle.**
-- `tests/submissions/` : six bancs, **361 contrôles**, dont **50 mutations**.
+- `tests/submissions/` : sept bancs, **495 contrôles**, dont **79 mutations**.
   Doublure WordPress complète à horloge pilotable.
 
 ### Modifié
@@ -45,6 +45,27 @@ Réception, protection et conservation des demandes de conception.
 - `Deactivator.php` référence `Retention::HOOK` plutôt qu'une chaîne : renommer
   la tâche sans renommer ici laisserait un événement orphelin.
 - Version 0.6.0, alignée dans les deux `block.json`. Aucune autre clé ne change.
+
+### Atomicité (revue de la PR #18)
+- **Jetons** : `reserve_token()` / `consume_token()` / `release_token()` /
+  `cleanup_expired_tokens()`. La réservation repose sur l'unicité de
+  `option_name`, non sur un transient : une purge de cache ne rend plus un jeton
+  rejouable, et deux requêtes concurrentes ne peuvent plus passer ensemble
+  (D-017).
+- **Références** : réservation atomique par `add_option`, libérée si la
+  persistance échoue, définitive sinon. Le compteur n'est plus qu'un
+  accélérateur ; les références historiques restent protégées (D-017).
+- **Débit** : le quota porte désormais sur les demandes **réellement
+  enregistrées**. Une erreur corrigible rend son créneau ; six requêtes valides
+  simultanées n'en obtiennent jamais plus de cinq (D-018).
+- **Planification** : `Retention::ensure_scheduled()` idempotente, appelée sur
+  `init` en plus de l'activation — une mise à jour de fichiers ne déclenche pas
+  le hook d'activation (D-019).
+- **Ménage quotidien** : jetons expirés, créneaux périmés et réservations de
+  référence abandonnées. Toutes les options techniques portent
+  `autoload = false`.
+- `src/Support/OptionsScan.php` : recherche d'options par préfixe interne,
+  seule requête directe du plugin, bornée aux préfixes `urbizen_`.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc le vérifie sur l'ensemble du plugin.

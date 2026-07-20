@@ -41,11 +41,13 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_posts']      = array();
 	$GLOBALS['wpd_meta']       = array();
 	$GLOBALS['wpd_options']    = array();
+	$GLOBALS['wpd_autoload']   = array();
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
 	$GLOBALS['wpd_actions']    = array();
 	$GLOBALS['wpd_done']       = array();
 	$GLOBALS['wpd_cron']       = array();
+	$GLOBALS['wpd_cron_calls'] = array();
 	$GLOBALS['wpd_redirects']  = array();
 	$GLOBALS['wpd_logs']       = array();
 	$GLOBALS['wpd_next_id']    = 1;
@@ -159,12 +161,53 @@ function get_option( $cle, $defaut = false ) {
 
 function update_option( $cle, $valeur, $autoload = null ) {
 	$GLOBALS['wpd_options'][ $cle ] = $valeur;
+
+	if ( null !== $autoload ) {
+		$GLOBALS['wpd_autoload'][ $cle ] = $autoload ? 'yes' : 'no';
+	}
+
+	return true;
+}
+
+/**
+ * Ajout d'option, primitive **atomique**.
+ *
+ * Reproduit fidèlement le comportement de WordPress, qui s'appuie sur l'index
+ * unique de `option_name` : si le nom existe déjà, l'ajout échoue et renvoie
+ * faux. C'est cette propriété, et elle seule, qui départage deux requêtes
+ * concurrentes.
+ */
+function add_option( $cle, $valeur = '', $deprecated = '', $autoload = 'yes' ) {
+	if ( array_key_exists( $cle, $GLOBALS['wpd_options'] ) ) {
+		return false;
+	}
+
+	$GLOBALS['wpd_options'][ $cle ]  = $valeur;
+	$GLOBALS['wpd_autoload'][ $cle ] = ( false === $autoload || 'no' === $autoload ) ? 'no' : 'yes';
+
 	return true;
 }
 
 function delete_option( $cle ) {
-	unset( $GLOBALS['wpd_options'][ $cle ] );
+	unset( $GLOBALS['wpd_options'][ $cle ], $GLOBALS['wpd_autoload'][ $cle ] );
 	return true;
+}
+
+/**
+ * Valeur d'autoload d'une option, pour les bancs.
+ */
+function wpd_autoload( string $cle ): string {
+	return $GLOBALS['wpd_autoload'][ $cle ] ?? 'absent';
+}
+
+/**
+ * Vide le cache objet et les transients, sans toucher aux options.
+ *
+ * Reproduit ce qu'une purge LiteSpeed ou un `wp cache flush` fait réellement :
+ * les transients peuvent disparaître, les options persistent en base.
+ */
+function wpd_purger_caches(): void {
+	$GLOBALS['wpd_transients'] = array();
 }
 
 // ------------------------------------------------------------------ erreurs -
@@ -361,6 +404,11 @@ function wp_next_scheduled( $hook, $args = array() ) {
 
 function wp_schedule_event( $timestamp, $recurrence, $hook, $args = array() ) {
 	$GLOBALS['wpd_cron'][ $hook ] = $timestamp;
+
+	// Compte les appels réels : c'est ce qui distingue une programmation
+	// idempotente d'une reprogrammation à chaque chargement.
+	$GLOBALS['wpd_cron_calls'][ $hook ] = ( $GLOBALS['wpd_cron_calls'][ $hook ] ?? 0 ) + 1;
+
 	return true;
 }
 
@@ -380,3 +428,50 @@ function wp_mail( $to, $subject, $message, $headers = '', $attachments = array()
 	$GLOBALS['wpd_mails'][] = array( 'to' => $to, 'subject' => $subject );
 	return true;
 }
+
+// ---------------------------------------------------------------- $wpdb -----
+/**
+ * Doublure minimale de $wpdb.
+ *
+ * Ne sert qu'à `OptionsScan` : retrouver des noms d'options par préfixe. Elle
+ * n'implémente que ce que cette requête emploie.
+ */
+class WPDB_Double {
+	public string $options = 'wp_options';
+
+	public function esc_like( $texte ) {
+		return addcslashes( (string) $texte, '_%\\' );
+	}
+
+	public function prepare( $requete, ...$args ) {
+		foreach ( $args as $arg ) {
+			$requete = preg_replace(
+				'/%[sd]/',
+				is_int( $arg ) ? (string) $arg : "'" . str_replace( "'", "''", (string) $arg ) . "'",
+				$requete,
+				1
+			);
+		}
+		return $requete;
+	}
+
+	public function get_col( $requete ) {
+		if ( ! preg_match( "/option_name LIKE '([^']*)'/", $requete, $m ) ) {
+			return array();
+		}
+
+		$prefixe = stripslashes( rtrim( $m[1], '%' ) );
+		$limite  = preg_match( '/LIMIT (\d+)/', $requete, $l ) ? (int) $l[1] : 500;
+
+		$noms = array_values(
+			array_filter(
+				array_keys( $GLOBALS['wpd_options'] ),
+				static fn( $c ) => str_starts_with( (string) $c, $prefixe )
+			)
+		);
+
+		return array_slice( $noms, 0, $limite );
+	}
+}
+
+$GLOBALS['wpdb'] = new WPDB_Double();

@@ -19,7 +19,10 @@
 
 namespace Urbizen\Platform\Privacy;
 
+use Urbizen\Platform\Security\AntiSpam;
+use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,23 +59,81 @@ final class Retention {
 	private const LOT = 200;
 
 	/**
-	 * Accroche la tâche.
+	 * Accroche la tâche et garantit sa programmation.
+	 *
+	 * `ensure_scheduled()` est appelée à **chaque chargement**, pas seulement à
+	 * l'activation. C'est indispensable : mettre à jour une extension déjà
+	 * active remplace ses fichiers sans déclencher le hook d'activation. Sans
+	 * cela, la purge n'existerait jamais sur un site passé de 0.5.0 à 0.6.0 —
+	 * et il faudrait désactiver puis réactiver l'extension à la main, ce qu'on
+	 * ne peut pas exiger d'une mise en production.
 	 *
 	 * @return void
 	 */
 	public static function register(): void {
-		add_action( self::HOOK, array( self::class, 'purge' ) );
+		add_action( self::HOOK, array( self::class, 'run_daily' ) );
+		add_action( 'init', array( self::class, 'ensure_scheduled' ) );
 	}
 
 	/**
-	 * Programme la tâche quotidienne, une seule fois.
+	 * Programme la tâche quotidienne si elle ne l'est pas déjà.
+	 *
+	 * Idempotente : `wp_next_scheduled()` interroge le tableau des tâches, déjà
+	 * chargé en mémoire. Cent appels successifs ne créent qu'une tâche.
+	 *
+	 * @return void
+	 */
+	public static function ensure_scheduled(): void {
+		if ( false !== wp_next_scheduled( self::HOOK ) ) {
+			return;
+		}
+
+		wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
+		Logger::info( 'rétention : tâche quotidienne programmée' );
+	}
+
+	/**
+	 * Alias historique, conservé pour l'activation.
 	 *
 	 * @return void
 	 */
 	public static function schedule(): void {
-		if ( ! wp_next_scheduled( self::HOOK ) ) {
-			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', self::HOOK );
+		self::ensure_scheduled();
+	}
+
+	/**
+	 * Passage quotidien complet : purge des demandes, puis ménage technique.
+	 *
+	 * Les réservations techniques — jetons consommés, créneaux de débit,
+	 * références abandonnées — ne portent aucune donnée personnelle, mais
+	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
+	 *
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return array{demandes:int,jetons:int,creneaux:int,references:int}
+	 */
+	public static function run_daily( ?int $now = null ): array {
+		$now = null === $now ? time() : $now;
+
+		$bilan = array(
+			'demandes'   => self::purge( $now ),
+			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
+			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
+			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
+		);
+
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] ) {
+			// Des décomptes, jamais un jeton, un condensat ou une référence.
+			Logger::info(
+				sprintf(
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s) de référence',
+					$bilan['jetons'],
+					$bilan['creneaux'],
+					$bilan['references']
+				)
+			);
 		}
+
+		return $bilan;
 	}
 
 	/**

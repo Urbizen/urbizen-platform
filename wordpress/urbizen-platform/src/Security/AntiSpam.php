@@ -23,6 +23,8 @@
 
 namespace Urbizen\Platform\Security;
 
+use Urbizen\Platform\Support\OptionsScan;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -47,9 +49,18 @@ final class AntiSpam {
 	public const MAX_AGE = 86400;
 
 	/**
-	 * Préfixe des transients de consommation.
+	 * Préfixe des options de réservation.
+	 *
+	 * Une **option**, pas un transient. Un transient exprime une durée
+	 * *maximale* de conservation, jamais une garantie : une purge du cache
+	 * objet, un vidage LiteSpeed ou une éviction mémoire peuvent le faire
+	 * disparaître avant terme — et rendre un jeton déjà consommé réutilisable.
+	 *
+	 * L'unicité de `option_name` en base fournit en revanche une primitive
+	 * réellement atomique : `add_option()` échoue si le nom existe déjà, quel
+	 * que soit le nombre de requêtes concurrentes.
 	 */
-	private const PREFIX = 'urbizen_tok_';
+	public const OPTION_PREFIX = 'urbizen_tok_';
 
 	/**
 	 * Sépare les trois champs du jeton.
@@ -118,6 +129,9 @@ final class AntiSpam {
 			return self::refus( 'token_expired' );
 		}
 
+		// La réservation n'a pas lieu ici : verify_token() ne décide que de la
+		// validité intrinsèque. Réserver est un effet de bord, confié à
+		// reserve_token() pour que l'appelant maîtrise le moment exact.
 		if ( self::is_used( $token ) ) {
 			return self::refus( 'duplicate_submission' );
 		}
@@ -130,23 +144,133 @@ final class AntiSpam {
 	}
 
 	/**
-	 * Marque un jeton comme consommé.
+	 * Réserve un jeton, de façon atomique.
+	 *
+	 * `add_option()` s'appuie sur l'unicité de `option_name` : de deux requêtes
+	 * concurrentes portant le même jeton, une seule peut réussir. C'est ce qui
+	 * ferme la fenêtre entre « vérifier » et « marquer », par laquelle deux
+	 * soumissions simultanées passaient toutes les deux.
+	 *
+	 * La réservation vaut occupation : une seconde requête reçue **pendant** le
+	 * traitement de la première est refusée, sans attendre que celle-ci ait fini
+	 * d'écrire sa demande.
+	 *
+	 * @param string   $token Jeton.
+	 * @param int|null $now   Horodatage courant (tests).
+	 * @return bool Vrai si la réservation est acquise.
+	 */
+	public static function reserve_token( string $token, ?int $now = null ): bool {
+		$now = null === $now ? time() : $now;
+		$cle = self::option_key( $token );
+
+		$existante = get_option( $cle, null );
+
+		if ( is_array( $existante ) ) {
+			// Une réservation périmée se recycle. Ce chemin ne concerne en
+			// pratique que des jetons déjà refusés par le contrôle de date : il
+			// existe pour que le nettoyage ne soit jamais indispensable.
+			if ( isset( $existante['expires'] ) && $now >= (int) $existante['expires'] ) {
+				delete_option( $cle );
+			} else {
+				return false;
+			}
+		}
+
+		return (bool) add_option(
+			$cle,
+			array(
+				'state'   => 'reserved',
+				'expires' => $now + self::MAX_AGE,
+			),
+			'',
+			false
+		);
+	}
+
+	/**
+	 * Confirme la consommation définitive d'un jeton.
+	 *
+	 * La réservation est conservée jusqu'à l'expiration du jeton : c'est elle
+	 * qui interdit le rejeu.
+	 *
+	 * @param string   $token Jeton.
+	 * @param int|null $now   Horodatage courant (tests).
+	 * @return void
+	 */
+	public static function consume_token( string $token, ?int $now = null ): void {
+		$now = null === $now ? time() : $now;
+
+		update_option(
+			self::option_key( $token ),
+			array(
+				'state'   => 'consumed',
+				'expires' => $now + self::MAX_AGE,
+			),
+			false
+		);
+	}
+
+	/**
+	 * Libère une réservation.
+	 *
+	 * Appelée quand le traitement échoue pour une raison corrigible : la
+	 * personne doit pouvoir rectifier son formulaire et renvoyer, sans que son
+	 * jeton ait été brûlé par un refus qui n'est pas de son fait.
 	 *
 	 * @param string $token Jeton.
 	 * @return void
 	 */
-	public static function mark_used( string $token ): void {
-		set_transient( self::transient_key( $token ), 1, self::MAX_AGE );
+	public static function release_token( string $token ): void {
+		delete_option( self::option_key( $token ) );
 	}
 
 	/**
-	 * Un jeton a-t-il déjà servi ?
+	 * Un jeton a-t-il déjà servi ou est-il en cours de traitement ?
 	 *
-	 * @param string $token Jeton.
+	 * @param string   $token Jeton.
+	 * @param int|null $now   Horodatage courant (tests).
 	 * @return bool
 	 */
-	public static function is_used( string $token ): bool {
-		return false !== get_transient( self::transient_key( $token ) );
+	public static function is_used( string $token, ?int $now = null ): bool {
+		$now       = null === $now ? time() : $now;
+		$existante = get_option( self::option_key( $token ), null );
+
+		if ( ! is_array( $existante ) ) {
+			return false;
+		}
+
+		return ! isset( $existante['expires'] ) || $now < (int) $existante['expires'];
+	}
+
+	/**
+	 * Supprime les réservations expirées.
+	 *
+	 * Idempotent : deux passages consécutifs donnent le même état. Aucun jeton
+	 * ni condensat complet n'est journalisé — seul un décompte l'est.
+	 *
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return int Nombre de réservations supprimées.
+	 */
+	public static function cleanup_expired_tokens( ?int $now = null ): int {
+		$now       = null === $now ? time() : $now;
+		$supprimees = 0;
+
+		foreach ( OptionsScan::names( self::OPTION_PREFIX ) as $cle ) {
+			$valeur = get_option( $cle, null );
+
+			if ( ! is_array( $valeur ) || ! isset( $valeur['expires'] ) ) {
+				delete_option( $cle );
+				++$supprimees;
+				continue;
+			}
+
+			if ( $now >= (int) $valeur['expires'] ) {
+				delete_option( $cle );
+				++$supprimees;
+			}
+		}
+
+		return $supprimees;
 	}
 
 	/**
@@ -181,16 +305,18 @@ final class AntiSpam {
 	}
 
 	/**
-	 * Clé de transient d'un jeton.
+	 * Nom d'option d'un jeton.
 	 *
 	 * Condensat non réversible : la base ne contient jamais le jeton lui-même,
-	 * seulement une empreinte qui permet de reconnaître un doublon.
+	 * ni sa signature, ni son identifiant lisible — seulement une empreinte qui
+	 * permet de reconnaître un doublon. Longueur totale 52 caractères, bien en
+	 * deçà de la limite de `option_name`.
 	 *
 	 * @param string $token Jeton.
 	 * @return string
 	 */
-	private static function transient_key( string $token ): string {
-		return self::PREFIX . substr( hash_hmac( 'sha256', $token, self::secret() ), 0, 40 );
+	public static function option_key( string $token ): string {
+		return self::OPTION_PREFIX . substr( hash_hmac( 'sha256', $token, self::secret() ), 0, 40 );
 	}
 
 	/**

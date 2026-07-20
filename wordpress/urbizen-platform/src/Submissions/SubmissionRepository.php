@@ -22,6 +22,7 @@
 namespace Urbizen\Platform\Submissions;
 
 use Urbizen\Platform\Support\Logger;
+use Urbizen\Platform\Support\OptionsScan;
 use Urbizen\Platform\Support\Reference;
 
 defined( 'ABSPATH' ) || exit;
@@ -35,6 +36,22 @@ final class SubmissionRepository {
 	 * Option portant les compteurs de référence, par année.
 	 */
 	public const SEQUENCE_OPTION = 'urbizen_reference_sequence';
+
+	/**
+	 * Préfixe des options de réservation de référence.
+	 *
+	 * Le compteur seul ne garantit rien : deux requêtes peuvent le lire avant
+	 * que l'une n'écrive, et repartir avec le même rang. Il reste un
+	 * **accélérateur** — il évite de repartir de 1 à chaque fois — mais
+	 * l'unicité vient de l'unicité de `option_name`, que `add_option()` rend
+	 * atomique.
+	 */
+	public const RESERVATION_PREFIX = 'urbizen_ref_';
+
+	/**
+	 * Délai au-delà duquel une réservation jamais attribuée est abandonnée.
+	 */
+	public const RESERVATION_TTL = 3600;
 
 	/**
 	 * Version du schéma de stockage.
@@ -102,7 +119,9 @@ final class SubmissionRepository {
 		);
 
 		if ( is_wp_error( $id ) || ! $id ) {
+			self::release_reference( $reference );
 			Logger::error( 'demande : création impossible' );
+
 			return self::echec( 'persistence_failed' );
 		}
 
@@ -129,6 +148,7 @@ final class SubmissionRepository {
 				// qu'une absence de demande : elle laisse croire que le dossier
 				// est en main. On efface et on annonce l'échec.
 				wp_delete_post( $id, true );
+				self::release_reference( $reference );
 				Logger::error( sprintf( 'demande %s : métadonnée « %s » non écrite, demande supprimée', $reference, $cle ) );
 
 				return self::echec( 'persistence_failed' );
@@ -139,10 +159,14 @@ final class SubmissionRepository {
 
 		if ( array() !== $manquantes ) {
 			wp_delete_post( $id, true );
+			self::release_reference( $reference );
 			Logger::error( sprintf( 'demande %s : métadonnées manquantes après écriture, demande supprimée', $reference ) );
 
 			return self::echec( 'persistence_failed' );
 		}
+
+		// La référence est désormais attribuée pour de bon.
+		self::confirm_reference( $reference, $id );
 
 		Logger::info( sprintf( 'demande %s enregistrée (#%d, %s)', $reference, $id, $form_type ) );
 
@@ -178,15 +202,131 @@ final class SubmissionRepository {
 			++$rang;
 			$reference = Reference::format( $annee, $rang );
 
-			if ( ! self::reference_exists( $reference ) ) {
-				$compteurs[ $annee ] = $rang;
-				update_option( self::SEQUENCE_OPTION, $compteurs, false );
-
-				return $reference;
+			// Deux barrières, dans cet ordre. La première écarte les références
+			// historiques, créées avant l'existence des réservations. La
+			// seconde, atomique, tranche entre deux requêtes concurrentes : une
+			// seule peut réussir add_option() sur un nom donné.
+			if ( self::reference_exists( $reference ) ) {
+				continue;
 			}
+
+			if ( ! self::reserve_reference( $reference, $now ) ) {
+				continue;
+			}
+
+			$compteurs[ $annee ] = $rang;
+			update_option( self::SEQUENCE_OPTION, $compteurs, false );
+
+			return $reference;
 		}
 
 		return '';
+	}
+
+	/**
+	 * Réserve une référence, de façon atomique.
+	 *
+	 * @param string $reference Référence.
+	 * @param int    $now       Horodatage courant.
+	 * @return bool Vrai si la réservation est acquise.
+	 */
+	public static function reserve_reference( string $reference, int $now ): bool {
+		$cle       = self::RESERVATION_PREFIX . $reference;
+		$existante = get_option( $cle, null );
+
+		if ( is_array( $existante ) ) {
+			// Une réservation attribuée n'est jamais recyclée : la référence
+			// appartient définitivement à une demande. Seule une réservation
+			// abandonnée — jamais attribuée, et ancienne — se libère.
+			if ( 'reserved' !== ( $existante['state'] ?? '' ) ) {
+				return false;
+			}
+
+			if ( $now - (int) ( $existante['at'] ?? 0 ) < self::RESERVATION_TTL ) {
+				return false;
+			}
+
+			delete_option( $cle );
+		}
+
+		return (bool) add_option(
+			$cle,
+			array(
+				'state' => 'reserved',
+				'at'    => $now,
+				'post'  => 0,
+			),
+			'',
+			false
+		);
+	}
+
+	/**
+	 * Libère une réservation de référence.
+	 *
+	 * Appelée quand la demande n'a finalement pas pu être écrite : la référence
+	 * redevient disponible plutôt que de laisser un trou dans la série.
+	 *
+	 * @param string $reference Référence.
+	 * @return void
+	 */
+	public static function release_reference( string $reference ): void {
+		delete_option( self::RESERVATION_PREFIX . $reference );
+	}
+
+	/**
+	 * Marque une réservation comme définitivement attribuée.
+	 *
+	 * @param string $reference Référence.
+	 * @param int    $post_id   Demande associée.
+	 * @return void
+	 */
+	public static function confirm_reference( string $reference, int $post_id ): void {
+		update_option(
+			self::RESERVATION_PREFIX . $reference,
+			array(
+				'state' => 'attributed',
+				'post'  => $post_id,
+			),
+			false
+		);
+	}
+
+	/**
+	 * Supprime les réservations abandonnées.
+	 *
+	 * Une réservation **attribuée** n'est jamais supprimée : elle est associée à
+	 * une demande, et la référence ne doit pas pouvoir resservir. Seules partent
+	 * celles restées à l'état `reserved` au-delà du délai — trace d'un
+	 * traitement interrompu.
+	 *
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return int Nombre de réservations libérées.
+	 */
+	public static function cleanup_abandoned_references( ?int $now = null ): int {
+		$now       = null === $now ? time() : $now;
+		$liberees  = 0;
+
+		foreach ( OptionsScan::names( self::RESERVATION_PREFIX ) as $cle ) {
+			$valeur = get_option( $cle, null );
+
+			if ( ! is_array( $valeur ) ) {
+				delete_option( $cle );
+				++$liberees;
+				continue;
+			}
+
+			if ( 'reserved' !== ( $valeur['state'] ?? '' ) ) {
+				continue;
+			}
+
+			if ( $now - (int) ( $valeur['at'] ?? 0 ) >= self::RESERVATION_TTL ) {
+				delete_option( $cle );
+				++$liberees;
+			}
+		}
+
+		return $liberees;
 	}
 
 	/**

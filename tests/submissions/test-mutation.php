@@ -141,7 +141,8 @@ $a = mutant(
 );
 
 $rejoue = AntiSpam::issue_token( $maintenant - 60 );
-AntiSpam::mark_used( $rejoue );
+AntiSpam::reserve_token( $rejoue, $maintenant );
+AntiSpam::consume_token( $rejoue, $maintenant );
 
 check( '5 · contrôle de réemploi retiré → le jeton se rejoue', $a::verify_token( $rejoue, $maintenant )['ok'] );
 check( '5 · le dépôt refuse le rejeu', 'duplicate_submission' === AntiSpam::verify_token( $rejoue, $maintenant )['code'] );
@@ -163,42 +164,42 @@ wpd_reset();
 $s = serveur();
 
 for ( $i = 1; $i <= 5; $i++ ) {
-	$r::allow( 'conception', $s, wpd_now() );
+	$r::reserve( 'conception', $s, wpd_now() );
 }
 
-check( '6 · limite relevée → la sixième passe', $r::allow( 'conception', $s, wpd_now() ) );
+check( '6 · limite relevée → la sixième passe', null !== $r::reserve( 'conception', $s, wpd_now() ) );
 check( '6 · le dépôt bloque toujours à cinq', 5 === RateLimiter::DEFAULT_MAX );
 
 wpd_reset();
 for ( $i = 1; $i <= 5; $i++ ) {
-	RateLimiter::allow( 'conception', $s, wpd_now() );
+	RateLimiter::reserve( 'conception', $s, wpd_now() );
 }
-check( '6 · le dépôt refuse la sixième', ! RateLimiter::allow( 'conception', $s, wpd_now() ) );
+check( '6 · le dépôt refuse la sixième', null === RateLimiter::reserve( 'conception', $s, wpd_now() ) );
 
 // ================================= 7 · l'adresse IP brute est enregistrée ===
 $r = mutant(
 	'src/Security/RateLimiter.php',
 	'RateLimiter',
 	array(
-		'return self::PREFIX . substr(
+		'return self::OPTION_PREFIX . substr(
 			hash_hmac( \'sha256\', $bucket . \'|\' . $origine, self::secret() ),
 			0,
-			40
-		);' => "return self::PREFIX . \$bucket . '_' . \$origine;",
+			32
+		);' => "return self::OPTION_PREFIX . \$bucket . '_' . \$origine;",
 	)
 );
 
 wpd_reset();
-$r::allow( 'conception', $s, wpd_now() );
-$fuite = wp_json_encode( $GLOBALS['wpd_transients'] );
+$r::reserve( 'conception', $s, wpd_now() );
+$fuite = wp_json_encode( array_keys( $GLOBALS['wpd_options'] ) );
 
-check( '7 · condensat retiré → l’adresse apparaît dans les transients', str_contains( (string) $fuite, '203.0.113.10' ) );
+check( '7 · condensat retiré → l’adresse apparaît dans les options', str_contains( (string) $fuite, '203.0.113.10' ) );
 
 wpd_reset();
-RateLimiter::allow( 'conception', $s, wpd_now() );
-$propre = wp_json_encode( $GLOBALS['wpd_transients'] );
+RateLimiter::reserve( 'conception', $s, wpd_now() );
+$propre = wp_json_encode( array_keys( $GLOBALS['wpd_options'] ) );
 
-check( '7 · le dépôt ne laisse aucune adresse dans les transients', ! str_contains( (string) $propre, '203.0.113.10' ) );
+check( '7 · le dépôt ne laisse aucune adresse dans les options', ! str_contains( (string) $propre, '203.0.113.10' ) );
 
 // ================== 8 · X-Forwarded-For devient automatiquement fiable ======
 $r = mutant(
@@ -213,7 +214,7 @@ check( '8 · en-tête cru sur parole → l’origine devient celle annoncée', '
 check( '8 · le dépôt s’en tient à REMOTE_ADDR', '203.0.113.10' === RateLimiter::origin( $menteur ) );
 check( '8 · le dépôt donne la même clé quel que soit l’en-tête',
 	RateLimiter::key( 'conception', $menteur ) === RateLimiter::key( 'conception', $s ) );
-check( '8 · muté, la clé change avec l’en-tête', $r::key( 'conception', $menteur ) !== $r::key( 'conception', $s ) );
+check( '8 · muté, le compartiment change avec l’en-tête', $r::key( 'conception', $menteur ) !== $r::key( 'conception', $s ) );
 
 // ========================= 9 · les fichiers sont silencieusement ignorés ====
 $c = mutant(
@@ -298,6 +299,7 @@ $d = mutant(
 	'SubmissionRepository',
 	array(
 		'				wp_delete_post( $id, true );
+				self::release_reference( $reference );
 				Logger::error( sprintf( \'demande %s : métadonnée « %s » non écrite, demande supprimée\', $reference, $cle ) );' =>
 		'				Logger::error( \'retour arrière neutralisé\' );',
 	)
@@ -404,10 +406,10 @@ $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
 	array(
-		'		// --- 13 · le jeton est consommé, et une seule fois ---' =>
+		'		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---' =>
 		'		wp_mail( \'contact@exemple.test\', \'Nouvelle demande\', $creation[\'reference\'] );
 
-		// --- 13 · le jeton est consommé, et une seule fois ---',
+		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---',
 	)
 );
 
@@ -439,5 +441,377 @@ $rendu_sain = \Urbizen\Platform\Forms\Renderer::render( $conception );
 check( '17 · garde-fou retiré → le formulaire se rend publiquement', '' !== $rendu_mute );
 check( '17 · garde-fou retiré → les champs sortent à plat', substr_count( $rendu_mute, '<input' ) > 20 );
 check( '17 · le dépôt ne rend rien', '' === $rendu_sain );
+
+// ======================================================================
+// MUTATIONS DE LA REVUE : ATOMICITÉ ET PLANIFICATION
+// ======================================================================
+
+// ============= 18 · la réservation redevient une séquence lire-puis-écrire ==
+// C'est le mécanisme d'origine : vérifier, puis marquer. Entre les deux
+// s'ouvre une fenêtre par laquelle deux requêtes passent toutes les deux.
+$a = mutant(
+	'src/Security/AntiSpam.php',
+	'AntiSpam',
+	array(
+		'		$existante = get_option( $cle, null );
+
+		if ( is_array( $existante ) ) {
+			// Une réservation périmée se recycle. Ce chemin ne concerne en
+			// pratique que des jetons déjà refusés par le contrôle de date : il
+			// existe pour que le nettoyage ne soit jamais indispensable.
+			if ( isset( $existante[\'expires\'] ) && $now >= (int) $existante[\'expires\'] ) {
+				delete_option( $cle );
+			} else {
+				return false;
+			}
+		}
+' => '',
+		'		return (bool) add_option(
+			$cle,
+			array(
+				\'state\'   => \'reserved\',
+				\'expires\' => $now + self::MAX_AGE,
+			),
+			\'\',
+			false
+		);' =>
+		'		// Le mécanisme d\'origine : marquer, sans arbitrer. Les deux requêtes
+		// ont déjà passé le contrôle is_used() de verify_token(), et rien ici
+		// ne les départage.
+		update_option( $cle, array( \'state\' => \'reserved\', \'expires\' => $now + self::MAX_AGE ), false );
+
+		return true;',
+	)
+);
+
+$jeton_a = AntiSpam::issue_token( wpd_now() - 60 );
+wpd_reset();
+
+// Deux requêtes concurrentes : sans add_option, les deux réussissent.
+check( '18 · séquence lire-puis-écrire → les deux requêtes réservent',
+	$a::reserve_token( $jeton_a, wpd_now() ) && $a::reserve_token( $jeton_a, wpd_now() ) );
+
+wpd_reset();
+check( '18 · le dépôt n’en laisse passer qu’une',
+	AntiSpam::reserve_token( $jeton_a, wpd_now() ) && ! AntiSpam::reserve_token( $jeton_a, wpd_now() ) );
+
+// ================= 19 · le jeton consommé repose de nouveau sur un transient =
+$a = mutant(
+	'src/Security/AntiSpam.php',
+	'AntiSpam',
+	array(
+		'	public static function is_used( string $token, ?int $now = null ): bool {
+		$now       = null === $now ? time() : $now;
+		$existante = get_option( self::option_key( $token ), null );' =>
+		'	public static function is_used( string $token, ?int $now = null ): bool {
+		$now       = null === $now ? time() : $now;
+		$existante = get_transient( self::option_key( $token ) );
+		$existante = is_array( $existante ) ? $existante : null;',
+	)
+);
+
+wpd_reset();
+$jeton_t = AntiSpam::issue_token( wpd_now() - 60 );
+set_transient( AntiSpam::option_key( $jeton_t ), array( 'state' => 'consumed', 'expires' => wpd_now() + 86400 ), 86400 );
+
+check( '19 · sur transient → le jeton est bien vu comme consommé', $a::is_used( $jeton_t, wpd_now() ) );
+
+wpd_purger_caches();
+
+check( '19 · UNE PURGE DE CACHE LE REND REJOUABLE', ! $a::is_used( $jeton_t, wpd_now() ) );
+
+wpd_reset();
+AntiSpam::reserve_token( $jeton_t, wpd_now() );
+AntiSpam::consume_token( $jeton_t, wpd_now() );
+wpd_purger_caches();
+
+check( '19 · le dépôt résiste à la purge : c’est une option', AntiSpam::is_used( $jeton_t, wpd_now() ) );
+
+// ============ 20 · une réservation est conservée après validation échouée ===
+$c = mutant(
+	'src/Http/SubmissionController.php',
+	'SubmissionController',
+	array(
+		'			RateLimiter::release( $creneau );
+			AntiSpam::release_token( $jeton );' => '			// libération neutralisée.',
+	)
+);
+
+neuf();
+$mauvais = soumission( array( 'nature' => 'chateau_fort' ) );
+$c::process( $mauvais, array(), serveur(), wpd_now() );
+$mauvais['nature'] = 'maison';
+
+check( '20 · libération neutralisée → le jeton reste brûlé après une faute de saisie',
+	SubmissionResult::DUPLICATE_SUBMISSION === $c::process( $mauvais, array(), serveur(), wpd_now() )->code() );
+
+neuf();
+$corrigeable = soumission( array( 'nature' => 'chateau_fort' ) );
+traiter( $corrigeable );
+$corrigeable['nature'] = 'maison';
+
+check( '20 · le dépôt rend le jeton : la correction aboutit', traiter( $corrigeable )->is_success() );
+
+// ============ 21 · le créneau n'est pas libéré après échec =================
+neuf();
+
+for ( $i = 1; $i <= 5; $i++ ) {
+	$c::process( soumission( array( 'nature' => 'chateau_fort' ) ), array(), serveur(), wpd_now() );
+}
+
+check( '21 · libération neutralisée → cinq erreurs épuisent le quota',
+	SubmissionResult::RATE_LIMITED === $c::process( soumission(), array(), serveur(), wpd_now() )->code() );
+
+neuf();
+
+for ( $i = 1; $i <= 5; $i++ ) {
+	traiter( soumission( array( 'nature' => 'chateau_fort' ) ) );
+}
+
+check( '21 · le dépôt rend les créneaux : la demande valide passe', traiter( soumission() )->is_success() );
+check( '21 · aucun créneau n’a été consommé', 0 === RateLimiter::used( 'conception', serveur(), wpd_now() ) - 1 );
+
+// ============ 22 · deux requêtes peuvent recevoir la même référence ========
+$d = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array(
+		'			if ( ! self::reserve_reference( $reference, $now ) ) {
+				continue;
+			}' => '			// réservation neutralisée : le compteur seul décide.',
+	)
+);
+
+neuf();
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+$ref_a = $d::next_reference( wpd_now() );
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+$ref_b = $d::next_reference( wpd_now() );
+
+check( '22 · réservation retirée → deux requêtes obtiennent la même référence', $ref_a === $ref_b );
+
+neuf();
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+$sain_a = SubmissionRepository::next_reference( wpd_now() );
+update_option( SubmissionRepository::SEQUENCE_OPTION, array( (int) gmdate( 'Y', wpd_now() ) => 0 ) );
+$sain_b = SubmissionRepository::next_reference( wpd_now() );
+
+check( '22 · le dépôt en donne deux distinctes', $sain_a !== $sain_b );
+check( '22 · et dans l’ordre attendu', str_ends_with( $sain_a, '-0001' ) && str_ends_with( $sain_b, '-0002' ) );
+
+// ============ 23 · le compteur seul redevient la garantie d'unicité ========
+// En retirant AUSSI la vérification en base, plus rien ne protège.
+$d = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array(
+		'			if ( self::reference_exists( $reference ) ) {
+				continue;
+			}
+
+			if ( ! self::reserve_reference( $reference, $now ) ) {
+				continue;
+			}' => '			// les deux barrières sont neutralisées.',
+	)
+);
+
+neuf();
+$ancienne = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+update_post_meta( $ancienne, '_urbizen_reference', 'URB-' . gmdate( 'Y', wpd_now() ) . '-0001' );
+
+check( '23 · barrières retirées → une référence historique est réattribuée',
+	str_ends_with( $d::next_reference( wpd_now() ), '-0001' ) );
+
+neuf();
+$ancienne = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+update_post_meta( $ancienne, '_urbizen_reference', 'URB-' . gmdate( 'Y', wpd_now() ) . '-0001' );
+
+check( '23 · le dépôt évite la référence historique',
+	! str_ends_with( SubmissionRepository::next_reference( wpd_now() ), '-0001' ) );
+
+// ============ 24 · l'échec de persistance laisse une référence bloquée =====
+$d = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array(
+		'				self::release_reference( $reference );
+				Logger::error( sprintf( \'demande %s : métadonnée' => '				Logger::error( sprintf( \'demande %s : métadonnée',
+	)
+);
+
+neuf();
+$def_m = \Urbizen\Platform\Forms\FormRegistry::get( 'conception' );
+$val_m = \Urbizen\Platform\Forms\Validator::validate(
+	$def_m,
+	array( 'nature' => 'maison', 'situation' => 'terrain_nu', 'a_terrain' => 'non', 'nom' => 'Camille Fictif', 'email' => 'camille@exemple.test', 'rgpd' => '1' )
+);
+
+$GLOBALS['wpd_meta_fail'] = '_urbizen_payload';
+$d::create( $val_m['clean'], $val_m['pricing'], array( 'now' => wpd_now() ) );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '24 · libération retirée → la référence reste réservée après échec',
+	null !== get_option( SubmissionRepository::RESERVATION_PREFIX . 'URB-' . gmdate( 'Y', wpd_now() ) . '-0001', null ) );
+
+neuf();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_payload';
+SubmissionRepository::create( $val_m['clean'], $val_m['pricing'], array( 'now' => wpd_now() ) );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '24 · le dépôt libère la référence',
+	null === get_option( SubmissionRepository::RESERVATION_PREFIX . 'URB-' . gmdate( 'Y', wpd_now() ) . '-0001', null ) );
+
+// ============ 25 · la rétention dépend uniquement de l'activation ==========
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array( "		add_action( 'init', array( self::class, 'ensure_scheduled' ) );" => '		// programmation retirée du chargement.' )
+);
+
+wpd_reset();
+$p::register();
+do_action( 'init' );
+
+check( '25 · sans appel au chargement → une mise à jour ne programme rien',
+	false === wp_next_scheduled( Retention::HOOK ) );
+
+wpd_reset();
+Retention::register();
+do_action( 'init' );
+
+check( '25 · le dépôt programme la tâche sans réactivation', false !== wp_next_scheduled( Retention::HOOK ) );
+
+// ============ 26 · deux tâches de rétention sont programmées ===============
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'		if ( false !== wp_next_scheduled( self::HOOK ) ) {
+			return;
+		}' => '		// contrôle d\'existence retiré.',
+	)
+);
+
+// On compte les appels réels à wp_schedule_event, et non les horodatages :
+// deux programmations successives dans la même seconde donneraient la même
+// date, et le contrôle passerait à tort.
+wpd_reset();
+$p::ensure_scheduled();
+$p::ensure_scheduled();
+$p::ensure_scheduled();
+
+check( '26 · contrôle retiré → la tâche est reprogrammée à chaque appel',
+	3 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+
+wpd_reset();
+Retention::ensure_scheduled();
+Retention::ensure_scheduled();
+Retention::ensure_scheduled();
+
+check( '26 · le dépôt ne programme qu’une seule fois',
+	1 === ( $GLOBALS['wpd_cron_calls'][ Retention::HOOK ] ?? 0 ) );
+check( '26 · une seule tâche existe', 1 === count( $GLOBALS['wpd_cron'] ) );
+
+// ============ 27 · une option technique passe en autoload=true =============
+$a = mutant(
+	'src/Security/AntiSpam.php',
+	'AntiSpam',
+	array(
+		'			array(
+				\'state\'   => \'reserved\',
+				\'expires\' => $now + self::MAX_AGE,
+			),
+			\'\',
+			false
+		);' =>
+		'			array(
+				\'state\'   => \'reserved\',
+				\'expires\' => $now + self::MAX_AGE,
+			),
+			\'\',
+			true
+		);',
+	)
+);
+
+wpd_reset();
+$jeton_al = AntiSpam::issue_token( wpd_now() - 60 );
+$a::reserve_token( $jeton_al, wpd_now() );
+
+check( '27 · muté → la réservation devient autoloadée', 'yes' === wpd_autoload( AntiSpam::option_key( $jeton_al ) ) );
+
+wpd_reset();
+AntiSpam::reserve_token( $jeton_al, wpd_now() );
+
+check( '27 · le dépôt n’autoloade jamais une réservation', 'no' === wpd_autoload( AntiSpam::option_key( $jeton_al ) ) );
+
+// ============ 28 · les réservations expirées ne sont jamais nettoyées ======
+$p = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		"			'jetons'     => AntiSpam::cleanup_expired_tokens( \$now )," => "			'jetons'     => 0,",
+		"			'creneaux'   => RateLimiter::cleanup_expired_slots( \$now )," => "			'creneaux'   => 0,",
+		"			'references' => SubmissionRepository::cleanup_abandoned_references( \$now )," => "			'references' => 0,",
+	)
+);
+
+neuf();
+AntiSpam::reserve_token( AntiSpam::issue_token( wpd_now() ), wpd_now() );
+RateLimiter::reserve( 'conception', serveur(), wpd_now() );
+SubmissionRepository::reserve_reference( 'URB-2026-0800', wpd_now() );
+
+$plus_tard = wpd_now() + AntiSpam::MAX_AGE + 1;
+$p::run_daily( $plus_tard );
+
+$restantes_mutees = count( array_filter( array_keys( $GLOBALS['wpd_options'] ), static fn( $c ) => preg_match( '/^urbizen_(tok|rl|ref)_/', $c ) ) );
+
+check( '28 · nettoyage retiré → les réservations s’accumulent', 3 === $restantes_mutees );
+
+neuf();
+AntiSpam::reserve_token( AntiSpam::issue_token( wpd_now() ), wpd_now() );
+RateLimiter::reserve( 'conception', serveur(), wpd_now() );
+SubmissionRepository::reserve_reference( 'URB-2026-0800', wpd_now() );
+
+Retention::run_daily( $plus_tard );
+
+check( '28 · le dépôt les nettoie toutes',
+	0 === count( array_filter( array_keys( $GLOBALS['wpd_options'] ), static fn( $c ) => preg_match( '/^urbizen_(tok|rl|ref)_/', $c ) ) ) );
+
+// ============ 29 · six requêtes concurrentes créent six demandes ===========
+$c = mutant(
+	'src/Http/SubmissionController.php',
+	'SubmissionController',
+	array(
+		'		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+
+		if ( null === $creneau ) {' => '		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+
+		if ( false ) {',
+	)
+);
+
+neuf();
+$creees = 0;
+
+for ( $i = 1; $i <= 6; $i++ ) {
+	if ( $c::process( soumission(), array(), serveur(), wpd_now() )->is_success() ) {
+		++$creees;
+	}
+}
+
+check( '29 · limite neutralisée → six demandes sont créées', 6 === $creees );
+
+neuf();
+$creees = 0;
+
+for ( $i = 1; $i <= 6; $i++ ) {
+	if ( traiter( soumission() )->is_success() ) {
+		++$creees;
+	}
+}
+
+check( '29 · le dépôt en crée exactement cinq', 5 === $creees );
+check( '29 · cinq demandes en base', 5 === count( $GLOBALS['wpd_posts'] ) );
 
 verdict();

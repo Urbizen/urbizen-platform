@@ -58,20 +58,57 @@ $futur = AntiSpam::issue_token( $maintenant + 500 );
 check( 'un jeton daté du futur est refusé', ! AntiSpam::verify_token( $futur, $maintenant )['ok'] );
 
 // --- réemploi ---
-check( 'un jeton neuf n’est pas marqué comme utilisé', ! AntiSpam::is_used( $jeton ) );
-AntiSpam::mark_used( $jeton );
-check( 'un jeton consommé est reconnu comme tel', AntiSpam::is_used( $jeton ) );
-check( 'un jeton consommé est refusé comme doublon', 'duplicate_submission' === AntiSpam::verify_token( $jeton, $maintenant )['code'] );
+check( 'un jeton neuf n’est pas marqué comme utilisé', ! AntiSpam::is_used( $jeton, $maintenant ) );
+check( 'la première réservation aboutit', AntiSpam::reserve_token( $jeton, $maintenant ) );
+check( 'la seconde réservation du même jeton échoue', ! AntiSpam::reserve_token( $jeton, $maintenant ) );
+check( 'un jeton réservé est reconnu comme utilisé', AntiSpam::is_used( $jeton, $maintenant ) );
+check( 'un jeton réservé est refusé comme doublon', 'duplicate_submission' === AntiSpam::verify_token( $jeton, $maintenant )['code'] );
+
+AntiSpam::consume_token( $jeton, $maintenant );
+check( 'après consommation, le jeton reste refusé', 'duplicate_submission' === AntiSpam::verify_token( $jeton, $maintenant )['code'] );
+check( 'l’état stocké est « consumed »', 'consumed' === ( get_option( AntiSpam::option_key( $jeton ) )['state'] ?? '' ) );
 
 $autre = AntiSpam::issue_token( $maintenant - 60 );
 check( 'consommer un jeton n’affecte pas les autres', AntiSpam::verify_token( $autre, $maintenant )['ok'] );
 
+// --- réservation libérable : une erreur corrigible ne brûle pas le jeton ---
+$libere = AntiSpam::issue_token( $maintenant - 60 );
+AntiSpam::reserve_token( $libere, $maintenant );
+AntiSpam::release_token( $libere );
+check( 'un jeton libéré redevient utilisable', AntiSpam::verify_token( $libere, $maintenant )['ok'] );
+check( 'un jeton libéré ne laisse aucune option', null === get_option( AntiSpam::option_key( $libere ), null ) );
+
+// --- une purge de cache ne rend pas un jeton rejouable ---
+$apres_purge = AntiSpam::issue_token( $maintenant - 60 );
+AntiSpam::reserve_token( $apres_purge, $maintenant );
+AntiSpam::consume_token( $apres_purge, $maintenant );
+wpd_purger_caches();
+check( 'APRÈS PURGE DU CACHE, un jeton consommé reste refusé',
+	'duplicate_submission' === AntiSpam::verify_token( $apres_purge, $maintenant )['code'] );
+check( 'la réservation survit à la purge : c’est une option, pas un transient',
+	is_array( get_option( AntiSpam::option_key( $apres_purge ), null ) ) );
+check( 'aucune réservation n’est autoloadée', 'no' === wpd_autoload( AntiSpam::option_key( $apres_purge ) ) );
+
+// --- nettoyage des réservations expirées ---
+check( 'nettoyage : rien à faire à cet instant', 0 === AntiSpam::cleanup_expired_tokens( $maintenant ) );
+$avant   = count( array_filter( array_keys( $GLOBALS['wpd_options'] ), static fn( $c ) => str_starts_with( $c, AntiSpam::OPTION_PREFIX ) ) );
+$purgees = AntiSpam::cleanup_expired_tokens( $maintenant + AntiSpam::MAX_AGE + 1 );
+check( 'nettoyage : toutes les réservations expirées partent', $purgees === $avant && $avant > 0 );
+check( 'nettoyage : plus aucune réservation ne subsiste',
+	array() === array_filter( array_keys( $GLOBALS['wpd_options'] ), static fn( $c ) => str_starts_with( $c, AntiSpam::OPTION_PREFIX ) ) );
+check( 'nettoyage : idempotent', 0 === AntiSpam::cleanup_expired_tokens( $maintenant + AntiSpam::MAX_AGE + 1 ) );
+check( 'nettoyage : rien de sensible dans le journal',
+	! str_contains( journal(), $jeton ) && ! str_contains( journal(), AntiSpam::option_key( $jeton ) ) );
+
 // --- rien de brut n'est conservé ---
-$stockage = wp_json_encode( $GLOBALS['wpd_transients'] );
+$stockage = wp_json_encode( array( $GLOBALS['wpd_options'], array_keys( $GLOBALS['wpd_options'] ), $GLOBALS['wpd_transients'] ) );
 
 check( 'le jeton brut n’est stocké nulle part', ! str_contains( (string) $stockage, $jeton ) );
 check( 'la signature n’est stockée nulle part', ! str_contains( (string) $stockage, $sig ) );
 check( 'l’identifiant du jeton n’est stocké nulle part', ! str_contains( (string) $stockage, $id ) );
+check( 'le nom d’option est un condensat de longueur fixe',
+	1 === preg_match( '/^urbizen_tok_[0-9a-f]{40}$/', AntiSpam::option_key( $jeton ) ) );
+check( 'le nom d’option tient dans la limite de option_name', strlen( AntiSpam::option_key( $jeton ) ) <= 191 );
 
 // --- le délai minimal est ajustable ---
 add_filter( 'urbizen_antispam_min_seconds', static fn() => 30 );
@@ -99,6 +136,8 @@ $r = traiter( soumission( array( SubmissionController::HONEYPOT_FIELD => '   ' )
 check( 'un pot de miel n’ayant que des espaces laisse passer', $r->is_success() );
 
 // ================================================ LIMITATION DE DÉBIT =======
+// Politique : cinq demandes **réellement enregistrées** par heure et par
+// origine. Une erreur corrigible ne doit pas brûler un créneau.
 wpd_reset();
 SubmissionPostType::register_post_type();
 
@@ -106,21 +145,49 @@ $s = serveur();
 
 check( 'valeurs par défaut : 5 par heure', 5 === RateLimiter::max() && 3600 === RateLimiter::window() );
 
-$autorisees = 0;
+$creneaux = array();
 
 for ( $i = 1; $i <= 5; $i++ ) {
-	if ( RateLimiter::allow( 'conception', $s, wpd_now() ) ) {
-		++$autorisees;
-	}
+	$creneaux[] = RateLimiter::reserve( 'conception', $s, wpd_now() );
 }
 
-check( 'les cinq premières soumissions passent', 5 === $autorisees );
-check( 'la sixième est refusée', ! RateLimiter::allow( 'conception', $s, wpd_now() ) );
-check( 'la septième aussi', ! RateLimiter::allow( 'conception', $s, wpd_now() ) );
+check( 'cinq créneaux sont réservables', 5 === count( array_filter( $creneaux ) ) );
+check( 'les cinq créneaux sont distincts', 5 === count( array_unique( $creneaux ) ) );
+check( 'le sixième est refusé', null === RateLimiter::reserve( 'conception', $s, wpd_now() ) );
+check( 'cinq créneaux comptés comme occupés', 5 === RateLimiter::used( 'conception', $s, wpd_now() ) );
 
-// Une tentative refusée ne doit pas repousser la fin de la fenêtre.
-check( 'à 59 minutes, toujours refusé', ! RateLimiter::allow( 'conception', $s, wpd_now() + 3540 ) );
-check( 'à 60 minutes, la fenêtre est rouverte', RateLimiter::allow( 'conception', $s, wpd_now() + 3600 ) );
+// --- libérer rend le créneau immédiatement ---
+RateLimiter::release( $creneaux[2] );
+
+check( 'libérer un créneau le rend disponible', 4 === RateLimiter::used( 'conception', $s, wpd_now() ) );
+$repris = RateLimiter::reserve( 'conception', $s, wpd_now() );
+check( 'le créneau libéré est repris', null !== $repris );
+check( 'le quota est de nouveau atteint', null === RateLimiter::reserve( 'conception', $s, wpd_now() ) );
+
+// --- confirmer garde le créneau jusqu'à la fin de la fenêtre ---
+RateLimiter::confirm( $creneaux[0], wpd_now() );
+
+check( 'un créneau confirmé reste occupé', 5 === RateLimiter::used( 'conception', $s, wpd_now() ) );
+check( 'l’état stocké est « confirmed »', 'confirmed' === ( get_option( $creneaux[0] )['state'] ?? '' ) );
+check( 'confirmer ne repousse pas la fin de la fenêtre',
+	(int) get_option( $creneaux[0] )['expires'] === wpd_now() + 3600 );
+
+// --- la fenêtre s'écoule ---
+check( 'à 59 minutes, toujours refusé', null === RateLimiter::reserve( 'conception', $s, wpd_now() + 3540 ) );
+check( 'à 60 minutes, un créneau se libère', null !== RateLimiter::reserve( 'conception', $s, wpd_now() + 3600 ) );
+
+// --- une purge de cache ne perd pas la comptabilisation ---
+wpd_reset();
+
+for ( $i = 1; $i <= 5; $i++ ) {
+	RateLimiter::confirm( RateLimiter::reserve( 'conception', $s, wpd_now() ), wpd_now() );
+}
+
+wpd_purger_caches();
+
+check( 'APRÈS PURGE DU CACHE, les cinq créneaux confirmés tiennent', 5 === RateLimiter::used( 'conception', $s, wpd_now() ) );
+check( 'après purge, le sixième reste refusé', null === RateLimiter::reserve( 'conception', $s, wpd_now() ) );
+check( 'aucun créneau n’est autoloadé', 'no' === wpd_autoload( RateLimiter::key( 'conception', $s ) . '_0' ) );
 
 // --- origines indépendantes ---
 wpd_reset();
@@ -128,38 +195,34 @@ $a = serveur( array( 'REMOTE_ADDR' => '203.0.113.10' ) );
 $b = serveur( array( 'REMOTE_ADDR' => '198.51.100.20' ) );
 
 for ( $i = 1; $i <= 5; $i++ ) {
-	RateLimiter::allow( 'conception', $a, wpd_now() );
+	RateLimiter::reserve( 'conception', $a, wpd_now() );
 }
 
-check( 'une origine épuisée est bloquée', ! RateLimiter::allow( 'conception', $a, wpd_now() ) );
-check( 'une autre origine reste libre', RateLimiter::allow( 'conception', $b, wpd_now() ) );
-check( 'deux origines ont des clés distinctes', RateLimiter::key( 'conception', $a ) !== RateLimiter::key( 'conception', $b ) );
-check( 'deux compartiments ont des clés distinctes', RateLimiter::key( 'conception', $a ) !== RateLimiter::key( 'contact', $a ) );
+check( 'une origine épuisée est bloquée', null === RateLimiter::reserve( 'conception', $a, wpd_now() ) );
+check( 'une autre origine reste libre', null !== RateLimiter::reserve( 'conception', $b, wpd_now() ) );
+check( 'deux origines ont des préfixes distincts', RateLimiter::key( 'conception', $a ) !== RateLimiter::key( 'conception', $b ) );
+check( 'deux compartiments ont des préfixes distincts', RateLimiter::key( 'conception', $a ) !== RateLimiter::key( 'contact', $a ) );
 
 // --- aucune adresse conservée ---
-$stockage = wp_json_encode( array( $GLOBALS['wpd_transients'], $GLOBALS['wpd_options'], $GLOBALS['wpd_meta'] ) );
+$stockage = wp_json_encode( array( $GLOBALS['wpd_options'], array_keys( $GLOBALS['wpd_options'] ), $GLOBALS['wpd_transients'], $GLOBALS['wpd_meta'] ) );
 
-check( 'aucune adresse brute dans les transients, options ou métadonnées',
+check( 'aucune adresse brute dans les options, transients ou métadonnées',
 	! str_contains( (string) $stockage, '203.0.113.10' ) && ! str_contains( (string) $stockage, '198.51.100.20' ) );
 check( 'aucune adresse brute dans le journal',
 	! str_contains( journal(), '203.0.113.10' ) && ! str_contains( journal(), '198.51.100.20' ) );
-check( 'la clé ne contient pas l’adresse', ! str_contains( RateLimiter::key( 'conception', $a ), '203.0.113' ) );
-check( 'la clé est un condensat de longueur fixe', 1 === preg_match( '/^urbizen_rl_[0-9a-f]{40}$/', RateLimiter::key( 'conception', $a ) ) );
+check( 'le préfixe est un condensat de longueur fixe',
+	1 === preg_match( '/^urbizen_rl_[0-9a-f]{32}$/', RateLimiter::key( 'conception', $a ) ) );
+check( 'le nom de créneau tient dans la limite de option_name',
+	strlen( RateLimiter::key( 'conception', $a ) . '_4' ) <= 191 );
 
 // --- en-têtes de proxy : jamais crus sur parole ---
 $menteur = serveur( array( 'HTTP_X_FORWARDED_FOR' => '198.51.100.99', 'HTTP_X_REAL_IP' => '198.51.100.98', 'HTTP_CLIENT_IP' => '198.51.100.97' ) );
 
 check( 'X-Forwarded-For est ignoré par défaut', '203.0.113.10' === RateLimiter::origin( $menteur ) );
-check( 'un faux en-tête ne change pas la clé', RateLimiter::key( 'conception', $menteur ) === RateLimiter::key( 'conception', $a ) );
+check( 'un faux en-tête ne change pas le compartiment', RateLimiter::key( 'conception', $menteur ) === RateLimiter::key( 'conception', $a ) );
+check( 'un faux X-Forwarded-For ne permet pas de contourner la limite',
+	null === RateLimiter::reserve( 'conception', $menteur, wpd_now() ) );
 
-wpd_reset();
-for ( $i = 1; $i <= 5; $i++ ) {
-	RateLimiter::allow( 'conception', $a, wpd_now() );
-}
-check( 'un faux X-Forwarded-For ne permet pas de contourner la limite', ! RateLimiter::allow( 'conception', $menteur, wpd_now() ) );
-
-// Un hébergement derrière un proxy de confiance peut le déclarer, mais c'est
-// une décision explicite, jamais un comportement par défaut.
 add_filter( 'urbizen_trusted_proxy_header', static fn() => 'X-Forwarded-For' );
 check( 'un proxy déclaré par filtre est honoré', '198.51.100.99' === RateLimiter::origin( $menteur ) );
 check( 'une chaîne de proxys retient la première adresse',
@@ -167,19 +230,30 @@ check( 'une chaîne de proxys retient la première adresse',
 check( 'sans l’en-tête, on retombe sur REMOTE_ADDR', '203.0.113.10' === RateLimiter::origin( $a ) );
 wpd_clear_filter( 'urbizen_trusted_proxy_header' );
 
+// --- nettoyage des créneaux expirés ---
+$avant   = count( array_filter( array_keys( $GLOBALS['wpd_options'] ), static fn( $c ) => str_starts_with( $c, RateLimiter::OPTION_PREFIX ) ) );
+check( 'nettoyage : rien à faire dans la fenêtre', 0 === RateLimiter::cleanup_expired_slots( wpd_now() ) );
+$purges = RateLimiter::cleanup_expired_slots( wpd_now() + 3601 );
+check( 'nettoyage : tous les créneaux expirés partent', $purges === $avant && $avant > 0 );
+check( 'nettoyage : idempotent', 0 === RateLimiter::cleanup_expired_slots( wpd_now() + 3601 ) );
+
 // --- limites ajustables ---
-// La remise à zéro efface aussi les filtres : elle vient donc en premier.
 wpd_reset();
 add_filter( 'urbizen_rate_limit_max', static fn() => 2 );
 add_filter( 'urbizen_rate_limit_window', static fn() => 60 );
 
 check( 'la limite est ajustable par filtre', 2 === RateLimiter::max() );
 check( 'la fenêtre est ajustable par filtre', 60 === RateLimiter::window() );
-check( '1re passe', RateLimiter::allow( 'conception', $a, wpd_now() ) );
-check( '2e passe', RateLimiter::allow( 'conception', $a, wpd_now() ) );
-check( '3e refusée', ! RateLimiter::allow( 'conception', $a, wpd_now() ) );
-check( 'après 60 s, rouverte', RateLimiter::allow( 'conception', $a, wpd_now() + 60 ) );
+check( '1re réservation', null !== RateLimiter::reserve( 'conception', $a, wpd_now() ) );
+check( '2e réservation', null !== RateLimiter::reserve( 'conception', $a, wpd_now() ) );
+check( '3e refusée', null === RateLimiter::reserve( 'conception', $a, wpd_now() ) );
+check( 'après 60 s, rouverte', null !== RateLimiter::reserve( 'conception', $a, wpd_now() + 60 ) );
 wpd_clear_filter( 'urbizen_rate_limit_max' );
 wpd_clear_filter( 'urbizen_rate_limit_window' );
+
+// --- une valeur de créneau étrangère est ignorée ---
+RateLimiter::release( 'option_du_site' );
+RateLimiter::confirm( 'option_du_site', wpd_now() );
+check( 'release et confirm refusent un nom hors préfixe', null === get_option( 'option_du_site', null ) );
 
 verdict();

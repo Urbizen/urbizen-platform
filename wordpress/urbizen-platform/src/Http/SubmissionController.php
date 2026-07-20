@@ -164,37 +164,68 @@ final class SubmissionController {
 			return SubmissionResult::failure( SubmissionResult::SPAM_HONEYPOT );
 		}
 
-		// --- 4 et 5 · jeton signé, fraîcheur, réemploi ---
-		$jeton      = isset( $post[ self::TOKEN_FIELD ] ) ? (string) $post[ self::TOKEN_FIELD ] : '';
-		$verdict    = AntiSpam::verify_token( $jeton, $now );
+		// --- 4 · jeton : signature et dates ---
+		$jeton   = isset( $post[ self::TOKEN_FIELD ] ) ? (string) $post[ self::TOKEN_FIELD ] : '';
+		$verdict = AntiSpam::verify_token( $jeton, $now );
 
 		if ( ! $verdict['ok'] ) {
 			return SubmissionResult::failure( $verdict['code'] );
 		}
 
-		// --- 6 · limitation de fréquence ---
-		if ( ! RateLimiter::allow( self::FORM_TYPE, $server, $now ) ) {
+		// --- 5 · réservation atomique du jeton ---
+		// Réserver, et non « marquer plus tard » : entre un contrôle et une
+		// écriture différée s'ouvre une fenêtre par laquelle deux requêtes
+		// concurrentes passent toutes les deux. Ici, une seule peut réussir.
+		if ( ! AntiSpam::reserve_token( $jeton, $now ) ) {
+			return SubmissionResult::failure( SubmissionResult::DUPLICATE_SUBMISSION );
+		}
+
+		// --- 6 · réservation d'un créneau de débit ---
+		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+
+		if ( null === $creneau ) {
+			// Le quota est atteint : le jeton reste utilisable plus tard.
+			AntiSpam::release_token( $jeton );
+
 			return SubmissionResult::failure( SubmissionResult::RATE_LIMITED );
 		}
 
+		/**
+		 * Abandonne le traitement en rendant ce qui a été réservé.
+		 *
+		 * Une erreur corrigible ne doit coûter ni le jeton, ni l'un des cinq
+		 * créneaux horaires : la personne doit pouvoir rectifier et renvoyer.
+		 *
+		 * @param string                $code   Code interne.
+		 * @param array<string, string> $errors Erreurs de validation.
+		 * @return SubmissionResult
+		 */
+		$renoncer = static function ( string $code, array $errors = array() ) use ( $jeton, $creneau ): SubmissionResult {
+			RateLimiter::release( $creneau );
+			AntiSpam::release_token( $jeton );
+
+			return SubmissionResult::failure( $code, $errors );
+		};
+
 		// --- 7 · fichiers : refusés jusqu'à la PR B2 ---
 		if ( self::has_files( $files ) ) {
-			return SubmissionResult::failure( SubmissionResult::FILES_NOT_SUPPORTED_YET );
+			return $renoncer( SubmissionResult::FILES_NOT_SUPPORTED_YET );
 		}
 
 		// --- 8 · définition ---
 		$definition = FormRegistry::get( self::FORM_TYPE );
 
 		if ( null === $definition || ! $definition->is_valid() ) {
-			Logger::error( 'soumission : définition « ' . self::FORM_TYPE .' » indisponible ou invalide' );
-			return SubmissionResult::failure( SubmissionResult::INVALID_FORM );
+			Logger::error( 'soumission : définition « ' . self::FORM_TYPE . ' » indisponible ou invalide' );
+
+			return $renoncer( SubmissionResult::INVALID_FORM );
 		}
 
 		// --- 9 · validation ---
 		$validation = Validator::validate( $definition, self::strip_technical_fields( $post ) );
 
 		if ( ! $validation['valid'] ) {
-			return SubmissionResult::failure( SubmissionResult::VALIDATION_FAILED, $validation['errors'] );
+			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] );
 		}
 
 		// --- 10 · prix, recalculé côté serveur ---
@@ -202,12 +233,14 @@ final class SubmissionController {
 
 		if ( ! is_array( $pricing ) || ! isset( $pricing['total'], $pricing['base'] ) ) {
 			Logger::error( 'soumission : calcul tarifaire indisponible' );
-			return SubmissionResult::failure( SubmissionResult::PRICING_FAILED );
+
+			return $renoncer( SubmissionResult::PRICING_FAILED );
 		}
 
 		if ( (int) $pricing['base'] !== Pricing::BASE ) {
 			Logger::error( 'soumission : prix de base incohérent avec le catalogue' );
-			return SubmissionResult::failure( SubmissionResult::PRICING_FAILED );
+
+			return $renoncer( SubmissionResult::PRICING_FAILED );
 		}
 
 		// --- 11 et 12 · référence et enregistrement, avant toute action externe ---
@@ -222,11 +255,12 @@ final class SubmissionController {
 		);
 
 		if ( empty( $creation['ok'] ) ) {
-			return SubmissionResult::failure( SubmissionResult::PERSISTENCE_FAILED );
+			return $renoncer( SubmissionResult::PERSISTENCE_FAILED );
 		}
 
-		// --- 13 · le jeton est consommé, et une seule fois ---
-		AntiSpam::mark_used( $jeton );
+		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---
+		AntiSpam::consume_token( $jeton, $now );
+		RateLimiter::confirm( $creneau, $now );
 
 		// --- 14 · succès. Aucun courriel : ce sera la PR B3. ---
 		return SubmissionResult::success( (string) $creation['reference'], (int) $creation['id'] );

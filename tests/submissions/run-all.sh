@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Lance les cinq bancs d'essai de la réception des demandes.
+# Lance les six bancs d'essai de la réception des demandes.
 #
 #   ./run-all.sh
 #
@@ -33,23 +33,27 @@ command -v "$PHP_BIN" >/dev/null 2>&1 || {
 	exit 2
 }
 
-titre "1/5 — Défenses : jeton, pot de miel, limitation de débit"
+titre "1/6 — Défenses : jeton, pot de miel, limitation de débit"
 "$PHP_BIN" test-security.php
 verdict $? "test-security.php"
 
-titre "2/5 — Conservation : type de contenu privé et repository"
+titre "2/6 — Conservation : type de contenu privé et repository"
 "$PHP_BIN" test-storage.php
 verdict $? "test-storage.php"
 
-titre "3/5 — Contrôleur de soumission"
+titre "3/6 — Contrôleur de soumission"
 "$PHP_BIN" test-controller.php
 verdict $? "test-controller.php"
 
-titre "4/5 — Rétention à 365 jours"
+titre "4/6 — Rétention à 365 jours"
 "$PHP_BIN" test-retention.php
 verdict $? "test-retention.php"
 
-titre "5/5 — Compatibilité et absence d'effet public"
+titre "5/6 — Concurrence, atomicité et planification"
+"$PHP_BIN" test-concurrence.php
+verdict $? "test-concurrence.php"
+
+titre "6/6 — Compatibilité et absence d'effet public"
 "$PHP_BIN" test-compat.php
 verdict $? "test-compat.php"
 
@@ -59,7 +63,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 6 bancs passent.\033[0m\n'
+	printf '\033[32mLes 7 bancs passent.\033[0m\n'
 	exit 0
 fi
 

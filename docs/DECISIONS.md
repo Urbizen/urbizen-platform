@@ -584,3 +584,115 @@ indéfiniment n'est ni nécessaire, ni licite.
   une tâche planifiée. Le reliquat part au passage suivant.
 - La tâche est programmée à l'activation et retirée à la désactivation, sous le
   nom `urbizen_purge_expired` que le `Deactivator` déprogrammait déjà.
+
+---
+
+## D-017 — L'atomicité repose sur l'unicité de `option_name`
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-014] et [D-015]
+
+**Contexte.** La première écriture de la réception employait des transients pour
+mémoriser les jetons consommés et compter les soumissions. La revue a montré que
+ce choix ne tenait pas sur deux points.
+
+**Un transient exprime une durée maximale de conservation, jamais une
+garantie.** Une purge du cache objet, un vidage LiteSpeed ou une éviction
+mémoire peuvent le faire disparaître avant terme — et rendre réutilisable un
+jeton déjà consommé.
+
+**Et surtout, `lire puis écrire` n'arbitre rien.** Entre `is_used()` et
+`mark_used()` s'ouvre une fenêtre par laquelle deux requêtes concurrentes
+passent toutes les deux. Le même défaut affectait l'allocation des références :
+deux requêtes pouvaient lire le même compteur avant que l'une n'écrive.
+
+**Décision.** Toutes les réservations reposent sur **l'unicité de
+`option_name`**, la seule primitive réellement atomique offerte par WordPress
+sans table dédiée. `add_option()` échoue si le nom existe déjà, quel que soit le
+nombre de requêtes simultanées.
+
+| Ressource | Nom d'option | Contenu |
+|---|---|---|
+| Jeton | `urbizen_tok_<40 hex>` | état, expiration |
+| Créneau de débit | `urbizen_rl_<32 hex>_<0..4>` | état, expiration |
+| Référence | `urbizen_ref_URB-AAAA-NNNN` | état, date, demande |
+
+Le nom porte un **condensat HMAC** : jamais le jeton, jamais sa signature,
+jamais son identifiant lisible, jamais une adresse IP. **Toutes ces options sont
+créées avec `autoload = false`** : elles ne pèsent sur aucune page.
+
+**Le compteur de références reste, mais comme accélérateur seulement.** Il évite
+de repartir de 1 à chaque allocation ; l'unicité vient de la réservation. Deux
+barrières successives protègent en outre les références historiques, créées
+avant ce mécanisme : la présence en base, puis la réservation atomique.
+
+**Conséquences.**
+- Une seconde requête portant le même jeton est refusée **pendant** le
+  traitement de la première, sans attendre sa persistance.
+- Une purge de cache ne rend rien réutilisable : les options vivent en base.
+- Les entrelacements sont éprouvés de façon **déterministe** — la requête A
+  s'arrête après avoir choisi son candidat, B s'exécute entièrement, puis A
+  reprend — et non par une répétition qui espère tomber sur la course.
+- Une référence libérée après échec n'est pas *bloquée*, mais le compteur ne
+  recule pas : la série peut sauter un rang. C'est assumé — faire reculer un
+  compteur rouvrirait exactement la course que la réservation vient de fermer.
+
+---
+
+## D-018 — Cinq demandes *enregistrées*, pas cinq tentatives
+
+**Date** : 20 juillet 2026 · **État** : actée · **Remplace** la règle de comptage de [D-015]
+
+**Contexte.** Le limiteur comptait toute tentative. Une personne qui oublie une
+case obligatoire, corrige, se trompe encore, corrige — cinq allers-retours
+ordinaires — se retrouvait bloquée une heure par sa propre application. Le
+mécanisme censé écarter les robots punissait les clients.
+
+**Décision.** Le quota porte sur les demandes **réellement enregistrées**.
+
+Le limiteur fonctionne en trois temps : **réserver** un créneau avant le
+traitement, le **libérer** si le traitement échoue pour une raison corrigible,
+le **confirmer** une fois la demande écrite.
+
+Ne consomment aucun créneau : `validation_failed`, `files_not_supported_yet`,
+`pricing_failed`, `persistence_failed` — ni aucun refus de sécurité, qui
+intervient avant la réservation.
+
+**La réservation reste atomique.** Six requêtes valides simultanées ne peuvent
+pas acquérir plus de cinq créneaux : leurs noms sont déterministes et numérotés,
+et `add_option()` n'aboutit qu'une fois par nom.
+
+Le jeton suit la même logique : un échec corrigible le rend, pour que la
+personne puisse rectifier et renvoyer.
+
+**Conséquences.**
+- Confirmer ne repousse pas la fin de la fenêtre : un flux soutenu ne peut pas
+  la prolonger indéfiniment.
+- Les refus de sécurité restent bloqués mais ne sont jamais présentés comme des
+  demandes enregistrées. Un dispositif anti-abus distinct pourra les traiter.
+
+---
+
+## D-019 — Une mise à jour ne doit rien exiger d'un administrateur
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** L'extension est active en production. Remplacer ses fichiers par
+une nouvelle version **ne déclenche pas le hook d'activation** : la tâche de
+purge, programmée uniquement à l'activation, n'aurait jamais existé sur un site
+passé de 0.5.0 à 0.6.0. Il aurait fallu désactiver puis réactiver l'extension à
+la main — ce qu'on ne peut pas exiger d'une mise en production, et qu'on
+oublierait.
+
+**Décision.** `Retention::ensure_scheduled()` est **idempotente** et appelée à
+chaque chargement, sur `init`, en plus de l'activation.
+
+Le coût est nul : `wp_next_scheduled()` interroge un tableau déjà chargé en
+mémoire. Cent chargements ne créent qu'une tâche.
+
+**Conséquences.**
+- Les six scénarios sont éprouvés : installation neuve, remplacement de fichiers
+  sans réactivation, chargements répétés, tâche déjà présente, désactivation,
+  réactivation.
+- La même tâche quotidienne assure le ménage des réservations techniques.
+  Une réservation **attribuée** n'est jamais supprimée : la référence appartient
+  à une demande et ne doit pas pouvoir resservir.
