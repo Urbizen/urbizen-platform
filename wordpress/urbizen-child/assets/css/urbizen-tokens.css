@@ -1,0 +1,74 @@
+/* ============================================================================
+   urbizen-tokens.css
+   Charte graphique Urbizen — copie conforme de frontend/assets/css/urbizen-tokens.css,
+   qui reste la référence de la maquette. Aucune valeur n'est modifiée ici :
+   ce fichier existe parce que le rendu appartient au thème (D-002), et qu'un
+   thème ne peut pas lire un fichier situé hors de WordPress.
+   Toute évolution de la charte se fait dans les deux fichiers, à l'identique.
+   À charger AVANT tout autre CSS.
+   ========================================================================== */
+
+:root {
+  /* --- Couleurs : surfaces --- */
+  --u-paper:       #EAEEF2;   /* fond général, papier technique */
+  --u-grid:        #DCE3EA;   /* lignes du quadrillage */
+  --u-surface:     #FBFCFD;   /* cartes, blocs */
+  --u-surface-2:   #F2F5F8;   /* surfaces alternées */
+
+  /* --- Couleurs : texte --- */
+  --u-ink:         #14233B;   /* bleu nuit, texte principal / titres */
+  --u-ink-soft:    #55617A;   /* texte secondaire */
+  --u-ink-faint:   #8791A6;   /* texte tertiaire, légendes */
+
+  /* --- Couleurs : traits --- */
+  --u-line:        #C9D3DD;   /* traits fins */
+  --u-line-strong: #9FADBC;   /* traits appuyés, bordures de cartes */
+
+  /* --- Couleurs : accent Urbizen --- */
+  --u-brand:       #128A5A;   /* vert Urbizen : accent principal, boutons */
+  --u-brand-dk:    #0E6E48;   /* vert foncé : survols */
+  --u-brand-sf:    #E4F5EC;   /* vert très clair : fonds d'accent, focus */
+  --u-mint:        #54CF99;   /* menthe : états confirmés, filets d'accent */
+
+  /* --- Couleur : erreur (réservée à la validation) --- */
+  --u-error:       #C0392B;
+
+  /* --- Formes --- */
+  --u-radius:      4px;        /* angles très peu arrondis */
+  --u-radius-sm:   3px;
+
+  /* --- Typographies --- */
+  --u-font-title:  "Space Grotesk", system-ui, sans-serif;   /* titres, boutons */
+  --u-font-body:   "IBM Plex Sans", system-ui, sans-serif;   /* textes courants */
+  --u-font-mono:   "IBM Plex Mono", ui-monospace, monospace; /* références techniques */
+
+  /* --- Rythme --- */
+  --u-maxw:        1120px;
+  --u-pad:         clamp(20px, 5vw, 40px);
+
+  /* --- Ombres (extrêmement discrètes) --- */
+  --u-shadow-card: 0 1px 0 rgba(20,35,59,.03), 0 20px 40px -30px rgba(20,35,59,.5);
+
+  /* --- Quadrillage réutilisable (à appliquer en background) --- */
+  --u-grid-bg:
+    linear-gradient(var(--u-grid) 1px, transparent 1px) 0 0 / 28px 28px,
+    linear-gradient(90deg, var(--u-grid) 1px, transparent 1px) 0 0 / 28px 28px,
+    var(--u-paper);
+}
+
+/* Classe utilitaire de fond quadrillé */
+.u-grid-bg { background: var(--u-grid-bg); }
+
+/* Cartouche technique réutilisable (façon légende de plan) */
+.u-cartouche {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--u-brand);
+}
+
+/* Réduction des animations si demandé par l'utilisateur */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
