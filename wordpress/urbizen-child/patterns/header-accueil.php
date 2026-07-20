@@ -10,9 +10,11 @@
  * fichier .html de gabarit n'exécute pas PHP, d'où ce pattern — les patterns
  * de thème sont des fichiers PHP par conception.
  *
- * Les attributs width et height valent les dimensions intrinsèques du PNG
- * (430 x 120). Ils réduisent le décalage de mise en page au chargement et ne
- * changent rien à l'affichage, piloté par le CSS.
+ * Aucun attribut width/height sur le logo : mesuré en conditions réelles, les
+ * ajouter donne à l'image un rapport d'aspect définitif qui change le calcul
+ * flex de l'en-tête — le logo passait de 109 à 290 px et le menu perdait
+ * 135 px, ses libellés basculant sur deux lignes. La maquette s'appuie sur la
+ * compression du logo par flex-shrink : on ne la contrarie pas.
  *
  * @package Urbizen\Child
  */
@@ -24,7 +26,7 @@ defined( 'ABSPATH' ) || exit;
   <div class="wrap nav">
     <a class="logo" href="#top" aria-label="Urbizen — accueil">
       <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>"
-           alt="Urbizen · urbanisme & projets" width="430" height="120" />
+           alt="Urbizen · urbanisme & projets" />
     </a>
     <nav class="nav-links" aria-label="Navigation principale">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>

@@ -50,7 +50,7 @@ function rendre_pattern( $fichier ) {
 /** Remet la ligne du logo dans sa forme d'origine, pour comparer le reste. */
 function neutraliser_logo( $html ) {
 	$html = preg_replace(
-		'#<img src="https://exemple\.test/wp-content/themes/urbizen-child/assets/img/logo-urbizen\.png"\s*\n\s*alt="([^"]*)"((?: class="[^"]*")?) width="430" height="120" />#',
+		'#<img src="https://exemple\.test/wp-content/themes/urbizen-child/assets/img/logo-urbizen\.png"\s*\n\s*alt="([^"]*)"((?: class="[^"]*")?) />#',
 		'<img src="assets/logo-urbizen.png" alt="$1"$2 />',
 		$html
 	);
@@ -64,8 +64,11 @@ $entete_ref   = maquette( $lignes, 77, 110 );
 check( 'En-tête : markup identique à la maquette (hors URL du logo)', $entete_rendu === $entete_ref );
 check( 'En-tête : logo résolu par le thème, aucune URL en dur',
 	str_contains( rendre_pattern( $theme . '/patterns/header-accueil.php' ), '/wp-content/themes/urbizen-child/assets/img/logo-urbizen.png' ) );
-check( 'En-tête : dimensions intrinsèques 430x120 présentes',
-	str_contains( rendre_pattern( $theme . '/patterns/header-accueil.php' ), 'width="430" height="120"' ) );
+// Mesuré en conditions réelles : ces attributs donnent à l'image un rapport
+// d'aspect définitif qui change le calcul flex de l'en-tête. Le logo passait de
+// 109 à 290 px et le menu perdait 135 px. Leur absence est donc une exigence.
+check( 'En-tête : AUCUN attribut width/height sur le logo',
+	! preg_match( '/<img[^>]*logo-urbizen\.png[^>]*(width|height)=/', rendre_pattern( $theme . '/patterns/header-accueil.php' ) ) );
 // Le nombre de liens est comparé à la maquette, pas à un total deviné :
 // 17 balises <a> — menu desktop, menu mobile, connexion et CTA.
 check( 'En-tête : tous les liens de la maquette présents',
@@ -88,6 +91,8 @@ check( 'Pied de page : marque et trois listes de liens conservées',
 	str_contains( $pied_rendu, 'class="foot-brand"' )
 	&& 3 === substr_count( $pied_rendu, '<ul>' )
 	&& substr_count( $pied_rendu, '<h4>' ) === substr_count( $pied_ref, '<h4>' ) );
+check( 'Pied de page : AUCUN attribut width/height sur le logo',
+	! preg_match( '/<img[^>]*logo-urbizen\.png[^>]*(width|height)=/', rendre_pattern( $theme . '/patterns/footer-accueil.php' ) ) );
 check( 'Pied de page : coordonnées inchangées',
 	str_contains( $pied_rendu, 'contact@urbizen.fr' ) && str_contains( $pied_rendu, '+33 6 64 89 58 15' ) );
 

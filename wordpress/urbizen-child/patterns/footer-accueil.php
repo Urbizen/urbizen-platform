@@ -18,7 +18,7 @@ defined( 'ABSPATH' ) || exit;
   <div class="wrap foot">
     <div class="foot-brand">
       <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>"
-           alt="Urbizen" class="foot-logo" width="430" height="120" />
+           alt="Urbizen" class="foot-logo" />
       <p>Dossiers d'urbanisme à distance : déclaration préalable, permis de construire, CERFA, plans, insertions paysagères et pièces graphiques prêts à déposer. Partout en France métropolitaine.</p>
     </div>
     <div>
