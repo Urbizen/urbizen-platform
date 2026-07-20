@@ -87,3 +87,39 @@ body.admin-bar .urbizen-accueil header.site {
 		top: 0;
 	}
 }
+
+/* --- 5. Ancres du menu : atterrir SOUS l'en-tête, pas derrière ------------ */
+/* Un en-tête collant ne décale pas la cible d'une ancre : le navigateur amène
+   le haut de la section à `y = 0`, donc sous l'en-tête. Mesuré avant
+   correction, chaque cible perdait ainsi la hauteur de l'en-tête ; seul le
+   rembourrage interne des sections sauvait certains titres, et pas tous :
+   « Panneaux solaires » disparaissait de 24 px à 1440 px, et les surtitres de
+   `prestations`, `methode`, `faq` et `localisation` de 11 px à 390 px.
+   `#tarifs` est le plus exposé : c'est une grille de cartes, sans rembourrage
+   haut.
+
+   `scroll-margin-top` est la réponse native : elle ne déplace rien à l'écran,
+   elle indique seulement au navigateur où s'arrêter. Aucun JavaScript de
+   défilement n'est ajouté, et `scroll-behavior: smooth` de la maquette
+   continue de s'appliquer.
+
+   Valeurs : hauteur réelle de l'en-tête plus 9 px de respiration —
+   71 + 9 = 80 px, et 63 + 9 = 72 px sous 421 px, où la maquette ramène
+   `.nav` à 62 px. */
+.urbizen-accueil #localisation,
+.urbizen-accueil #methode,
+.urbizen-accueil #prestations,
+.urbizen-accueil #tarifs,
+.urbizen-accueil #faq {
+	scroll-margin-top: 80px;
+}
+
+@media (max-width: 420px) {
+	.urbizen-accueil #localisation,
+	.urbizen-accueil #methode,
+	.urbizen-accueil #prestations,
+	.urbizen-accueil #tarifs,
+	.urbizen-accueil #faq {
+		scroll-margin-top: 72px;
+	}
+}

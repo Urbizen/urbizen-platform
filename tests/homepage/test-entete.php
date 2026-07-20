@@ -118,6 +118,54 @@ check( 'admin-bar : aucun décalage sous 601 px, la barre y défile avec la page
 check( 'Les décalages sont conditionnés à .admin-bar, jamais imposés à l\'anonyme',
 	3 === substr_count( $css, 'body.admin-bar' ) );
 
+// ------------------------------------------ 5. ancres sous l'en-tête --------
+// Un en-tête collant ne décale pas la cible d'une ancre : sans scroll-margin,
+// le navigateur amène le haut de la section à y = 0, donc derrière l'en-tête.
+$cibles = array( '#localisation', '#methode', '#prestations', '#tarifs', '#faq' );
+
+foreach ( $cibles as $cible ) {
+	check( 'Ancre « ' . $cible .' » : scroll-margin-top défini',
+		(bool) preg_match(
+			'/\.urbizen-accueil\s+' . preg_quote( $cible, '/' ) . '\s*[,{]/',
+			$css
+		) );
+}
+
+preg_match_all( '/scroll-margin-top:\s*(\d+)px/', $css, $marges );
+$valeurs = array_map( 'intval', $marges[1] );
+
+check( 'Deux valeurs de scroll-margin-top : bureau et mobile', 2 === count( $valeurs ) );
+check( 'Bureau : 80 px, soit les 71 px de l\'en-tête plus une respiration',
+	in_array( 80, $valeurs, true ) );
+check( 'Mobile : 72 px, soit les 63 px de l\'en-tête sous 421 px',
+	in_array( 72, $valeurs, true ) );
+check( 'Chaque valeur dépasse la hauteur réelle de l\'en-tête',
+	80 > 71 && 72 > 63 );
+// La valeur mobile doit vivre dans la media query du point de rupture de la
+// maquette — celui où `.nav` passe de 70 à 62 px de haut.
+$bloc_420 = null;
+$i        = strpos( $css, 'max-width: 420px' );
+
+if ( false !== $i ) {
+	$j = strpos( $css, '{', $i );
+	$p = 1;
+	$k = $j + 1;
+
+	while ( $k < strlen( $css ) && $p > 0 ) {
+		$p += ( '{' === $css[ $k ] ) - ( '}' === $css[ $k ] );
+		$k++;
+	}
+
+	$bloc_420 = substr( $css, $j + 1, $k - $j - 2 );
+}
+
+check( 'La valeur mobile est bornée au point de rupture de la maquette (420 px)',
+	null !== $bloc_420 && str_contains( $bloc_420, 'scroll-margin-top: 72px' ) );
+check( 'Les 5 cibles sont reprises dans la règle mobile',
+	null !== $bloc_420 && 5 === substr_count( $bloc_420, '.urbizen-accueil #' ) );
+check( 'Aucun JavaScript de défilement n\'est ajouté',
+	! str_contains( $css, 'scroll-behavior' ) );
+
 // ------------------------------------------------------- le gabarit ---------
 $source = file_get_contents( $theme . '/templates/page-accueil-urbizen.html' );
 $front  = file_get_contents( $theme . '/templates/front-page.html' );
