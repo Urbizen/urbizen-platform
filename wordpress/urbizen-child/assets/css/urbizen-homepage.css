@@ -1,0 +1,255 @@
+/* ============================================================================
+   urbizen-homepage.css — styles de la page d'accueil Urbizen.
+
+   Copie de frontend/homepage/homepage.css, portée sous `.urbizen-accueil`
+   pour cohabiter avec les styles du thème parent et de Kadence Blocks.
+   AUCUNE valeur graphique n'est modifiée : seuls les sélecteurs changent.
+   Le reset `*` est lui aussi borné à la portée, pour ne pas déborder sur
+   l'administration ni sur les autres pages. Seul `html { scroll-behavior }`
+   reste global : c'est un comportement du document, pas un style de page.
+   Dépend de urbizen-tokens.css et urbizen-fonts.css.
+   ========================================================================== */
+
+.urbizen-accueil, .urbizen-accueil * { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+.urbizen-accueil { font-family: var(--u-font-body); color: var(--u-ink); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+.urbizen-accueil h1, .urbizen-accueil h2, .urbizen-accueil h3, .urbizen-accueil h4 { font-family: var(--u-font-title); letter-spacing: -0.015em; line-height: 1.14; }
+.urbizen-accueil a { color: inherit; text-decoration: none; }
+.urbizen-accueil .wrap { max-width: var(--u-maxw); margin: 0 auto; padding-left: var(--u-pad); padding-right: var(--u-pad); }
+.urbizen-accueil .mono { font-family: var(--u-font-mono); }
+.urbizen-accueil img { max-width: 100%; }
+
+.urbizen-accueil .u-skip { position: absolute; left: -9999px; top: 0; background: var(--u-ink); color: #fff; padding: 10px 16px; border-radius: var(--u-radius); z-index: 100; }
+.urbizen-accueil .u-skip:focus { left: 12px; top: 12px; }
+
+.urbizen-accueil .eyebrow {
+  font-family: var(--u-font-mono); font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--u-brand); display: inline-flex; align-items: center; gap: 9px;
+}
+.urbizen-accueil .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--u-mint); display: inline-block; }
+
+/* --- Boutons --- */
+.urbizen-accueil .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--u-font-title); font-weight: 500; font-size: 15px;
+  padding: 12px 22px; border-radius: var(--u-radius); cursor: pointer;
+  border: 1px solid transparent; transition: background .16s, border-color .16s, box-shadow .16s, transform .12s;
+}
+.urbizen-accueil .btn:hover { transform: translateY(-1px); }
+.urbizen-accueil .btn:active { transform: translateY(0); }
+.urbizen-accueil .btn-primary { background: var(--u-brand); color: #fff; }
+.urbizen-accueil .btn-primary:hover { background: var(--u-brand-dk); box-shadow: 0 8px 18px -10px rgba(18,138,90,.7); }
+.urbizen-accueil .btn-ghost { background: transparent; color: var(--u-ink); border-color: var(--u-line-strong); }
+.urbizen-accueil .btn-ghost:hover { border-color: var(--u-ink); box-shadow: 0 8px 18px -12px rgba(20,35,59,.4); }
+.urbizen-accueil .btn-sm { padding: 9px 16px; font-size: 14px; }
+.urbizen-accueil :focus-visible { outline: 2px solid var(--u-brand); outline-offset: 2px; }
+
+/* --- Header --- */
+.urbizen-accueil header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,253,.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .nav { display: flex; align-items: center; justify-content: space-between; gap: 18px; height: 70px; }
+.urbizen-accueil .nav .logo img { height: 36px; display: block; }
+.urbizen-accueil .nav-links { display: flex; gap: 22px; }
+.urbizen-accueil .nav-links a { font-size: 14px; color: var(--u-ink-soft); font-weight: 500; transition: color .15s; }
+.urbizen-accueil .nav-links a:hover { color: var(--u-brand); }
+.urbizen-accueil .nav-right { display: flex; align-items: center; gap: 14px; }
+.urbizen-accueil .link-login { font-size: 14px; color: var(--u-ink-soft); font-weight: 500; }
+.urbizen-accueil .link-login:hover { color: var(--u-brand); }
+.urbizen-accueil .burger { display: none; background: none; border: none; cursor: pointer; padding: 6px; }
+.urbizen-accueil .burger span { display: block; width: 22px; height: 2px; background: var(--u-ink); margin: 4px 0; transition: .2s; }
+.urbizen-accueil .mmenu { border-top: 1px solid var(--u-line); background: var(--u-surface); }
+.urbizen-accueil .mmenu .wrap { display: grid; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
+.urbizen-accueil .mmenu a { font-size: 15px; color: var(--u-ink); }
+@media (max-width: 900px) {
+  .urbizen-accueil .nav-links, .urbizen-accueil .nav-right .link-login { display: none; }
+  .urbizen-accueil .burger { display: block; }
+}
+
+/* --- Sections génériques --- */
+.urbizen-accueil main section { padding: clamp(52px, 8vw, 88px) 0; }
+.urbizen-accueil .sec-head { max-width: 640px; margin-bottom: clamp(28px, 4vw, 44px); }
+.urbizen-accueil .sec-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+.urbizen-accueil .sec-head.center .eyebrow { justify-content: center; }
+.urbizen-accueil .sec-head h2 { font-size: clamp(26px, 3.6vw, 38px); font-weight: 600; margin: 12px 0; }
+.urbizen-accueil .sec-head p { color: var(--u-ink-soft); font-size: 16.5px; }
+
+/* --- Hero --- */
+.urbizen-accueil .hero { padding: clamp(46px, 8vw, 88px) 0 clamp(36px, 6vw, 64px); }
+.urbizen-accueil .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: clamp(32px, 6vw, 60px); align-items: center; }
+.urbizen-accueil .hero h1 { font-size: clamp(32px, 5.2vw, 52px); font-weight: 600; margin: 16px 0 16px; }
+.urbizen-accueil .hero .lead { font-size: clamp(16px, 1.6vw, 18.5px); color: var(--u-ink-soft); max-width: 46ch; margin-bottom: 24px; }
+.urbizen-accueil .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+.urbizen-accueil .hero-reassure { list-style: none; display: flex; gap: 22px; flex-wrap: wrap; }
+.urbizen-accueil .hero-reassure li { font-size: 14.5px; color: var(--u-ink); display: flex; align-items: center; gap: 8px; }
+.urbizen-accueil .hero-reassure li::before { content: "✓"; color: var(--u-brand); font-weight: 700; width: 20px; height: 20px; display: grid; place-items: center; background: var(--u-brand-sf); border-radius: 50%; font-size: 12px; }
+.urbizen-accueil .hero-plan { position: relative; background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); padding: 22px; box-shadow: var(--u-shadow-card); }
+.urbizen-accueil .hero-plan-tag { position: absolute; top: -11px; left: 22px; background: var(--u-ink); color: #fff; font-family: var(--u-font-mono); font-size: 11px; letter-spacing: .08em; padding: 4px 10px; border-radius: 3px; }
+.urbizen-accueil .hero-plan svg { width: 100%; height: auto; display: block; }
+@media (max-width: 800px) { .urbizen-accueil .hero-grid { grid-template-columns: 1fr; } .urbizen-accueil .hero-plan { order: -1; } }
+
+/* Animation d'entrée du plan (hero).
+   Uniquement si l'utilisateur n'a pas demandé à réduire les animations :
+   par défaut / en mouvement réduit, les éléments restent visibles et nets. */
+@media (prefers-reduced-motion: no-preference) {
+  .urbizen-accueil .hero-plan .hp-fade { opacity: 0; animation: hpFade .6s ease forwards; }
+  .urbizen-accueil .hero-plan .hp-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: hpDraw .9s ease forwards; }
+  /* cadres : apparition rapide en premier */
+.urbizen-accueil .hero-plan .hp-d1 { animation-delay: .05s; }
+  .urbizen-accueil .hero-plan .hp-d2 { animation-delay: .12s; }
+  .urbizen-accueil .hero-plan .hp-d3 { animation-delay: .19s; }
+  .urbizen-accueil .hero-plan .hp-d4 { animation-delay: .26s; }
+  /* tracé des contours, une vignette après l'autre */
+.urbizen-accueil .hero-plan .hp-dr1 { animation-delay: .35s; }
+  .urbizen-accueil .hero-plan .hp-dr2 { animation-delay: .80s; }
+  .urbizen-accueil .hero-plan .hp-dr3 { animation-delay: 1.25s; }
+  .urbizen-accueil .hero-plan .hp-dr4 { animation-delay: 1.70s; }
+  /* remplissages, juste après le tracé de chaque vignette */
+.urbizen-accueil .hero-plan .hp-fd1 { animation-delay: .55s; }
+  .urbizen-accueil .hero-plan .hp-fd2 { animation-delay: 1.00s; }
+  .urbizen-accueil .hero-plan .hp-fd3 { animation-delay: 1.45s; }
+  .urbizen-accueil .hero-plan .hp-fd4 { animation-delay: 1.90s; }
+}
+@keyframes hpFade { to { opacity: 1; } }
+@keyframes hpDraw { to { stroke-dashoffset: 0; } }
+
+/* --- Bandeau confiance --- */
+.urbizen-accueil .trust { border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); background: var(--u-surface); }
+.urbizen-accueil .trust .wrap { display: flex; flex-wrap: wrap; gap: 12px 40px; justify-content: space-between; padding-top: 18px; padding-bottom: 18px; }
+.urbizen-accueil .trust-item { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--u-ink-soft); }
+.urbizen-accueil .trust-item b { color: var(--u-ink); font-weight: 600; }
+.urbizen-accueil .trust-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--u-mint); flex: none; }
+
+/* --- Section 3 : localisation --- */
+.urbizen-accueil .locate { background: var(--u-surface-2); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .locate-card { background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); padding: clamp(20px, 4vw, 32px); box-shadow: var(--u-shadow-card); max-width: 860px; }
+
+/* --- Section 4 : type de projet --- */
+.urbizen-accueil .projet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.urbizen-accueil .pcard {
+  display: flex; flex-direction: column; gap: 6px; text-align: left;
+  background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius);
+  padding: 16px 16px; cursor: pointer; font-family: var(--u-font-body);
+  transition: border-color .15s, background .15s, transform .12s;
+}
+.urbizen-accueil .pcard:hover { border-color: var(--u-line-strong); transform: translateY(-2px); }
+.urbizen-accueil .pcard.is-selected { border-color: var(--u-brand); background: var(--u-brand-sf); box-shadow: inset 0 0 0 1px var(--u-brand); }
+.urbizen-accueil .pcard-ico { font-size: 20px; color: var(--u-brand); line-height: 1; }
+.urbizen-accueil .pcard-t { font-family: var(--u-font-title); font-weight: 500; font-size: 15.5px; color: var(--u-ink); }
+.urbizen-accueil .pcard-d { font-size: 12px; color: var(--u-ink-soft); }
+.urbizen-accueil .projet-continue { margin-top: 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.urbizen-accueil .projet-continue .btn:disabled { opacity: .45; cursor: not-allowed; }
+.urbizen-accueil .projet-continue-hint { font-size: 13.5px; color: var(--u-ink-faint); }
+
+/* --- Section 5 : étapes --- */
+.urbizen-accueil .steps { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border: 1px solid var(--u-line); border-radius: var(--u-radius); overflow: hidden; background: var(--u-surface); }
+.urbizen-accueil .step { padding: 26px 22px; border-right: 1px solid var(--u-line); position: relative; }
+.urbizen-accueil .step:last-child { border-right: none; }
+.urbizen-accueil .step-n { font-family: var(--u-font-mono); font-size: 13px; color: var(--u-brand); border: 1px solid var(--u-brand); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; margin-bottom: 16px; }
+.urbizen-accueil .step h3 { font-size: 16.5px; margin-bottom: 8px; }
+.urbizen-accueil .step p { font-size: 14px; color: var(--u-ink-soft); }
+@media (max-width: 820px) { .urbizen-accueil .steps { grid-template-columns: 1fr; } .urbizen-accueil .step { border-right: none; border-bottom: 1px solid var(--u-line); } .urbizen-accueil .step:last-child { border-bottom: none; } }
+
+/* --- Section 6 : planche dossier --- */
+.urbizen-accueil .dossier { background: var(--u-surface-2); border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .planche { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.urbizen-accueil .planche-item { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 18px 16px; display: flex; flex-direction: column; gap: 8px; min-height: 96px; }
+.urbizen-accueil .planche-item .code { font-family: var(--u-font-mono); font-size: 11px; color: var(--u-brand); }
+.urbizen-accueil .planche-t { font-family: var(--u-font-title); font-weight: 500; font-size: 15px; color: var(--u-ink); margin-top: auto; }
+@media (max-width: 820px) { .urbizen-accueil .planche { grid-template-columns: 1fr 1fr; } }
+
+/* --- Section 7 : prestations + tarifs --- */
+.urbizen-accueil .presta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+.urbizen-accueil .presta { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 28px 24px; display: flex; flex-direction: column; }
+.urbizen-accueil .presta.featured { border-color: var(--u-brand); box-shadow: 0 0 0 1px var(--u-brand); }
+.urbizen-accueil .presta h3 { font-size: 20px; margin-bottom: 12px; }
+.urbizen-accueil .presta p { font-size: 14.5px; color: var(--u-ink-soft); margin-bottom: 14px; }
+.urbizen-accueil .presta-price { font-family: var(--u-font-body); font-size: 14px; color: var(--u-ink-soft); margin-top: auto; margin-bottom: 16px !important; }
+.urbizen-accueil .presta-price b { font-family: var(--u-font-title); font-size: 20px; color: var(--u-ink); }
+@media (max-width: 800px) { .urbizen-accueil .presta-grid { grid-template-columns: 1fr; } }
+
+.urbizen-accueil .tarifs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.urbizen-accueil .tarif { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 20px 16px; display: flex; flex-direction: column; }
+.urbizen-accueil .tarif.featured { border-color: var(--u-brand); box-shadow: 0 0 0 1px var(--u-brand); }
+.urbizen-accueil .tarif-badge { font-family: var(--u-font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--u-brand); margin-bottom: 10px; min-height: 14px; }
+.urbizen-accueil .tarif h3 { font-size: 15px; margin-bottom: 14px; line-height: 1.25; }
+.urbizen-accueil .tarif-price { font-family: var(--u-font-title); font-weight: 700; font-size: 24px; color: var(--u-ink); margin-top: auto; }
+@media (max-width: 960px) { .urbizen-accueil .tarifs { grid-template-columns: 1fr 1fr 1fr; } }
+@media (max-width: 560px) { .urbizen-accueil .tarifs { grid-template-columns: 1fr 1fr; } }
+.urbizen-accueil .tarif-note { margin-top: 20px; font-size: 13px; color: var(--u-ink-faint); max-width: 780px; }
+
+/* --- Section 8 : pourquoi --- */
+.urbizen-accueil .pourquoi { background: var(--u-ink); color: #fff; border-radius: var(--u-radius); padding: clamp(32px, 5vw, 52px); position: relative; overflow: hidden; }
+.urbizen-accueil .pourquoi::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0 27px, rgba(84,207,153,.05) 27px 28px) 0 0 / 28px 28px; pointer-events: none; }
+.urbizen-accueil .pourquoi .eyebrow { color: var(--u-mint); }
+.urbizen-accueil .pourquoi .eyebrow::before { background: var(--u-mint); }
+.urbizen-accueil .pourquoi h2 { color: #fff; font-size: clamp(24px, 3.4vw, 34px); font-weight: 600; margin: 12px 0 32px; }
+.urbizen-accueil .pourquoi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px 40px; position: relative; }
+.urbizen-accueil .pq { display: flex; gap: 14px; }
+.urbizen-accueil .pq-k { font-family: var(--u-font-mono); color: var(--u-mint); font-size: 13px; padding-top: 3px; flex: none; }
+.urbizen-accueil .pq h3 { font-size: 16.5px; margin-bottom: 6px; color: #fff; }
+.urbizen-accueil .pq p { font-size: 14px; color: #C5CEDA; }
+@media (max-width: 700px) { .urbizen-accueil .pourquoi-grid { grid-template-columns: 1fr; } }
+
+/* --- Section 9 : exemples --- */
+.urbizen-accueil .exemple-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.urbizen-accueil .exemple { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 22px 20px; position: relative; }
+.urbizen-accueil .demo-flag { display: inline-block; font-family: var(--u-font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--u-ink-faint); border: 1px solid var(--u-line); border-radius: 3px; padding: 2px 7px; margin-bottom: 12px; }
+.urbizen-accueil .exemple h3 { font-size: 16px; margin-bottom: 10px; }
+.urbizen-accueil .exemple .mono { font-size: 12.5px; color: var(--u-ink-soft); display: block; }
+@media (max-width: 860px) { .urbizen-accueil .exemple-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .urbizen-accueil .exemple-grid { grid-template-columns: 1fr; } }
+
+/* --- Section 10 : avis --- */
+.urbizen-accueil .avis { background: var(--u-surface-2); border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .avis-placeholder { border: 1px dashed var(--u-line-strong); border-radius: var(--u-radius); background: var(--u-surface); padding: 34px; text-align: center; max-width: 640px; margin: 0 auto; }
+.urbizen-accueil .avis-placeholder p { color: var(--u-ink-faint); font-size: 14.5px; }
+
+/* --- Section 11 : FAQ --- */
+.urbizen-accueil .faq { max-width: 800px; margin: 0 auto; }
+.urbizen-accueil .faq details { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); margin-bottom: 10px; overflow: hidden; }
+.urbizen-accueil .faq summary { list-style: none; cursor: pointer; padding: 17px 20px; font-family: var(--u-font-title); font-weight: 500; font-size: 16px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.urbizen-accueil .faq summary::-webkit-details-marker { display: none; }
+.urbizen-accueil .faq summary::after { content: "+"; color: var(--u-brand); font-size: 22px; flex: none; transition: transform .2s; }
+.urbizen-accueil .faq details[open] summary::after { transform: rotate(45deg); }
+.urbizen-accueil .faq .a { padding: 0 20px 18px; font-size: 14.5px; color: var(--u-ink-soft); }
+
+/* --- Section 12 : CTA final --- */
+.urbizen-accueil .cta-band { text-align: center; background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); padding: clamp(36px, 6vw, 60px); box-shadow: var(--u-shadow-card); }
+.urbizen-accueil .cta-band h2 { font-size: clamp(26px, 3.6vw, 36px); font-weight: 600; margin-bottom: 12px; }
+.urbizen-accueil .cta-band p { color: var(--u-ink-soft); font-size: 16.5px; margin-bottom: 24px; }
+
+/* --- Footer --- */
+.urbizen-accueil .site-footer { border-top: 1px solid var(--u-line); background: var(--u-surface); }
+.urbizen-accueil .foot { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 32px; padding-top: 48px; padding-bottom: 32px; }
+.urbizen-accueil .foot-logo { height: 34px; margin-bottom: 14px; }
+.urbizen-accueil .foot-brand p { font-size: 13.5px; color: var(--u-ink-soft); max-width: 40ch; }
+.urbizen-accueil .site-footer h4 { font-size: 15px; margin-bottom: 14px; }
+.urbizen-accueil .site-footer ul { list-style: none; display: grid; gap: 8px; }
+.urbizen-accueil .site-footer ul a { font-size: 13.5px; color: var(--u-ink-soft); }
+.urbizen-accueil .site-footer ul a:hover { color: var(--u-brand); }
+.urbizen-accueil .foot-bottom { border-top: 1px solid var(--u-line); padding: 18px 0; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 12.5px; color: var(--u-ink-faint); }
+@media (max-width: 820px) { .urbizen-accueil .foot { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .urbizen-accueil .foot { grid-template-columns: 1fr; } }
+
+/* ============================================================
+   Affinages mobile (petits écrans / iPhone, dès 320px)
+   ============================================================ */
+@media (max-width: 420px) {
+  .urbizen-accueil :root { --u-pad: 18px; }
+  .urbizen-accueil main section { padding: 44px 0; }
+  .urbizen-accueil .hero { padding: 30px 0 26px; }
+  .urbizen-accueil .hero h1 { margin: 12px 0; }
+  .urbizen-accueil .hero-plan { padding: 14px; }
+  .urbizen-accueil .hero-reassure { gap: 10px 18px; }
+  .urbizen-accueil .hero-reassure li { font-size: 14px; }
+  .urbizen-accueil .sec-head { margin-bottom: 24px; }
+  .urbizen-accueil .sec-head h2 { font-size: clamp(22px, 6.5vw, 28px); }
+  .urbizen-accueil .nav { height: 62px; }
+  .urbizen-accueil .nav .logo img { height: 32px; width: auto; }
+  .urbizen-accueil .locate-card, .urbizen-accueil .cta-band { padding: 22px 16px; }
+  .urbizen-accueil .tarif-price { font-size: 22px; }
+  .urbizen-accueil .projet-continue { flex-direction: column; align-items: stretch; }
+  .urbizen-accueil .projet-continue .btn { width: 100%; }
+  .urbizen-accueil .hero-cta .btn, .urbizen-accueil .cta-band .btn { width: 100%; }
+  .urbizen-accueil .hero-cta { flex-direction: column; align-items: stretch; }
+}

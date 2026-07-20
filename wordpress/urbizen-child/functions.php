@@ -164,10 +164,10 @@ function urbizen_child_enqueue_styles() {
 add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_styles', 20 );
 
 /**
- * Déclare le répertoire des patterns du thème enfant.
+ * Réglages du thème enfant.
  *
- * Les patterns Urbizen (accueil, pages métier) y seront ajoutés aux étapes
- * suivantes. WordPress enregistre automatiquement le contenu de /patterns.
+ * Les patterns du répertoire /patterns sont enregistrés automatiquement par
+ * WordPress à partir de leurs en-têtes de commentaire : rien à déclarer ici.
  *
  * @return void
  */
@@ -175,3 +175,86 @@ function urbizen_child_setup() {
 	load_child_theme_textdomain( 'urbizen-child', get_stylesheet_directory() . '/languages' );
 }
 add_action( 'after_setup_theme', 'urbizen_child_setup' );
+
+/**
+ * Identifiant du gabarit de la page d'accueil Urbizen.
+ */
+const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
+
+/**
+ * La page affichée utilise-t-elle le gabarit de l'accueil Urbizen ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_accueil_urbizen() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return URBIZEN_CHILD_TEMPLATE_ACCUEIL === get_page_template_slug( $id );
+}
+
+/**
+ * Charge la charte, les polices, les styles et le script de l'accueil.
+ *
+ * Chargement strictement conditionnel : une page qui n'utilise pas le gabarit
+ * ne reçoit aucune de ces ressources. Les polices sont auto-hébergées — aucun
+ * appel à fonts.googleapis.com ni à fonts.gstatic.com.
+ *
+ * @return void
+ */
+function urbizen_child_enqueue_accueil() {
+	if ( ! urbizen_child_est_accueil_urbizen() ) {
+		return;
+	}
+
+	$dir = get_stylesheet_directory();
+	$uri = get_stylesheet_directory_uri();
+
+	$ressources = array(
+		'urbizen-fonts'    => array( '/assets/css/urbizen-fonts.css', array() ),
+		'urbizen-tokens'   => array( '/assets/css/urbizen-tokens.css', array( 'urbizen-fonts' ) ),
+		'urbizen-homepage' => array( '/assets/css/urbizen-homepage.css', array( 'urbizen-tokens', 'urbizen-child-style' ) ),
+	);
+
+	foreach ( $ressources as $handle => $definition ) {
+		list( $chemin, $deps ) = $definition;
+
+		if ( ! file_exists( $dir . $chemin ) ) {
+			continue;
+		}
+
+		wp_enqueue_style( $handle, $uri . $chemin, $deps, (string) filemtime( $dir . $chemin ) );
+	}
+
+	$script = '/assets/js/urbizen-homepage.js';
+
+	if ( file_exists( $dir . $script ) ) {
+		wp_enqueue_script( 'urbizen-homepage', $uri . $script, array(), (string) filemtime( $dir . $script ), true );
+	}
+}
+add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_accueil', 30 );
+
+/**
+ * Ajoute une classe au corps de page sur le gabarit de l'accueil.
+ *
+ * La maquette porte son quadrillage sur `<body class="u-grid-bg">`. Un gabarit
+ * de bloc ne peut pas écrire cet attribut : on l'ajoute ici.
+ *
+ * @param array<int, string> $classes Classes existantes.
+ * @return array<int, string>
+ */
+function urbizen_child_body_class( $classes ) {
+	if ( urbizen_child_est_accueil_urbizen() ) {
+		$classes[] = 'u-grid-bg';
+	}
+
+	return $classes;
+}
+add_filter( 'body_class', 'urbizen_child_body_class' );
