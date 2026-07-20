@@ -914,3 +914,132 @@ qu'on essaie en quelques secondes.
   guillemets et de tout chemin : il entre dans un en-tête HTTP.
 - Aucun lien n'est affiché ni envoyé en PR B2. La PR B3 les emploiera dans le
   courriel administrateur.
+
+---
+
+## D-026 — Une interruption brutale se rattrape hors de la requête
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-024]
+
+**Contexte.** La PR B2 démontrait le nettoyage après des erreurs **interceptées**.
+Elle ne disait rien d'une coupure de processus. Or quand PHP est tué, que le
+serveur redémarre ou que la connexion tombe pendant l'écriture, ni `catch`, ni
+`finally`, ni destructeur ne s'exécutent. Le rattrapage ne peut donc pas vivre
+dans la requête.
+
+**Décision.** Un **état durable**, relu par une requête ultérieure.
+
+Chaque demande porte `_urbizen_transaction` — identifiant aléatoire, date de
+début, état `processing` ou `committed`, staging, référence — et
+`_urbizen_status = processing` tant que la transaction n'est pas achevée.
+Aucune donnée personnelle n'y figure.
+
+**Sept conditions doivent être réunies simultanément** pour qu'une transaction
+soit jugée abandonnée : bon type de contenu, état `processing`, ancienneté
+supérieure à une heure, absence de marqueur `committed`, référence lisible,
+réservation encore `reserved`, et réservation rattachée à cette demande.
+**Toute incertitude conduit à conserver et à signaler.**
+
+L'ordre de nettoyage compte : le staging, puis les fichiers de la référence,
+puis la demande, puis la réservation. À aucun moment un fichier ne survit à la
+disparition de ce qui permet de le retrouver.
+
+**Conséquences.**
+- Le marqueur `committed` est posé **avant** l'attribution de la référence. Une
+  coupure entre les deux laisse une demande que la récupération conserve,
+  plutôt qu'une référence attribuée sans demande complète.
+- La récupération passe **avant** le ménage des réservations : elle s'appuie
+  sur la réservation `reserved` pour reconnaître une transaction abandonnée.
+- Une réservation rattachée à une demande qui existe encore n'est jamais
+  libérée par le ménage : c'est du ressort de la récupération.
+- Neuf points d'arrêt sont éprouvés, chacun en abandonnant le traitement sans
+  rollback puis en repartant comme d'une nouvelle requête.
+
+---
+
+## D-027 — La suppression est fermée par défaut
+
+**Date** : 20 juillet 2026 · **État** : actée · **Corrige** [D-024]
+
+**Contexte.** Un fichier qu'on ne parvient pas à effacer et dont on supprime
+malgré tout la demande devient un **orphelin** : une donnée personnelle que plus
+rien ne rattache à une personne, donc que plus rien ne permet d'effacer sur
+demande. C'est précisément ce qu'une politique de conservation doit rendre
+impossible.
+
+`before_delete_post` ne pouvait rien empêcher : c'est une action.
+
+**Décision.** Le blocage passe par le filtre **`pre_delete_post`**, seul capable
+de court-circuiter `wp_delete_post()`, déclaré avec ses **trois** arguments.
+
+Une API unique, `FileCleaner::delete()`, renvoie une issue explicite :
+`success`, `already_deleted`, `partial_failure`, `unsafe_path`,
+`filesystem_failure`. Un garde de réentrance évite les doubles nettoyages entre
+la rétention, la suppression manuelle et le hook métier.
+
+**Si le nettoyage échoue, la suppression n'a pas lieu.** La demande, ses
+métadonnées et sa réservation attribuée sont conservées, l'état passe à
+`delete_failed`, un code technique est consigné, et l'opération sera retentée.
+
+---
+
+## D-028 — Provenance HTTP et intégrité à la lecture
+
+**Date** : 20 juillet 2026 · **État** : actée · **Corrige** [D-022]
+
+**Contexte.** Deux fenêtres restaient ouvertes dans la PR B2.
+
+`Storage::move_uploaded()` retombait sur `rename()` lorsque
+`is_uploaded_file()` était faux. Un `tmp_name` forgé — `/etc/passwd`, un fichier
+du dépôt, une sauvegarde — pouvait donc être déplacé dans le stockage privé,
+puis servi par un lien signé.
+
+Le téléchargement, lui, appelait `filesize()` puis `fopen()` : deux ouvertures
+distinctes, sans vérifier l'empreinte. Un document remplacé entre les deux
+aurait été servi sous couvert d'un lien valide.
+
+**Décision.**
+
+**Provenance** : une abstraction `UploadedFileMover`. L'implémentation de
+production exige `is_uploaded_file()` puis `move_uploaded_file()`, **sans aucun
+repli**. L'adaptateur d'essai n'est atteignable ni par filtre, ni par option, ni
+par paramètre : `Storage::set_mover()` exige la ligne de commande ou une
+constante définie hors du dépôt.
+
+**Intégrité** : tout se fait sur **un seul descripteur** — `fstat()` pour la
+taille, le flux pour le SHA-256, `hash_equals()` pour la comparaison, puis
+rembobinage et diffusion. Refermer entre la vérification et la lecture rouvrirait
+la fenêtre qu'on cherche à fermer.
+
+Une atteinte à l'intégrité produit la **même réponse** qu'un document absent, et
+ne journalise qu'un identifiant technique et le code `file_integrity_failed`.
+
+---
+
+## D-029 — Un corps écarté par PHP n'est pas un défaut de sécurité
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Un corps de requête dépassant `post_max_size` est vidé par PHP
+**avant** que le code ne s'exécute : `$_POST` et `$_FILES` arrivent vides. La
+soumission se présentait alors comme dépourvue de nonce, et le visiteur recevait
+un refus de sécurité pour un fichier simplement trop lourd — message trompeur et
+incompréhensible.
+
+**Décision.** Une détection précoce reconnaît la signature : requête POST,
+`CONTENT_LENGTH` positif, ni champs ni fichiers, et longueur annoncée supérieure
+à la limite. Le code interne est `request_too_large`, et aucun jeton, créneau ni
+référence n'est consommé.
+
+**Configuration relevée sur l'hébergement**, en lecture seule, sans rien
+modifier : PHP 8.3.30 · `file_uploads` 1 · `upload_max_filesize` 1536M ·
+`post_max_size` 1536M · `max_file_uploads` **20** · `upload_tmp_dir` vide
+(`/tmp`) · `max_input_time` 360 · `max_execution_time` 360 · `memory_limit`
+1536M.
+
+La politique — 10 Mio par document, 25 Mio cumulés, 20 documents — est donc
+applicable. **Un point de vigilance subsiste** : `max_file_uploads` vaut
+exactement 20, soit notre plafond. PHP écarte silencieusement les fichiers
+au-delà ; un envoi de 21 documents en verrait 20 arriver, sans que rien ne
+signale la perte. Porter `max_file_uploads` à 21 permettrait de la détecter.
+La politique serveur n'est pas réduite pour autant.

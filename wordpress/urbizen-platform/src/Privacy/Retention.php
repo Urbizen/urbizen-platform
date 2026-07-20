@@ -19,6 +19,7 @@
 
 namespace Urbizen\Platform\Privacy;
 
+use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Files\Storage;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
@@ -208,13 +209,18 @@ final class Retention {
 	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return array{demandes:int,jetons:int,creneaux:int,references:int,staging:int}
+	 * @return array{demandes:int,jetons:int,creneaux:int,references:int,staging:int,abandons:int}
 	 */
 	public static function run_daily( ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
 
+		// L'ordre compte. La récupération passe **avant** le ménage des
+		// réservations : elle s'appuie sur la réservation « reserved » pour
+		// reconnaître une transaction abandonnée, et la libère elle-même. La
+		// nettoyer d'abord la priverait de son seul repère.
 		$bilan = array(
 			'demandes'   => self::purge( $now ),
+			'abandons'   => self::recover_abandoned( $now ),
 			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
 			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
 			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
@@ -223,15 +229,16 @@ final class Retention {
 			'staging'    => Storage::cleanup_staging( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(
-					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging',
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s)',
 					$bilan['jetons'],
 					$bilan['creneaux'],
 					$bilan['references'],
-					$bilan['staging']
+					$bilan['staging'],
+					$bilan['abandons']
 				)
 			);
 		}
@@ -274,6 +281,148 @@ final class Retention {
 	 */
 	public static function purgeable_statuses(): array {
 		return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED );
+	}
+
+	/**
+	 * Délai au-delà duquel une transaction reste en plan est jugée abandonnée.
+	 */
+	public const ABANDON_TTL = 3600;
+
+	/**
+	 * Récupère les transactions interrompues brutalement.
+	 *
+	 * Une exception se rattrape ; une coupure de processus, non. Ni `catch`,
+	 * ni `finally`, ni destructeur ne s'exécutent lorsque PHP est tué, que le
+	 * serveur redémarre ou que la connexion tombe pendant l'écriture. Le
+	 * rattrapage ne peut donc pas vivre dans la requête : il lui faut un état
+	 * **durable**, relu par une requête ultérieure.
+	 *
+	 * Sept conditions doivent être réunies **simultanément** pour qu'une
+	 * demande soit jugée abandonnée. Toute incertitude conduit à conserver.
+	 *
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return int Nombre de transactions récupérées.
+	 */
+	public static function recover_abandoned( ?int $now = null ): int {
+		$now    = null === $now ? time() : $now;
+		$limite = gmdate( 'Y-m-d H:i:s', $now - self::ABANDON_TTL );
+
+		$candidats = get_posts(
+			array(
+				'post_type'        => SubmissionPostType::POST_TYPE,
+				'post_status'      => 'any',
+				'posts_per_page'   => self::LOT,
+				'fields'           => 'ids',
+				'no_found_rows'    => true,
+				'suppress_filters' => true,
+				'meta_query'       => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
+					'relation' => 'AND',
+					array(
+						'key'     => '_urbizen_status',
+						'value'   => SubmissionPostType::STATUS_PROCESSING,
+						'compare' => '=',
+					),
+					array(
+						'key'     => '_urbizen_created_at_gmt',
+						'value'   => $limite,
+						'compare' => '<',
+						'type'    => 'DATETIME',
+					),
+				),
+			)
+		);
+
+		$recuperees = 0;
+
+		foreach ( $candidats as $id ) {
+			$id = (int) $id;
+
+			if ( self::recover_one( $id, $now ) ) {
+				++$recuperees;
+			}
+		}
+
+		return $recuperees;
+	}
+
+	/**
+	 * Récupère une transaction, si et seulement si toutes les conditions sont réunies.
+	 *
+	 * @param int $id  Demande.
+	 * @param int $now Horodatage courant.
+	 * @return bool
+	 */
+	private static function recover_one( int $id, int $now ): bool {
+		$post = get_post( $id );
+
+		// 1 · le bon type de contenu.
+		if ( ! $post || SubmissionPostType::POST_TYPE !== $post->post_type ) {
+			return false;
+		}
+
+		// 2 · état interne « processing ».
+		if ( SubmissionPostType::STATUS_PROCESSING !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
+			return false;
+		}
+
+		// 3 · ancienneté suffisante.
+		$creee = (string) get_post_meta( $id, '_urbizen_created_at_gmt', true );
+
+		if ( '' === $creee || strtotime( $creee . ' UTC' ) > $now - self::ABANDON_TTL ) {
+			return false;
+		}
+
+		// 4 · aucun marqueur de validation.
+		$transaction = SubmissionRepository::transaction( $id );
+
+		if ( 'committed' === ( $transaction['state'] ?? '' ) ) {
+			Logger::error( sprintf( 'transaction #%d : marquée committed mais restée processing — conservée', $id ) );
+
+			return false;
+		}
+
+		$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
+
+		if ( ! Storage::is_reference( $reference ) ) {
+			Logger::error( sprintf( 'transaction #%d : référence illisible — conservée', $id ) );
+
+			return false;
+		}
+
+		// 5 et 6 · la réservation doit être encore « reserved » et pointer sur
+		// cette demande. Une référence attribuée signale une demande valide :
+		// on ne touche à rien.
+		$reservation = get_option( SubmissionRepository::RESERVATION_PREFIX . $reference, null );
+
+		if ( ! is_array( $reservation ) || 'reserved' !== ( $reservation['state'] ?? '' ) ) {
+			Logger::error( sprintf( 'transaction #%d : réservation non « reserved » — conservée', $id ) );
+
+			return false;
+		}
+
+		$rattachee = (int) ( $reservation['post'] ?? 0 );
+
+		if ( 0 !== $rattachee && $rattachee !== $id ) {
+			Logger::error( sprintf( 'transaction #%d : réservation rattachée à une autre demande — conservée', $id ) );
+
+			return false;
+		}
+
+		// Ordre sûr : staging, puis fichiers finaux de cette référence, puis la
+		// demande, puis la réservation. À aucun moment un fichier ne survit à
+		// la disparition de ce qui permet de le retrouver.
+		if ( isset( $transaction['staging'] ) && is_string( $transaction['staging'] ) ) {
+			Storage::discard_staging( $transaction['staging'] );
+		}
+
+		Storage::delete_reference_dir( $reference );
+
+		wp_delete_post( $id, true );
+		SubmissionRepository::release_reference( $reference );
+
+		Logger::info( sprintf( 'transaction abandonnée récupérée : #%d (%s)', $id, $reference ) );
+
+		return true;
 	}
 
 	/**
@@ -325,8 +474,21 @@ final class Retention {
 
 			$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
 
-			// Les fichiers rattachés s'effacent ici, avant que la demande ne
-			// disparaisse : après, plus rien ne permettrait de les retrouver.
+			// Les fichiers rattachés s'effacent d'abord : après la suppression
+			// de la demande, plus rien ne permettrait de les retrouver.
+			$nettoyage = FileCleaner::delete( $id, $reference );
+
+			if ( ! in_array( $nettoyage['code'], FileCleaner::OK, true ) ) {
+				// Fermé par défaut : la demande est conservée et sera retentée
+				// au passage suivant. Un document qu'on n'a pas su effacer ne
+				// doit jamais devenir orphelin.
+				update_post_meta( $id, '_urbizen_files_status', 'delete_failed' );
+				Logger::error( sprintf( 'rétention : suppression différée pour #%d (%s)', $id, $nettoyage['code'] ) );
+
+				continue;
+			}
+
+			// Le hook reste offert aux tiers, la demande existant encore.
 			do_action( self::BEFORE_DELETE, $id, $reference );
 
 			wp_delete_post( $id, true );

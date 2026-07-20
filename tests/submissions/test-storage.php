@@ -54,8 +54,10 @@ check( 'lecture et modification réservées à manage_options',
 	&& 'manage_options' === ( $caps['delete_post'] ?? '' ) );
 check( 'personne ne crée une demande à la main', 'do_not_allow' === ( $caps['create_posts'] ?? '' ) );
 check( 'personne ne publie une demande', 'do_not_allow' === ( $caps['publish_posts'] ?? '' ) );
-check( 'les trois états métier sont déclarés',
-	array( 'received', 'converted', 'closed' ) === SubmissionPostType::statuses() );
+// « processing » s'ajoute : c'est l'état durable d'une transaction en cours,
+// que la récupération reconnaît après une interruption brutale.
+check( 'les quatre états métier sont déclarés',
+	array( 'processing', 'received', 'converted', 'closed' ) === SubmissionPostType::statuses() );
 
 // ==================================================== REPOSITORY ============
 wpd_reset();

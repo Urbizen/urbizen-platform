@@ -135,9 +135,33 @@ foreach ( $sources as $chemin => $contenu ) {
 }
 
 check( 'aucun document ne passe par la médiathèque WordPress', array() === $mediatheque );
-check( 'le déplacement passe par move_uploaded_file, dans Storage seulement',
-	1 === count( array_filter( array_keys( $sources ), static fn( $c ) => str_contains( $sources[ $c ], 'move_uploaded_file' ) ) )
-	&& str_contains( $sources['src/Files/Storage.php'], 'move_uploaded_file' ) );
+// `move_uploaded_file()` n'est appelé qu'à un seul endroit : l'adaptateur de
+// production. Storage délègue, et ne connaît plus aucun repli.
+// `move_uploaded_file()` n'est **appelé** qu'à un seul endroit. Le contrat
+// l'évoque en commentaire, ce qui est légitime : on compare donc le code, pas
+// la documentation.
+$appelants = array();
+
+foreach ( $sources as $chemin => $contenu ) {
+	$code = implode(
+		'',
+		array_map(
+			static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+			token_get_all( $contenu )
+		)
+	);
+
+	if ( str_contains( $code, 'move_uploaded_file(' ) ) {
+		$appelants[] = $chemin;
+	}
+}
+
+check( 'move_uploaded_file n’est appelé que dans l’adaptateur de production',
+	array( 'src/Files/HttpUploadedFileMover.php' ) === $appelants );
+check( 'Storage ne déplace plus rien lui-même',
+	! preg_match( '/@rename\( \$source/', $sources['src/Files/Storage.php'] ) );
+check( 'la provenance HTTP est exigée dans l’adaptateur',
+	str_contains( $sources['src/Files/HttpUploadedFileMover.php'], 'is_uploaded_file(' ) );
 
 // ------------------------------------------------ aucune table SQL ----------
 $sql = array();

@@ -10,7 +10,12 @@
  * détruits à la fin du processus.
  */
 
-$GLOBALS['fx_temp'] = array();
+require_once __DIR__ . '/test-mover.php';
+
+$GLOBALS['fx_temp']  = array();
+$GLOBALS['fx_mover'] = new FixtureFileMover();
+
+\Urbizen\Platform\Files\Storage::set_mover( $GLOBALS['fx_mover'] );
 
 register_shutdown_function(
 	static function () {
@@ -27,6 +32,23 @@ register_shutdown_function(
  * @return string Chemin.
  */
 function fx_write( string $contenu ): string {
+	$chemin = tempnam( sys_get_temp_dir(), 'urbfx' );
+	file_put_contents( $chemin, $contenu );
+	$GLOBALS['fx_temp'][] = $chemin;
+
+	return $GLOBALS['fx_mover']->autoriser( $chemin );
+}
+
+/**
+ * Écrit un fichier temporaire **sans** le déclarer comme téléversé.
+ *
+ * Sert à éprouver le refus des chemins forgés : ce fichier existe, mais aucun
+ * upload HTTP ne l'a produit.
+ *
+ * @param string $contenu Contenu.
+ * @return string
+ */
+function fx_write_brut( string $contenu ): string {
 	$chemin = tempnam( sys_get_temp_dir(), 'urbfx' );
 	file_put_contents( $chemin, $contenu );
 	$GLOBALS['fx_temp'][] = $chemin;
@@ -116,7 +138,7 @@ function fx_copie( string $source ): string {
 	copy( $source, $copie );
 	$GLOBALS['fx_temp'][] = $copie;
 
-	return $copie;
+	return $GLOBALS['fx_mover']->autoriser( $copie );
 }
 
 /**

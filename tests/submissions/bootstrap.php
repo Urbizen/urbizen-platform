@@ -30,6 +30,9 @@ foreach (
 		'src/Privacy/Retention.php',
 		'src/Admin/SubmissionsAdmin.php',
 		'src/Http/SubmissionResult.php',
+		'src/Support/PhpLimits.php',
+		'src/Files/UploadedFileMover.php',
+		'src/Files/HttpUploadedFileMover.php',
 		'src/Files/UploadPolicy.php',
 		'src/Files/UploadNormalizer.php',
 		'src/Files/Storage.php',
@@ -48,6 +51,7 @@ foreach (
  * La doublure fixe ABSPATH au répertoire des bancs ; un répertoire du dossier
  * temporaire du système est donc bien à l'extérieur, comme en production.
  */
+define( 'URBIZEN_TESTING', true );
 define( 'URBIZEN_TEST_STORAGE', sys_get_temp_dir() . '/urbizen-b2-' . getmypid() );
 
 add_filter( 'urbizen_private_storage_dir', static fn() => URBIZEN_TEST_STORAGE );

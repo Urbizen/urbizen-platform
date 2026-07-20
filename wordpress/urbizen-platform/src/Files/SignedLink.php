@@ -92,19 +92,40 @@ final class SignedLink {
 	public static function verify( array $params, ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
 
-		$version    = isset( $params['v'] ) ? (int) $params['v'] : 0;
-		$submission = isset( $params['submission'] ) ? (int) $params['submission'] : 0;
-		$file       = isset( $params['file'] ) && is_string( $params['file'] ) ? $params['file'] : '';
-		$expires    = isset( $params['expires'] ) ? (int) $params['expires'] : 0;
-		$signature  = isset( $params['signature'] ) && is_string( $params['signature'] ) ? $params['signature'] : '';
+		// Aucune coercition PHP ne doit intervenir dans la chaîne signée : un
+		// tableau, un flottant ou une notation scientifique se convertiraient
+		// en un entier qui ne correspondrait plus à ce qui a été signé. On
+		// exige donc des formes strictement canoniques, avant tout calcul.
+		foreach ( array( 'v', 'submission', 'file', 'expires', 'signature' ) as $cle ) {
+			if ( ! isset( $params[ $cle ] ) || ! is_scalar( $params[ $cle ] ) ) {
+				return self::refus();
+			}
+		}
 
-		if ( self::SCHEMA !== $version || $submission <= 0 || '' === $signature ) {
+		$version    = (string) $params['v'];
+		$submission = (string) $params['submission'];
+		$file       = (string) $params['file'];
+		$expires    = (string) $params['expires'];
+		$signature  = (string) $params['signature'];
+
+		// Entiers décimaux, sans signe, sans zéro initial superflu, bornés.
+		if ( 1 !== preg_match( '/^[1-9]\d{0,9}$/', $submission )
+			|| 1 !== preg_match( '/^[1-9]\d{0,11}$/', $expires )
+			|| (string) self::SCHEMA !== $version ) {
 			return self::refus();
 		}
 
 		if ( 1 !== preg_match( '/^[0-9a-f]{32}$/', $file ) ) {
 			return self::refus();
 		}
+
+		// Longueur exacte d'un HMAC-SHA256 en hexadécimal.
+		if ( 1 !== preg_match( '/^[0-9a-f]{64}$/', $signature ) ) {
+			return self::refus();
+		}
+
+		$submission = (int) $submission;
+		$expires    = (int) $expires;
 
 		// Comparaison à temps constant : une comparaison naïve laisse fuir la
 		// signature attendue, octet par octet, par mesure du temps de réponse.

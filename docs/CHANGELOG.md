@@ -31,9 +31,10 @@ Validation et stockage privé des documents joints à une demande.
 - `src/Http/FileDownloadController.php` : diffusion par flux, en-têtes de
   sécurité, réponse générique identique pour toute défaillance.
 - `tests/submissions/test-documents.php` (130 contrôles),
-  `test-transaction.php` (141), `fixtures.php` : fichiers d'essai portant de
-  **véritables signatures de format**, pour que `finfo` réagisse comme en
-  production.
+  `test-transaction.php` (144), `test-interruption.php` (66), `fixtures.php` :
+  fichiers d'essai portant de **véritables signatures de format**, pour que
+  `finfo` réagisse comme en production. **1 045 contrôles**, dont **211
+  mutations**.
 
 ### Modifié
 - `SubmissionController` : le refus provisoire `files_not_supported_yet` cède
@@ -50,6 +51,26 @@ Validation et stockage privé des documents joints à une demande.
 ### États des documents
 `none` sans document · `pending` pendant le traitement · `stored` une fois en
 place · `deleted` après effacement.
+
+### Robustesse (revue de la PR #19)
+- **Récupération après interruption brutale** : état durable
+  `_urbizen_transaction`, état interne `processing`, et un récupérateur
+  quotidien exigeant **sept conditions simultanées**. Neuf points d'arrêt sont
+  éprouvés en abandonnant le traitement sans rollback (D-026).
+- **Suppression fermée par défaut** : le filtre `pre_delete_post`, seul capable
+  de court-circuiter `wp_delete_post()`, remplace `before_delete_post`. Si un
+  fichier résiste, la demande est conservée et l'état passe à `delete_failed`
+  (D-027).
+- **Provenance HTTP obligatoire** : `UploadedFileMover` exige
+  `is_uploaded_file()` puis `move_uploaded_file()`, sans aucun repli sur
+  `rename()`. Un `tmp_name` forgé est refusé (D-028).
+- **Intégrité au téléchargement** : taille et SHA-256 vérifiés sur **un seul
+  descripteur**, avant tout octet diffusé (D-028).
+- **Corps écarté par PHP** : détection précoce, code `request_too_large` au lieu
+  d'un trompeur `invalid_nonce` (D-029).
+- **Paramètres signés durcis** : formes strictement canoniques exigées avant
+  tout calcul — aucune coercition PHP dans la chaîne signée.
+- `src/Support/PhpLimits.php` : lecture et interprétation des limites du serveur.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.

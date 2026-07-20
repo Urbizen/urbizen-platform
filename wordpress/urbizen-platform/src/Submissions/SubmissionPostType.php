@@ -42,6 +42,7 @@ final class SubmissionPostType {
 	/**
 	 * États métier d'une demande.
 	 */
+	public const STATUS_PROCESSING = 'processing';
 	public const STATUS_RECEIVED  = 'received';
 	public const STATUS_CONVERTED = 'converted';
 	public const STATUS_CLOSED    = 'closed';
@@ -140,6 +141,6 @@ final class SubmissionPostType {
 	 * @return array<int, string>
 	 */
 	public static function statuses(): array {
-		return array( self::STATUS_RECEIVED, self::STATUS_CONVERTED, self::STATUS_CLOSED );
+		return array( self::STATUS_PROCESSING, self::STATUS_RECEIVED, self::STATUS_CONVERTED, self::STATUS_CLOSED );
 	}
 }

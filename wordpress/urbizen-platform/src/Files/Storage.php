@@ -68,6 +68,50 @@ final class Storage {
 	private static ?string $racine = null;
 
 	/**
+	 * Stratégie de déplacement des fichiers reçus.
+	 *
+	 * @var UploadedFileMover|null
+	 */
+	private static ?UploadedFileMover $mover = null;
+
+	/**
+	 * Stratégie de déplacement en vigueur.
+	 *
+	 * @return UploadedFileMover
+	 */
+	public static function mover(): UploadedFileMover {
+		if ( null === self::$mover ) {
+			self::$mover = new HttpUploadedFileMover();
+		}
+
+		return self::$mover;
+	}
+
+	/**
+	 * Remplace la stratégie de déplacement.
+	 *
+	 * **Réservé aux bancs d'essai.** Aucun filtre, aucune option et aucun
+	 * paramètre de requête ne mène ici : le remplacement n'est possible qu'en
+	 * ligne de commande, ou sous une constante définie hors du dépôt. Une
+	 * requête HTTP ordinaire ne peut donc pas désactiver le contrôle de
+	 * provenance.
+	 *
+	 * @param UploadedFileMover|null $mover Stratégie, ou null pour rétablir celle de production.
+	 * @return bool Vrai si le remplacement a été accepté.
+	 */
+	public static function set_mover( ?UploadedFileMover $mover ): bool {
+		if ( 'cli' !== PHP_SAPI && ! defined( 'URBIZEN_TESTING' ) ) {
+			Logger::error( 'tentative de remplacement du déplacement de fichiers hors ligne de commande' );
+
+			return false;
+		}
+
+		self::$mover = $mover;
+
+		return true;
+	}
+
+	/**
 	 * Racine privée, créée si nécessaire.
 	 *
 	 * Renvoie null si aucun emplacement sûr n'est disponible — auquel cas
@@ -380,6 +424,41 @@ final class Storage {
 	}
 
 	/**
+	 * Supprime le répertoire complet d'une référence.
+	 *
+	 * Réservé à la récupération d'une transaction abandonnée : la référence
+	 * doit être encore `reserved`, jamais attribuée. Bornée au sous-répertoire
+	 * des demandes finalisées.
+	 *
+	 * @param string $reference Référence.
+	 * @return bool
+	 */
+	public static function delete_reference_dir( string $reference ): bool {
+		$racine = self::root();
+
+		if ( null === $racine || ! self::is_reference( $reference ) ) {
+			return false;
+		}
+
+		$base = $racine . '/' . self::DIR_FINAL;
+
+		return self::rmtree( $base . '/' . $reference, $base );
+	}
+
+	/**
+	 * Un répertoire existe-t-il pour cette référence ?
+	 *
+	 * @param string $reference Référence.
+	 * @return bool
+	 */
+	public static function has_reference_dir( string $reference ): bool {
+		$racine = self::root();
+
+		return null !== $racine && self::is_reference( $reference )
+			&& is_dir( $racine . '/' . self::DIR_FINAL . '/' . $reference );
+	}
+
+	/**
 	 * Supprime les stagings abandonnés.
 	 *
 	 * Ne touche **que** le répertoire de staging. Un document final n'est
@@ -504,20 +583,16 @@ final class Storage {
 	/**
 	 * Déplace un fichier téléversé.
 	 *
-	 * `move_uploaded_file()` refuse tout chemin qui n'a pas été téléversé par
-	 * PHP — protection que l'on veut conserver en production. Hors contexte
-	 * HTTP, on retombe sur un déplacement ordinaire.
+	 * Aucun repli sur `rename()` : un `tmp_name` forgé — `/etc/passwd`, un
+	 * fichier du dépôt, une sauvegarde — doit **échouer**, pas être traité
+	 * autrement. C'est la stratégie injectée qui atteste de la provenance.
 	 *
 	 * @param string $source Chemin temporaire.
 	 * @param string $cible  Destination.
 	 * @return bool
 	 */
 	private static function move_uploaded( string $source, string $cible ): bool {
-		$ok = is_uploaded_file( $source )
-			? @move_uploaded_file( $source, $cible )
-			: @rename( $source, $cible );
-
-		if ( ! $ok ) {
+		if ( ! self::mover()->move( $source, $cible ) ) {
 			return false;
 		}
 

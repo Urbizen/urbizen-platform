@@ -65,6 +65,7 @@ final class SubmissionRepository {
 	 */
 	public const REQUIRED_META = array(
 		'_urbizen_files',
+		'_urbizen_transaction',
 		'_urbizen_reference',
 		'_urbizen_form_type',
 		'_urbizen_schema_version',
@@ -130,11 +131,26 @@ final class SubmissionRepository {
 
 		$id = (int) $id;
 
+		// La réservation apprend à quelle demande elle appartient. C'est ce qui
+		// permettra au nettoyage de ne pas la libérer sous les pieds d'une
+		// transaction encore en cours, et à la récupération de vérifier qu'elle
+		// traite bien la bonne.
+		update_option(
+			self::RESERVATION_PREFIX . $reference,
+			array( 'state' => 'reserved', 'at' => $now, 'post' => $id ),
+			false
+		);
+
 		$meta = array(
 			'_urbizen_reference'           => $reference,
 			'_urbizen_form_type'           => $form_type,
 			'_urbizen_schema_version'      => self::SCHEMA_VERSION,
-			'_urbizen_status'              => SubmissionPostType::STATUS_RECEIVED,
+			// Tant que la transaction n'est pas achevée, la demande porte
+			// « processing » : c'est ce qui permettra à une requête ultérieure
+			// de la reconnaître si le processus est tué en cours de route.
+			'_urbizen_status'              => $finaliser
+				? SubmissionPostType::STATUS_RECEIVED
+				: SubmissionPostType::STATUS_PROCESSING,
 			'_urbizen_created_at_gmt'      => $horodatage,
 			'_urbizen_last_contact_at_gmt' => $horodatage,
 			'_urbizen_payload'             => (string) wp_json_encode( $clean ),
@@ -146,6 +162,17 @@ final class SubmissionRepository {
 			// le traitement d'un lot, puis `stored` à la finalisation.
 			'_urbizen_files_status'        => isset( $context['files_status'] ) ? (string) $context['files_status'] : 'none',
 			'_urbizen_files'               => wp_json_encode( array() ),
+			// État durable de la transaction. Aucun élément personnel : un
+			// identifiant aléatoire, une date, un état et un chemin technique.
+			'_urbizen_transaction'         => (string) wp_json_encode(
+				array(
+					'id'         => isset( $context['transaction'] ) ? (string) $context['transaction'] : '',
+					'started_at' => $horodatage,
+					'state'      => $finaliser ? 'committed' : 'processing',
+					'staging'    => isset( $context['staging'] ) ? (string) $context['staging'] : '',
+					'reference'  => $reference,
+				)
+			),
 		);
 
 		foreach ( $meta as $cle => $valeur ) {
@@ -197,6 +224,21 @@ final class SubmissionRepository {
 	 */
 	public static function finalize( int $id, string $reference, string $files_status, int $now ): bool {
 		if ( ! update_post_meta( $id, '_urbizen_files_status', $files_status ) ) {
+			return false;
+		}
+
+		// L'ordre compte : la transaction est marquée validée AVANT que la
+		// référence ne soit attribuée. Une coupure entre les deux laisse une
+		// demande « committed » que la récupération conserve, plutôt qu'une
+		// référence attribuée sans demande complète.
+		$transaction          = self::transaction( $id );
+		$transaction['state'] = 'committed';
+
+		if ( ! update_post_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $transaction ) ) ) {
+			return false;
+		}
+
+		if ( ! update_post_meta( $id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED ) ) {
 			return false;
 		}
 
@@ -424,6 +466,15 @@ final class SubmissionRepository {
 				continue;
 			}
 
+			// Une réservation rattachée à une demande qui existe encore n'est
+			// pas orpheline : c'est une transaction en cours ou interrompue, du
+			// ressort de la récupération, pas du ménage.
+			$rattachee = (int) ( $valeur['post'] ?? 0 );
+
+			if ( $rattachee > 0 && null !== get_post( $rattachee ) ) {
+				continue;
+			}
+
 			if ( $now - (int) ( $valeur['at'] ?? 0 ) >= self::RESERVATION_TTL ) {
 				delete_option( $cle );
 				++$liberees;
@@ -485,9 +536,22 @@ final class SubmissionRepository {
 			'mail_status'     => (string) get_post_meta( $id, '_urbizen_mail_status', true ),
 			'files_status'    => (string) get_post_meta( $id, '_urbizen_files_status', true ),
 			'files'           => self::decode_files( $id ),
+			'transaction'     => self::transaction( $id ),
 			'payload'         => is_array( $payload ) ? $payload : array(),
 			'pricing'         => is_array( $pricing ) ? $pricing : array(),
 		);
+	}
+
+	/**
+	 * État durable de la transaction d'une demande.
+	 *
+	 * @param int $id Demande.
+	 * @return array<string, mixed>
+	 */
+	public static function transaction( int $id ): array {
+		$brut = json_decode( (string) get_post_meta( $id, '_urbizen_transaction', true ), true );
+
+		return is_array( $brut ) ? $brut : array();
 	}
 
 	/**

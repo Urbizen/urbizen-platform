@@ -50,6 +50,9 @@ final class SubmissionResult {
 	public const STORAGE_UNAVAILABLE        = 'storage_unavailable';
 	public const STORAGE_FAILED             = 'storage_failed';
 	public const FILE_METADATA_FAILED       = 'file_metadata_failed';
+	public const FILE_INTEGRITY_FAILED      = 'file_integrity_failed';
+	public const REQUEST_TOO_LARGE          = 'request_too_large';
+	public const SERVER_UPLOAD_LIMIT        = 'server_upload_limit_exceeded';
 	public const INVALID_FORM            = 'invalid_form';
 	public const VALIDATION_FAILED       = 'validation_failed';
 	public const PRICING_FAILED          = 'pricing_failed';
@@ -86,6 +89,9 @@ final class SubmissionResult {
 		self::STORAGE_UNAVAILABLE,
 		self::STORAGE_FAILED,
 		self::FILE_METADATA_FAILED,
+		self::FILE_INTEGRITY_FAILED,
+		self::REQUEST_TOO_LARGE,
+		self::SERVER_UPLOAD_LIMIT,
 		self::INVALID_FORM,
 		self::VALIDATION_FAILED,
 		self::PRICING_FAILED,

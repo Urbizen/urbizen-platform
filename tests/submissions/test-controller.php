@@ -18,28 +18,6 @@ use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 /**
- * Crée un PDF minimal valide dans le répertoire temporaire.
- *
- * @return string
- */
-function fichier_pdf(): string {
-	$c = tempnam( sys_get_temp_dir(), 'urb' );
-	file_put_contents( $c, "%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n" );
-	return $c;
-}
-
-/**
- * Crée un SVG, format volontairement refusé.
- *
- * @return string
- */
-function fichier_svg(): string {
-	$c = tempnam( sys_get_temp_dir(), 'urb' );
-	file_put_contents( $c, '<svg xmlns="http://www.w3.org/2000/svg"><text>x</text></svg>' );
-	return $c;
-}
-
-/**
  * Repart d'un état propre.
  */
 function neuf(): void {
@@ -136,7 +114,7 @@ check( 'cinq demandes en base, pas six', 5 === count( $GLOBALS['wpd_posts'] ) );
 // délègue correctement et respecte les invariants de B1.
 neuf();
 
-$pdf = fichier_pdf();
+$pdf = fx_copie( fx_pdf() );
 
 $avec_fichier = array(
 	'croquis_plans' => array(
@@ -173,7 +151,7 @@ check( 'sans document, files_status vaut none', 'none' === get_post_meta( $r->id
 
 // Un document refusé ne doit consommer ni jeton, ni créneau, ni référence.
 neuf();
-$svg = fichier_svg();
+$svg = fx_copie( fx_svg() );
 $r   = traiter(
 	soumission(),
 	array(
@@ -389,7 +367,9 @@ check( 'le refus ne contient aucune donnée personnelle', ! str_contains( $log, 
 // ================================================== RÉSULTAT STRUCTURÉ ======
 // Treize codes de B1 (files_not_supported_yet a disparu) plus quatorze codes
 // de documents introduits par B2.
-check( 'les vingt-sept codes internes sont déclarés', 27 === count( SubmissionResult::CODES ) );
+// Vingt-sept codes de B2, plus trois ajoutés par le correctif : intégrité au
+// téléchargement et deux refus liés aux limites du serveur.
+check( 'les trente codes internes sont déclarés', 30 === count( SubmissionResult::CODES ) );
 check( 'le code provisoire de B1 a disparu', ! in_array( 'files_not_supported_yet', SubmissionResult::CODES, true ) );
 check( 'aucun code en double', count( SubmissionResult::CODES ) === count( array_unique( SubmissionResult::CODES ) ) );
 check( 'un échec ne porte ni référence ni identifiant', '' === $echec->reference() && 0 === $echec->id() );

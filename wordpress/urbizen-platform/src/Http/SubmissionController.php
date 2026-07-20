@@ -31,6 +31,7 @@ use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
+use Urbizen\Platform\Support\PhpLimits;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -149,6 +150,17 @@ final class SubmissionController {
 
 		if ( 'POST' !== $methode ) {
 			return SubmissionResult::failure( SubmissionResult::INVALID_METHOD );
+		}
+
+		// --- 1 bis · corps écarté par PHP ---
+		// Un corps dépassant `post_max_size` est vidé par PHP avant que ce code
+		// ne s'exécute. Sans ce contrôle, la requête se présenterait comme
+		// dépourvue de nonce, et le visiteur recevrait un refus de sécurité
+		// pour un fichier simplement trop lourd.
+		if ( PhpLimits::body_rejected( $post, $files, $server ) ) {
+			Logger::info( 'soumission conception refusée : request_too_large' );
+
+			return SubmissionResult::failure( SubmissionResult::REQUEST_TOO_LARGE );
 		}
 
 		// --- 2 · nonce ---
@@ -313,6 +325,10 @@ final class SubmissionController {
 				'now'          => $now,
 				'files_status' => array() === $lot ? 'none' : 'pending',
 				'finalize'     => false,
+				// État durable : si le processus est tué après ce point, une
+				// requête ultérieure saura retrouver ce qu'il faut nettoyer.
+				'transaction'  => Storage::random_id(),
+				'staging'      => null === $staging ? '' : $staging,
 			)
 		);
 

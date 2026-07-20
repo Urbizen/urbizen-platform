@@ -68,7 +68,16 @@ final class FileDownloadController {
 			self::introuvable();
 		}
 
-		self::stream( $document );
+		// Un seul descripteur, ouvert ici, vérifié puis diffusé. Vérifier un
+		// chemin, refermer, puis rouvrir pour lire rouvrirait une fenêtre de
+		// substitution entre les deux.
+		$flux = self::open_verified( $document );
+
+		if ( null === $flux ) {
+			self::introuvable();
+		}
+
+		self::stream( $document, $flux );
 	}
 
 	/**
@@ -121,13 +130,82 @@ final class FileDownloadController {
 	}
 
 	/**
-	 * Diffuse un document.
+	 * Ouvre un document et vérifie son intégrité sur le même descripteur.
+	 *
+	 * Le SHA-256 et la taille enregistrés ne sont pas de simples souvenirs :
+	 * ils attestent que le fichier diffusé est bien celui qui a été reçu et
+	 * contrôlé. Un document remplacé sur le disque après coup — par une
+	 * restauration malheureuse, un accès concurrent ou une compromission — ne
+	 * doit pas être servi sous couvert d'un lien valide.
+	 *
+	 * Tout se fait sur **un seul descripteur** : `fstat()` pour la taille, le
+	 * flux pour l'empreinte, puis rembobinage et diffusion. Refermer entre la
+	 * vérification et la lecture rouvrirait la fenêtre qu'on cherche à fermer.
 	 *
 	 * @param array<string, mixed> $document Document localisé.
+	 * @return resource|null Descripteur positionné au début, ou null.
+	 */
+	public static function open_verified( array $document ) {
+		$flux = @fopen( $document['path'], 'rb' );
+
+		if ( false === $flux ) {
+			return null;
+		}
+
+		$stat   = fstat( $flux );
+		$taille = is_array( $stat ) && isset( $stat['size'] ) ? (int) $stat['size'] : -1;
+
+		if ( $taille !== (int) ( $document['size'] ?? -2 ) ) {
+			fclose( $flux );
+			self::corruption( $document, 'taille' );
+
+			return null;
+		}
+
+		$contexte = hash_init( 'sha256' );
+		hash_update_stream( $contexte, $flux );
+		$empreinte = hash_final( $contexte );
+
+		if ( ! hash_equals( (string) ( $document['sha256'] ?? '' ), $empreinte ) ) {
+			fclose( $flux );
+			self::corruption( $document, 'empreinte' );
+
+			return null;
+		}
+
+		rewind( $flux );
+
+		return $flux;
+	}
+
+	/**
+	 * Consigne une atteinte à l'intégrité.
+	 *
+	 * Ni chemin, ni nom d'origine : un identifiant technique et un code.
+	 *
+	 * @param array<string, mixed> $document Document.
+	 * @param string               $motif    Champ fautif.
 	 * @return void
 	 */
-	private static function stream( array $document ): void {
-		$taille = (int) filesize( $document['path'] );
+	private static function corruption( array $document, string $motif ): void {
+		Logger::error(
+			sprintf(
+				'file_integrity_failed : document %s (%s)',
+				substr( (string) ( $document['id'] ?? '' ), 0, 8 ),
+				$motif
+			)
+		);
+	}
+
+	/**
+	 * Diffuse un document déjà vérifié.
+	 *
+	 * @param array<string, mixed> $document Document localisé.
+	 * @param resource             $flux     Descripteur vérifié, positionné au début.
+	 * @return void
+	 */
+	private static function stream( array $document, $flux ): void {
+		$taille = (int) $document['size'];
 
 		nocache_headers();
 
@@ -146,12 +224,6 @@ final class FileDownloadController {
 
 		while ( ob_get_level() > 0 ) {
 			ob_end_clean();
-		}
-
-		$flux = fopen( $document['path'], 'rb' );
-
-		if ( false === $flux ) {
-			self::introuvable();
 		}
 
 		while ( ! feof( $flux ) ) {

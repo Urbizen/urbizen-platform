@@ -337,23 +337,34 @@ check( 'la référence n’est pas réattribuée', SubmissionRepository::next_re
 // --- suppression manuelle dans l'administration ---
 neuf();
 FileCleaner::register();
+FileCleaner::reset();
 $r = traiter( soumission(), fx_files( 'photos', array( array( 'photo.jpg', fx_copie( fx_jpeg() ) ) ) ) );
 
 check( 'un document existe', 1 === fx_compte_fichiers() );
-do_action( 'before_delete_post', $r->id() );
+
+$verdict = apply_filters( 'pre_delete_post', null, get_post( $r->id() ), true );
+
 check( 'une suppression manuelle efface aussi le document', 0 === fx_compte_fichiers() );
+check( 'la suppression n’est pas bloquée', false !== $verdict );
 check( 'files_status passe à deleted', 'deleted' === get_post_meta( $r->id(), '_urbizen_files_status', true ) );
 
 // --- idempotence ---
-check( 'une seconde purge ne fait rien', 0 === FileCleaner::purge( $r->id(), $r->reference() ) );
-check( 'une purge sur une demande inexistante ne casse rien', 0 === FileCleaner::purge( 999999, 'URB-2026-0001' ) );
-check( 'une purge avec une référence mal formée ne casse rien', 0 === FileCleaner::purge( $r->id(), '../etc' ) );
+check( 'une seconde suppression signale already_deleted', 'already_deleted' === FileCleaner::delete( $r->id(), $r->reference() )['code'] );
+check( 'une demande inexistante ne casse rien', 'already_deleted' === FileCleaner::delete( 999999, 'URB-2026-0001' )['code'] );
+check( 'un identifiant nul est refusé', 'unsafe_path' === FileCleaner::delete( 0, 'URB-2026-0001' )['code'] );
 
 // --- une demande sans document ---
 neuf();
 FileCleaner::register();
 $sans = traiter( soumission() );
-check( 'une demande sans document se purge sans erreur', 0 === FileCleaner::purge( $sans->id(), $sans->reference() ) );
+check( 'une demande sans document se supprime sans erreur', 'already_deleted' === FileCleaner::delete( $sans->id(), $sans->reference() )['code'] );
+
+// --- une référence mal formée est refusée ---
+neuf();
+FileCleaner::register();
+$r = traiter( soumission(), fx_files( 'photos', array( array( 'photo.jpg', fx_copie( fx_jpeg() ) ) ) ) );
+check( 'une référence mal formée est refusée', 'unsafe_path' === FileCleaner::delete( $r->id(), '../etc' )['code'] );
+check( 'et le document est conservé', 1 === fx_compte_fichiers() );
 
 // --- le hook transmet bien deux arguments ---
 neuf();
