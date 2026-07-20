@@ -37,6 +37,36 @@ function maquette( array $lignes, $debut, $fin ) {
 	return implode( "\n", array_slice( $lignes, $debut - 1, $fin - $debut + 1 ) );
 }
 
+/**
+ * Repère le bloc délimité par deux balises, et renvoie ses bornes 1-indexées.
+ *
+ * Les numéros de ligne ne sont jamais codés en dur : la maquette évolue, et un
+ * simple décalage ferait échouer la comparaison pour une mauvaise raison.
+ *
+ * @param array<int, string> $lignes Lignes de la maquette.
+ * @param string             $ouvre  Balise ouvrante, comparée sur la ligne nue.
+ * @param string             $ferme  Balise fermante.
+ * @return array{0: int, 1: int} Bornes, ou [0, 0] si le bloc est introuvable.
+ */
+function bornes( array $lignes, $ouvre, $ferme ) {
+	$debut = 0;
+	$fin   = 0;
+
+	foreach ( $lignes as $i => $ligne ) {
+		$nu = trim( $ligne );
+
+		if ( 0 === $debut && $ouvre === $nu ) {
+			$debut = $i + 1;
+		}
+
+		if ( $debut > 0 && 0 === $fin && $ferme === $nu ) {
+			$fin = $i + 1;
+		}
+	}
+
+	return array( $debut, $fin );
+}
+
 /** Rend un pattern et retire l'enrobage de bloc. */
 function rendre_pattern( $fichier ) {
 	ob_start();
@@ -59,7 +89,9 @@ function neutraliser_logo( $html ) {
 
 // ---------------------------------------------------------------- en-tête ---
 $entete_rendu = neutraliser_logo( rendre_pattern( $theme . '/patterns/header-accueil.php' ) );
-$entete_ref   = maquette( $lignes, 77, 110 );
+list( $e_debut, $e_fin ) = bornes( $lignes, '<header class="site" id="top">', '</header>' );
+check( 'Maquette : les bornes de <header> sont repérées', $e_debut > 0 && $e_fin > $e_debut );
+$entete_ref   = maquette( $lignes, $e_debut, $e_fin );
 
 check( 'En-tête : markup identique à la maquette (hors URL du logo)', $entete_rendu === $entete_ref );
 check( 'En-tête : logo résolu par le thème, aucune URL en dur',
@@ -83,7 +115,9 @@ check( 'En-tête : burger mobile et ses attributs ARIA conservés',
 
 // ----------------------------------------------------------- pied de page ---
 $pied_rendu = neutraliser_logo( rendre_pattern( $theme . '/patterns/footer-accueil.php' ) );
-$pied_ref   = maquette( $lignes, 412, 447 );
+list( $p_debut, $p_fin ) = bornes( $lignes, '<footer class="site-footer">', '</footer>' );
+check( 'Maquette : les bornes de <footer> sont repérées', $p_debut > 0 && $p_fin > $p_debut );
+$pied_ref   = maquette( $lignes, $p_debut, $p_fin );
 
 check( 'Pied de page : markup identique à la maquette (hors URL du logo)', $pied_rendu === $pied_ref );
 // La grille .foot est en quatre colonnes (CSS) : une marque + trois listes.
@@ -122,7 +156,26 @@ $corps_rendu = str_replace(
 	),
 	$corps_rendu
 );
-$corps_ref = maquette( $lignes, 112, 409 );
+// Bornes repérées sur le contenu, non codées en dur : la maquette évolue, et
+// un décalage de lignes ferait échouer la comparaison pour une mauvaise raison.
+$debut_main = 0;
+$fin_main   = 0;
+
+foreach ( $lignes as $i => $ligne ) {
+	$nu = trim( $ligne );
+
+	if ( 0 === $debut_main && '<main>' === $nu ) {
+		$debut_main = $i + 1;
+	}
+
+	if ( '</main>' === $nu ) {
+		$fin_main = $i + 1;
+	}
+}
+
+check( 'Maquette : les bornes de <main> sont repérées', $debut_main > 0 && $fin_main > $debut_main );
+
+$corps_ref = maquette( $lignes, $debut_main, $fin_main );
 check( 'Corps : les 12 sections identiques à la maquette', $corps_rendu === $corps_ref );
 
 check( 'Corps : SVG du hero inline et inchangé',
