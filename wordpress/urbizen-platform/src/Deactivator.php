@@ -7,6 +7,8 @@
 
 namespace Urbizen\Platform;
 
+use Urbizen\Platform\Privacy\Retention;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -24,7 +26,9 @@ final class Deactivator {
 	 * @return void
 	 */
 	public static function deactivate(): void {
-		$hooks = array( 'urbizen_purge_expired', 'urbizen_retry_transmission' );
+		// La constante plutôt qu'une chaîne : renommer la tâche sans renommer
+		// ici laisserait un événement orphelin tourner indéfiniment.
+		$hooks = array( Retention::HOOK, 'urbizen_retry_transmission' );
 
 		foreach ( $hooks as $hook ) {
 			$timestamp = wp_next_scheduled( $hook );

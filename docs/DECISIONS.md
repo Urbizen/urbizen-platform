@@ -473,3 +473,302 @@ accentuées, espacées, construites à partir de libellés affichés.
 - Le banc de mutation mesure les deux barrières **séparément** : retirer l'une
   laisse l'autre protéger, retirer les deux laisse entrer les clés arbitraires.
 - La même discipline s'appliquera à toute famille dynamique future.
+
+---
+
+## D-014 — La demande est écrite avant toute action externe
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Une soumission déclenche plusieurs effets : enregistrement,
+notification à Urbizen, confirmation au client, et plus tard transmission au
+service de génération. L'ordre de ces effets détermine ce qu'on perd quand l'un
+d'eux échoue.
+
+Le schéma naturel — valider, envoyer un courriel, et considérer que c'est fait —
+fait reposer tout le dossier sur la délivrabilité d'un SMTP. Une panne de
+Fluent SMTP, un rejet du destinataire, une adresse en quarantaine, et le
+prospect disparaît sans laisser de trace.
+
+**Décision.** La demande est **enregistrée en base avant tout appel externe**.
+
+- Le courriel devient une **notification**, jamais le support de la demande.
+- Un échec d'envoi est un incident réparable : la demande existe, elle est
+  consultable, et l'envoi sera rejouable.
+- Les métadonnées `_urbizen_mail_status` et `_urbizen_files_status` valent
+  `not_started` en PR B1 et porteront l'état réel dès les PR B2 et B3.
+- Si une métadonnée obligatoire ne peut pas être écrite, la demande
+  partiellement créée est **supprimée** et l'échec est annoncé. Une demande
+  amputée est pire qu'une absence de demande : elle laisse croire que le
+  dossier est en main.
+
+**Conséquences.**
+- Aucune table SQL n'est créée. Une demande est un contenu WordPress privé,
+  pas un schéma parallèle à maintenir et à migrer.
+- `SubmissionRepository` est la **seule** couche autorisée à écrire une demande.
+- La référence `URB-AAAA-NNNN` est attribuée par un compteur en option, mais
+  l'unicité est vérifiée en base : deux soumissions simultanées se décalent au
+  lieu de s'écraser.
+
+---
+
+## D-015 — Trois signaux anti-robot, aucun ne conservant d'adresse IP
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Un formulaire public reçoit des robots. Un seul garde-fou se
+contourne ; il en faut plusieurs, indépendants. Mais la lutte contre le spam ne
+justifie pas de constituer un fichier d'adresses IP.
+
+**Décision.** Trois signaux, et **aucune adresse conservée**.
+
+1. **Nonce WordPress**, action `urbizen_conception_submit`.
+2. **Pot de miel** `company_website` : refus silencieux si rempli. Rien de ce
+   qu'un robot a écrit n'est journalisé — ni la valeur, ni le nom du champ.
+3. **Jeton signé** : identifiant aléatoire, heure d'émission, signature HMAC sur
+   un sel WordPress. Le serveur en déduit le temps écoulé — un horodatage
+   envoyé par le navigateur se falsifie en une ligne de JavaScript. Délai
+   minimal 3 secondes, validité 24 heures, usage unique.
+
+Le jeton consommé n'est mémorisé que sous forme de **condensat non réversible**,
+dans un transient. Ni le jeton brut, ni sa signature, ni son identifiant
+n'apparaissent en base.
+
+**La limitation de débit ne conserve pas davantage.** Cinq soumissions par heure
+et par origine, la clé du compteur étant un HMAC de l'adresse. Il permet de
+reconnaître deux requêtes de la même origine, jamais de retrouver cette origine.
+
+**Aucun en-tête de proxy n'est cru sur parole.** `X-Forwarded-For`, `X-Real-IP`
+et `Client-IP` sont envoyés par le client : les accepter d'office offrirait un
+contournement trivial de la limite. La source est `REMOTE_ADDR`. Un hébergement
+derrière un proxy de confiance peut désigner un en-tête par le filtre
+`urbizen_trusted_proxy_header` — décision explicite, jamais un défaut.
+
+**Conséquences.**
+- Les codes de refus sont **internes**. Expliquer à un robot pourquoi il a été
+  refusé, c'est l'aider : la réponse publique reste générique.
+- La comparaison de signature passe par `hash_equals()` : une comparaison naïve
+  laisse fuir la signature attendue par mesure du temps de réponse.
+- Le banc de mutation mesure chaque signal séparément.
+
+---
+
+## D-016 — Conservation limitée à 365 jours, sauf dossier client
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Une demande contient des données personnelles : nom, adresse
+électronique, téléphone, localisation, description d'un projet. La conserver
+indéfiniment n'est ni nécessaire, ni licite.
+
+**Décision.** Purge quotidienne, **365 jours après le dernier contact**.
+
+- Les états `received` et `closed` sont purgeables.
+- L'état `converted` — la demande est devenue un dossier client — n'est
+  **jamais** touché par ce mécanisme. Il relève d'une politique contractuelle et
+  comptable distincte, à définir séparément.
+- La durée vit à un seul endroit, ajustable par le filtre
+  `urbizen_retention_days`. Une durée recopiée à trois endroits est une durée
+  qu'on finit par ne plus respecter.
+- Une durée nulle ou négative est ramenée à un jour : un filtre mal écrit ne
+  doit pas pouvoir tout effacer au premier passage.
+- Le hook `urbizen_before_submission_delete` est déclenché **avant** la
+  suppression, la demande existant encore. La PR B2 s'y branchera pour effacer
+  les fichiers : après, plus rien ne permettrait de les retrouver.
+
+**Conséquences.**
+- Une seconde barrière relit l'état de chaque demande avant de la supprimer :
+  une requête de métadonnées mal interprétée ne doit pas pouvoir emporter un
+  dossier client.
+- La purge traite au plus 200 demandes par passage, pour ne jamais faire expirer
+  une tâche planifiée. Le reliquat part au passage suivant.
+- La tâche est programmée à l'activation et retirée à la désactivation, sous le
+  nom `urbizen_purge_expired` que le `Deactivator` déprogrammait déjà.
+
+---
+
+## D-017 — L'atomicité repose sur l'unicité de `option_name`
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-014] et [D-015]
+
+**Contexte.** La première écriture de la réception employait des transients pour
+mémoriser les jetons consommés et compter les soumissions. La revue a montré que
+ce choix ne tenait pas sur deux points.
+
+**Un transient exprime une durée maximale de conservation, jamais une
+garantie.** Une purge du cache objet, un vidage LiteSpeed ou une éviction
+mémoire peuvent le faire disparaître avant terme — et rendre réutilisable un
+jeton déjà consommé.
+
+**Et surtout, `lire puis écrire` n'arbitre rien.** Entre `is_used()` et
+`mark_used()` s'ouvre une fenêtre par laquelle deux requêtes concurrentes
+passent toutes les deux. Le même défaut affectait l'allocation des références :
+deux requêtes pouvaient lire le même compteur avant que l'une n'écrive.
+
+**Décision.** Toutes les réservations reposent sur **l'unicité de
+`option_name`**, la seule primitive réellement atomique offerte par WordPress
+sans table dédiée. `add_option()` échoue si le nom existe déjà, quel que soit le
+nombre de requêtes simultanées.
+
+| Ressource | Nom d'option | Contenu |
+|---|---|---|
+| Jeton | `urbizen_tok_<40 hex>` | état, expiration |
+| Créneau de débit | `urbizen_rl_<32 hex>_<0..4>` | état, expiration |
+| Référence | `urbizen_ref_URB-AAAA-NNNN` | état, date, demande |
+
+Le nom porte un **condensat HMAC** : jamais le jeton, jamais sa signature,
+jamais son identifiant lisible, jamais une adresse IP. **Toutes ces options sont
+créées avec `autoload = false`** : elles ne pèsent sur aucune page.
+
+**Le compteur de références reste, mais comme accélérateur seulement.** Il évite
+de repartir de 1 à chaque allocation ; l'unicité vient de la réservation. Deux
+barrières successives protègent en outre les références historiques, créées
+avant ce mécanisme : la présence en base, puis la réservation atomique.
+
+**Conséquences.**
+- Une seconde requête portant le même jeton est refusée **pendant** le
+  traitement de la première, sans attendre sa persistance.
+- Une purge de cache ne rend rien réutilisable : les options vivent en base.
+- Les entrelacements sont éprouvés de façon **déterministe** — la requête A
+  s'arrête après avoir choisi son candidat, B s'exécute entièrement, puis A
+  reprend — et non par une répétition qui espère tomber sur la course.
+- Une référence libérée après échec n'est pas *bloquée*, mais le compteur ne
+  recule pas : la série peut sauter un rang. C'est assumé — faire reculer un
+  compteur rouvrirait exactement la course que la réservation vient de fermer.
+
+---
+
+## D-018 — Cinq demandes *enregistrées*, pas cinq tentatives
+
+**Date** : 20 juillet 2026 · **État** : actée · **Remplace** la règle de comptage de [D-015]
+
+**Contexte.** Le limiteur comptait toute tentative. Une personne qui oublie une
+case obligatoire, corrige, se trompe encore, corrige — cinq allers-retours
+ordinaires — se retrouvait bloquée une heure par sa propre application. Le
+mécanisme censé écarter les robots punissait les clients.
+
+**Décision.** Le quota porte sur les demandes **réellement enregistrées**.
+
+Le limiteur fonctionne en trois temps : **réserver** un créneau avant le
+traitement, le **libérer** si le traitement échoue pour une raison corrigible,
+le **confirmer** une fois la demande écrite.
+
+Ne consomment aucun créneau : `validation_failed`, `files_not_supported_yet`,
+`pricing_failed`, `persistence_failed` — ni aucun refus de sécurité, qui
+intervient avant la réservation.
+
+**La réservation reste atomique.** Six requêtes valides simultanées ne peuvent
+pas acquérir plus de cinq créneaux : leurs noms sont déterministes et numérotés,
+et `add_option()` n'aboutit qu'une fois par nom.
+
+Le jeton suit la même logique : un échec corrigible le rend, pour que la
+personne puisse rectifier et renvoyer.
+
+**Conséquences.**
+- Confirmer ne repousse pas la fin de la fenêtre : un flux soutenu ne peut pas
+  la prolonger indéfiniment.
+- Les refus de sécurité restent bloqués mais ne sont jamais présentés comme des
+  demandes enregistrées. Un dispositif anti-abus distinct pourra les traiter.
+
+---
+
+## D-019 — Une mise à jour ne doit rien exiger d'un administrateur
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** L'extension est active en production. Remplacer ses fichiers par
+une nouvelle version **ne déclenche pas le hook d'activation** : la tâche de
+purge, programmée uniquement à l'activation, n'aurait jamais existé sur un site
+passé de 0.5.0 à 0.6.0. Il aurait fallu désactiver puis réactiver l'extension à
+la main — ce qu'on ne peut pas exiger d'une mise en production, et qu'on
+oublierait.
+
+**Décision.** `Retention::ensure_scheduled()` est **idempotente** et appelée à
+chaque chargement, sur `init`, en plus de l'activation.
+
+Le coût est nul : `wp_next_scheduled()` interroge un tableau déjà chargé en
+mémoire. Cent chargements ne créent qu'une tâche.
+
+**Conséquences.**
+- Les six scénarios sont éprouvés : installation neuve, remplacement de fichiers
+  sans réactivation, chargements répétés, tâche déjà présente, désactivation,
+  réactivation.
+- La même tâche quotidienne assure le ménage des réservations techniques.
+  Une réservation **attribuée** n'est jamais supprimée : la référence appartient
+  à une demande et ne doit pas pouvoir resservir.
+
+---
+
+## D-020 — Données personnelles effaçables, registre des références permanent
+
+**Date** : 20 juillet 2026 · **État** : actée · **Précise** [D-016] et [D-017]
+
+**Contexte.** La revue a relevé une contradiction dans un compte rendu : une
+réservation attribuée était présentée à la fois comme jamais supprimée et comme
+libérée par la purge à 365 jours. Vérification faite, **le code était correct** —
+c'était la prose qui ne l'était pas. Mais l'ambiguïté méritait d'être tranchée
+et inscrite.
+
+**Décision.** Deux natures de données, deux régimes.
+
+**Les données personnelles** — nom, adresse électronique, téléphone, adresse du
+terrain, description du projet — vivent dans la demande, contenu WordPress
+privé. Elles sont **effacées 365 jours après le dernier contact**, sauf dossier
+client. C'est la limitation de conservation.
+
+**Le registre des références attribuées** est autre chose. Une option
+`urbizen_ref_URB-AAAA-NNNN` portant l'état `attributed` est un **registre
+technique permanent d'unicité**. Elle ne contient aucune donnée personnelle :
+un état, une date technique d'attribution, l'identifiant du contenu WordPress.
+Rien d'autre — ni nom, ni adresse, ni charge utile, ni adresse IP, ni fichier.
+
+Elle n'est supprimée par **rien** : ni le nettoyage quotidien, ni la rétention,
+ni la suppression de la demande. Sans elle, un numéro déjà communiqué à un
+client pourrait être réattribué à un autre dossier des années plus tard — une
+confusion que rien ne permettrait ensuite de démêler.
+
+**Conséquences.**
+- Effacer les données personnelles d'une demande **ne réautorise pas** l'usage
+  de son numéro. Le pire des cas est éprouvé : demande supprimée, compteur remis
+  à zéro, caches purgés — la référence n'est toujours pas réattribuée.
+- Une réservation `reserved` reste, elle, temporaire : libérée si la persistance
+  échoue, supprimée si elle est abandonnée depuis plus d'une heure.
+- Le nettoyage ne touche **que** l'état `reserved`. Une valeur devenue illisible
+  est conservée : garder une ligne inutile coûte une ligne, en supprimer une à
+  tort rouvre une référence déjà donnée.
+- Une ligne d'option par référence attribuée. Le volume suit celui des demandes
+  réelles, et chaque ligne porte `autoload = false`.
+
+---
+
+## D-021 — La programmation du cron est protégée par un verrou atomique
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-019]
+
+**Contexte.** `wp_next_scheduled()` puis `wp_schedule_event()` est un « lire
+puis écrire », exactement le motif écarté ailleurs. Juste après une mise à jour,
+deux requêtes simultanées ne trouvent ni l'une ni l'autre de tâche, et en
+programment deux. La démonstration d'idempotence portait sur des chargements
+**successifs** ; elle ne disait rien de la concurrence.
+
+**Décision.** Un verrou atomique, sur la même primitive que le reste : l'unicité
+de `option_name`.
+
+- **Chemin rapide** : si la tâche existe, on sort sans rien écrire. C'est le cas
+  de l'immense majorité des requêtes — aucun verrou n'est même posé.
+- **Sinon** : `add_option( 'urbizen_cron_lock', …, '', false )`. Une seule
+  requête l'obtient ; les autres renoncent sans programmer.
+- Le contrôle est **refait sous verrou** : entre le chemin rapide et
+  l'obtention, une autre requête a pu programmer.
+- Le verrou expire au bout de **30 secondes**. La section protégée se réduit à
+  une lecture et une écriture ; un arrêt brutal au milieu ne doit pas empêcher
+  la programmation pour toujours. Un verrou manifestement périmé est repris.
+- Il est rendu immédiatement après. En fonctionnement normal, **aucun verrou ne
+  subsiste** dans `wp_options`.
+
+**Conséquences.**
+- L'entrelacement est éprouvé de façon déterministe : A tient le verrou, B
+  s'exécute entièrement et ne programme rien, A termine et rend le verrou, B
+  repasse et constate que la tâche existe. Le nombre d'appels réels à
+  `wp_schedule_event` est mesuré, et vaut exactement 1.
+- Le verrou ne contient qu'une échéance. Aucune donnée personnelle.
