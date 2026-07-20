@@ -239,6 +239,9 @@ function urbizen_child_enqueue_accueil() {
 		'urbizen-fonts'    => array( '/assets/css/urbizen-fonts.css', array() ),
 		'urbizen-tokens'   => array( '/assets/css/urbizen-tokens.css', array( 'urbizen-fonts' ) ),
 		'urbizen-homepage' => array( '/assets/css/urbizen-homepage.css', array( 'urbizen-tokens', 'urbizen-child-style' ) ),
+		// Corrige les interférences WordPress sur l'en-tête. Chargée en dernier,
+		// après la feuille générée depuis la maquette, qu'elle ne modifie pas.
+		'urbizen-entete'   => array( '/assets/css/urbizen-accueil-entete.css', array( 'urbizen-homepage' ) ),
 	);
 
 	foreach ( $ressources as $handle => $definition ) {
