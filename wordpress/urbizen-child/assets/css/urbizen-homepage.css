@@ -140,7 +140,8 @@ html { scroll-behavior: smooth; }
 }
 .urbizen-accueil .pcard:hover { border-color: var(--u-line-strong); transform: translateY(-2px); }
 .urbizen-accueil .pcard.is-selected { border-color: var(--u-brand); background: var(--u-brand-sf); box-shadow: inset 0 0 0 1px var(--u-brand); }
-.urbizen-accueil .pcard-ico { font-size: 20px; color: var(--u-brand); line-height: 1; }
+.urbizen-accueil .pcard-ico { display: block; width: 26px; height: 26px; color: var(--u-brand); }
+.urbizen-accueil .pcard-ico svg { width: 100%; height: 100%; display: block; }
 .urbizen-accueil .pcard-t { font-family: var(--u-font-title); font-weight: 500; font-size: 15.5px; color: var(--u-ink); }
 .urbizen-accueil .pcard-d { font-size: 12px; color: var(--u-ink-soft); }
 .urbizen-accueil .projet-continue { margin-top: 28px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
