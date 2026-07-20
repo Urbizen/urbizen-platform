@@ -1,0 +1,89 @@
+/* ============================================================================
+   urbizen-accueil-entete.css — comportement de l'en-tête de la page d'accueil.
+
+   Fichier écrit à la main, délibérément SÉPARÉ de urbizen-homepage.css. Ce
+   dernier est généré par scripts/scope-css.py depuis la maquette et son
+   invariant, vérifié par les tests, est de n'ajouter aucune déclaration et
+   aucun !important. Les corrections ci-dessous n'appartiennent pas à la
+   maquette : elles ne réparent que des interférences de l'environnement
+   WordPress. Elles vivent donc à part.
+
+   La maquette déclare déjà `header.site { position: sticky; top: 0 }`. Sous
+   WordPress, trois obstacles l'empêchaient d'agir — aucun ne vient de notre
+   CSS.
+
+   1. BANDE DE 75 PX
+      Le thème parent réserve `body.hostinger-ai-builder-gutenberg {
+      padding-top: 75px }` pour son propre en-tête. Notre page n'utilise pas
+      cet en-tête : la bande restait vide, et comme le quadrillage est porté
+      par `body.u-grid-bg`, on voyait des carreaux au-dessus du menu. Elle
+      s'applique à tout le monde, connecté ou non.
+
+   2. POSITION FORCÉE
+      Les styles globaux du thème imposent
+      `header, .wp-block-template-part { position: relative !important;
+      z-index: 10 !important }`. Un !important l'emporte sur toute règle de
+      priorité normale, quelle que soit sa spécificité : le `sticky` de la
+      maquette était écrasé en silence. Le rétablir impose d'employer
+      !important à notre tour. C'est le seul endroit du projet où nous en
+      posons, et uniquement sur ces deux propriétés.
+
+   3. ENVELOPPE DE BLOC
+      Un gabarit enveloppe chaque template part dans un `<div>`. Un élément
+      collant est borné par la boîte de son parent : enfermé dans un conteneur
+      de la hauteur exacte de l'en-tête, il n'avait aucune course à parcourir.
+      `display: contents` supprime la boîte de l'enveloppe sans rien changer à
+      son contenu ; l'en-tête retrouve `.urbizen-accueil` pour parent et peut
+      accompagner tout le défilement. La classe `urbizen-entete` est posée par
+      le gabarit : le pied de page, lui, n'est pas concerné.
+
+   BARRE D'ADMINISTRATION — elle n'existe que pour les utilisateurs connectés.
+   WordPress la fixe en haut de la fenêtre au-dessus de 600 px de large, et la
+   repasse en `position: absolute` en dessous : elle défile alors avec la page.
+   Les décalages ci-dessous suivent exactement ce comportement, de sorte qu'un
+   visiteur anonyme voit toujours l'en-tête à `top: 0`.
+   ========================================================================== */
+
+/* --- 1. Supprimer la bande réservée à l'en-tête du thème parent ------------ */
+/* `u-grid-bg` n'est posée que sur cette page : les autres pages gardent leur
+   réserve de 75 px et leur en-tête Hostinger intacts. */
+html body.u-grid-bg {
+	padding-top: 0;
+}
+
+/* --- 2. L'enveloppe de bloc ne doit pas borner l'en-tête ------------------- */
+.urbizen-accueil .urbizen-entete {
+	display: contents;
+}
+
+/* --- 3. Rétablir le comportement collant de la maquette ------------------- */
+.urbizen-accueil header.site {
+	position: sticky !important;
+	top: 0;
+	/* Leaflet empile ses panneaux jusqu'à 1000 (`.leaflet-top`, `.leaflet-bottom`)
+	   sans créer de contexte d'empilement isolé : avec le z-index 50 de la
+	   maquette, la carte du cadastre passerait au-dessus de l'en-tête pendant
+	   le défilement. On monte donc au-dessus de cette pile. */
+	z-index: 1100 !important;
+}
+
+/* --- 4. Barre d'administration : ne pas glisser dessous ------------------- */
+/* Au-delà de 782 px, la barre est fixe et haute de 32 px. */
+body.admin-bar .urbizen-accueil header.site {
+	top: 32px;
+}
+
+/* De 601 à 782 px, elle reste fixe mais passe à 46 px. */
+@media screen and (max-width: 782px) {
+	body.admin-bar .urbizen-accueil header.site {
+		top: 46px;
+	}
+}
+
+/* En dessous de 601 px, WordPress la repasse en `position: absolute` : elle
+   défile avec la page, il ne faut donc plus la compenser. */
+@media screen and (max-width: 600px) {
+	body.admin-bar .urbizen-accueil header.site {
+		top: 0;
+	}
+}
