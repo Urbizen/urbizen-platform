@@ -17,6 +17,8 @@
 
 namespace Urbizen\Platform\Forms;
 
+use Urbizen\Platform\Support\Logger;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -43,6 +45,18 @@ final class Renderer {
 	 * @return string HTML échappé.
 	 */
 	public static function render( FormDefinition $def, array $options = array() ): string {
+		// Un formulaire en étapes exige un rendu que cette classe ne sait pas
+		// produire : elle poserait tous les champs à plat, sans distinguer un
+		// bouton radio d'un champ texte. Plutôt qu'un formulaire trompeur, on
+		// ne rend rien tant que StepRenderer n'existe pas.
+		if ( array() !== $def->steps() ) {
+			Logger::error(
+				sprintf( 'rendu refusé : le formulaire « %s » est en étapes', $def->type() )
+			);
+
+			return '';
+		}
+
 		$storage_key = isset( $options['storageKey'] ) ? (string) $options['storageKey'] : 'parcel';
 		$form_id     = isset( $options['formId'] ) ? (string) $options['formId'] : '';
 
@@ -160,9 +174,22 @@ final class Renderer {
 			'data-from' => (string) ( $field['from'] ?? '' ),
 		);
 
-		foreach ( array( 'maxlength', 'inputmode', 'min', 'step', 'autocomplete' ) as $key ) {
+		// Clé de définition => attribut HTML. `increment` porte l'incrément des
+		// champs numériques : depuis l'introduction des formulaires en étapes,
+		// `step` désigne l'étape d'appartenance et ne peut plus servir ici.
+		$passants = array(
+			'maxlength'    => 'maxlength',
+			'inputmode'    => 'inputmode',
+			'min'          => 'min',
+			'max'          => 'max',
+			'increment'    => 'step',
+			'autocomplete' => 'autocomplete',
+			'placeholder'  => 'placeholder',
+		);
+
+		foreach ( $passants as $key => $attribut ) {
 			if ( isset( $field[ $key ] ) ) {
-				$attrs[ $key ] = (string) $field[ $key ];
+				$attrs[ $attribut ] = (string) $field[ $key ];
 			}
 		}
 

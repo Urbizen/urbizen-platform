@@ -3,14 +3,18 @@
  * Catalogue des formulaires déclarés.
  *
  * Chaque définition est un fichier de `definitions/` renvoyant un tableau.
- * Un seul formulaire existe à ce jour : `localisation`. Le catalogue reste
- * délibérément minimal — pas de découverte dynamique, pas de filtre
- * d'extension tant qu'aucun second cas ne le justifie.
+ * Deux formulaires sont déclarés : `localisation` et `conception`. Le catalogue
+ * reste délibérément minimal — pas de découverte dynamique, pas de filtre
+ * d'extension tant qu'aucun besoin concret ne le justifie : une liste blanche
+ * en dur est la garantie qu'aucune valeur reçue du navigateur ne peut désigner
+ * un fichier arbitraire.
  *
  * @package Urbizen\Platform
  */
 
 namespace Urbizen\Platform\Forms;
+
+use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -22,7 +26,7 @@ final class FormRegistry {
 	/**
 	 * Formulaires connus. Toute valeur hors de cette liste est refusée.
 	 */
-	public const KNOWN = array( 'localisation' );
+	public const KNOWN = array( 'localisation', 'conception' );
 
 	/**
 	 * Définitions déjà chargées.
@@ -58,12 +62,21 @@ final class FormRegistry {
 			return null;
 		}
 
-		self::$loaded[ $type ] = new FormDefinition(
+		$definition = new FormDefinition(
 			(string) ( $raw['type'] ?? $type ),
 			(string) ( $raw['title'] ?? '' ),
 			(string) ( $raw['submit_label'] ?? '' ),
-			$raw['fields']
+			$raw['fields'],
+			isset( $raw['steps'] ) && is_array( $raw['steps'] ) ? $raw['steps'] : array()
 		);
+
+		// Une définition fautive n'interrompt pas la page, mais elle ne passe
+		// jamais inaperçue : les anomalies sont des erreurs de développement.
+		foreach ( $definition->errors() as $anomalie ) {
+			Logger::error( sprintf( 'définition « %s » : %s', $type, $anomalie ) );
+		}
+
+		self::$loaded[ $type ] = $definition;
 
 		return self::$loaded[ $type ];
 	}
