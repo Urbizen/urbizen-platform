@@ -47,6 +47,32 @@ Notification administrative fiable d'une demande de conception acceptée.
   définitive, sans toucher à la réservation attribuée.
 - La tâche quotidienne réconcilie aussi les notifications.
 
+### Sérialisation des transitions (revue de la PR #20)
+- **Verrou commun par notification**, à jeton propriétaire. Toutes les
+  opérations qui touchent l'état d'une notification passent par lui : envoi,
+  annulation à la Corbeille, suppression définitive, restauration, action
+  administrative, planification, déplanification, réconciliation (D-039).
+- API centrale dans `MailQueue` : `acquire_lock()` rend un jeton,
+  `owns_lock()`, `release_lock()` vérifie le jeton, `with_lock()` encadre un
+  travail, `is_locked()` répond sans prétendre à la propriété.
+- **Un processus ne peut plus supprimer le verrou d'un autre.** Le nettoyage de
+  fichiers le faisait sans le savoir.
+- TTL porté de **300 à 600 secondes**, avec un plancher à
+  `max_execution_time + 1` : un verrou de 300 s pouvait être repris alors que
+  son propriétaire, autorisé à 360 s, s'exécutait encore.
+- Mise à la Corbeille et suppression définitive **refusées** tant qu'un envoi
+  est en vol ; toutes deux restent rejouables ensuite.
+- **Ultime vérification d'éligibilité immédiatement avant l'appel au
+  transport**, cache d'objets purgé, puis contrôle postérieur : un courriel ne
+  part jamais pour un dossier fermé entre-temps, et `sent` n'écrase jamais une
+  annulation légitime.
+- `schedule_unique()` encadre la vérification et la création par le verrou :
+  `wp_next_scheduled()` suivi de `wp_schedule_single_event()` n'est pas
+  atomique. `unschedule_all()` retire tous les événements résiduels.
+- Banc `tests/integration/test-concurrence-reelle.php` : **processus PHP
+  distincts**, synchronisés par fichiers de rendez-vous, contre un vrai
+  WordPress 7.0.2.
+
 ### Volontairement absent
 - Aucun courriel au demandeur. Aucune pièce jointe. Aucun accusé de réception.
 - Aucune modification de l'adresse `From` globale de WordPress.

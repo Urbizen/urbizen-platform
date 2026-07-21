@@ -157,13 +157,32 @@ final class SubmissionsAdmin {
 			self::refus( 'ineligible' );
 		}
 
-		if ( ! MailQueue::requeue( $id ) ) {
+		// Sous le verrou commun : deux clics simultanés ne doivent produire
+		// qu'un seul état `pending` et qu'un seul événement. L'envoi n'a
+		// **pas** lieu dans cette requête — une action d'administration ne doit
+		// pas dépendre d'un serveur de messagerie.
+		$resultat = MailQueue::with_lock(
+			$id,
+			static function ( string $jeton ) use ( $id ) {
+				// Relecture sous verrou : l'état a pu changer depuis le
+				// contrôle d'éligibilité, et `sent` ne se reprend jamais.
+				$statut = (string) get_post_meta( $id, MailPolicy::META_STATUS, true );
+
+				if ( ! in_array( $statut, array( MailPolicy::FAILED, MailPolicy::CANCELLED ), true ) ) {
+					return false;
+				}
+
+				if ( ! MailQueue::requeue( $id ) ) {
+					return false;
+				}
+
+				return MailScheduler::schedule_unique( $id, null, $jeton );
+			}
+		);
+
+		if ( empty( $resultat['ok'] ) || true !== $resultat['valeur'] ) {
 			self::refus( 'requeue' );
 		}
-
-		// L'envoi n'a **pas** lieu dans cette requête : une action
-		// d'administration ne doit pas dépendre d'un serveur de messagerie.
-		MailScheduler::schedule( $id );
 
 		wp_safe_redirect(
 			add_query_arg(

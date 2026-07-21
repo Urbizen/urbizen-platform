@@ -99,6 +99,29 @@ final class FileCleaner {
 			return false;
 		}
 
+		// Un envoi est en vol. Supprimer maintenant retirerait sous ses pieds
+		// le contenu, les fichiers et les métadonnées qu'il est en train de
+		// lire. On refuse ; la suppression reste possible ensuite.
+		if ( MailQueue::is_locked( $id ) ) {
+			Logger::error( sprintf( 'suppression bloquée pour #%d : notification en cours d’envoi', $id ) );
+
+			return false;
+		}
+
+		// Sous le verrou commun : on ferme l'éligibilité de la notification et
+		// on retire tout événement résiduel **avant** de toucher aux fichiers.
+		// Un envoi ultérieur relira cet état et ne fera rien.
+		MailQueue::with_lock(
+			$id,
+			static function ( string $jeton ) use ( $id ) {
+				// `sent` est une preuve historique : elle n'est pas effacée.
+				MailQueue::cancel( $id, 'demande_supprimee' );
+				MailScheduler::unschedule_all( $id );
+
+				return true;
+			}
+		);
+
 		$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
 
 		$resultat  = self::delete( $id, $reference );
@@ -219,12 +242,6 @@ final class FileCleaner {
 				'failed'  => $echecs,
 			);
 		}
-
-		// Un événement de notification programmé pour une demande en cours de
-		// suppression doit devenir sans effet. La réservation `attributed`
-		// n'est pas touchée : elle garantit qu'un numéro ne sera pas réattribué.
-		MailScheduler::unschedule( $submission );
-		MailQueue::release_lock( $submission );
 
 		Storage::delete_files( $reference, array() );
 

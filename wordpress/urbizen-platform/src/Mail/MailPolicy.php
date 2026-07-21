@@ -75,9 +75,38 @@ final class MailPolicy {
 	public const LOCK_PREFIX = 'urbizen_mail_lock_';
 
 	/**
-	 * Durée de vie d'un verrou.
+	 * Durée de vie d'un verrou, en secondes.
+	 *
+	 * **Un verrou ne doit jamais expirer pendant que son propriétaire peut
+	 * encore s'exécuter.** La production autorise `max_execution_time = 360` :
+	 * un verrou de 300 s pouvait donc être repris alors que son propriétaire
+	 * était toujours en train d'appeler le transport. 600 s laisse une marge
+	 * franche au-delà du temps d'exécution maximal.
 	 */
-	public const LOCK_TTL = 300;
+	public const LOCK_TTL = 600;
+
+	/**
+	 * Temps d'exécution maximal constaté en production.
+	 *
+	 * Sert de plancher au TTL : un contrôle nommé refuse tout réglage qui
+	 * repasserait sous cette valeur.
+	 */
+	public const MAX_EXECUTION = 360;
+
+	/**
+	 * Durée de vie effective d'un verrou.
+	 *
+	 * Filtrable pour les bancs, mais **jamais** en dessous du temps
+	 * d'exécution maximal : un réglage fautif ne doit pas pouvoir réintroduire
+	 * la reprise d'un verrou encore détenu.
+	 *
+	 * @return int
+	 */
+	public static function lock_ttl(): int {
+		$filtre = (int) apply_filters( 'urbizen_mail_lock_ttl', self::LOCK_TTL );
+
+		return max( self::MAX_EXECUTION + 1, $filtre );
+	}
 
 	/**
 	 * Délais avant chaque tentative, en secondes.
@@ -213,7 +242,42 @@ final class MailPolicy {
 	 * @return string|null Code technique, ou `null` si l'envoi est permis.
 	 */
 	public static function blocker( int $id, ?int $now = null ): ?string {
-		$now  = null === $now ? time() : $now;
+		$now   = null === $now ? time() : $now;
+		$ferme = self::closed_blocker( $id );
+
+		if ( null !== $ferme ) {
+			return $ferme;
+		}
+
+		$mail = (string) get_post_meta( $id, self::META_STATUS, true );
+
+		if ( in_array( $mail, self::sendable_statuses(), true ) ) {
+			return null;
+		}
+
+		// Un `sending` périmé est repris : c'est la trace d'une requête tuée en
+		// plein envoi. Voir la politique « au moins une fois ».
+		if ( self::SENDING === $mail && self::sending_is_stale( $id, $now ) ) {
+			return null;
+		}
+
+		return 'mail_status_non_envoyable';
+	}
+
+	/**
+	 * Ce qui ferme une demande à toute notification, **hors** état de la
+	 * notification elle-même.
+	 *
+	 * Employée pour l'ultime vérification avant l'appel au transport : à cet
+	 * instant, l'état vaut légitimement `sending`, puisque c'est nous qui
+	 * venons de l'écrire. Ce qui doit être relu, c'est tout le reste — et en
+	 * particulier le statut natif, qu'une mise à la Corbeille concurrente a pu
+	 * changer.
+	 *
+	 * @param int $id Demande.
+	 * @return string|null
+	 */
+	public static function closed_blocker( int $id ): ?string {
 		$post = get_post( $id );
 
 		if ( ! $post || SubmissionPostType::POST_TYPE !== $post->post_type ) {
@@ -279,19 +343,7 @@ final class MailPolicy {
 			return 'recipient_unavailable';
 		}
 
-		$mail = (string) get_post_meta( $id, self::META_STATUS, true );
-
-		if ( in_array( $mail, self::sendable_statuses(), true ) ) {
-			return null;
-		}
-
-		// Un `sending` périmé est repris : c'est la trace d'une requête tuée en
-		// plein envoi. Voir la politique « au moins une fois ».
-		if ( self::SENDING === $mail && self::sending_is_stale( $id, $now ) ) {
-			return null;
-		}
-
-		return 'mail_status_non_envoyable';
+		return null;
 	}
 
 	/**

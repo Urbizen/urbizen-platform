@@ -251,36 +251,149 @@ final class MailQueue {
 	 * Prend le verrou d'une notification.
 	 *
 	 * `add_option()` n'aboutit qu'une fois pour un même nom : c'est la seule
-	 * primitive réellement atomique dont on dispose sans table dédiée. Le
-	 * verrou est en `autoload = false`, porte sa propre expiration, et ne
-	 * contient aucune donnée personnelle.
+	 * primitive réellement atomique dont on dispose sans table dédiée.
 	 *
-	 * @param int $id  Demande.
-	 * @param int $now Horodatage courant.
-	 * @return bool
+	 * Le verrou porte un **jeton propriétaire** aléatoire. Sans lui, n'importe
+	 * quel processus pouvait supprimer le verrou d'un autre — et c'est
+	 * exactement ce que faisait le nettoyage de fichiers. Avec lui, un ancien
+	 * propriétaire dont le verrou a expiré et été repris ne peut plus ni
+	 * écrire, ni libérer.
+	 *
+	 * L'option est en `autoload = false` et ne contient aucune donnée
+	 * personnelle : un jeton technique et une échéance.
+	 *
+	 * @param int      $id  Demande.
+	 * @param int|null $now Horodatage courant.
+	 * @return string|null Jeton propriétaire, ou `null` si le verrou est pris.
 	 */
-	public static function acquire_lock( int $id, int $now ): bool {
+	public static function acquire_lock( int $id, ?int $now = null ): ?string {
+		$now      = null === $now ? time() : $now;
 		$cle      = MailPolicy::LOCK_PREFIX . $id;
 		$existant = get_option( $cle, null );
 
 		if ( is_array( $existant ) ) {
 			if ( $now < (int) ( $existant['expires'] ?? 0 ) ) {
-				return false;
+				return null;
 			}
 
+			// Verrou périmé : son propriétaire ne peut plus s'exécuter, la
+			// durée de vie étant supérieure au temps d'exécution maximal.
 			delete_option( $cle );
 		}
 
-		return (bool) add_option( $cle, array( 'expires' => $now + MailPolicy::LOCK_TTL ), '', false );
+		$jeton = self::new_token();
+
+		// Le nouveau propriétaire obtient un **nouveau** jeton : l'ancien, s'il
+		// revenait, ne serait plus reconnu.
+		if ( ! add_option( $cle, array( 'owner' => $jeton, 'expires' => $now + MailPolicy::lock_ttl() ), '', false ) ) {
+			return null;
+		}
+
+		return $jeton;
 	}
 
 	/**
-	 * Rend le verrou.
+	 * Le jeton est-il toujours propriétaire du verrou ?
 	 *
-	 * @param int $id Demande.
-	 * @return void
+	 * @param int      $id    Demande.
+	 * @param string   $jeton Jeton.
+	 * @param int|null $now   Horodatage courant.
+	 * @return bool
 	 */
-	public static function release_lock( int $id ): void {
+	public static function owns_lock( int $id, string $jeton, ?int $now = null ): bool {
+		$now      = null === $now ? time() : $now;
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+
+		if ( ! is_array( $existant ) || '' === $jeton ) {
+			return false;
+		}
+
+		if ( $now >= (int) ( $existant['expires'] ?? 0 ) ) {
+			return false;
+		}
+
+		return hash_equals( (string) ( $existant['owner'] ?? '' ), $jeton );
+	}
+
+	/**
+	 * Rend le verrou, **si et seulement si** on en est le propriétaire.
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $jeton Jeton.
+	 * @return bool Vrai si le verrou a bien été rendu par son propriétaire.
+	 */
+	public static function release_lock( int $id, string $jeton ): bool {
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+
+		if ( ! is_array( $existant ) || '' === $jeton ) {
+			return false;
+		}
+
+		if ( ! hash_equals( (string) ( $existant['owner'] ?? '' ), $jeton ) ) {
+			// Le verrou appartient à quelqu'un d'autre : on n'y touche pas.
+			return false;
+		}
+
 		delete_option( MailPolicy::LOCK_PREFIX . $id );
+
+		return true;
+	}
+
+	/**
+	 * Exécute un travail en section critique.
+	 *
+	 * Le rappel reçoit le jeton propriétaire ; il lui appartient de vérifier
+	 * `owns_lock()` avant toute écriture décisive, car un verrou expiré peut
+	 * avoir été repris entre-temps.
+	 *
+	 * @param int          $id      Demande.
+	 * @param callable     $travail Rappel, recevant le jeton.
+	 * @param int|null     $now     Horodatage courant.
+	 * @return array{ok:bool,code:string,valeur:mixed}
+	 */
+	public static function with_lock( int $id, callable $travail, ?int $now = null ) {
+		$now   = null === $now ? time() : $now;
+		$jeton = self::acquire_lock( $id, $now );
+
+		if ( null === $jeton ) {
+			return array( 'ok' => false, 'code' => 'verrou_occupe', 'valeur' => null );
+		}
+
+		try {
+			return array( 'ok' => true, 'code' => 'ok', 'valeur' => $travail( $jeton ) );
+		} finally {
+			self::release_lock( $id, $jeton );
+		}
+	}
+
+	/**
+	 * Un envoi est-il en cours pour cette demande ?
+	 *
+	 * Le verrou seul fait foi : l'état `sending` peut subsister après une
+	 * requête tuée, alors qu'un verrou vivant signifie qu'un processus est
+	 * réellement en train de travailler.
+	 *
+	 * @param int      $id  Demande.
+	 * @param int|null $now Horodatage courant.
+	 * @return bool
+	 */
+	public static function is_locked( int $id, ?int $now = null ): bool {
+		$now      = null === $now ? time() : $now;
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+
+		return is_array( $existant ) && $now < (int) ( $existant['expires'] ?? 0 );
+	}
+
+	/**
+	 * Fabrique un jeton propriétaire.
+	 *
+	 * @return string
+	 */
+	private static function new_token(): string {
+		try {
+			return bin2hex( random_bytes( 16 ) );
+		} catch ( \Throwable $e ) {
+			return wp_generate_password( 32, false, false );
+		}
 	}
 }

@@ -80,38 +80,106 @@ final class MailScheduler {
 	}
 
 	/**
-	 * Programme le traitement d'une demande.
+	 * Programme le traitement d'une demande, sans jamais créer de doublon.
 	 *
-	 * Dédupliqué : un événement déjà programmé n'est pas doublé.
+	 * `wp_next_scheduled()` suivi de `wp_schedule_single_event()` n'est **pas**
+	 * atomique : deux processus peuvent tous deux constater l'absence de
+	 * l'événement, et tous deux en créer un. La vérification et la création
+	 * sont donc encadrées par le verrou de la notification.
+	 *
+	 * @param int         $id    Demande.
+	 * @param int|null    $now   Horodatage courant.
+	 * @param string|null $jeton Jeton propriétaire, si le verrou est déjà tenu.
+	 * @return bool Vrai si un événement est programmé après cet appel.
+	 */
+	public static function schedule_unique( int $id, ?int $now = null, ?string $jeton = null ): bool {
+		$now = null === $now ? time() : $now;
+
+		// Verrou déjà tenu par l'appelant : on travaille directement.
+		if ( null !== $jeton && MailQueue::owns_lock( $id, $jeton, $now ) ) {
+			return self::poser_evenement( $id, $now );
+		}
+
+		$resultat = MailQueue::with_lock(
+			$id,
+			static fn( string $propre ) => self::poser_evenement( $id, $now ),
+			$now
+		);
+
+		return ! empty( $resultat['ok'] ) && true === $resultat['valeur'];
+	}
+
+	/**
+	 * Alias historique.
 	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
-	 * @return bool Vrai si un événement est programmé après cet appel.
+	 * @return bool
 	 */
 	public static function schedule( int $id, ?int $now = null ): bool {
-		$now  = null === $now ? time() : $now;
+		return self::schedule_unique( $id, $now );
+	}
+
+	/**
+	 * Pose l'événement s'il n'existe pas déjà. À n'appeler que sous verrou.
+	 *
+	 * @param int $id  Demande.
+	 * @param int $now Horodatage courant.
+	 * @return bool
+	 */
+	private static function poser_evenement( int $id, int $now ): bool {
 		$args = array( $id );
 
 		if ( false !== wp_next_scheduled( MailPolicy::EVENT, $args ) ) {
 			return true;
 		}
 
-		return false !== wp_schedule_single_event( $now, MailPolicy::EVENT, $args );
+		if ( false === wp_schedule_single_event( $now, MailPolicy::EVENT, $args ) ) {
+			return false;
+		}
+
+		// Relecture : sans événement réellement inscrit, on ne prétend pas
+		// l'avoir programmé.
+		return false !== wp_next_scheduled( MailPolicy::EVENT, $args );
 	}
 
 	/**
-	 * Retire l'événement programmé d'une demande.
+	 * Retire **tous** les événements résiduels d'une demande.
+	 *
+	 * Une seule suppression ne suffit pas : un doublon créé avant que la
+	 * planification ne devienne atomique doit pouvoir être retiré lui aussi.
+	 *
+	 * @param int $id Demande.
+	 * @return int Nombre d'événements retirés.
+	 */
+	public static function unschedule_all( int $id ): int {
+		$args    = array( $id );
+		$retires = 0;
+
+		// Boucle bornée : `wp_next_scheduled()` ne rend qu'une occurrence à la
+		// fois, et un compteur évite toute boucle infinie sur un cron fautif.
+		for ( $i = 0; $i < 50; $i++ ) {
+			$programme = wp_next_scheduled( MailPolicy::EVENT, $args );
+
+			if ( false === $programme ) {
+				break;
+			}
+
+			wp_unschedule_event( $programme, MailPolicy::EVENT, $args );
+			++$retires;
+		}
+
+		return $retires;
+	}
+
+	/**
+	 * Alias historique.
 	 *
 	 * @param int $id Demande.
 	 * @return void
 	 */
 	public static function unschedule( int $id ): void {
-		$args      = array( $id );
-		$programme = wp_next_scheduled( MailPolicy::EVENT, $args );
-
-		if ( false !== $programme ) {
-			wp_unschedule_event( $programme, MailPolicy::EVENT, $args );
-		}
+		self::unschedule_all( $id );
 	}
 
 	/**
@@ -127,6 +195,12 @@ final class MailScheduler {
 	/**
 	 * Tente d'envoyer la notification d'une demande.
 	 *
+	 * Toute la séquence — relecture, passage à `sending`, rendu, appel au
+	 * transport, écriture du résultat — se déroule sous **un seul** verrou.
+	 * Une ultime vérification d'éligibilité a lieu immédiatement avant l'appel
+	 * au transport : si une mise à la Corbeille a gagné la course entre-temps,
+	 * aucun courriel ne part.
+	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
 	 * @return string Code technique.
@@ -138,11 +212,10 @@ final class MailScheduler {
 			return 'identifiant_invalide';
 		}
 
-		// Une demande supprimée laisse parfois un événement derrière elle :
-		// il doit être sans effet, et faire le ménage de son propre verrou.
+		// Une demande supprimée laisse parfois un événement derrière elle : il
+		// doit être sans effet. Aucun verrou n'est touché ici — il pourrait
+		// appartenir à un autre processus.
 		if ( null === get_post( $id ) ) {
-			MailQueue::release_lock( $id );
-
 			return 'post_absent';
 		}
 
@@ -154,67 +227,140 @@ final class MailScheduler {
 			return $motif;
 		}
 
-		if ( ! MailQueue::acquire_lock( $id, $now ) ) {
-			// Une autre requête traite cette notification en ce moment même.
-			return 'verrou_occupe';
+		$resultat = MailQueue::with_lock(
+			$id,
+			static function ( string $jeton ) use ( $id, $now ) {
+				return self::envoyer_sous_verrou( $id, $jeton, $now );
+			},
+			$now
+		);
+
+		if ( empty( $resultat['ok'] ) ) {
+			return (string) $resultat['code'];
 		}
 
-		try {
-			// Relecture **sous le verrou** : l'autre processus a pu aboutir
-			// entre le contrôle d'éligibilité et la prise du verrou.
-			$motif = MailPolicy::blocker( $id, $now );
+		return (string) $resultat['valeur'];
+	}
 
-			if ( null !== $motif ) {
-				return $motif;
-			}
+	/**
+	 * Séquence d'envoi, exécutée en section critique.
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $jeton Jeton propriétaire.
+	 * @param int    $now   Horodatage courant.
+	 * @return string Code technique.
+	 */
+	private static function envoyer_sous_verrou( int $id, string $jeton, int $now ): string {
+		// Relecture sous verrou : l'état a pu changer entre le contrôle
+		// préalable et l'obtention du verrou.
+		$motif = MailPolicy::blocker( $id, $now );
 
-			$rang = ( (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true ) ) + 1;
+		if ( null !== $motif ) {
+			return $motif;
+		}
 
-			if ( $rang > MailPolicy::MAX_ATTEMPTS ) {
-				MailQueue::mark_failure( $id, $rang, 'attempts_exhausted', $now );
+		$rang = ( (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true ) ) + 1;
 
-				return 'tentatives_epuisees';
-			}
+		if ( $rang > MailPolicy::MAX_ATTEMPTS ) {
+			MailQueue::mark_failure( $id, $rang, 'attempts_exhausted', $now );
 
-			if ( ! MailQueue::mark_sending( $id, $rang, $now ) ) {
-				return 'etat_non_ecrit';
-			}
+			return 'tentatives_epuisees';
+		}
 
-			$message = MailRenderer::render( $id, $now );
+		if ( ! MailQueue::mark_sending( $id, $rang, $now ) ) {
+			return 'etat_non_ecrit';
+		}
 
-			if ( null === $message ) {
-				MailQueue::mark_failure( $id, $rang, 'render_failed', $now );
+		$message = MailRenderer::render( $id, $now );
 
-				return 'rendu_impossible';
-			}
+		if ( null === $message ) {
+			MailQueue::mark_failure( $id, $rang, 'render_failed', $now );
 
-			$resultat = self::transport()->send(
-				$message['to'],
-				$message['subject'],
-				$message['body'],
-				$message['headers']
+			return 'rendu_impossible';
+		}
+
+		// **Ultime vérification, au plus près de l'appel.** Le rendu a pu
+		// prendre du temps ; une mise à la Corbeille a pu aboutir. On relit
+		// l'état réel, cache vidé, et on renonce plutôt que d'envoyer la
+		// notification d'un dossier retiré.
+		if ( ! MailQueue::owns_lock( $id, $jeton, $now ) ) {
+			return 'verrou_perdu';
+		}
+
+		self::oublier_cache( $id );
+
+		// `closed_blocker` et non `blocker` : l'état vaut `sending`, puisque
+		// c'est nous qui venons de l'écrire. Ce qu'on relit, c'est tout le
+		// reste — en particulier le statut natif du contenu.
+		$motif = MailPolicy::closed_blocker( $id );
+
+		if ( null !== $motif ) {
+			// L'état est passé à fermé pendant la préparation : on ne consomme
+			// pas la tentative, la situation n'ayant rien d'un échec technique.
+			Logger::info( sprintf( 'notification #%d abandonnée avant envoi : %s', $id, $motif ) );
+
+			return $motif;
+		}
+
+		$resultat = self::transport()->send(
+			$message['to'],
+			$message['subject'],
+			$message['body'],
+			$message['headers']
+		);
+
+		// Le verrou a-t-il tenu pendant l'appel ? S'il a été repris, un autre
+		// processus est aux commandes : on n'écrase pas son travail.
+		if ( ! MailQueue::owns_lock( $id, $jeton, $now ) ) {
+			Logger::error( sprintf( 'notification #%d : verrou perdu pendant l’envoi', $id ) );
+
+			return 'verrou_perdu';
+		}
+
+		// Dernière garantie avant d'écrire : la demande ne doit pas s'être
+		// fermée pendant l'appel. Si elle l'a fait, l'envoi a bien eu lieu — la
+		// politique « au moins une fois » l'assume — mais on n'écrit pas `sent`
+		// par-dessus une annulation légitime.
+		$ferme = MailPolicy::closed_blocker( $id );
+
+		if ( null !== $ferme ) {
+			Logger::error( sprintf( 'notification #%d : envoi accepté mais demande fermée entre-temps (%s)', $id, $ferme ) );
+
+			return 'ferme_pendant_envoi';
+		}
+
+		if ( ! empty( $resultat['ok'] ) ) {
+			MailQueue::mark_sent( $id, $now );
+
+			Logger::info(
+				sprintf(
+					'notification #%d [%s] acceptée par le transport (tentative %d)',
+					$id,
+					MailPolicy::short_id( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ),
+					$rang
+				)
 			);
 
-			if ( ! empty( $resultat['ok'] ) ) {
-				MailQueue::mark_sent( $id, $now );
+			return 'sent';
+		}
 
-				Logger::info(
-					sprintf(
-						'notification #%d [%s] acceptée par le transport (tentative %d)',
-						$id,
-						MailPolicy::short_id( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ),
-						$rang
-					)
-				);
+		MailQueue::mark_failure( $id, $rang, (string) ( $resultat['code'] ?? 'transport_refused' ), $now );
 
-				return 'sent';
-			}
+		return 'echec';
+	}
 
-			MailQueue::mark_failure( $id, $rang, (string) ( $resultat['code'] ?? 'transport_refused' ), $now );
-
-			return 'echec';
-		} finally {
-			MailQueue::release_lock( $id );
+	/**
+	 * Oublie le cache d'objets d'un contenu.
+	 *
+	 * Sans cela, une relecture de `post_status` pourrait rendre la valeur que
+	 * ce processus a chargée avant que l'autre ne la change.
+	 *
+	 * @param int $id Demande.
+	 * @return void
+	 */
+	private static function oublier_cache( int $id ): void {
+		if ( function_exists( 'clean_post_cache' ) ) {
+			clean_post_cache( $id );
 		}
 	}
 
@@ -256,10 +402,15 @@ final class MailScheduler {
 			$statut = (string) get_post_meta( $id, MailPolicy::META_STATUS, true );
 
 			if ( null === get_post( $id ) ) {
-				self::unschedule( $id );
-				MailQueue::release_lock( $id );
+				self::unschedule_all( $id );
 				++$bilan['orphelins'];
 
+				continue;
+			}
+
+			// Un envoi en cours n'est pas réconcilié : son propriétaire
+			// travaille. Le verrou, et non l'état, fait foi.
+			if ( MailQueue::is_locked( $id, $now ) ) {
 				continue;
 			}
 
@@ -268,12 +419,26 @@ final class MailScheduler {
 					continue;
 				}
 
-				// Envoi abandonné : on le rend de nouveau traitable. Le même
-				// identifiant de notification est conservé.
-				$rang = (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true );
-				MailQueue::mark_failure( $id, max( 1, $rang ), 'sending_stale', $now );
-				MailQueue::release_lock( $id );
-				++$bilan['abandonnees'];
+				// Envoi abandonné, et aucun verrou vivant : on le rend de
+				// nouveau traitable, sous verrou, avec le même identifiant.
+				$reprise = MailQueue::with_lock(
+					$id,
+					static function ( string $jeton ) use ( $id, $now ) {
+						if ( MailPolicy::SENDING !== (string) get_post_meta( $id, MailPolicy::META_STATUS, true ) ) {
+							return false;
+						}
+
+						$rang = (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true );
+						MailQueue::mark_failure( $id, max( 1, $rang ), 'sending_stale', $now );
+
+						return true;
+					},
+					$now
+				);
+
+				if ( ! empty( $reprise['ok'] ) && true === $reprise['valeur'] ) {
+					++$bilan['abandonnees'];
+				}
 
 				continue;
 			}
@@ -285,7 +450,7 @@ final class MailScheduler {
 					continue;
 				}
 
-				if ( self::schedule( $id, $now ) ) {
+				if ( self::schedule_unique( $id, $now ) ) {
 					++$bilan['reprises'];
 				}
 
@@ -293,7 +458,7 @@ final class MailScheduler {
 			}
 
 			// `pending` sans événement programmé.
-			if ( false === wp_next_scheduled( MailPolicy::EVENT, array( $id ) ) && self::schedule( $id, $now ) ) {
+			if ( false === wp_next_scheduled( MailPolicy::EVENT, array( $id ) ) && self::schedule_unique( $id, $now ) ) {
 				++$bilan['planifiees'];
 			}
 		}

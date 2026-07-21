@@ -1430,3 +1430,56 @@ verrou.
 - Le journal du serveur web n'étant pas lisible en SSH chez l'hébergeur,
   l'exploitation ne peut pas en dépendre : tout l'état utile est **persisté et
   consultable depuis l'administration**.
+
+---
+
+## D-039 — Un état partagé se sérialise, il ne se surveille pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-038]
+
+**Contexte.** La première version de la notification prenait un verrou pour
+l'envoi, et pour lui seul. Tout le reste — annulation à la Corbeille,
+restauration, reprise administrative, suppression, planification — écrivait le
+même état sans coordination.
+
+Le défaut a été reproduit sur un vrai WordPress, avec **deux processus
+distincts** : l'un arrêté juste avant le transport, l'autre mettant la demande
+à la Corbeille. Résultat mesuré : la Corbeille aboutissait, `mail_status`
+passait à `cancelled`, puis l'envoi reprenait la main, appelait `wp_mail()` et
+écrivait `sent` **par-dessus** l'annulation. Un courriel partait pour un
+dossier retiré, et la base affirmait le contraire de ce qui s'était passé.
+
+Deux appels successifs dans un même processus n'auraient jamais montré cela :
+ils partagent le cache d'objets, les variables statiques et l'ordre
+d'exécution.
+
+**Décision.** Un **verrou commun par notification**, et toute transition passe
+par lui.
+
+Le verrou porte un jeton propriétaire aléatoire et une échéance — rien d'autre,
+et surtout aucune donnée personnelle. `release_lock()` vérifie le jeton :
+un processus ne peut plus supprimer le verrou d'un autre. Le nettoyage de
+fichiers le faisait, sans le savoir.
+
+**Conséquences.**
+- Mise à la Corbeille et suppression définitive sont **refusées** tant qu'un
+  envoi est en vol. Elles restent rejouables dès le verrou rendu : différer
+  vaut mieux qu'écrire par-dessus quelqu'un.
+- L'éligibilité est relue une dernière fois **immédiatement avant** l'appel au
+  transport, cache d'objets purgé — puis une nouvelle fois après, avant
+  d'écrire `sent`. Si la demande s'est fermée pendant l'appel, le courriel est
+  parti — la politique « au moins une fois » l'assume — mais l'annulation n'est
+  pas écrasée, et le fait est consigné.
+- Le TTL passe de 300 à **600 secondes**, avec un plancher à
+  `max_execution_time + 1`. Un verrou ne doit jamais expirer pendant que son
+  propriétaire peut encore s'exécuter : la production autorise 360 secondes.
+- `schedule_unique()` encadre `wp_next_scheduled()` et
+  `wp_schedule_single_event()` par le verrou. Pris séparément, ces deux appels
+  ne sont pas atomiques : deux processus peuvent constater la même absence.
+- **`sent` est une preuve historique.** Ni la Corbeille, ni la restauration, ni
+  l'action administrative ne l'effacent ou ne le rejouent. `cancelled` ne
+  concerne que `pending`, `retry` et `sending`.
+- La limite demeure, et doit être dite : `wp_mail()` peut avoir rendu `true`
+  juste avant une interruption, sans que `sent` ait été écrit. Dans cet état,
+  nous ne connaissons pas la livraison réelle, et nous ne prétendons pas la
+  connaître.

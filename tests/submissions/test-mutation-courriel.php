@@ -187,11 +187,27 @@ $ms = mutant(
 
 			return \$motif;
 		}" => '		// contrôle d\'éligibilité retiré.',
-		"			\$motif = MailPolicy::blocker( \$id, \$now );
+		"		\$motif = MailPolicy::blocker( \$id, \$now );
 
-			if ( null !== \$motif ) {
-				return \$motif;
-			}" => '			// relecture sous verrou retirée.',
+		if ( null !== \$motif ) {
+			return \$motif;
+		}" => '		// relecture sous verrou retirée.',
+		"		\$motif = MailPolicy::closed_blocker( \$id );
+
+		if ( null !== \$motif ) {
+			// L'état est passé à fermé pendant la préparation : on ne consomme
+			// pas la tentative, la situation n'ayant rien d'un échec technique.
+			Logger::info( sprintf( 'notification #%d abandonnée avant envoi : %s', \$id, \$motif ) );
+
+			return \$motif;
+		}" => '		// ultime vérification retirée.',
+		"		\$ferme = MailPolicy::closed_blocker( \$id );
+
+		if ( null !== \$ferme ) {
+			Logger::error( sprintf( 'notification #%d : envoi accepté mais demande fermée entre-temps (%s)', \$id, \$ferme ) );
+
+			return 'ferme_pendant_envoi';
+		}" => '		// contrôle postérieur retiré.',
 	)
 );
 
@@ -265,10 +281,21 @@ check( '7 · le dépôt refuse', 'documents_non_finaux' === MailPolicy::blocker(
 $ms2 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
-	array( "		if ( ! MailQueue::acquire_lock( \$id, \$now ) ) {
-			// Une autre requête traite cette notification en ce moment même.
-			return 'verrou_occupe';
-		}" => '		// verrou retiré.' )
+	array( "		\$resultat = MailQueue::with_lock(
+			\$id,
+			static function ( string \$jeton ) use ( \$id, \$now ) {
+				return self::envoyer_sous_verrou( \$id, \$jeton, \$now );
+			},
+			\$now
+		);
+
+		if ( empty( \$resultat['ok'] ) ) {
+			return (string) \$resultat['code'];
+		}
+
+		return (string) \$resultat['valeur'];" =>
+		"		return self::envoyer_sous_verrou( \$id, 'jeton-mute', \$now );",
+		'MailQueue::owns_lock(' => 'true || MailQueue::owns_lock(' )
 );
 
 neuf();
@@ -302,10 +329,21 @@ $ms_concurrent = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array(
-		"		if ( ! MailQueue::acquire_lock( \$id, \$now ) ) {
-			// Une autre requête traite cette notification en ce moment même.
-			return 'verrou_occupe';
-		}" => '		// verrou retiré.',
+		"		\$resultat = MailQueue::with_lock(
+			\$id,
+			static function ( string \$jeton ) use ( \$id, \$now ) {
+				return self::envoyer_sous_verrou( \$id, \$jeton, \$now );
+			},
+			\$now
+		);
+
+		if ( empty( \$resultat['ok'] ) ) {
+			return (string) \$resultat['code'];
+		}
+
+		return (string) \$resultat['valeur'];" =>
+		"		return self::envoyer_sous_verrou( \$id, 'jeton-mute', \$now );",
+		'MailQueue::owns_lock(' => 'true || MailQueue::owns_lock(',
 		'MailPolicy::' => $mp_concurrent . '::',
 	)
 );
@@ -341,8 +379,8 @@ check( '9 · le dépôt n’envoie qu’une fois', 1 === count( $transport->envo
 $ms3 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
-	array( "			if ( ! empty( \$resultat['ok'] ) ) {
-				MailQueue::mark_sent( \$id, \$now );" => "			if ( ! empty( \$resultat['ok'] ) ) {" )
+	array( "		if ( ! empty( \$resultat['ok'] ) ) {
+			MailQueue::mark_sent( \$id, \$now );" => "		if ( ! empty( \$resultat['ok'] ) ) {" )
 );
 
 neuf();
@@ -363,7 +401,9 @@ check( '10 · le dépôt enregistre sent', MailPolicy::SENT === get_post_meta( $
 $ms4 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
-	array( "			if ( ! empty( \$resultat['ok'] ) ) {" => '			if ( true ) {' )
+	array( "		if ( ! empty( \$resultat['ok'] ) ) {
+			MailQueue::mark_sent( \$id, \$now );" => "		if ( true ) {
+			MailQueue::mark_sent( \$id, \$now );" )
 );
 
 neuf();
@@ -568,10 +608,30 @@ $ms5 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array( "		if ( null === get_post( \$id ) ) {
-			MailQueue::release_lock( \$id );
-
 			return 'post_absent';
 		}" => '		// garde du post absent retirée.' )
+);
+
+// Deux barrières se superposent : la garde de `process()` et le contrôle de
+// `blocker()`. Retirer l'une seule ne change rien — c'est mesurable, et c'est
+// dit. On les retire donc toutes les deux pour observer la conséquence.
+$mp_absent = mutant(
+	'src/Mail/MailPolicy.php',
+	'MailPolicy',
+	array( "		if ( ! \$post || SubmissionPostType::POST_TYPE !== \$post->post_type ) {
+			return 'post_absent';
+		}" => '		// contrôle du post retiré.' )
+);
+
+$ms_absent = mutant(
+	'src/Mail/MailScheduler.php',
+	'MailScheduler',
+	array(
+		"		if ( null === get_post( \$id ) ) {
+			return 'post_absent';
+		}" => '		// garde du post absent retirée.',
+		'MailPolicy::' => $mp_absent . '::',
+	)
 );
 
 neuf();
@@ -579,30 +639,46 @@ $d  = demande();
 $id = $d['id'];
 wp_trash_post( $id );
 wp_delete_post( $id, true );
-add_option( MailPolicy::LOCK_PREFIX . $id, array( 'expires' => wpd_now() + 300 ), '', false );
 $ms5::set_transport( $transport );
-$ms5::process( $id, wpd_now() );
 
-check( '21 · garde retirée → LE VERROU D’UNE DEMANDE SUPPRIMÉE SUBSISTE',
-	false !== get_option( MailPolicy::LOCK_PREFIX . $id, false ) );
+check( '21 · garde seule retirée, blocker protège encore', 'post_absent' === $ms5::process( $id, wpd_now() ) );
+
+$ms_absent::set_transport( $transport );
+
+check( '21 · les DEUX barrières retirées → le traitement va plus loin',
+	'post_absent' !== $ms_absent::process( $id, wpd_now() ) );
 
 neuf();
 $d  = demande();
 $id = $d['id'];
 wp_trash_post( $id );
 wp_delete_post( $id, true );
-add_option( MailPolicy::LOCK_PREFIX . $id, array( 'expires' => wpd_now() + 300 ), '', false );
 
 check( '21 · le dépôt s’arrête net', 'post_absent' === MailScheduler::process( $id, wpd_now() ) );
-check( '21 · et nettoie le verrou', false === get_option( MailPolicy::LOCK_PREFIX . $id, false ) );
 check( '21 · et n’envoie rien', array() === $transport->envois );
+check( '21 · un verrou appartenant à autrui n’est pas volé',
+	( static function () use ( $id ) {
+		add_option( MailPolicy::LOCK_PREFIX . $id, array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+		MailScheduler::process( $id, wpd_now() );
+		$reste = get_option( MailPolicy::LOCK_PREFIX . $id, false );
+		delete_option( MailPolicy::LOCK_PREFIX . $id );
+
+		return is_array( $reste ) && 'autrui' === ( $reste['owner'] ?? '' );
+	} )() );
 
 // ====== 22 · une notification annulée est envoyée pendant la Corbeille ====
 $tg = mutant(
 	'src/Submissions/TrashGuard.php',
 	'TrashGuard',
-	array( "		MailQueue::cancel( \$id, 'demande_en_corbeille' );
-		MailScheduler::unschedule( \$id );" => '		// annulation de la notification retirée.' )
+	array( "		MailQueue::with_lock(
+			\$id,
+			static function ( string \$jeton ) use ( \$id ) {
+				MailQueue::cancel( \$id, 'demande_en_corbeille' );
+				MailScheduler::unschedule_all( \$id );
+
+				return true;
+			}
+		);" => '		// annulation de la notification retirée.' )
 );
 
 neuf();
@@ -659,5 +735,398 @@ check( '24 · elle n’envoie pas elle-même',
 	! str_contains( $source_admin, 'MailScheduler::process' ) && ! str_contains( $source_admin, 'wp_mail' ) );
 check( '24 · elle n’est pas accrochée en nopriv',
 	! str_contains( $source_admin, 'admin_post_nopriv_' ) );
+
+// ====== 25 · TrashGuard n'utilise plus le verrou commun ==================
+// Sans verrou, l'annulation s'écrit alors qu'un envoi peut être en vol.
+$tg25 = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( MailQueue::is_locked( \$id ) ) {
+			Logger::error( sprintf( 'corbeille différée pour #%d : notification en cours d’envoi', \$id ) );
+
+			return false;
+		}" => '		// refus pendant un envoi retiré.',
+	)
+);
+
+neuf();
+wpd_clear_filter( 'pre_trash_post' );
+wpd_clear_action( 'trashed_post' );
+$tg25::register();
+$d = demande();
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'envoyeur', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '25 · garde retirée → LA CORBEILLE PASSE PENDANT UN ENVOI', false !== wp_trash_post( $d['id'] ) );
+
+neuf();
+$d = demande();
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'envoyeur', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '25 · le dépôt refuse la Corbeille', false === wp_trash_post( $d['id'] ) );
+check( '25 · le contenu reste privé', 'private' === get_post( $d['id'] )->post_status );
+check( '25 · et la notification n’est pas annulée', MailPolicy::PENDING === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '25 · verrou rendu, la Corbeille aboutit', false !== wp_trash_post( $d['id'] ) );
+
+// ====== 26 · FileCleaner ne vérifie plus le verrou =======================
+$fc = mutant(
+	'src/Files/FileCleaner.php',
+	'FileCleaner',
+	array( "		if ( MailQueue::is_locked( \$id ) ) {
+			Logger::error( sprintf( 'suppression bloquée pour #%d : notification en cours d’envoi', \$id ) );
+
+			return false;
+		}" => '		// refus pendant un envoi retiré.' )
+);
+
+neuf();
+$d = demande( 1 );
+wp_trash_post( $d['id'] );
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'envoyeur', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '26 · garde retirée → la suppression n’est plus bloquée',
+	false !== $fc::guard_delete( null, get_post( $d['id'] ), true ) );
+
+neuf();
+$d = demande( 1 );
+wp_trash_post( $d['id'] );
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'envoyeur', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '26 · le dépôt bloque la suppression', false === FileCleaner::guard_delete( null, get_post( $d['id'] ), true ) );
+check( '26 · les documents sont conservés', 1 === fx_compte_fichiers() );
+
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+// ====== 27 · l'ultime vérification avant le transport disparaît ==========
+$ms27 = mutant(
+	'src/Mail/MailScheduler.php',
+	'MailScheduler',
+	array( "		\$motif = MailPolicy::closed_blocker( \$id );
+
+		if ( null !== \$motif ) {
+			// L'état est passé à fermé pendant la préparation : on ne consomme
+			// pas la tentative, la situation n'ayant rien d'un échec technique.
+			Logger::info( sprintf( 'notification #%d abandonnée avant envoi : %s', \$id, \$motif ) );
+
+			return \$motif;
+		}" => '		// ultime vérification retirée.' )
+);
+
+/** Transport qui ferme la demande juste avant d'envoyer. */
+final class TransportSaboteur implements MailTransport {
+
+	public int $id = 0;
+
+	/** @var array<int, string> */
+	public array $envois = array();
+
+	public function send( string $d, string $s, string $c, array $e ): array {
+		// Une Corbeille concurrente gagne la course à cet instant précis.
+		get_post( $this->id )->post_status = 'trash';
+		$this->envois[] = $s;
+
+		return array( 'ok' => true, 'code' => 'accepted' );
+	}
+}
+
+// Le sabotage doit intervenir AVANT l'appel : on ferme la demande pendant le
+// rendu, en s'accrochant à un filtre traversé par le rendu.
+neuf();
+$d = demande( 1 );
+add_filter( 'urbizen_signed_link_ttl', static function ( $ttl ) use ( $d ) {
+	get_post( $d['id'] )->post_status = 'trash';
+
+	return $ttl;
+}, 10, 1 );
+
+$ms27::set_transport( $transport );
+$ms27::process( $d['id'], wpd_now() );
+
+check( '27 · vérification retirée → UN COURRIEL PART POUR UNE DEMANDE FERMÉE', 1 === count( $transport->envois ) );
+
+neuf();
+$d = demande( 1 );
+add_filter( 'urbizen_signed_link_ttl', static function ( $ttl ) use ( $d ) {
+	get_post( $d['id'] )->post_status = 'trash';
+
+	return $ttl;
+}, 10, 1 );
+
+$refus = MailScheduler::process( $d['id'], wpd_now() );
+
+check( '27 · le dépôt renonce avant d’envoyer', array() === $transport->envois );
+check( '27 · et le dit', 'post_status_inattendu' === $refus );
+
+// ====== 28 · sent écrasé par cancelled ===================================
+$mq28 = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "		if ( ! in_array( \$statut, array( MailPolicy::PENDING, MailPolicy::RETRY, MailPolicy::SENDING ), true ) ) {
+			return false;
+		}" => '		// garde des états annulables retirée.' )
+);
+
+neuf();
+$d = demande();
+MailScheduler::process( $d['id'], wpd_now() );
+$mq28::cancel( $d['id'], 'essai' );
+
+check( '28 · garde retirée → SENT DEVIENT CANCELLED', MailPolicy::CANCELLED === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+neuf();
+$d = demande();
+MailScheduler::process( $d['id'], wpd_now() );
+MailQueue::cancel( $d['id'], 'essai' );
+
+check( '28 · le dépôt conserve sent', MailPolicy::SENT === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+wp_trash_post( $d['id'] );
+
+check( '28 · la Corbeille ne l’efface pas non plus', MailPolicy::SENT === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+check( '28 · et sent_at est conservé', '' !== get_post_meta( $d['id'], MailPolicy::META_SENT_AT, true ) );
+
+// ====== 29 · cancelled écrasé par sent ===================================
+$ms29 = mutant(
+	'src/Mail/MailScheduler.php',
+	'MailScheduler',
+	array( "		\$ferme = MailPolicy::closed_blocker( \$id );
+
+		if ( null !== \$ferme ) {
+			Logger::error( sprintf( 'notification #%d : envoi accepté mais demande fermée entre-temps (%s)', \$id, \$ferme ) );
+
+			return 'ferme_pendant_envoi';
+		}" => '		// contrôle postérieur retiré.' )
+);
+
+/** Ferme la demande pendant l'appel au transport. */
+final class TransportFermeur implements MailTransport {
+
+	public int $id = 0;
+
+	public function send( string $d, string $s, string $c, array $e ): array {
+		get_post( $this->id )->post_status = 'trash';
+		update_post_meta( $this->id, '_urbizen_mail_status', 'cancelled' );
+
+		return array( 'ok' => true, 'code' => 'accepted' );
+	}
+}
+
+$fermeur = new TransportFermeur();
+
+neuf();
+$d            = demande();
+$fermeur->id  = $d['id'];
+$ms29::set_transport( $fermeur );
+$ms29::process( $d['id'], wpd_now() );
+
+check( '29 · contrôle retiré → CANCELLED DEVIENT SENT', MailPolicy::SENT === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+neuf();
+$d           = demande();
+$fermeur->id = $d['id'];
+MailScheduler::set_transport( $fermeur );
+$resultat    = MailScheduler::process( $d['id'], wpd_now() );
+
+check( '29 · le dépôt n’écrase pas l’annulation', MailPolicy::CANCELLED === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+check( '29 · et le signale', 'ferme_pendant_envoi' === $resultat );
+
+MailScheduler::set_transport( $transport );
+
+// ====== 30 · le TTL repasse sous le temps d'exécution maximal ============
+$mp30 = mutant(
+	'src/Mail/MailPolicy.php',
+	'MailPolicy',
+	array( "		return max( self::MAX_EXECUTION + 1, \$filtre );" => '		return $filtre;' )
+);
+
+wpd_clear_filter( 'urbizen_mail_lock_ttl' );
+add_filter( 'urbizen_mail_lock_ttl', static fn() => 300 );
+
+check( '30 · plancher retiré → LE TTL REPASSE SOUS 360 s', 300 === $mp30::lock_ttl() );
+check( '30 · le dépôt refuse de descendre sous le maximum d’exécution',
+	MailPolicy::lock_ttl() > MailPolicy::MAX_EXECUTION );
+check( '30 · le défaut vaut 600 s', 600 === MailPolicy::LOCK_TTL );
+
+wpd_clear_filter( 'urbizen_mail_lock_ttl' );
+
+// ====== 31 · un ancien propriétaire supprime le verrou repris ============
+$mq31 = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "		if ( ! hash_equals( (string) ( \$existant['owner'] ?? '' ), \$jeton ) ) {
+			// Le verrou appartient à quelqu'un d'autre : on n'y touche pas.
+			return false;
+		}" => '		// contrôle du propriétaire retiré.' )
+);
+
+neuf();
+$d      = demande();
+$ancien = MailQueue::acquire_lock( $d['id'], wpd_now() );
+$repris = MailQueue::acquire_lock( $d['id'], wpd_now() + MailPolicy::lock_ttl() + 1 );
+
+check( '31 · le verrou a bien été repris', is_string( $repris ) && $ancien !== $repris );
+check( '31 · contrôle retiré → L’ANCIEN SUPPRIME LE VERROU DU NOUVEAU',
+	true === $mq31::release_lock( $d['id'], (string) $ancien ) );
+
+neuf();
+$d      = demande();
+$ancien = MailQueue::acquire_lock( $d['id'], wpd_now() );
+$repris = MailQueue::acquire_lock( $d['id'], wpd_now() + MailPolicy::lock_ttl() + 1 );
+
+check( '31 · le dépôt refuse', false === MailQueue::release_lock( $d['id'], (string) $ancien ) );
+check( '31 · le verrou du nouveau tient', false !== get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+check( '31 · le nouveau peut le rendre', true === MailQueue::release_lock( $d['id'], (string) $repris ) );
+
+// ====== 32 · schedule_unique n'est plus atomique =========================
+$source_ms = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailScheduler.php' );
+
+check( '32 · la planification est encadrée par le verrou',
+	str_contains( $source_ms, 'MailQueue::with_lock(' ) && str_contains( $source_ms, 'poser_evenement' ) );
+check( '32 · la vérification et la création sont dans la même méthode privée',
+	1 === preg_match( '/private static function poser_evenement.*?wp_next_scheduled.*?wp_schedule_single_event/s', $source_ms ) );
+// Commentaires retirés : parler de la fonction est permis, l'appeler ailleurs
+// ne l'est pas.
+$code_ms = implode(
+	'',
+	array_map(
+		static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+		token_get_all( $source_ms )
+	)
+);
+
+check( '32 · aucune planification directe hors de ce chemin',
+	1 === substr_count( $code_ms, 'wp_schedule_single_event(' ) );
+
+$ms32 = mutant(
+	'src/Mail/MailScheduler.php',
+	'MailScheduler',
+	array( "		\$resultat = MailQueue::with_lock(
+			\$id,
+			static fn( string \$propre ) => self::poser_evenement( \$id, \$now ),
+			\$now
+		);
+
+		return ! empty( \$resultat['ok'] ) && true === \$resultat['valeur'];" =>
+		"		return self::poser_evenement( \$id, \$now );" )
+);
+
+neuf();
+$d = demande();
+MailScheduler::unschedule_all( $d['id'] );
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '32 · verrou retiré → la planification passe outre un verrou tenu',
+	true === $ms32::schedule_unique( $d['id'], wpd_now() ) );
+
+neuf();
+$d = demande();
+MailScheduler::unschedule_all( $d['id'] );
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '32 · le dépôt attend le verrou', false === MailScheduler::schedule_unique( $d['id'], wpd_now() ) );
+check( '32 · et n’a rien planifié', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
+
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+// ====== 33 · l'action administrative ne prend plus le verrou =============
+$source_admin2 = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Admin/SubmissionsAdmin.php' );
+
+check( '33 · la reprise passe par le verrou commun', str_contains( $source_admin2, 'MailQueue::with_lock(' ) );
+check( '33 · elle relit l’état sous le verrou',
+	1 === preg_match( '/with_lock\(.*?get_post_meta\(\s*\$id,\s*MailPolicy::META_STATUS/s', $source_admin2 ) );
+check( '33 · et planifie sous le même jeton', str_contains( $source_admin2, 'schedule_unique( $id, null, $jeton )' ) );
+
+// ====== 34 · la restauration replanifie une notification sent ============
+// Deux barrières se superposent : les gardes de la restauration, et le refus
+// de `requeue()` sur un état `sent`. On les retire ensemble pour observer la
+// conséquence, puis on vérifie que chacune, seule, suffit.
+$mq34 = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "		// Un envoi déjà accepté ne se rejoue jamais tout seul.
+		if ( MailPolicy::SENT === \$statut ) {
+			return false;
+		}" => '		// garde du sent retirée de requeue.' )
+);
+
+$tg34 = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"				if ( MailPolicy::CANCELLED !== (string) get_post_meta( \$id, MailPolicy::META_STATUS, true ) ) {
+					return false;
+				}
+
+				if ( '' !== (string) get_post_meta( \$id, MailPolicy::META_SENT_AT, true ) ) {
+					return false;
+				}" => '				// gardes du sent retirées.',
+		'MailQueue::requeue(' => $mq34 . '::requeue(',
+	)
+);
+
+neuf();
+wpd_clear_filter( 'pre_trash_post' );
+wpd_clear_action( 'trashed_post' );
+wpd_clear_filter( 'pre_untrash_post' );
+wpd_clear_action( 'untrashed_post' );
+wpd_clear_filter( 'wp_untrash_post_status' );
+$tg34::register();
+$d = demande();
+MailScheduler::process( $d['id'], wpd_now() );
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '34 · les DEUX gardes retirées → UNE NOTIFICATION ENVOYÉE EST REMISE EN ATTENTE',
+	MailPolicy::PENDING === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+// La garde de `requeue()`, seule, suffit : sur une notification réellement
+// `sent`, elle refuse.
+neuf();
+$s34 = demande();
+MailScheduler::process( $s34['id'], wpd_now() );
+
+check( '34 · la garde de requeue, seule, suffit', false === MailQueue::requeue( $s34['id'], wpd_now() ) );
+check( '34 · et la notification reste sent', MailPolicy::SENT === get_post_meta( $s34['id'], MailPolicy::META_STATUS, true ) );
+
+neuf();
+$d = demande();
+MailScheduler::process( $d['id'], wpd_now() );
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '34 · le dépôt la laisse à sent', MailPolicy::SENT === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+check( '34 · aucun événement replanifié', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
+check( '34 · un seul envoi au total', 1 === count( $transport->envois ) );
+
+// ====== 35 · une clé générique _mail_* est persistée =====================
+neuf();
+$d = demande( 1 );
+MailScheduler::process( $d['id'], wpd_now() );
+
+$cles = array_keys( $GLOBALS['wpd_meta'][ $d['id'] ] ?? array() );
+
+$fautives = array_filter(
+	$cles,
+	static fn( $c ) => str_starts_with( (string) $c, '_mail_' )
+		|| ( str_contains( (string) $c, 'mail' ) && ! str_starts_with( (string) $c, '_urbizen_mail_' ) )
+);
+
+check( '35 · aucune clé générique _mail_*', array() === $fautives );
+check( '35 · les sept clés de notification sont bien préfixées',
+	array() === array_diff(
+		array(
+			MailPolicy::META_STATUS,
+			MailPolicy::META_ID,
+			MailPolicy::META_ATTEMPTS,
+			MailPolicy::META_LAST_ATTEMPT,
+			MailPolicy::META_SENT_AT,
+		),
+		array_filter( $cles, static fn( $c ) => str_starts_with( (string) $c, '_urbizen_mail_' ) )
+	) );
+check( '35 · le code ne référence aucune clé générique',
+	! str_contains( (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailPolicy.php' ), "'_mail_" ) );
+
 
 verdict();

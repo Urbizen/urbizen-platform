@@ -812,4 +812,147 @@ check( '12 · une notification envoyée est refusée',
 check( '12 · elle reste envoyée', MailPolicy::SENT === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
 
 
+// ======================================================================
+// 13 · VERROU : PROPRIÉTÉ ET DURÉE
+// ======================================================================
+neuf();
+$d = demande();
+
+$jeton = MailQueue::acquire_lock( $d['id'], wpd_now() );
+
+check( '13 · le verrou rend un jeton', is_string( $jeton ) && 32 === strlen( (string) $jeton ) );
+check( '13 · il ne contient aucune donnée personnelle',
+	1 === preg_match( '/^[0-9a-f]{32}$/', (string) $jeton ) );
+check( '13 · le verrou porte un propriétaire et une échéance',
+	is_array( get_option( MailPolicy::LOCK_PREFIX . $d['id'] ) )
+	&& isset( get_option( MailPolicy::LOCK_PREFIX . $d['id'] )['owner'], get_option( MailPolicy::LOCK_PREFIX . $d['id'] )['expires'] ) );
+check( '13 · et rien d’autre',
+	array( 'owner', 'expires' ) === array_keys( get_option( MailPolicy::LOCK_PREFIX . $d['id'] ) ) );
+check( '13 · autoload = false', 'no' === wpd_autoload( MailPolicy::LOCK_PREFIX . $d['id'] ) );
+check( '13 · un second appel est refusé', null === MailQueue::acquire_lock( $d['id'], wpd_now() ) );
+check( '13 · le propriétaire se reconnaît', MailQueue::owns_lock( $d['id'], (string) $jeton, wpd_now() ) );
+check( '13 · un jeton inventé, non', false === MailQueue::owns_lock( $d['id'], str_repeat( 'a', 32 ), wpd_now() ) );
+check( '13 · un jeton vide, non plus', false === MailQueue::owns_lock( $d['id'], '', wpd_now() ) );
+check( '13 · un tiers ne peut pas libérer', false === MailQueue::release_lock( $d['id'], str_repeat( 'b', 32 ) ) );
+check( '13 · le verrou tient toujours', false !== get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+check( '13 · le propriétaire libère', true === MailQueue::release_lock( $d['id'], (string) $jeton ) );
+check( '13 · plus aucune option', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+// --- durée ---
+$jeton = MailQueue::acquire_lock( $d['id'], 1000000 );
+
+check( '13 · propriétaire actif à 299 s', MailQueue::owns_lock( $d['id'], (string) $jeton, 1000299 ) );
+check( '13 · propriétaire actif à 359 s', MailQueue::owns_lock( $d['id'], (string) $jeton, 1000359 ) );
+check( '13 · verrou non repris à 599 s', null === MailQueue::acquire_lock( $d['id'], 1000599 ) );
+
+$repris = MailQueue::acquire_lock( $d['id'], 1000601 );
+
+check( '13 · verrou repris après expiration', is_string( $repris ) );
+check( '13 · avec un jeton neuf', $repris !== $jeton );
+check( '13 · L’ANCIEN NE PEUT PLUS LIBÉRER', false === MailQueue::release_lock( $d['id'], (string) $jeton ) );
+check( '13 · ni se croire propriétaire', false === MailQueue::owns_lock( $d['id'], (string) $jeton, 1000601 ) );
+
+MailQueue::release_lock( $d['id'], (string) $repris );
+
+check( '13 · le TTL dépasse le temps d’exécution maximal', MailPolicy::lock_ttl() > MailPolicy::MAX_EXECUTION );
+check( '13 · un filtre ne peut pas descendre sous ce plancher',
+	( static function () {
+		add_filter( 'urbizen_mail_lock_ttl', static fn() => 10 );
+		$ttl = MailPolicy::lock_ttl();
+		wpd_clear_filter( 'urbizen_mail_lock_ttl' );
+
+		return $ttl > MailPolicy::MAX_EXECUTION;
+	} )() );
+
+// --- with_lock ---
+neuf();
+$d = demande();
+
+$resultat = MailQueue::with_lock( $d['id'], static fn( string $j ) => 'travail-' . strlen( $j ) );
+
+check( '13 · with_lock exécute et rend la valeur', 'travail-32' === $resultat['valeur'] );
+check( '13 · et libère derrière lui', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+$resultat = MailQueue::with_lock(
+	$d['id'],
+	static function ( string $j ) use ( $d ) {
+		// Verrou occupé pendant le travail : un second appel doit échouer.
+		return MailQueue::with_lock( $d['id'], static fn() => 'jamais' );
+	}
+);
+
+check( '13 · un appel imbriqué constate le verrou', 'verrou_occupe' === ( $resultat['valeur']['code'] ?? '' ) );
+check( '13 · et le verrou est bien rendu à la fin', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+// Une exception ne laisse pas de verrou derrière elle.
+try {
+	MailQueue::with_lock( $d['id'], static function () { throw new RuntimeException( 'panne' ); } );
+} catch ( Throwable $e ) {
+	// attendu
+}
+
+check( '13 · une exception ne laisse aucun verrou', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+// ======================================================================
+// 14 · SÉRIALISATION DES TRANSITIONS
+// ======================================================================
+neuf();
+$d = demande();
+
+// Un envoi est en vol : le verrou est tenu par un autre.
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'envoyeur', 'expires' => wpd_now() + 600 ), '', false );
+
+check( '14 · la Corbeille est refusée pendant un envoi', false === wp_trash_post( $d['id'] ) );
+check( '14 · le contenu reste privé', 'private' === get_post( $d['id'] )->post_status );
+check( '14 · la notification n’est pas annulée', MailPolicy::PENDING === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+check( '14 · la suppression est refusée aussi', false === FileCleaner::guard_delete( null, get_post( $d['id'] ), true ) );
+check( '14 · aucun document supprimé', 0 === fx_compte_fichiers() );
+
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '14 · verrou rendu, la Corbeille aboutit', false !== wp_trash_post( $d['id'] ) );
+check( '14 · et la notification est annulée', MailPolicy::CANCELLED === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+check( '14 · aucun verrou résiduel', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+// --- l'état fermé gagne : aucun envoi ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+check( '14 · un envoi ultérieur ne fait rien', 'post_status_inattendu' === MailScheduler::process( $d['id'], wpd_now() ) );
+check( '14 · et n’appelle pas le transport', array() === $transport->envois );
+check( '14 · cancelled n’est pas devenu sent', MailPolicy::CANCELLED === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+// --- planification atomique ---
+neuf();
+$d = demande();
+MailScheduler::unschedule_all( $d['id'] );
+
+check( '14 · aucun événement au départ', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
+
+$a = MailScheduler::schedule_unique( $d['id'], wpd_now() );
+$b = MailScheduler::schedule_unique( $d['id'], wpd_now() );
+$c = MailScheduler::schedule_unique( $d['id'], wpd_now() );
+
+check( '14 · trois planifications, un seul événement',
+	$a && $b && $c && 1 === count( $GLOBALS['wpd_cron'][ MailPolicy::EVENT ] ) );
+check( '14 · aucun verrou résiduel', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+
+// Un verrou tenu par un tiers empêche toute planification.
+add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+MailScheduler::unschedule_all( $d['id'] );
+
+check( '14 · verrou tenu → aucune planification', false === MailScheduler::schedule_unique( $d['id'], wpd_now() ) );
+check( '14 · et aucun événement créé', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
+
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+// --- unschedule_all retire les doublons ---
+wp_schedule_single_event( wpd_now(), MailPolicy::EVENT, array( $d['id'] ) );
+
+check( '14 · unschedule_all retire tout', 1 === MailScheduler::unschedule_all( $d['id'] ) );
+check( '14 · plus aucun événement', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
+check( '14 · et il est idempotent', 0 === MailScheduler::unschedule_all( $d['id'] ) );
+
+
 verdict();
