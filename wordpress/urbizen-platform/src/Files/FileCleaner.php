@@ -26,6 +26,8 @@ namespace Urbizen\Platform\Files;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Submissions\TrashGuard;
+use Urbizen\Platform\Mail\MailQueue;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -217,6 +219,12 @@ final class FileCleaner {
 				'failed'  => $echecs,
 			);
 		}
+
+		// Un événement de notification programmé pour une demande en cours de
+		// suppression doit devenir sans effet. La réservation `attributed`
+		// n'est pas touchée : elle garantit qu'un numéro ne sera pas réattribué.
+		MailScheduler::unschedule( $submission );
+		MailQueue::release_lock( $submission );
 
 		Storage::delete_files( $reference, array() );
 

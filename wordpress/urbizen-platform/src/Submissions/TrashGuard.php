@@ -27,6 +27,9 @@
 
 namespace Urbizen\Platform\Submissions;
 
+use Urbizen\Platform\Mail\MailPolicy;
+use Urbizen\Platform\Mail\MailQueue;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -238,6 +241,11 @@ final class TrashGuard {
 
 		$transition['state'] = self::COMPLETED;
 		update_post_meta( $id, self::TRANSITION, (string) wp_json_encode( $transition ) );
+
+		// Une demande retirée ne se notifie pas. Un envoi déjà accepté n'est
+		// en revanche jamais annulé : le message est parti, le nier serait faux.
+		MailQueue::cancel( $id, 'demande_en_corbeille' );
+		MailScheduler::unschedule( $id );
 
 		Logger::info( sprintf( 'demande #%d : mise à la Corbeille confirmée', $id ) );
 	}
@@ -566,6 +574,16 @@ final class TrashGuard {
 		// supprimer plus tôt priverait tout diagnostic ultérieur.
 		delete_post_meta( $id, self::PRE_TRASH );
 		delete_post_meta( $id, self::TRANSITION );
+
+		// La notification annulée par la mise à la Corbeille reprend son cours,
+		// avec le même identifiant. Une notification déjà `sent` n'est jamais
+		// réémise automatiquement.
+		if ( MailPolicy::CANCELLED === (string) get_post_meta( $id, MailPolicy::META_STATUS, true )
+			&& '' === (string) get_post_meta( $id, MailPolicy::META_SENT_AT, true )
+			&& MailQueue::requeue( $id )
+		) {
+			MailScheduler::schedule( $id );
+		}
 
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
 	}

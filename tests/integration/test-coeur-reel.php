@@ -54,6 +54,16 @@ foreach (
 		'src/Submissions/SubmissionRepository.php',
 		'src/Submissions/TransactionRecovery.php',
 		'src/Submissions/TrashGuard.php',
+		'src/Files/UploadPolicy.php',
+		'src/Files/UploadNormalizer.php',
+		'src/Files/Storage.php',
+		'src/Files/SignedLink.php',
+		'src/Mail/MailPolicy.php',
+		'src/Mail/MailQueue.php',
+		'src/Mail/MailRenderer.php',
+		'src/Mail/MailTransport.php',
+		'src/Mail/WordPressMailTransport.php',
+		'src/Mail/MailScheduler.php',
 	) as $fichier
 ) {
 	require_once URBIZEN_PLATFORM_DIR . $fichier;
@@ -63,6 +73,8 @@ use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
+use Urbizen\Platform\Mail\MailPolicy;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Submissions\TrashGuard;
 
 SubmissionPostType::register_post_type();
@@ -252,6 +264,133 @@ verifier( '10 · avec le statut métier exact', 'received' === get_post_meta( $i
 // Ménage : ce banc ne laisse rien derrière lui.
 delete_option( SubmissionRepository::RESERVATION_PREFIX . $ref );
 wp_delete_post( $id, true );
+
+
+// ======================================================================
+// 11 · NOTIFICATION ADMINISTRATIVE, SUR LE VRAI CŒUR
+// ======================================================================
+// Aucun courriel ne part réellement : `pre_wp_mail` court-circuite l'envoi et
+// capture ce que WordPress s'apprêtait à transmettre. Le chemin traversé est
+// bien celui de production — `WordPressMailTransport` appelle `wp_mail()`.
+
+$captures = array();
+$reponse  = true;
+
+add_filter(
+	'pre_wp_mail',
+	static function ( $court, $atts ) use ( &$captures, &$reponse ) {
+		$captures[] = $atts;
+
+		return $reponse;
+	},
+	10,
+	2
+);
+
+add_filter( 'urbizen_mail_retry_delays', static fn() => array( 1 => 0, 2 => 1, 3 => 2, 4 => 3, 5 => 4 ) );
+update_option( 'admin_email', 'dossiers@urbizen.test' );
+
+MailScheduler::register();
+
+$creation = SubmissionRepository::create( $validation['clean'], $validation['pricing'], array( 'now' => time() ) );
+$mid      = (int) ( $creation['id'] ?? 0 );
+$mref     = (string) ( $creation['reference'] ?? '' );
+
+verifier( '11 · la demande est finalisée', ! empty( $creation['ok'] ) );
+verifier( '11 · mail_status = pending', MailPolicy::PENDING === get_post_meta( $mid, MailPolicy::META_STATUS, true ) );
+verifier( '11 · un identifiant de notification est présent',
+	1 === preg_match( '/^[0-9a-f]{32}$/', (string) get_post_meta( $mid, MailPolicy::META_ID, true ) ) );
+verifier( '11 · un événement cron unique est planifié', false !== wp_next_scheduled( MailPolicy::EVENT, array( $mid ) ) );
+verifier( '11 · aucun courriel n’est encore parti', array() === $captures );
+
+// Persistance : réécrire une valeur identique n'est pas un échec.
+verifier( '11 · update_post_meta rend false sur une valeur identique',
+	false === update_post_meta( $mid, MailPolicy::META_STATUS, MailPolicy::PENDING ) );
+verifier( '11 · persist_meta y voit malgré tout un succès',
+	true === SubmissionRepository::persist_meta( $mid, MailPolicy::META_STATUS, MailPolicy::PENDING ) );
+
+// Exécution réelle de l'événement.
+do_action( MailPolicy::EVENT, $mid );
+
+verifier( '11 · l’événement a déclenché un envoi', 1 === count( $captures ) );
+verifier( '11 · le destinataire est l’adresse d’administration', 'dossiers@urbizen.test' === ( $captures[0]['to'] ?? '' ) );
+verifier( '11 · le sujet porte la référence', str_contains( (string) ( $captures[0]['subject'] ?? '' ), $mref ) );
+verifier( '11 · le sujet ne porte aucune donnée personnelle',
+	! str_contains( (string) ( $captures[0]['subject'] ?? '' ), 'Camille' ) );
+verifier( '11 · un en-tête technique identifie la notification',
+	(bool) preg_grep( '/^X-Urbizen-Notification-ID: [0-9a-f]{32}$/', (array) ( $captures[0]['headers'] ?? array() ) ) );
+verifier( '11 · aucune pièce jointe', array() === (array) ( $captures[0]['attachments'] ?? array() ) );
+verifier( '11 · statut sent après un retour true', MailPolicy::SENT === get_post_meta( $mid, MailPolicy::META_STATUS, true ) );
+verifier( '11 · sent_at est renseigné', '' !== get_post_meta( $mid, MailPolicy::META_SENT_AT, true ) );
+
+// Aucune seconde émission.
+do_action( MailPolicy::EVENT, $mid );
+
+verifier( '11 · aucune seconde émission après sent', 1 === count( $captures ) );
+
+// --- retour false → retry ---
+$creation2 = SubmissionRepository::create( $validation['clean'], $validation['pricing'], array( 'now' => time() ) );
+$mid2      = (int) ( $creation2['id'] ?? 0 );
+$mref2     = (string) ( $creation2['reference'] ?? '' );
+$reponse   = false;
+
+do_action( MailPolicy::EVENT, $mid2 );
+
+verifier( '11 · statut retry après un retour false', MailPolicy::RETRY === get_post_meta( $mid2, MailPolicy::META_STATUS, true ) );
+verifier( '11 · une tentative comptée', 1 === (int) get_post_meta( $mid2, MailPolicy::META_ATTEMPTS, true ) );
+verifier( '11 · la demande reste reçue', 'received' === get_post_meta( $mid2, '_urbizen_status', true ) );
+verifier( '11 · la référence reste attribuée',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $mref2 )['state'] ?? '' ) );
+
+$reponse = true;
+
+// --- Corbeille : annulation ---
+$creation3 = SubmissionRepository::create( $validation['clean'], $validation['pricing'], array( 'now' => time() ) );
+$mid3      = (int) ( $creation3['id'] ?? 0 );
+$mref3     = (string) ( $creation3['reference'] ?? '' );
+
+wp_trash_post( $mid3 );
+
+verifier( '11 · la Corbeille annule la notification', MailPolicy::CANCELLED === get_post_meta( $mid3, MailPolicy::META_STATUS, true ) );
+verifier( '11 · l’événement est retiré', false === wp_next_scheduled( MailPolicy::EVENT, array( $mid3 ) ) );
+
+$avant_corbeille = count( $captures );
+do_action( MailPolicy::EVENT, $mid3 );
+
+verifier( '11 · aucun envoi pendant la Corbeille', $avant_corbeille === count( $captures ) );
+
+// --- restauration : replanification ---
+wp_untrash_post( $mid3 );
+
+verifier( '11 · la restauration remet la notification en attente',
+	MailPolicy::PENDING === get_post_meta( $mid3, MailPolicy::META_STATUS, true ) );
+verifier( '11 · et replanifie un événement', false !== wp_next_scheduled( MailPolicy::EVENT, array( $mid3 ) ) );
+
+do_action( MailPolicy::EVENT, $mid3 );
+
+verifier( '11 · l’envoi a alors lieu', ( $avant_corbeille + 1 ) === count( $captures ) );
+
+// --- suppression : l'événement résiduel est inoffensif ---
+$apres_suppression = count( $captures );
+wp_trash_post( $mid3 );
+wp_delete_post( $mid3, true );
+
+verifier( '11 · la demande est supprimée', null === get_post( $mid3 ) );
+
+do_action( MailPolicy::EVENT, $mid3 );
+
+verifier( '11 · l’événement résiduel n’envoie rien', $apres_suppression === count( $captures ) );
+verifier( '11 · aucun verrou résiduel', false === get_option( MailPolicy::LOCK_PREFIX . $mid3, false ) );
+
+// Ménage.
+foreach ( array( $mid, $mid2 ) as $reste ) {
+	MailScheduler::unschedule( $reste );
+	wp_delete_post( $reste, true );
+}
+
+foreach ( array( $mref, $mref2, $mref3 ) as $r ) {
+	delete_option( SubmissionRepository::RESERVATION_PREFIX . $r );
+}
 
 printf( "\n%d contrôle(s) réussi(s), %d en échec\n", $reussis, $echecs );
 

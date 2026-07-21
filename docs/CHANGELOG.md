@@ -5,6 +5,55 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.8.0] — 21 juillet 2026
+
+Notification administrative fiable d'une demande de conception acceptée.
+
+> **Aucun effet public.** Aucun courriel n'est envoyé au demandeur. Aucun
+> document n'est joint à un message. Aucun formulaire conception n'est rendu,
+> aucune page n'est créée. Le site est strictement inchangé.
+
+### Ajouté
+- `src/Mail/MailPolicy.php` : source serveur unique des états, des délais de
+  reprise, du destinataire et des conditions d'éligibilité.
+- `src/Mail/MailQueue.php` : persistance de l'état des notifications, verrou
+  atomique par demande. Toutes les écritures passent par `persist_meta()`.
+- `src/Mail/MailRenderer.php` : rendu déterministe du sujet, du corps et des
+  en-têtes, avec un échappement choisi selon la destination — texte, attribut,
+  URL, sujet, en-tête.
+- `src/Mail/MailTransport.php` : contrat de transport, qui rend toute la
+  mécanique éprouvable sans jamais envoyer de courriel.
+- `src/Mail/WordPressMailTransport.php` : **seul** composant du greffon qui
+  appelle `wp_mail()`. Un contrôle de compatibilité le vérifie.
+- `src/Mail/MailScheduler.php` : planification d'un événement unique
+  `urbizen_send_submission_mail`, envoi sous verrou, et réconciliation de
+  sécurité (D-038).
+- Colonne « Notification » dans la liste des demandes : état, nombre de
+  tentatives, date d'envoi. Ni destinataire, ni corps, ni lien signé, ni
+  détail d'erreur.
+- Action administrative « Réessayer la notification », en POST, avec nonce,
+  capacité `manage_options` et identifiant canonique. Elle remet la
+  notification en attente et replanifie — elle n'envoie rien elle-même.
+- Banc `tests/submissions/test-courriel.php` (260 contrôles) et
+  `test-mutation-courriel.php` (24 mutations).
+
+### Modifié
+- `SubmissionRepository::finalize()` enregistre la notification `pending`
+  **avant** de déclarer la demande reçue : une demande reçue sans notification
+  serait un dossier que personne ne saurait avoir à traiter.
+- `TrashGuard` annule la notification à la mise à la Corbeille et la
+  replanifie à la restauration — sauf si un envoi a déjà été accepté.
+- `FileCleaner` retire l'événement et le verrou lors d'une suppression
+  définitive, sans toucher à la réservation attribuée.
+- La tâche quotidienne réconcilie aussi les notifications.
+
+### Volontairement absent
+- Aucun courriel au demandeur. Aucune pièce jointe. Aucun accusé de réception.
+- Aucune modification de l'adresse `From` globale de WordPress.
+- Aucun CC, aucun BCC.
+
+---
+
 ## [0.7.0] — 20 juillet 2026
 
 Validation et stockage privé des documents joints à une demande.

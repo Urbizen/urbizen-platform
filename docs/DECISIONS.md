@@ -1378,3 +1378,55 @@ conclure que sur la relecture.
   futur usage fautif tombe dans les bancs plutôt qu'en production.
 - Les doublures sont une commodité, pas une preuve. Un banc d'intégration
   s'exécute désormais contre un vrai WordPress 7.0.2 jetable.
+
+---
+
+## D-038 — Une notification est une conséquence, jamais une condition
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-037]
+
+**Contexte.** Urbizen doit être prévenue lorsqu'un dossier est accepté. La
+tentation est de faire de l'envoi une étape de la soumission. Ce serait une
+faute : un serveur de messagerie indisponible transformerait alors une demande
+parfaitement valide en soumission échouée, et le demandeur, qui n'y est pour
+rien, recommencerait.
+
+**Décision.** Séparer ce qui doit être garanti de ce qui doit être retenté.
+
+Ce qui est **garanti** : à la finalisation, une notification `pending` est
+enregistrée durablement, avec un identifiant serveur, **avant** que la demande
+ne soit déclarée reçue. Si cette écriture échoue, la finalisation échoue et le
+retour arrière transactionnel s'applique. Le succès garantit donc simultanément
+transaction `committed`, référence `attributed`, statut `received`,
+`files_status` final, identifiant de notification et `mail_status` `pending`.
+
+Ce qui est **retenté** : l'envoi lui-même. Cinq tentatives au plus, espacées de
+0, 5 min, 30 min, 2 h et 12 h, puis `failed`. Chaque tentative relit
+l'éligibilité complète, prend un verrou atomique et relit l'état sous ce
+verrou.
+
+**Conséquences.**
+- Un transport indisponible ne change rien au dossier : il reste `received`, sa
+  référence reste attribuée, ses documents restent en place.
+- Rien n'est envoyé pour une demande qui n'est pas, à l'instant même,
+  pleinement cohérente. Une transition de Corbeille, même seulement préparée,
+  suffit à tout suspendre.
+- **La garantie est « au moins une fois », et c'est assumé.** `wp_mail()` ne
+  permet pas mieux : une interruption peut survenir après l'appel et avant
+  l'écriture de `sent`. Un état `sending` abandonné est donc repris. Un doublon
+  exceptionnel, reconnaissable à son en-tête `X-Urbizen-Notification-ID`, vaut
+  mieux qu'une notification définitivement perdue.
+- `wp_mail()` rendant `true` signifie que **WordPress a accepté la requête
+  d'envoi** — pas que le message est arrivé. L'état `sent` ne prétend rien de
+  plus, et la documentation le dit.
+- Le destinataire vient d'une constante serveur, d'un filtre, ou de
+  `admin_email` — jamais d'une donnée de formulaire. Sans adresse valide,
+  l'envoi est refusé, fermé, avec le code `recipient_unavailable`.
+- Aucune pièce jointe : les documents restent derrière les liens signés de B2,
+  générés au moment du rendu, jamais stockés, jamais journalisés.
+- La base ne conserve que des états, des compteurs et des horodatages. Ni
+  corps, ni destinataire, ni lien, ni signature, ni chemin — rien qui ferait
+  d'elle une seconde copie des données personnelles.
+- Le journal du serveur web n'étant pas lisible en SSH chez l'hébergeur,
+  l'exploitation ne peut pas en dépendre : tout l'état utile est **persisté et
+  consultable depuis l'administration**.
