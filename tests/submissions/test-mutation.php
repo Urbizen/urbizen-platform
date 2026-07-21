@@ -3707,4 +3707,64 @@ check( '127 · le dépôt refuse', false === SubmissionRepository::persist_meta(
 $GLOBALS['wpd_meta_lie'] = '';
 
 
+// ====== 128 · l'horodatage natif réparé est la chaîne GMT ================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "			update_post_meta( \$id, self::NATIVE_TIME, \$horo );" => "			update_post_meta( \$id, self::NATIVE_TIME, \$prepare );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$tg::repair_native( $r->id(), wpd_now() );
+
+check( '128 · chaîne GMT écrite → la métadonnée n’est plus un entier',
+	! is_int( get_post_meta( $r->id(), TG::NATIVE_TIME, true ) ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+TG::repair_native( $d['id'], wpd_now() );
+
+$prep = (string) ( TG::transition( $d['id'] )['prepared_at'] ?? '' );
+
+check( '128 · le dépôt écrit un entier', is_int( get_post_meta( $d['id'], TG::NATIVE_TIME, true ) ) );
+check( '128 · égal à strtotime(prepared_at UTC)',
+	(int) strtotime( $prep . ' UTC' ) === (int) get_post_meta( $d['id'], TG::NATIVE_TIME, true ) );
+
+// ====== 129 · l'horodatage réparé est remplacé par l'heure courante =======
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "			\$prepare = (string) ( self::transition( \$id )['prepared_at'] ?? '' );
+			\$horo    = '' === \$prepare ? \$now : (int) strtotime( \$prepare . ' UTC' );" =>
+		"			\$prepare = (string) ( self::transition( \$id )['prepared_at'] ?? '' );
+			\$horo    = \$now;" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wpd_avancer( 20 * 86400 );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$tg::repair_native( $r->id(), wpd_now() );
+
+$prep_m = (string) ( $tg::transition( $r->id() )['prepared_at'] ?? '' );
+
+check( '129 · heure courante écrite → LE SÉJOUR EN CORBEILLE EST PROLONGÉ',
+	(int) get_post_meta( $r->id(), TG::NATIVE_TIME, true ) > (int) strtotime( $prep_m . ' UTC' ) );
+
+
 verdict();

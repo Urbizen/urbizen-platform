@@ -39,7 +39,29 @@ command -v "$PHP_BIN" >/dev/null 2>&1 || {
 	echo "Installez PHP 8.1+, ou désignez-le : PHP_BIN=/chemin/vers/php ./run-all.sh"
 	exit 2
 }
-[ -d node_modules/jsdom ] || { echo "jsdom absent. Lancez : npm install"; exit 2; }
+# La dépendance n'est **jamais** installée automatiquement : un banc qui
+# installe ce qui lui manque masque l'état réel de l'environnement, et fait
+# passer pour reproductible une exécution qui ne l'est pas.
+if [ ! -d node_modules/jsdom ]; then
+	printf '\033[31m✗ dépendance manquante : jsdom\033[0m\n' >&2
+	printf 'Le banc cadastre ne peut pas s'"'"'exécuter sans DOM simulé.\n' >&2
+	printf 'Installez la version verrouillée, depuis %s :\n\n' "$(pwd)" >&2
+	printf '    npm ci\n\n' >&2
+	printf '(`npm ci` respecte package-lock.json ; `npm install` peut dériver.)\n' >&2
+	exit 2
+fi
+
+# La version installée doit être **exactement** celle qui a été validée : une
+# version différente rendrait les 243 contrôles non comparables.
+JSDOM_ATTENDU="$(node -p "require('./package.json').devDependencies.jsdom" 2>/dev/null)"
+JSDOM_REEL="$(node -p "require('./node_modules/jsdom/package.json').version" 2>/dev/null)"
+
+if [ "$JSDOM_REEL" != "$JSDOM_ATTENDU" ]; then
+	printf '\033[31m✗ version de jsdom inattendue\033[0m\n' >&2
+	printf 'attendue : %s — installée : %s\n' "$JSDOM_ATTENDU" "$JSDOM_REEL" >&2
+	printf 'Relancez : npm ci\n' >&2
+	exit 2
+fi
 
 # --- Fixture : le HTML réel de Renderer.php, régénéré à chaque exécution ---
 titre "Fixture — rendu réel de Renderer.php"
