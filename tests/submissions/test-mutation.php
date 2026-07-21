@@ -3655,10 +3655,10 @@ check( '125 · et il porte une expiration',
 $sr = mutant(
 	'src/Submissions/SubmissionRepository.php',
 	'SubmissionRepository',
-	array( "		update_post_meta( \$id, \$cle, \$valeur );
+	array( "		update_post_meta( \$id, \$cle, self::echapper( \$valeur ) );
 
 		return self::meta_equivaut( get_post_meta( \$id, \$cle, true ), \$valeur );" =>
-		"		return (bool) update_post_meta( \$id, \$cle, \$valeur );" )
+		"		return (bool) update_post_meta( \$id, \$cle, self::echapper( \$valeur ) );" )
 );
 
 neuf_fichiers();
@@ -3765,6 +3765,103 @@ $prep_m = (string) ( $tg::transition( $r->id() )['prepared_at'] ?? '' );
 
 check( '129 · heure courante écrite → LE SÉJOUR EN CORBEILLE EST PROLONGÉ',
 	(int) get_post_meta( $r->id(), TG::NATIVE_TIME, true ) > (int) strtotime( $prep_m . ' UTC' ) );
+
+
+// ====== 130 · l'échappement avant écriture est retiré ====================
+// Le défaut trouvé par le banc WordPress réel : sans `wp_slash`, le cœur
+// applique `wp_unslash` à une valeur qui n'était pas échappée, et mange les
+// antislashes que `wp_json_encode` place devant chaque `/`.
+$sr130 = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		update_post_meta( \$id, \$cle, self::echapper( \$valeur ) );" => "		update_post_meta( \$id, \$cle, \$valeur );" )
+);
+
+neuf_fichiers();
+$id130 = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+$json  = (string) wp_json_encode( array( 'staging' => '/private/urbizen-conception/.staging/abc' ) );
+
+check( '130 · échappement retiré → LA PERSISTANCE ÉCHOUE SUR UN CHEMIN',
+	false === $sr130::persist_meta( $id130, '_essai', $json ) );
+check( '130 · le dépôt réussit', true === SubmissionRepository::persist_meta( $id130, '_essai2', $json ) );
+check( '130 · et relit octet pour octet', $json === get_post_meta( $id130, '_essai2', true ) );
+
+// Conséquence complète : une soumission avec document.
+neuf_fichiers();
+FileCleaner::reset();
+$r130 = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+
+check( '130 · le dépôt finalise une soumission avec document', $r130->is_success() );
+check( '130 · transaction committed',
+	'committed' === ( SubmissionRepository::transaction( $r130->id() )['state'] ?? '' ) );
+
+// ====== 131 · la comparaison porte sur la valeur échappée ================
+$sr131 = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		return self::meta_equivaut( get_post_meta( \$id, \$cle, true ), \$valeur );" =>
+		"		return self::meta_equivaut( get_post_meta( \$id, \$cle, true ), self::echapper( \$valeur ) );" )
+);
+
+neuf_fichiers();
+$id131 = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+
+check( '131 · comparaison sur la valeur échappée → échec sur un chemin',
+	false === $sr131::persist_meta( $id131, '_essai', $json ) );
+check( '131 · le dépôt compare la valeur logique', true === SubmissionRepository::persist_meta( $id131, '_essai', $json ) );
+
+// ====== 132 · double échappement ========================================
+$sr132 = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		update_post_meta( \$id, \$cle, self::echapper( \$valeur ) );" =>
+		"		update_post_meta( \$id, \$cle, self::echapper( self::echapper( \$valeur ) ) );" )
+);
+
+neuf_fichiers();
+$id132 = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+
+check( '132 · double échappement → la relecture diverge',
+	false === $sr132::persist_meta( $id132, '_essai', $json ) );
+check( '132 · le dépôt n’échappe qu’une fois', true === SubmissionRepository::persist_meta( $id132, '_essai', $json ) );
+check( '132 · et deux écritures successives restent identiques',
+	SubmissionRepository::persist_meta( $id132, '_essai', $json )
+	&& $json === get_post_meta( $id132, '_essai', true ) );
+
+// ====== 133 · seul _urbizen_transaction serait corrigé ==================
+$sr133 = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		update_post_meta( \$id, \$cle, self::echapper( \$valeur ) );" =>
+		"		update_post_meta( \$id, \$cle, '_urbizen_transaction' === \$cle ? self::echapper( \$valeur ) : \$valeur );" )
+);
+
+neuf_fichiers();
+$id133 = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+
+check( '133 · correction partielle → _urbizen_files échoue',
+	false === $sr133::persist_meta( $id133, '_urbizen_files', $json ) );
+check( '133 · le dépôt couvre toutes les clés',
+	SubmissionRepository::persist_meta( $id133, '_urbizen_files', $json )
+	&& SubmissionRepository::persist_meta( $id133, '_urbizen_source_path', '/a/b/c' )
+	&& SubmissionRepository::persist_meta( $id133, '_urbizen_payload', (string) wp_json_encode( array( 'url' => 'https://x.test/a/b' ) ) ) );
+
+// ====== 134 · la vérification de persistance est supprimée ==============
+$sr134 = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		return self::meta_equivaut( get_post_meta( \$id, \$cle, true ), \$valeur );" => '		return true;' )
+);
+
+neuf_fichiers();
+$id134 = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+$GLOBALS['wpd_meta_fail'] = '_essai';
+
+check( '134 · vérification retirée → un échec réel passe pour un succès',
+	true === $sr134::persist_meta( $id134, '_essai', 'x' ) );
+check( '134 · le dépôt le détecte', false === SubmissionRepository::persist_meta( $id134, '_essai', 'x' ) );
+
+$GLOBALS['wpd_meta_fail'] = '';
 
 
 verdict();

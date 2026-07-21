@@ -620,7 +620,12 @@ function update_post_meta( $id, $cle, $valeur, $prev = '' ) {
 		return false;
 	}
 
-	$id      = (int) $id;
+	$id = (int) $id;
+
+	// Le cœur applique `wp_unslash()` à toute valeur de métadonnée : il suppose
+	// recevoir des données échappées. Ne pas le reproduire ferait passer pour
+	// correcte une écriture qui, en production, perd ses antislashes.
+	$valeur  = wp_unslash( $valeur );
 	$present = array_key_exists( $cle, $GLOBALS['wpd_meta'][ $id ] ?? array() );
 
 	// Couche de stockage qui **annonce** un succès sans rien écrire. Un code
@@ -723,14 +728,55 @@ function wpd_meta_query_match( int $id, array $query ): bool {
 }
 
 // -------------------------------------------------------------------- JSON --
+/**
+ * Encodage JSON, **fidèle** au cœur.
+ *
+ * `wp_json_encode()` n'ajoute aucun drapeau : elle échappe donc `/` en `\/`,
+ * et laisse l'Unicode sous forme `\uXXXX`. Ajouter `JSON_UNESCAPED_SLASHES`,
+ * comme le faisait cette doublure, supprimait précisément les antislashes dont
+ * la disparition constituait le défaut — et le rendait invisible.
+ */
 function wp_json_encode( $donnees, $options = 0, $depth = 512 ) {
-	return json_encode( $donnees, $options | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, $depth );
+	return json_encode( $donnees, $options, $depth );
 }
 
 // ---------------------------------------------------------------- adresses --
 function home_url( $chemin = '' ) { return 'https://exemple.test' . $chemin; }
 function wp_parse_url( $url, $composant = -1 ) { return parse_url( $url, $composant ); }
-function wp_unslash( $valeur ) { return $valeur; }
+/**
+ * Retire les antislashes, **comme le cœur**.
+ *
+ * L'ancienne doublure rendait la valeur telle quelle. C'est cette infidélité
+ * qui a masqué, jusqu'au banc WordPress réel, le fait que l'API des
+ * métadonnées applique `wp_unslash()` à tout ce qu'on lui confie — et mange
+ * donc les antislashes que `wp_json_encode()` place devant chaque `/`.
+ */
+function wp_unslash( $valeur ) {
+	return wpd_stripslashes_profond( $valeur );
+}
+
+/**
+ * Ajoute les antislashes, comme `wp_slash()`.
+ */
+function wp_slash( $valeur ) {
+	if ( is_array( $valeur ) ) {
+		return array_map( 'wp_slash', $valeur );
+	}
+
+	if ( ! is_string( $valeur ) ) {
+		return $valeur;
+	}
+
+	return addslashes( $valeur );
+}
+
+function wpd_stripslashes_profond( $valeur ) {
+	if ( is_array( $valeur ) ) {
+		return array_map( 'wpd_stripslashes_profond', $valeur );
+	}
+
+	return is_string( $valeur ) ? stripslashes( $valeur ) : $valeur;
+}
 function wp_get_referer() { return '' !== $GLOBALS['wpd_referer'] ? $GLOBALS['wpd_referer'] : false; }
 
 function add_query_arg( $args, $url = '' ) {
