@@ -49,6 +49,7 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_styles']      = array();
 	$GLOBALS['wpd_scripts']     = array();
 	$GLOBALS['wpd_styles_reg']  = array();
+	$GLOBALS['wpd_styles_deps'] = array();
 	$GLOBALS['wpd_scripts_reg'] = array();
 	$GLOBALS['wpd_inline']      = array();
 	$GLOBALS['wpd_logged_in']   = false;
@@ -1006,8 +1007,31 @@ function wp_nonce_url( $url, $action = -1 ) {
  * script ni feuille de style n'est mis en file pour un visiteur anonyme.
  */
 function wp_register_style( $handle, $src = '', $deps = array(), $ver = false ) {
-	$GLOBALS['wpd_styles_reg'][ $handle ] = $src;
+	// WordPress ignore un réenregistrement : le premier enregistrement gagne.
+	// La doublure doit se comporter pareil, sans quoi un banc croirait pouvoir
+	// écraser une feuille déjà posée par le thème.
+	if ( isset( $GLOBALS['wpd_styles_reg'][ $handle ] ) ) {
+		return false;
+	}
+
+	$GLOBALS['wpd_styles_reg'][ $handle ]  = $src;
+	$GLOBALS['wpd_styles_deps'][ $handle ] = (array) $deps;
 	return true;
+}
+
+/**
+ * Racine du thème enfant réel.
+ *
+ * La doublure pointe vers le thème versionné du dépôt, et non vers un dossier
+ * inventé : un banc qui vérifie que la charte du thème est bien déclarée doit
+ * tomber si les fichiers disparaissent.
+ */
+function get_stylesheet_directory() {
+	return dirname( __DIR__, 2 ) . '/wordpress/urbizen-child';
+}
+
+function get_stylesheet_directory_uri() {
+	return 'https://exemple.test/wp-content/themes/urbizen-child';
 }
 
 function wp_register_script( $handle, $src = '', $deps = array(), $ver = false, $footer = false ) {

@@ -1593,3 +1593,48 @@ répertoire — refuse la soumission plutôt que de convertir `false` en zéro.
   réceptions partielles ; le refus est transactionnel — ni demande finalisée,
   ni référence attribuée, ni notification, ni document, ni staging.
 - Aucun faux succès n'est possible : sans comparaison certaine, on refuse.
+
+## D-043 — La maquette de référence, pas la production, fait foi visuellement
+
+**Contexte.** La propriétaire a jugé le formulaire de conception « ancien et
+générique », et a désigné les formulaires DP et PC comme référence visuelle
+obligatoire.
+
+Deux objets portent ce nom, et ils ne se ressemblent pas :
+
+1. les **pages publiques** `/declaration-prealable/` et `/permis-de-construire/`,
+   qui servent aujourd'hui des formulaires Fluent Forms — Poppins, Open Sans,
+   rayon 7px, bouton `#002D6B` ;
+2. les **maquettes versionnées** `frontend/formulaires/dp-formulaire.html` et
+   `pc-formulaire.html` — papier quadrillé, cartouche, rail de légende, Space
+   Grotesk, IBM Plex, vert `#128A5A`, rayon 3px.
+
+La référence retenue est la **seconde**. Les pages publiques sont destinées à
+être refaites : s'aligner dessus reviendrait à copier ce qui doit disparaître.
+
+**Conséquences.**
+
+- Les deux maquettes portent un CSS **strictement identique** — comparaison
+  ligne à ligne, zéro différence. Il n'y a donc qu'une référence, pas deux, et
+  aucun arbitrage à rendre entre elles.
+- Là où la maquette et `urbizen-tokens.css` divergent, c'est la maquette qui
+  l'emporte : rayon **3px** et non 4px, coque **960px** et non 1120px.
+- La palette annoncée en consigne (`#0B1F3A`, `#7BDCB5`, `#F6F8FB`) est celle du
+  gabarit Hostinger, pas celle de la maquette. Elle n'est pas retenue :
+  l'encre est `#14233B`, l'accent `#128A5A`, le papier `#EAEEF2`.
+- `urbizen-conception.css` ne déclare aucun token global : elle **consomme**
+  `var(--u-*)` avec le repli de la maquette, comme `urbizen-form.css` et
+  `urbizen-cadastre.css`. Le rendu global reste au thème (D-002).
+- Le thème enfant ne met sa charte en file que sous le gabarit de l'accueil.
+  `ConceptionAssets` déclare donc `urbizen-fonts` et `urbizen-tokens` en
+  dépendance de sa propre feuille — sans jamais en embarquer de copie, et sans
+  réenregistrer un handle que le thème aurait déjà posé.
+- L'alignement est **entièrement en CSS**. Aucun champ, aucune étape, aucune
+  règle tarifaire, aucun calcul serveur, aucun brouillon, aucun manifeste,
+  aucune limite de dépôt n'est touché.
+
+**Ce qui n'est pas repris.** La maquette ouvre sur un cartouche d'en-tête —
+sur-titre monospace, titre, sous-titre, logo, rose des vents. Le rendu serveur
+ne produit aucun de ces éléments : les ajouter demanderait de modifier
+`ConceptionRenderer`, hors du périmètre d'un commit de style. La numérotation
+des étapes reste « 1 » et non « 01 », pour la même raison.

@@ -14,6 +14,18 @@ Formulaire de conception en six étapes, brouillon local et manifeste de dépôt
 > Aucune page n'est créée, l'accueil, le menu et le pied de page sont
 > inchangés.
 
+### Apparence
+- Le parcours est aligné sur la maquette de référence
+  `frontend/formulaires/dp-formulaire.html` : papier quadrillé, coque de 960px,
+  rail de légende à pastilles numérotées, Space Grotesk et IBM Plex, accent vert
+  `#128A5A`, rayon 3px, hiérarchie de boutons retour/suivant/envoi (D-043).
+- `urbizen-conception.css` consomme désormais les tokens du thème avec le repli
+  de la maquette, au lieu d'une palette privée. `ConceptionAssets` déclare les
+  polices et les tokens du thème enfant en dépendance : sans eux le parcours
+  retombait sur la police du système.
+- Alignement **exclusivement CSS** : ni champ, ni étape, ni tarif, ni calcul
+  serveur, ni brouillon, ni manifeste, ni limite de dépôt n'est modifié.
+
 ### Ajouté
 - `src/Conception/` : `ConceptionAvailability` (garde serveur, fermée par
   défaut), `ConceptionSchema` (réduction de la définition, jamais une seconde

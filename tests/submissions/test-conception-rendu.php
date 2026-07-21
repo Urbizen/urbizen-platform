@@ -306,13 +306,121 @@ foreach ( $regles as $regle ) {
 }
 
 check( '10 · toutes les règles sont sous la classe racine', array() === $hors_racine );
-check( '10 · la palette Urbizen est employée',
-	str_contains( $css, '#0b1f3a' ) && str_contains( $css, '#7bdcb5' ) && str_contains( $css, '#f6f8fb' ) );
 check( '10 · une adaptation mobile est prévue', str_contains( $css, '@media' ) );
 check( '10 · la navigation masquée le reste vraiment',
 	str_contains( $css, '.urbizen-conception__navigation[hidden]' ) );
 check( '10 · aucune règle sur body, header ou footer',
 	! preg_match( '/(^|[\s,])(body|header|footer|html)\s*\{/m', $css ) );
+
+// ======================================================================
+// 12 · CONFORMITÉ À LA RÉFÉRENCE VISUELLE
+//
+// La référence obligatoire est `frontend/formulaires/dp-formulaire.html`.
+// Ces contrôles interdisent le retour à une apparence générique, sans figer
+// des valeurs fragiles : on vérifie que la feuille CONSOMME la charte du thème
+// et que sa hiérarchie de boutons est bien celle de la maquette, jamais qu'un
+// espacement vaut tel nombre de pixels.
+//
+// L'ancien contrôle « la palette Urbizen est employée », qui exigeait #0b1f3a,
+// #7bdcb5 et #f6f8fb, est retiré — et non affaibli : ces trois teintes étaient
+// celles du gabarit Hostinger, pas celles de la maquette de référence, qui
+// impose #14233B, #128A5A et #EAEEF2. Le contrôle ci-dessous est strictement
+// plus exigeant : il vérifie sept tokens au lieu de trois littéraux.
+// ======================================================================
+$maquette = (string) file_get_contents( dirname( __DIR__, 2 ) . '/frontend/formulaires/dp-formulaire.html' );
+
+check( '12 · la maquette de référence est bien présente dans le dépôt', '' !== $maquette );
+
+// Chaque token de charte consommé par la feuille, avec la valeur de repli que
+// la maquette impose. Le repli garantit un rendu juste même sans le thème.
+$tokens = array(
+	'--u-ink'         => '#14233b',
+	'--u-paper'       => '#eaeef2',
+	'--u-surface'     => '#fbfcfd',
+	'--u-line-strong' => '#9fadbc',
+	'--u-brand'       => '#128a5a',
+	'--u-font-title'  => 'space grotesk',
+	'--u-font-body'   => 'ibm plex sans',
+	'--u-font-mono'   => 'ibm plex mono',
+);
+
+$bas = strtolower( $css );
+
+foreach ( $tokens as $token => $repli ) {
+	check(
+		"12 · la feuille consomme « $token » avec le repli de la maquette",
+		str_contains( $bas, 'var(' . $token . ',' ) && str_contains( $bas, $repli )
+	);
+
+	// La valeur de la maquette doit aussi exister dans la maquette elle-même :
+	// si quelqu'un invente une teinte, la comparaison tombe.
+	check(
+		"12 · « $repli » vient bien de la maquette de référence",
+		str_contains( strtolower( $maquette ), $repli )
+	);
+}
+
+// La feuille ne déclare jamais la charte : elle appartient au thème (D-002).
+check( '12 · aucune déclaration de token global', 1 !== preg_match( '/(^|})\s*:root\s*\{/', $css ) );
+
+// Hiérarchie des boutons, reprise de la maquette : retour en contour, suivant
+// en encre, envoi en vert. Trois styles distincts, jamais un gris système.
+check( '12 · le bouton d’envoi porte l’accent vert',
+	1 === preg_match( '/--envoyer\s*\{[^}]*background:\s*var\(--uc-vert\)/', $css ) );
+check( '12 · le bouton suivant porte l’encre',
+	1 === preg_match( '/--suivant\s*\{[^}]*background:\s*var\(--uc-encre\)/', $css ) );
+check( '12 · le bouton précédent est un contour',
+	1 === preg_match( '/--precedent\s*\{[^}]*border-color:\s*var\(--uc-ligne-forte\)/', $css ) );
+
+// Signature visuelle de la maquette : papier quadrillé et rail de légende.
+check( '12 · le fond quadrillé de la maquette est repris', str_contains( $css, '26px 26px' ) );
+check( '12 · le rail de légende est en place',
+	str_contains( $css, 'grid-template-columns: 232px' ) );
+
+// Aucune apparence native laissée au navigateur sur le dépôt de pièces.
+check( '12 · le bouton natif du champ fichier est redessiné',
+	str_contains( $css, '::file-selector-button' ) );
+
+// --- la charte du thème est réellement déclarée en dépendance ---
+neuf();
+administrateur();
+ConceptionRenderer::render( $def );
+
+$deps = $GLOBALS['wpd_styles_deps'][ ConceptionAssets::HANDLE_CSS ] ?? array();
+
+check( '12 · les polices du thème sont déclarées en dépendance', in_array( 'urbizen-fonts', $deps, true ) );
+check( '12 · les tokens du thème aussi', in_array( 'urbizen-tokens', $deps, true ) );
+check( '12 · les tokens dépendent des polices',
+	array( 'urbizen-fonts' ) === ( $GLOBALS['wpd_styles_deps']['urbizen-tokens'] ?? null ) );
+check( '12 · les polices ne dépendent de rien',
+	array() === ( $GLOBALS['wpd_styles_deps']['urbizen-fonts'] ?? null ) );
+check( '12 · le greffon ne sert pas sa propre copie de la charte',
+	! file_exists( URBIZEN_PLATFORM_DIR . 'assets/css/urbizen-tokens.css' ) );
+
+// Une charte déjà posée par le thème n'est jamais réenregistrée : c'est la
+// version du thème qui sert.
+// Le thème pose sa feuille AVANT que le greffon n'enregistre la sienne :
+// c'est l'ordre réel, le thème s'accrochant plus tôt que le rendu du bloc.
+wpd_reset();
+ConceptionRenderer::reset();
+wp_register_style( 'urbizen-fonts', 'https://exemple.test/pose-par-le-theme.css' );
+ConceptionAssets::register();
+administrateur();
+ConceptionRenderer::render( $def );
+
+check( '12 · un handle déjà enregistré par le thème est respecté',
+	'https://exemple.test/pose-par-le-theme.css' === ( $GLOBALS['wpd_styles_reg']['urbizen-fonts'] ?? '' ) );
+check( '12 · et reste tout de même une dépendance',
+	in_array( 'urbizen-fonts', $GLOBALS['wpd_styles_deps'][ ConceptionAssets::HANDLE_CSS ] ?? array(), true ) );
+
+// Toute variable locale employée doit être définie : une faute de frappe
+// ferait silencieusement retomber le rendu sur le style du navigateur.
+preg_match_all( '/var\(\s*(--uc-[a-z0-9-]+)/', $css, $employes );
+preg_match_all( '/^\s*(--uc-[a-z0-9-]+)\s*:/m', $css, $definis );
+
+$orphelines = array_values( array_diff( array_unique( $employes[1] ), array_unique( $definis[1] ) ) );
+
+check( '12 · aucune variable locale employée sans définition', array() === $orphelines );
 
 // ======================================================================
 // 11 · ÉCHAPPEMENT

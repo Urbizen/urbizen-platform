@@ -1,24 +1,78 @@
 /*
- * Formulaire de conception.
+ * Formulaire de conception — apparence.
+ *
+ * RÉFÉRENCE VISUELLE OBLIGATOIRE : `frontend/formulaires/dp-formulaire.html` et
+ * `pc-formulaire.html`. Ces deux maquettes portent un CSS **strictement
+ * identique** (comparé ligne à ligne le 21/07/2026 : zéro différence) : il n'y
+ * a donc qu'une seule référence, pas deux. Rien n'est inventé ici — chaque
+ * valeur est relevée dans ce CSS.
+ *
+ *   univers           papier quadrillé, cartouche, légende de plan
+ *   fond              #EAEEF2 + quadrillage #DCE3EA au pas de 26 px
+ *   coque             #FBFCFD, 1px #9FADBC, rayon 3px, 960px, ombre longue
+ *   rail de légende   232px, pastilles numérotées reliées par un fil de côte
+ *   titres            Space Grotesk 600, interlettrage -.01em
+ *   texte             IBM Plex Sans, #14233B, interligne 1.55
+ *   références        IBM Plex Mono en capitales espacées, #128A5A
+ *   accent            #128A5A (vert Urbizen) — un seul accent
+ *   champ             #FBFCFD, 1px #9FADBC, rayon 3px, 9px 11px, 14px
+ *   focus             bordure verte + halo 3px #E4F5EC
+ *   boutons           Space Grotesk 500 14px, 10px 20px, rayon 3px
+ *                     retour = contour · suivant = encre · envoyer = vert
+ *
+ * Les tokens du thème (`--u-*`) sont la première valeur quand ils existent, la
+ * valeur de repli étant celle de la maquette : le composant est juste avec ou
+ * sans le thème, comme `urbizen-form.css` et `urbizen-cadastre.css`. Là où la
+ * maquette et les tokens divergent — rayon 3px et non 4px, largeur 960px et
+ * non 1120px — c'est la maquette qui l'emporte, elle est la référence.
  *
  * Tout est porté par `.urbizen-conception` : aucune règle ne vise un élément
  * global, ni l'en-tête, ni le pied de page, ni les formulaires antérieurs.
- * Palette Urbizen, lisible dès 320 px, et rien qui repose sur la seule
- * couleur pour transmettre une information.
+ * Aucune déclaration dans `:root` — le rendu global appartient au thème (D-002).
  */
 
 .urbizen-conception {
-	--uc-marine: #0b1f3a;
-	--uc-menthe: #7bdcb5;
-	--uc-gris: #f6f8fb;
-	--uc-blanc: #fff;
-	--uc-erreur: #8a1c1c;
+	/* --- surfaces --- */
+	--uc-papier: var(--u-paper, #eaeef2);
+	--uc-quadrillage: var(--u-grid, #dce3ea);
+	--uc-surface: var(--u-surface, #fbfcfd);
+	--uc-surface-2: var(--u-surface-2, #f2f5f8);
 
+	/* --- texte --- */
+	--uc-encre: var(--u-ink, #14233b);
+	--uc-encre-doux: var(--u-ink-soft, #55617a);
+	--uc-encre-pale: var(--u-ink-faint, #8791a6);
+
+	/* --- traits --- */
+	--uc-ligne: var(--u-line, #c9d3dd);
+	--uc-ligne-forte: var(--u-line-strong, #9fadbc);
+
+	/* --- accent unique --- */
+	--uc-vert: var(--u-brand, #128a5a);
+	--uc-vert-fonce: var(--u-brand-dk, #0e6e48);
+	--uc-vert-pale: var(--u-brand-sf, #e4f5ec);
+	--uc-erreur: var(--u-error, #c0392b);
+
+	/* --- formes : la maquette impose 3px, pas les 4px des tokens --- */
+	--uc-rayon: var(--u-radius-sm, 3px);
+	--uc-coque: 960px;
+
+	/* --- typographies --- */
+	--uc-titre: var(--u-font-title, "Space Grotesk"), system-ui, sans-serif;
+	--uc-texte: var(--u-font-body, "IBM Plex Sans"), system-ui, sans-serif;
+	--uc-mono: var(--u-font-mono, "IBM Plex Mono"), ui-monospace, monospace;
+
+	background:
+		linear-gradient(var(--uc-quadrillage) 1px, transparent 1px) 0 0 / 26px 26px,
+		linear-gradient(90deg, var(--uc-quadrillage) 1px, transparent 1px) 0 0 / 26px 26px,
+		var(--uc-papier);
 	box-sizing: border-box;
-	color: var(--uc-marine);
-	font-size: 1rem;
-	line-height: 1.5;
-	max-width: 46rem;
+	color: var(--uc-encre);
+	font-family: var(--uc-texte);
+	line-height: 1.55;
+	margin: 0 auto;
+	max-width: calc(var(--uc-coque) + 64px);
+	padding: clamp(16px, 4vw, 48px) clamp(12px, 4vw, 32px);
 }
 
 .urbizen-conception *,
@@ -27,54 +81,116 @@
 	box-sizing: inherit;
 }
 
+/* --- encarts posés au-dessus de la coque --- */
 .urbizen-conception__apercu,
 .urbizen-conception__noscript {
-	background: var(--uc-gris);
-	border-left: 3px solid var(--uc-marine);
-	margin: 0 0 1rem;
-	padding: 0.75rem 1rem;
+	background: var(--uc-surface-2);
+	border: 1px solid var(--uc-ligne);
+	border-left: 3px solid var(--uc-vert);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre-doux);
+	font-size: 13.5px;
+	margin: 0 auto 14px;
+	max-width: var(--uc-coque);
+	padding: 12px 15px;
 }
 
-/* --- progression --- */
+.urbizen-conception__apercu p,
+.urbizen-conception__noscript p {
+	margin: 0;
+}
+
+/*
+ * La coque : le rail de progression et le formulaire sont deux frères que rien
+ * n'enveloppe dans le HTML. Ils portent donc chacun une moitié du cadre, et se
+ * lisent comme une seule carte — sans ajouter le moindre élément au rendu.
+ */
+.urbizen-conception__progression,
+.urbizen-conception__form {
+	border: 1px solid var(--uc-ligne-forte);
+	box-shadow: 0 1px 0 rgba(27, 36, 48, 0.04), 0 24px 48px -32px rgba(27, 36, 48, 0.5);
+}
+
+/* --- rail de légende --- */
+.urbizen-conception__progression {
+	background: linear-gradient(180deg, var(--uc-surface-2), var(--uc-surface) 120px);
+	border-bottom: 0;
+	border-radius: var(--uc-rayon) var(--uc-rayon) 0 0;
+	margin: 0 auto;
+	max-width: var(--uc-coque);
+	padding: 14px 16px;
+}
+
 .urbizen-conception__progression ol {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 0.5rem;
+	gap: 4px;
 	list-style: none;
-	margin: 0 0 1.5rem;
-	padding: 0;
+	margin: 0;
+	min-width: 0;
+	overflow-x: auto;
+	padding: 0 0 4px;
 }
 
 .urbizen-conception__progression-item {
 	align-items: center;
-	background: var(--uc-gris);
-	border: 1px solid rgba(11, 31, 58, 0.15);
-	border-radius: 4px;
+	color: var(--uc-encre-pale);
 	display: flex;
-	font-size: 0.875rem;
-	gap: 0.4rem;
-	padding: 0.4rem 0.7rem;
-}
-
-/* L'étape courante se signale par le fond, la bordure ET le texte gras :
-   jamais par la seule couleur. */
-.urbizen-conception__progression-item[aria-current="step"] {
-	background: var(--uc-marine);
-	border-color: var(--uc-marine);
-	color: var(--uc-blanc);
-	font-weight: 700;
+	flex-direction: column;
+	font-size: 11px;
+	gap: 5px;
+	min-width: 62px;
+	padding: 4px 6px;
+	text-align: center;
 }
 
 .urbizen-conception__progression-rang {
+	align-items: center;
+	background: var(--uc-surface);
+	border: 1px solid var(--uc-ligne-forte);
+	border-radius: 50%;
+	color: var(--uc-encre-doux);
+	display: flex;
+	flex: none;
+	font-family: var(--uc-mono);
+	font-size: 11px;
 	font-variant-numeric: tabular-nums;
+	height: 23px;
+	justify-content: center;
+	transition: background 0.18s, border-color 0.18s, box-shadow 0.18s;
+	width: 23px;
+}
+
+/*
+ * L'étape courante se signale par la couleur, le halo, la graisse ET le
+ * contraste du numéro : jamais par la seule couleur.
+ */
+.urbizen-conception__progression-item[aria-current="step"] {
+	color: var(--uc-encre);
+	font-weight: 500;
+}
+
+.urbizen-conception__progression-item[aria-current="step"] .urbizen-conception__progression-rang {
+	background: var(--uc-vert);
+	border-color: var(--uc-vert);
+	box-shadow: 0 0 0 3px var(--uc-vert-pale);
+	color: #fff;
+}
+
+/* --- panneau --- */
+.urbizen-conception__form {
+	background: var(--uc-surface);
+	border-radius: 0 0 var(--uc-rayon) var(--uc-rayon);
+	margin: 0 auto;
+	max-width: var(--uc-coque);
+	padding: clamp(20px, 4vw, 34px) clamp(20px, 4vw, 38px);
 }
 
 /* --- étapes --- */
 .urbizen-conception__etape {
-	border: 1px solid rgba(11, 31, 58, 0.15);
-	border-radius: 6px;
-	margin: 0 0 1.5rem;
-	padding: 1.25rem;
+	border: 0;
+	margin: 0;
+	min-width: 0;
+	padding: 0;
 }
 
 .urbizen-conception__etape[hidden] {
@@ -82,19 +198,31 @@
 }
 
 .urbizen-conception__etape-titre {
-	font-size: 1.125rem;
-	font-weight: 700;
-	padding: 0 0.4rem;
+	color: var(--uc-encre);
+	display: block;
+	font-family: var(--uc-titre);
+	font-size: clamp(19px, 2.6vw, 24px);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1.15;
+	margin: 0 0 22px;
+	padding: 0;
 }
 
+/*
+ * Pas de cartouche « CADRE n » ici, contrairement à la maquette : les libellés
+ * d'étapes de la définition portent déjà leur rang (« 1. Programme »), et le
+ * doubler donnait « CADRE 1 / 1. Programme ».
+ */
 .urbizen-conception__etape-titre:focus-visible {
-	outline: 3px solid var(--uc-menthe);
-	outline-offset: 2px;
+	outline: 2px solid var(--uc-vert);
+	outline-offset: 3px;
 }
 
 /* --- champs --- */
 .urbizen-conception__champ {
-	margin: 0 0 1.25rem;
+	margin: 0 0 16px;
+	min-width: 0;
 }
 
 .urbizen-conception__champ[hidden] {
@@ -102,81 +230,190 @@
 }
 
 .urbizen-conception__label {
+	color: var(--uc-encre);
 	display: block;
-	font-weight: 600;
-	margin: 0 0 0.35rem;
+	font-size: 13px;
+	font-weight: 500;
+	margin: 0 0 6px;
+	padding: 0;
 }
 
+/* Dans la maquette, l'astérisque de champ requis est vert, pas rouge : le
+   rouge y est réservé aux erreurs de saisie. */
 .urbizen-conception__requis {
+	color: var(--uc-vert);
+	font-size: 12px;
 	font-weight: 400;
-	font-size: 0.875rem;
 }
 
 .urbizen-conception__groupe {
 	border: 0;
 	margin: 0;
+	min-width: 0;
 	padding: 0;
 }
 
-.urbizen-conception__choix {
-	align-items: center;
-	display: flex;
-	gap: 0.5rem;
-	/* Zone cliquable confortable, y compris au doigt. */
-	min-height: 2.75rem;
+/*
+ * Les choix se rangent en grille, comme les cases « nature des travaux » de la
+ * maquette : une pile de cartes pleine largeur donnait huit blocs empilés sur
+ * toute la hauteur de l'écran.
+ */
+.urbizen-conception__groupe {
+	display: grid;
+	gap: 9px;
+	grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
 }
 
-.urbizen-conception__choix label {
-	cursor: pointer;
-	flex: 1;
-	padding: 0.4rem 0;
+.urbizen-conception__groupe > .urbizen-conception__label {
+	grid-column: 1 / -1;
 }
 
 .urbizen-conception input[type="text"],
 .urbizen-conception input[type="number"],
 .urbizen-conception select,
 .urbizen-conception textarea {
-	background: var(--uc-blanc);
-	border: 1px solid rgba(11, 31, 58, 0.35);
-	border-radius: 4px;
-	color: inherit;
-	font: inherit;
+	background: var(--uc-surface);
+	border: 1px solid var(--uc-ligne-forte);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre);
+	font-family: inherit;
+	font-size: 14px;
 	max-width: 100%;
 	min-height: 2.75rem;
-	padding: 0.5rem 0.65rem;
+	padding: 9px 11px;
+	transition: border-color 0.15s, box-shadow 0.15s;
 	width: 100%;
+}
+
+.urbizen-conception textarea {
+	min-height: 88px;
+	resize: vertical;
+}
+
+.urbizen-conception input[type="text"]:focus,
+.urbizen-conception input[type="number"]:focus,
+.urbizen-conception select:focus,
+.urbizen-conception textarea:focus {
+	border-color: var(--uc-vert);
+	box-shadow: 0 0 0 3px var(--uc-vert-pale);
+	outline: none;
 }
 
 .urbizen-conception input:focus-visible,
 .urbizen-conception select:focus-visible,
 .urbizen-conception textarea:focus-visible,
 .urbizen-conception button:focus-visible {
-	outline: 3px solid var(--uc-menthe);
+	outline: 2px solid var(--uc-vert);
 	outline-offset: 2px;
 }
 
 .urbizen-conception [aria-invalid="true"] {
 	border-color: var(--uc-erreur);
-	border-width: 2px;
 }
 
 .urbizen-conception__erreur {
 	color: var(--uc-erreur);
-	font-size: 0.9375rem;
-	font-weight: 600;
-	margin: 0.35rem 0 0;
+	font-size: 12.5px;
+	margin: 8px 0 0;
 }
 
 .urbizen-conception__erreur[hidden] {
 	display: none;
 }
 
+/* --- choix : cartes à cocher de la maquette --- */
+.urbizen-conception__choix {
+	align-items: center;
+	background: var(--uc-surface);
+	border: 1px solid var(--uc-ligne-forte);
+	border-radius: var(--uc-rayon);
+	display: flex;
+	font-size: 13.5px;
+	gap: 9px;
+	/* Zone cliquable confortable, y compris au doigt. */
+	min-height: 2.75rem;
+	padding: 10px 12px;
+	transition: border-color 0.15s, background 0.15s;
+}
+
+.urbizen-conception__choix:hover {
+	background: #f5f8fa;
+}
+
+/*
+ * `:has()` n'est qu'un agrément : sans lui la carte reste lisible et l'état
+ * coché demeure porté par la case elle-même.
+ */
+.urbizen-conception__choix:has(input:checked) {
+	background: var(--uc-vert-pale);
+	border-color: var(--uc-vert);
+}
+
+.urbizen-conception__choix input {
+	accent-color: var(--uc-vert);
+	flex: none;
+	height: 16px;
+	margin: 0;
+	width: 16px;
+}
+
+.urbizen-conception__choix label {
+	cursor: pointer;
+	flex: 1;
+}
+
+/*
+ * L'attestation n'est pas un choix commercial : c'est l'encart d'engagement de
+ * la maquette. Attention, le consentement n'est **pas** rendu dans un
+ * `__choix` : le rendu pose le libellé puis la case, tous deux enfants directs
+ * du champ. Des règles visant `__choix` ne l'atteignaient pas et laissaient une
+ * case orpheline sous son libellé.
+ */
+.urbizen-conception__champ--consent {
+	align-items: flex-start;
+	background: #f1f5f8;
+	border: 1px solid var(--uc-ligne);
+	border-left: 3px solid var(--uc-vert);
+	border-radius: var(--uc-rayon);
+	display: flex;
+	flex-wrap: wrap;
+	gap: 11px;
+	padding: 13px 15px;
+}
+
+/* La case passe avant son libellé, comme sur la maquette. Elle reste la seule
+   commande focalisable du bloc : l'ordre de tabulation est inchangé. */
+.urbizen-conception__champ--consent input[type="checkbox"] {
+	accent-color: var(--uc-vert);
+	flex: none;
+	height: 16px;
+	margin: 3px 0 0;
+	order: -1;
+	width: 16px;
+}
+
+.urbizen-conception__champ--consent .urbizen-conception__label {
+	color: var(--uc-encre-doux);
+	flex: 1;
+	font-size: 13px;
+	font-weight: 400;
+	margin: 0;
+	min-width: 0;
+}
+
+.urbizen-conception__champ--consent .urbizen-conception__erreur {
+	flex-basis: 100%;
+	margin: 0;
+}
+
 /* --- résumé d'erreurs --- */
 .urbizen-conception__erreurs {
-	border: 2px solid var(--uc-erreur);
-	border-radius: 6px;
-	margin: 0 0 1.5rem;
-	padding: 1rem;
+	background: #fdecea;
+	border: 1px solid var(--uc-ligne);
+	border-left: 3px solid var(--uc-erreur);
+	border-radius: var(--uc-rayon);
+	margin: 0 0 22px;
+	padding: 13px 15px;
 }
 
 .urbizen-conception__erreurs[hidden] {
@@ -184,8 +421,20 @@
 }
 
 .urbizen-conception__erreurs-titre {
-	font-size: 1rem;
-	margin: 0 0 0.5rem;
+	font-family: var(--uc-titre);
+	font-size: 14px;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.urbizen-conception__erreurs-liste {
+	font-size: 13px;
+	margin: 0;
+	padding-left: 18px;
+}
+
+.urbizen-conception__erreurs-liste a {
+	color: var(--uc-erreur);
 }
 
 /* --- pot de miel --- */
@@ -197,55 +446,141 @@
 	width: 1px;
 }
 
-/* --- documents --- */
+/* --- pièces --- */
 .urbizen-conception__consignes {
-	background: var(--uc-gris);
-	border-radius: 4px;
-	font-size: 0.9375rem;
-	margin: 0 0 1.25rem;
-	padding: 0.75rem 1rem;
+	background: var(--uc-surface-2);
+	border: 1px solid var(--uc-ligne);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre-doux);
+	font-size: 12.5px;
+	margin: 0 0 12px;
+	padding: 11px 13px;
+}
+
+.urbizen-conception__champ--file input[type="file"] {
+	background: var(--uc-surface);
+	border: 1px dashed var(--uc-ligne-forte);
+	border-radius: var(--uc-rayon);
+	font-size: 13px;
+	max-width: 100%;
+	padding: 11px 13px;
+	width: 100%;
+}
+
+/*
+ * Le bouton interne du champ fichier garde sinon l'apparence native du
+ * navigateur — un gris système au milieu d'une charte. On le redessine comme le
+ * bouton de dépôt de la maquette. Aucune conséquence sur le comportement : la
+ * commande reste le champ `file` lui-même.
+ */
+.urbizen-conception__champ--file input[type="file"]::file-selector-button {
+	background: #f1f5f8;
+	border: 1px solid var(--uc-ligne-forte);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre);
+	cursor: pointer;
+	font-family: inherit;
+	font-size: 12.5px;
+	margin-right: 12px;
+	padding: 7px 12px;
+}
+
+.urbizen-conception__champ--file input[type="file"]::file-selector-button:hover {
+	border-color: var(--uc-vert);
+	color: var(--uc-vert-fonce);
 }
 
 .urbizen-conception__fichiers {
 	list-style: none;
-	margin: 0.5rem 0 0;
+	margin: 10px 0 0;
 	padding: 0;
 }
 
 .urbizen-conception__fichiers li {
 	align-items: center;
-	border-bottom: 1px solid rgba(11, 31, 58, 0.12);
+	background: var(--uc-surface);
+	border: 1px solid var(--uc-ligne);
+	border-radius: var(--uc-rayon);
 	display: flex;
-	gap: 0.5rem;
-	padding: 0.5rem 0;
+	font-size: 13px;
+	gap: 12px;
+	justify-content: space-between;
+	margin-bottom: 8px;
+	min-width: 0;
+	padding: 9px 13px;
 	/* Un nom de document très long ne doit pas déborder. */
 	word-break: break-word;
 }
 
-/* --- navigation --- */
+.urbizen-conception__fichiers li button {
+	background: #f1f5f8;
+	border: 1px solid var(--uc-ligne-forte);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre);
+	cursor: pointer;
+	flex: none;
+	font-family: inherit;
+	font-size: 12.5px;
+	padding: 7px 12px;
+	white-space: nowrap;
+}
+
+.urbizen-conception__fichiers li button:hover {
+	border-color: var(--uc-vert);
+	color: var(--uc-vert-fonce);
+}
+
+/* --- pied de panneau --- */
 .urbizen-conception__navigation {
 	align-items: center;
+	border-top: 1px solid var(--uc-ligne);
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.75rem;
-	margin: 1.5rem 0 0;
+	gap: 12px;
+	justify-content: space-between;
+	margin: 26px 0 0;
+	padding: 18px 0 0;
 }
 
 .urbizen-conception__bouton {
-	background: var(--uc-marine);
-	border: 2px solid var(--uc-marine);
-	border-radius: 4px;
-	color: var(--uc-blanc);
+	border: 1px solid transparent;
+	border-radius: var(--uc-rayon);
 	cursor: pointer;
-	font: inherit;
-	font-weight: 600;
+	font-family: var(--uc-titre);
+	font-size: 14px;
+	font-weight: 500;
 	min-height: 2.75rem;
-	padding: 0.6rem 1.2rem;
+	padding: 10px 20px;
+	transition: background 0.15s, border-color 0.15s;
 }
 
+/* Reprise stricte de la hiérarchie de la maquette. */
 .urbizen-conception__bouton--precedent {
-	background: transparent;
-	color: var(--uc-marine);
+	background: var(--uc-surface);
+	border-color: var(--uc-ligne-forte);
+	color: var(--uc-encre);
+}
+
+.urbizen-conception__bouton--precedent:hover {
+	border-color: var(--uc-encre-doux);
+}
+
+.urbizen-conception__bouton--suivant {
+	background: var(--uc-encre);
+	color: #fff;
+}
+
+.urbizen-conception__bouton--suivant:hover {
+	background: #0f1620;
+}
+
+.urbizen-conception__bouton--envoyer {
+	background: var(--uc-vert);
+	color: #fff;
+}
+
+.urbizen-conception__bouton--envoyer:hover {
+	background: var(--uc-vert-fonce);
 }
 
 .urbizen-conception__bouton[hidden] {
@@ -254,36 +589,37 @@
 
 .urbizen-conception__bouton[disabled] {
 	cursor: not-allowed;
-	opacity: 0.6;
+	opacity: 0.45;
 }
 
+/*
+ * L'estimation est un relevé, pas une alerte : cartouche clair au filet vert,
+ * chiffre en encre. Aucun rouge, aucun pictogramme d'avertissement.
+ */
 .urbizen-conception__estimation {
-	flex: 1 1 12rem;
-	font-weight: 700;
+	background: #f1f5f8;
+	border: 1px solid var(--uc-ligne);
+	border-left: 3px solid var(--uc-vert);
+	border-radius: var(--uc-rayon);
+	color: var(--uc-encre);
+	flex: 1 1 14rem;
+	font-family: var(--uc-mono);
+	font-size: 13px;
 	min-width: 12rem;
-}
-
-@media (max-width: 26rem) {
-	.urbizen-conception__etape {
-		padding: 1rem 0.75rem;
-	}
-
-	.urbizen-conception__navigation .urbizen-conception__bouton {
-		flex: 1 1 100%;
-	}
+	padding: 10px 14px;
 }
 
 /* --- brouillon --- */
 .urbizen-conception__brouillon {
-	background: var(--uc-gris);
-	border-radius: 6px;
-	margin: 1.5rem 0 0;
-	padding: 1rem;
+	border-top: 1px solid var(--uc-ligne);
+	color: var(--uc-encre-doux);
+	margin: 22px 0 0;
+	padding: 16px 0 0;
 }
 
 .urbizen-conception__brouillon-note {
-	font-size: 0.9375rem;
-	margin: 0.5rem 0;
+	font-size: 12.5px;
+	margin: 6px 0;
 }
 
 .urbizen-conception__brouillon-info:empty {
@@ -293,18 +629,131 @@
 .urbizen-conception__lien {
 	background: none;
 	border: 0;
-	color: var(--uc-marine);
+	color: var(--uc-encre-doux);
 	cursor: pointer;
-	font: inherit;
+	font-family: inherit;
+	font-size: 12.5px;
 	min-height: 2.75rem;
 	padding: 0.4rem 0;
 	text-decoration: underline;
 }
 
-/* `display:flex` posé sur la classe l'emporte sur la règle `[hidden]` du
-   navigateur : sans cette règle, la navigation masquée par le serveur
-   resterait visible, et le message « JavaScript nécessaire » serait démenti
-   par un bouton « Envoyer » bien présent. */
+.urbizen-conception__lien:hover {
+	color: var(--uc-vert-fonce);
+}
+
+/* ==========================================================================
+   Au-delà de 720 px, la maquette passe le rail à gauche et met les champs
+   courts sur deux colonnes. En dessous, tout retombe en une colonne et le rail
+   redevient une bande horizontale.
+   ========================================================================== */
+@media (min-width: 45rem) {
+	.urbizen-conception {
+		display: grid;
+		grid-template-columns: 232px minmax(0, 1fr);
+		justify-content: center;
+	}
+
+	.urbizen-conception__apercu,
+	.urbizen-conception__noscript,
+	.urbizen-conception > noscript {
+		grid-column: 1 / -1;
+		width: 100%;
+	}
+
+	/*
+	 * `margin: 0 auto` empêche l'étirement par défaut d'un élément de grille :
+	 * le rail se rétractait à sa largeur de contenu, laissant une fente entre
+	 * lui et le panneau, et la coque se lisait comme deux cartes séparées.
+	 */
+	.urbizen-conception__progression {
+		border-bottom: 1px solid var(--uc-ligne-forte);
+		margin: 0;
+		border-radius: var(--uc-rayon) 0 0 var(--uc-rayon);
+		border-right: 1px solid var(--uc-ligne);
+		max-width: none;
+		padding: 22px 18px;
+	}
+
+	.urbizen-conception__progression ol {
+		display: block;
+		overflow-x: visible;
+		padding: 0;
+	}
+
+	/* Fil de côte reliant les pastilles, comme sur une légende de plan. */
+	.urbizen-conception__progression-item {
+		flex-direction: row;
+		font-size: 13.5px;
+		gap: 11px;
+		min-width: 0;
+		padding: 8px 0;
+		position: relative;
+		text-align: left;
+	}
+
+	.urbizen-conception__progression-item::before {
+		background: var(--uc-ligne);
+		bottom: -8px;
+		content: "";
+		left: 11px;
+		position: absolute;
+		top: 30px;
+		width: 1px;
+	}
+
+	.urbizen-conception__progression-item:last-child::before {
+		display: none;
+	}
+
+	.urbizen-conception__progression-rang {
+		z-index: 1;
+	}
+
+	.urbizen-conception__form {
+		border-left: 0;
+		border-radius: 0 var(--uc-rayon) var(--uc-rayon) 0;
+		margin: 0;
+		max-width: none;
+	}
+
+	/* Grille de champs : 1fr 1fr, les champs longs occupent la largeur. */
+	.urbizen-conception__etape {
+		column-gap: 16px;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+
+	.urbizen-conception__etape-titre,
+	.urbizen-conception__champ {
+		grid-column: 1 / -1;
+	}
+
+	.urbizen-conception__champ--text,
+	.urbizen-conception__champ--number,
+	.urbizen-conception__champ--select {
+		grid-column: span 1;
+	}
+}
+
+@media (max-width: 26rem) {
+	.urbizen-conception__navigation .urbizen-conception__bouton {
+		flex: 1 1 100%;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.urbizen-conception * {
+		transition: none;
+	}
+}
+
+/*
+ * `display:flex` posé sur la classe l'emporte sur la règle `[hidden]` du
+ * navigateur : sans cette règle, la navigation masquée par le serveur
+ * resterait visible, et le message « JavaScript nécessaire » serait démenti
+ * par un bouton « Envoyer » bien présent.
+ */
 .urbizen-conception__navigation[hidden] {
 	display: none;
 }
