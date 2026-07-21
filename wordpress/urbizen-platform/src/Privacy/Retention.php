@@ -25,6 +25,7 @@ use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
+use Urbizen\Platform\Submissions\TransactionRecovery;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -280,149 +281,31 @@ final class Retention {
 	 * @return array<int, string>
 	 */
 	public static function purgeable_statuses(): array {
-		return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED );
+		// `delete_failed` en fait partie : une suppression qui a échoué hier
+		// doit être retentée demain. Sans cela, une demande resterait figée
+		// hors de portée de la rétention, avec ses données personnelles.
+		return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed' );
 	}
 
 	/**
 	 * Délai au-delà duquel une transaction reste en plan est jugée abandonnée.
 	 */
-	public const ABANDON_TTL = 3600;
+	public const ABANDON_TTL = TransactionRecovery::TTL;
 
 	/**
-	 * Récupère les transactions interrompues brutalement.
+	 * Réconcilie les transactions interrompues.
 	 *
-	 * Une exception se rattrape ; une coupure de processus, non. Ni `catch`,
-	 * ni `finally`, ni destructeur ne s'exécutent lorsque PHP est tué, que le
-	 * serveur redémarre ou que la connexion tombe pendant l'écriture. Le
-	 * rattrapage ne peut donc pas vivre dans la requête : il lui faut un état
-	 * **durable**, relu par une requête ultérieure.
-	 *
-	 * Sept conditions doivent être réunies **simultanément** pour qu'une
-	 * demande soit jugée abandonnée. Toute incertitude conduit à conserver.
+	 * Délègue à `TransactionRecovery`, qui distingue les trois issues possibles :
+	 * annulation complète, normalisation d'une demande valide, ou conservation
+	 * prudente d'un état contradictoire.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return int Nombre de transactions récupérées.
+	 * @return int Nombre de transactions annulées.
 	 */
 	public static function recover_abandoned( ?int $now = null ): int {
-		$now    = null === $now ? time() : $now;
-		$limite = gmdate( 'Y-m-d H:i:s', $now - self::ABANDON_TTL );
+		$bilan = TransactionRecovery::run( $now );
 
-		$candidats = get_posts(
-			array(
-				'post_type'        => SubmissionPostType::POST_TYPE,
-				'post_status'      => 'any',
-				'posts_per_page'   => self::LOT,
-				'fields'           => 'ids',
-				'no_found_rows'    => true,
-				'suppress_filters' => true,
-				'meta_query'       => array( // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query
-					'relation' => 'AND',
-					array(
-						'key'     => '_urbizen_status',
-						'value'   => SubmissionPostType::STATUS_PROCESSING,
-						'compare' => '=',
-					),
-					array(
-						'key'     => '_urbizen_created_at_gmt',
-						'value'   => $limite,
-						'compare' => '<',
-						'type'    => 'DATETIME',
-					),
-				),
-			)
-		);
-
-		$recuperees = 0;
-
-		foreach ( $candidats as $id ) {
-			$id = (int) $id;
-
-			if ( self::recover_one( $id, $now ) ) {
-				++$recuperees;
-			}
-		}
-
-		return $recuperees;
-	}
-
-	/**
-	 * Récupère une transaction, si et seulement si toutes les conditions sont réunies.
-	 *
-	 * @param int $id  Demande.
-	 * @param int $now Horodatage courant.
-	 * @return bool
-	 */
-	private static function recover_one( int $id, int $now ): bool {
-		$post = get_post( $id );
-
-		// 1 · le bon type de contenu.
-		if ( ! $post || SubmissionPostType::POST_TYPE !== $post->post_type ) {
-			return false;
-		}
-
-		// 2 · état interne « processing ».
-		if ( SubmissionPostType::STATUS_PROCESSING !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
-			return false;
-		}
-
-		// 3 · ancienneté suffisante.
-		$creee = (string) get_post_meta( $id, '_urbizen_created_at_gmt', true );
-
-		if ( '' === $creee || strtotime( $creee . ' UTC' ) > $now - self::ABANDON_TTL ) {
-			return false;
-		}
-
-		// 4 · aucun marqueur de validation.
-		$transaction = SubmissionRepository::transaction( $id );
-
-		if ( 'committed' === ( $transaction['state'] ?? '' ) ) {
-			Logger::error( sprintf( 'transaction #%d : marquée committed mais restée processing — conservée', $id ) );
-
-			return false;
-		}
-
-		$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
-
-		if ( ! Storage::is_reference( $reference ) ) {
-			Logger::error( sprintf( 'transaction #%d : référence illisible — conservée', $id ) );
-
-			return false;
-		}
-
-		// 5 et 6 · la réservation doit être encore « reserved » et pointer sur
-		// cette demande. Une référence attribuée signale une demande valide :
-		// on ne touche à rien.
-		$reservation = get_option( SubmissionRepository::RESERVATION_PREFIX . $reference, null );
-
-		if ( ! is_array( $reservation ) || 'reserved' !== ( $reservation['state'] ?? '' ) ) {
-			Logger::error( sprintf( 'transaction #%d : réservation non « reserved » — conservée', $id ) );
-
-			return false;
-		}
-
-		$rattachee = (int) ( $reservation['post'] ?? 0 );
-
-		if ( 0 !== $rattachee && $rattachee !== $id ) {
-			Logger::error( sprintf( 'transaction #%d : réservation rattachée à une autre demande — conservée', $id ) );
-
-			return false;
-		}
-
-		// Ordre sûr : staging, puis fichiers finaux de cette référence, puis la
-		// demande, puis la réservation. À aucun moment un fichier ne survit à
-		// la disparition de ce qui permet de le retrouver.
-		if ( isset( $transaction['staging'] ) && is_string( $transaction['staging'] ) ) {
-			Storage::discard_staging( $transaction['staging'] );
-		}
-
-		Storage::delete_reference_dir( $reference );
-
-		wp_delete_post( $id, true );
-		SubmissionRepository::release_reference( $reference );
-
-		Logger::info( sprintf( 'transaction abandonnée récupérée : #%d (%s)', $id, $reference ) );
-
-		return true;
+		return $bilan['rollback'];
 	}
 
 	/**

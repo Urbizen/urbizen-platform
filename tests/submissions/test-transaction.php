@@ -424,4 +424,142 @@ foreach ( array(
 	check( "le journal ne contient pas : $libelle", ! str_contains( $log, $motif ) );
 }
 
+// ======================================================================
+// VERROUILLAGE DES LIENS PENDANT UNE SUPPRESSION
+// ======================================================================
+// Une signature valable ne suffit pas : l'état de la demande commande.
+
+/**
+ * Prépare une demande à deux documents et son lien signé.
+ *
+ * @return array{r:mixed,params:array<string,mixed>,params2:array<string,mixed>,dossier:string}
+ */
+function preparer_deux_documents(): array {
+	neuf();
+	FileCleaner::reset();
+
+	$files = array_merge(
+		fx_files( 'photos', array( array( 'a.jpg', fx_copie( fx_jpeg() ) ) ) ),
+		fx_files( 'urbanisme', array( array( 'b.pdf', fx_copie( fx_pdf() ) ) ) )
+	);
+
+	$r  = traiter( soumission(), $files );
+	$lu = SubmissionRepository::get( $r->id() );
+
+	parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $p1 );
+	parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][1]['id'], wpd_now() ), PHP_URL_QUERY ), $p2 );
+
+	return array( 'r' => $r, 'params' => $p1, 'params2' => $p2, 'dossier' => URBIZEN_TEST_STORAGE . '/conception/' . $r->reference() . '/urbanisme' );
+}
+
+$cas = preparer_deux_documents();
+
+// 1 · lien valide avant suppression.
+check( 'lien · valide avant toute suppression', null !== D::locate( $cas['params'], wpd_now() ) );
+check( 'lien · le second aussi', null !== D::locate( $cas['params2'], wpd_now() ) );
+
+// 2 · refusé dès le passage à deleting.
+update_post_meta( $cas['r']->id(), '_urbizen_status', SubmissionPostType::STATUS_DELETING );
+
+check( 'lien · REFUSÉ dès le passage à deleting', null === D::locate( $cas['params'], wpd_now() ) );
+check( 'lien · le second aussi', null === D::locate( $cas['params2'], wpd_now() ) );
+check( 'lien · le document est pourtant toujours là', 2 === fx_compte_fichiers() );
+
+// 3 · premier fichier effacé, second impossible.
+$cas = preparer_deux_documents();
+@chmod( $cas['dossier'], 0500 );
+
+$resultat = FileCleaner::delete( $cas['r']->id(), $cas['r']->reference() );
+
+check( 'suppression partielle · signalée comme telle', 'partial_failure' === $resultat['code'] );
+check( 'suppression partielle · un document effacé, un en échec', 1 === $resultat['deleted'] && 1 === $resultat['failed'] );
+check( 'suppression partielle · le second est physiquement présent', 1 === fx_compte_fichiers() );
+check( 'suppression partielle · l’état passe à delete_failed', 'delete_failed' === get_post_meta( $cas['r']->id(), '_urbizen_status', true ) );
+check( 'suppression partielle · les métadonnées sont conservées', 2 === (int) get_post_meta( $cas['r']->id(), '_urbizen_files_count', true ) );
+
+// 4 et 5 · l'ancien lien du document restant est néanmoins refusé.
+check( 'suppression partielle · L’ANCIEN LIEN DU DOCUMENT RESTANT EST REFUSÉ', null === D::locate( $cas['params2'], wpd_now() ) );
+check( 'suppression partielle · celui du document effacé aussi', null === D::locate( $cas['params'], wpd_now() ) );
+
+// 9 · réponse extérieure identique à celle d'un fichier inexistant.
+$inexistant = array_merge( $cas['params2'], array( 'submission' => 999999 ) );
+check( 'suppression partielle · même réponse que pour une demande inexistante',
+	D::locate( $cas['params2'], wpd_now() ) === D::locate( $inexistant, wpd_now() ) );
+
+// 6 · la suppression du contenu reste bloquée.
+FileCleaner::reset();
+check( 'suppression partielle · wp_delete_post reste bloqué',
+	false === FileCleaner::guard_delete( null, get_post( $cas['r']->id() ), true ) );
+
+// 7 et 8 · après correction, la nouvelle tentative aboutit.
+@chmod( $cas['dossier'], 0700 );
+FileCleaner::reset();
+$resultat = FileCleaner::delete( $cas['r']->id(), $cas['r']->reference() );
+
+check( 'nouvelle tentative · réussit', 'success' === $resultat['code'] );
+check( 'nouvelle tentative · plus aucun document', 0 === fx_compte_fichiers() );
+check( 'nouvelle tentative · le statut redevient exploitable', SubmissionPostType::STATUS_RECEIVED === get_post_meta( $cas['r']->id(), '_urbizen_status', true ) );
+
+FileCleaner::reset();
+check( 'nouvelle tentative · la suppression du contenu est autorisée',
+	false !== FileCleaner::guard_delete( null, get_post( $cas['r']->id() ), true ) );
+
+// --- les états qui autorisent, et ceux qui interdisent ---
+neuf();
+$r  = traiter( soumission(), fx_files( 'photos', array( array( 'p.jpg', fx_copie( fx_jpeg() ) ) ) ) );
+$lu = SubmissionRepository::get( $r->id() );
+parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $p );
+
+foreach ( array( 'received', 'converted', 'closed' ) as $etat ) {
+	update_post_meta( $r->id(), '_urbizen_status', $etat );
+	check( "état autorisant le téléchargement : $etat", null !== D::locate( $p, wpd_now() ) );
+}
+
+foreach ( array( 'processing', 'deleting', 'delete_failed', 'recovery_failed', 'incoherent', 'inconnu' ) as $etat ) {
+	update_post_meta( $r->id(), '_urbizen_status', $etat );
+	check( "état interdisant le téléchargement : $etat", null === D::locate( $p, wpd_now() ) );
+}
+
+update_post_meta( $r->id(), '_urbizen_status', 'received' );
+
+// --- les autres conditions cumulatives ---
+$ruptures = array(
+	'files_status non stored' => static function ( int $id ): void {
+		update_post_meta( $id, '_urbizen_files_status', 'pending' );
+	},
+	'transaction non committed' => static function ( int $id ): void {
+		$tx          = SubmissionRepository::transaction( $id );
+		$tx['state'] = 'processing';
+		update_post_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $tx ) );
+	},
+	'référence divergente' => static function ( int $id ): void {
+		$tx              = SubmissionRepository::transaction( $id );
+		$tx['reference'] = 'URB-2020-0001';
+		update_post_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $tx ) );
+	},
+	'réservation non attribuée' => static function ( int $id ): void {
+		$ref = (string) get_post_meta( $id, '_urbizen_reference', true );
+		update_option( SubmissionRepository::RESERVATION_PREFIX . $ref, array( 'state' => 'reserved', 'at' => 0, 'post' => $id ), false );
+	},
+	'réservation rattachée ailleurs' => static function ( int $id ): void {
+		$ref = (string) get_post_meta( $id, '_urbizen_reference', true );
+		update_option( SubmissionRepository::RESERVATION_PREFIX . $ref, array( 'state' => 'attributed', 'at' => '', 'post' => $id + 42 ), false );
+	},
+	'réservation absente' => static function ( int $id ): void {
+		delete_option( SubmissionRepository::RESERVATION_PREFIX . (string) get_post_meta( $id, '_urbizen_reference', true ) );
+	},
+);
+
+foreach ( $ruptures as $libelle => $casser ) {
+	neuf();
+	$r  = traiter( soumission(), fx_files( 'photos', array( array( 'p.jpg', fx_copie( fx_jpeg() ) ) ) ) );
+	$lu = SubmissionRepository::get( $r->id() );
+	parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $p );
+
+	check( "condition · [$libelle] le lien fonctionne d’abord", null !== D::locate( $p, wpd_now() ) );
+	$casser( $r->id() );
+	check( "condition · [$libelle] puis il est refusé", null === D::locate( $p, wpd_now() ) );
+}
+
+
 verdict();

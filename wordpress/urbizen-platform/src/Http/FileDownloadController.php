@@ -18,6 +18,7 @@ namespace Urbizen\Platform\Http;
 
 use Urbizen\Platform\Files\SignedLink;
 use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
 
@@ -103,6 +104,14 @@ final class FileDownloadController {
 			return null;
 		}
 
+		// Une signature valable ne suffit pas. La demande doit être dans un
+		// état qui autorise réellement la consultation : une suppression en
+		// cours, un nettoyage échoué, une transaction en plan ou une
+		// incohérence ferment l'accès, même si le lien est parfaitement formé.
+		if ( ! self::is_downloadable( $verdict['submission'], $demande ) ) {
+			return null;
+		}
+
 		$trouve = null;
 
 		foreach ( $demande['files'] as $file ) {
@@ -127,6 +136,64 @@ final class FileDownloadController {
 		$trouve['path'] = $reel;
 
 		return $trouve;
+	}
+
+	/**
+	 * La demande autorise-t-elle la consultation de ses documents ?
+	 *
+	 * Dix conditions cumulatives. Toute condition manquante produit la même
+	 * réponse qu'un document absent : rien ne doit distinguer un refus d'un
+	 * autre, ni révéler qu'une demande existe.
+	 *
+	 * @param int                  $id      Identifiant de la demande.
+	 * @param array<string, mixed> $demande Demande lue.
+	 * @return bool
+	 */
+	public static function is_downloadable( int $id, array $demande ): bool {
+		$post = get_post( $id );
+
+		// 1 · le bon type de contenu.
+		if ( ! $post || SubmissionPostType::POST_TYPE !== $post->post_type ) {
+			return false;
+		}
+
+		// 2 · un statut métier final et exploitable — liste fermée.
+		if ( ! in_array( (string) ( $demande['status'] ?? '' ), SubmissionPostType::downloadable_statuses(), true ) ) {
+			return false;
+		}
+
+		// 3 · une transaction validée.
+		$transaction = $demande['transaction'] ?? array();
+
+		if ( 'committed' !== ( $transaction['state'] ?? '' ) ) {
+			return false;
+		}
+
+		$reference = (string) ( $demande['reference'] ?? '' );
+
+		// 4 · la référence de la transaction concorde.
+		if ( '' === $reference || (string) ( $transaction['reference'] ?? '' ) !== $reference ) {
+			return false;
+		}
+
+		// 5 · les documents sont réellement en place.
+		if ( 'stored' !== (string) ( $demande['files_status'] ?? '' ) ) {
+			return false;
+		}
+
+		// 6, 7 et 8 · la réservation existe, est attribuée, et pointe ici.
+		$reservation = get_option( SubmissionRepository::RESERVATION_PREFIX . $reference, null );
+
+		if ( ! is_array( $reservation ) || 'attributed' !== ( $reservation['state'] ?? '' ) ) {
+			return false;
+		}
+
+		if ( (int) ( $reservation['post'] ?? 0 ) !== $id ) {
+			return false;
+		}
+
+		// 9 · au moins un document déclaré.
+		return array() !== ( $demande['files'] ?? array() );
 	}
 
 	/**

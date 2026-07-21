@@ -1043,3 +1043,89 @@ exactement 20, soit notre plafond. PHP écarte silencieusement les fichiers
 au-delà ; un envoi de 21 documents en verrait 20 arriver, sans que rien ne
 signale la perte. Porter `max_file_uploads` à 21 permettrait de la détecter.
 La politique serveur n'est pas réduite pour autant.
+
+---
+
+## D-030 — Le point de non-retour est l'attribution, pas le marqueur
+
+**Date** : 21 juillet 2026 · **État** : actée · **Corrige** [D-026]
+
+**Contexte.** La récupération conservait indéfiniment une transaction portant
+`committed` mais dont la référence était restée `reserved`. La revue a montré
+que ce n'était pas un état final acceptable.
+
+Dans le modèle transactionnel, **une réponse de succès ne part qu'après
+l'attribution définitive de la référence**. Une référence encore `reserved`
+signifie donc que la transaction n'a jamais atteint son point irréversible — le
+marqueur `committed` ne suffit pas à la rendre acceptée. La conserver
+maintiendrait des documents et des données personnelles sans aucune finalité.
+
+**Décision.** Trois issues, et trois seulement.
+
+| Situation | Issue |
+|---|---|
+| Référence `reserved`, ancienneté dépassée, réservation rattachée | **annulation complète** |
+| Référence `attributed` et tout concorde | **normalisation idempotente** du statut |
+| Référence `attributed` mais quelque chose ne concorde pas | **conservation prudente**, aucun téléchargement, signalement |
+
+Le point G rejoint donc A à F : aucun post, aucun fichier, aucun staging,
+aucune réservation, aucune donnée personnelle résiduelle.
+
+**Une référence `attributed` n'est jamais annulée.** La cohérence se juge sur
+cinq critères : transaction `committed`, référence identique, `files_status` à
+`stored` ou `none`, métadonnées obligatoires présentes, réservation rattachée au
+bon contenu.
+
+**Le rollback est fermé par défaut.** Si un seul fichier résiste, rien d'autre
+n'est supprimé : la demande passe en `recovery_failed`, ses métadonnées et sa
+réservation `reserved` sont conservées, et la tentative suivante reprendra. Un
+nettoyage partiel n'est **jamais** compté comme un succès.
+
+---
+
+## D-031 — Un lien signé ne suffit pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-025]
+
+**Contexte.** Une signature valable donnait accès au document, sans considérer
+l'état de la demande. Un téléchargement pouvait donc survenir pendant une
+suppression, ou après un nettoyage partiel.
+
+**Décision.** Neuf conditions **cumulatives** avant toute ouverture de fichier :
+bon type de contenu, statut métier dans une liste **fermée**
+(`received`, `converted`, `closed`), transaction `committed`, référence de la
+transaction identique, `files_status` exactement `stored`, réservation
+existante, `attributed`, rattachée au même contenu, et au moins un document
+déclaré.
+
+Toute condition manquante produit **la même réponse** qu'un document absent ou
+qu'une signature fausse.
+
+**Le verrou est posé avant le premier `unlink`.** `_urbizen_status` passe à
+`deleting` : à partir de cet instant, aucun lien ne fonctionne plus, y compris
+pour les documents pas encore touchés. En cas d'échec partiel, l'état devient
+`delete_failed` et le reste inaccessible ; le statut métier d'origine est
+mémorisé à part, pour qu'une seconde tentative ne prenne pas `delete_failed`
+pour l'état à restaurer.
+
+---
+
+## D-032 — `max_file_uploads` : prérequis avant publication
+
+**Date** : 21 juillet 2026 · **État** : consignée
+
+**Constat de production** : `max_file_uploads = 20`, exactement le plafond de la
+politique applicative. PHP écarte **silencieusement** les fichiers au-delà : un
+envoi de 21 documents en verrait 20 arriver, sans que rien ne signale la perte.
+
+Ce point **ne bloque pas** la fusion du backend, le formulaire n'étant pas
+public. Il devient **bloquant avant publication**. Deux voies :
+
+1. porter `max_file_uploads` à **21 au minimum**, idéalement 25 ;
+2. ou, en PR C, faire déclarer au client le nombre de documents par bloc et au
+   total, puis vérifier que le nombre reçu correspond **exactement**.
+
+Le manifeste ne permettrait jamais de dépasser les limites serveur : il sert
+uniquement à détecter une perte silencieuse.
+
+Aucune configuration Hostinger n'a été modifiée.

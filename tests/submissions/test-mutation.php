@@ -358,8 +358,8 @@ $p = mutant(
 	'src/Privacy/Retention.php',
 	'Retention',
 	array(
-		'return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED );' =>
-		'return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, SubmissionPostType::STATUS_CONVERTED );',
+		"return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed' );" =>
+		"return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed', SubmissionPostType::STATUS_CONVERTED );",
 	)
 );
 
@@ -1664,14 +1664,15 @@ check( '60 · et libère sa réservation', null === get_option( SubmissionReposi
 
 // ====== 61 · une référence attributed est supprimée par la récupération ====
 $p = mutant(
-	'src/Privacy/Retention.php',
-	'Retention',
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
 	array(
-		"		if ( ! is_array( \$reservation ) || 'reserved' !== ( \$reservation['state'] ?? '' ) ) {
-			Logger::error( sprintf( 'transaction #%d : réservation non « reserved » — conservée', \$id ) );
+		"		if ( 'attributed' !== \$etat ) {
+			return self::INCONSIST;
+		}
 
-			return false;
-		}" => '		// contrôle de l\'état de réservation retiré.',
+		return self::is_coherent( \$id, \$reference ) ? self::COHERENT : self::INCONSIST;" =>
+		'		return self::ROLLBACK;',
 	)
 );
 
@@ -1683,7 +1684,7 @@ $tx          = SubmissionRepository::transaction( $r->id() );
 $tx['state'] = 'processing';
 update_post_meta( $r->id(), '_urbizen_transaction', (string) wp_json_encode( $tx ) );
 
-$p::recover_abandoned( wpd_now() );
+$p::run( wpd_now() );
 
 check( '61 · contrôle retiré → UNE DEMANDE VALIDÉE EST DÉTRUITE', null === get_post( $r->id() ) );
 
@@ -1702,8 +1703,8 @@ check( '61 · avec son document', 1 === fx_compte_fichiers() );
 
 // ====== 62 · le répertoire final d'une transaction abandonnée subsiste =====
 $p = mutant(
-	'src/Privacy/Retention.php',
-	'Retention',
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
 	array( '		Storage::delete_reference_dir( $reference );' => '		// suppression du répertoire retirée.' )
 );
 
@@ -1719,7 +1720,7 @@ function abandon_avec_fichier( int $vieux ): array {
 
 neuf_fichiers();
 abandon_avec_fichier( $vieux );
-$p::recover_abandoned( wpd_now() );
+$p::run( wpd_now() );
 
 check( '62 · suppression retirée → le répertoire final subsiste', 1 === fx_compte_fichiers() );
 
@@ -2002,5 +2003,308 @@ $base_params = array( 'v' => '1', 'submission' => '7', 'file' => str_repeat( 'a'
 foreach ( $formes as $libelle => $modif ) {
 	check( "72 · refusé : $libelle", ! SignedLink::verify( array_merge( $base_params, $modif ), wpd_now() )['ok'] );
 }
+
+// ======================================================================
+// MUTATIONS DU TROISIÈME CORRECTIF
+// ======================================================================
+
+use Urbizen\Platform\Submissions\TransactionRecovery as TR;
+
+/** Demande valide, avec un document et son lien signé. */
+function demande_servie(): array {
+	neuf_fichiers();
+	FileCleaner::reset();
+	$r  = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+	$lu = SubmissionRepository::get( $r->id() );
+	parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $p );
+
+	return array( 'r' => $r, 'params' => $p );
+}
+
+// ====== 73 · le contrôleur cesse de vérifier files_status =================
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array(
+		"		if ( 'stored' !== (string) ( \$demande['files_status'] ?? '' ) ) {
+			return false;
+		}" => '		// contrôle de files_status retiré.',
+	)
+);
+
+$cas = demande_servie();
+update_post_meta( $cas['r']->id(), '_urbizen_files_status', 'delete_failed' );
+
+check( '73 · contrôle retiré → un document en cours de suppression reste servi', null !== $dl::locate( $cas['params'], wpd_now() ) );
+check( '73 · le dépôt le refuse', null === D2::locate( $cas['params'], wpd_now() ) );
+
+// ====== 74 · le contrôleur cesse de vérifier le statut de suppression =====
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array(
+		"		if ( ! in_array( (string) ( \$demande['status'] ?? '' ), SubmissionPostType::downloadable_statuses(), true ) ) {
+			return false;
+		}" => '		// contrôle du statut retiré.',
+	)
+);
+
+$cas = demande_servie();
+update_post_meta( $cas['r']->id(), '_urbizen_status', SubmissionPostType::STATUS_DELETING );
+
+check( '74 · contrôle retiré → un document reste servi pendant la suppression', null !== $dl::locate( $cas['params'], wpd_now() ) );
+check( '74 · le dépôt le refuse', null === D2::locate( $cas['params'], wpd_now() ) );
+
+// ====== 75 · le verrou n'est plus posé avant les unlink ===================
+// Deux écritures ferment l'accès : le verrou posé AVANT les unlink, et
+// `delete_failed` posé après un échec. On retire les deux pour observer, puis
+// on vérifie que le verrou est bien placé avant la boucle.
+$fc = mutant(
+	'src/Files/FileCleaner.php',
+	'FileCleaner',
+	array(
+		"		update_post_meta( \$submission, '_urbizen_status', SubmissionPostType::STATUS_DELETING );" => '		// verrou d\'accès retiré.',
+		"			update_post_meta( \$submission, '_urbizen_status', 'delete_failed' );" => '			// état bloquant retiré.',
+		"			update_post_meta( \$submission, '_urbizen_files_status', 'delete_failed' );" => '			// état de documents bloquant retiré.',
+	)
+);
+
+$cas     = demande_servie();
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $cas['r']->reference() . '/photos';
+@chmod( $dossier, 0500 );
+$fc::delete( $cas['r']->id(), $cas['r']->reference() );
+$mute_sert = null !== D2::locate( $cas['params'], wpd_now() );
+@chmod( $dossier, 0700 );
+
+check( '75 · verrou retiré → le document restant demeure téléchargeable', $mute_sert );
+
+$cas     = demande_servie();
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $cas['r']->reference() . '/photos';
+@chmod( $dossier, 0500 );
+FileCleaner::delete( $cas['r']->id(), $cas['r']->reference() );
+$sain_sert = null !== D2::locate( $cas['params'], wpd_now() );
+@chmod( $dossier, 0700 );
+
+check( '75 · le dépôt le rend inaccessible', ! $sain_sert );
+
+// Le verrou est bien posé avant la boucle d'effacement, et non après.
+$code_fc = implode(
+	'',
+	array_map(
+		static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+		token_get_all( (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Files/FileCleaner.php' ) )
+	)
+);
+
+check( '75 · le verrou précède la boucle d’effacement',
+	strpos( $code_fc, 'STATUS_DELETING' ) < strpos( $code_fc, 'foreach ( $files as $file )' ) );
+
+// ====== 76 · le post est supprimé malgré un échec de nettoyage ============
+$tr = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		"		if ( \$echecs > 0 || Storage::has_reference_dir( \$reference ) ) {
+			self::mark( \$id, self::RECOVERY_FAILED, sprintf( '%d nettoyage(s) en échec', max( 1, \$echecs ) ) );
+
+			return false;
+		}" => '		// contrôle du nettoyage retiré.',
+	)
+);
+
+/** Transaction abandonnée dont un document résiste. */
+function abandon_verrouille( int $vieux ): array {
+	neuf_fichiers();
+	$staging = Storage::open_staging();
+	$v       = \Urbizen\Platform\Forms\Validator::validate(
+		\Urbizen\Platform\Forms\FormRegistry::get( 'conception' ),
+		array( 'nature' => 'maison', 'situation' => 'terrain_nu', 'a_terrain' => 'non', 'nom' => 'Camille Fictif', 'email' => 'camille@exemple.test', 'rgpd' => '1' )
+	);
+	$c = SubmissionRepository::create( $v['clean'], $v['pricing'], array( 'now' => $vieux, 'files_status' => 'pending', 'finalize' => false, 'transaction' => 'tx', 'staging' => $staging ) );
+
+	$d    = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+	$meta = Storage::finalize( (string) $staging, (string) $c['reference'], array( Storage::stage( (string) $staging, $d['file'], 0 ) ), $vieux );
+	SubmissionRepository::set_files( (int) $c['id'], (array) $meta );
+
+	@chmod( URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos', 0500 );
+
+	return $c;
+}
+
+$vieux_m = wpd_now() - TR::TTL - 60;
+
+$c = abandon_verrouille( $vieux_m );
+$tr::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '76 · contrôle retiré → LE POST EST SUPPRIMÉ MALGRÉ LE FICHIER RESTANT', null === get_post( (int) $c['id'] ) );
+check( '76 · le document est devenu orphelin', 1 === fx_compte_fichiers() );
+@chmod( $dossier, 0700 );
+
+$c = abandon_verrouille( $vieux_m );
+TR::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '76 · le dépôt conserve le post', null !== get_post( (int) $c['id'] ) );
+check( '76 · et pose recovery_failed', TR::RECOVERY_FAILED === get_post_meta( (int) $c['id'], '_urbizen_status', true ) );
+@chmod( $dossier, 0700 );
+
+// ====== 77 · la réservation est libérée malgré un fichier restant =========
+$tr = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		'		if ( $echecs > 0 || Storage::has_reference_dir( $reference ) ) {' => '		if ( false ) {',
+	)
+);
+
+$c = abandon_verrouille( $vieux_m );
+$tr::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '77 · contrôle retiré → la réservation est libérée', null === get_option( SubmissionRepository::RESERVATION_PREFIX . $c['reference'], null ) );
+@chmod( $dossier, 0700 );
+
+$c = abandon_verrouille( $vieux_m );
+TR::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '77 · le dépôt la conserve en reserved', 'reserved' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $c['reference'] )['state'] ?? '' ) );
+@chmod( $dossier, 0700 );
+
+// ====== 78 · une transaction recovery_failed devient téléchargeable =======
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array(
+		"		if ( ! self::is_downloadable( \$verdict['submission'], \$demande ) ) {
+			return null;
+		}" => '		// contrôle d\'état retiré.',
+	)
+);
+
+$cas = demande_servie();
+update_post_meta( $cas['r']->id(), '_urbizen_status', TR::RECOVERY_FAILED );
+
+check( '78 · contrôle retiré → une demande recovery_failed est servie', null !== $dl::locate( $cas['params'], wpd_now() ) );
+check( '78 · le dépôt la refuse', null === D2::locate( $cas['params'], wpd_now() ) );
+
+update_post_meta( $cas['r']->id(), '_urbizen_status', TR::INCOHERENT );
+check( '78 · une demande incohérente est également refusée', null === D2::locate( $cas['params'], wpd_now() ) );
+
+// ====== 79 · un nettoyage partiel est compté comme un succès ==============
+// Deux barrières comptent l'échec : le décompte des unlink, et la vérification
+// que le répertoire de la référence a bien disparu. On les mesure séparément.
+$sans_unlink = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		'			if ( ! @unlink( $reel ) || file_exists( $reel ) ) {
+				++$echecs;
+			}' => '			@unlink( $reel );',
+	)
+);
+
+$sans_rien_79 = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		'			if ( ! @unlink( $reel ) || file_exists( $reel ) ) {
+				++$echecs;
+			}' => '			@unlink( $reel );',
+		'		if ( $echecs > 0 || Storage::has_reference_dir( $reference ) ) {' => '		if ( false ) {',
+	)
+);
+
+$c       = abandon_verrouille( $vieux_m );
+$bilan_m = $sans_unlink::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '79 · décompte retiré → la vérification du répertoire protège encore', 1 === $bilan_m['failed'] );
+@chmod( $dossier, 0700 );
+
+$c       = abandon_verrouille( $vieux_m );
+$bilan_m = $sans_rien_79::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '79 · LES DEUX RETIRÉES → le nettoyage partiel passe pour un succès', 0 === $bilan_m['failed'] );
+@chmod( $dossier, 0700 );
+
+$c = abandon_verrouille( $vieux_m );
+$bilan_s = TR::run( wpd_now() );
+$dossier = URBIZEN_TEST_STORAGE . '/conception/' . $c['reference'] . '/photos';
+
+check( '79 · le dépôt le compte comme un échec', 1 === $bilan_s['failed'] && 0 === $bilan_s['rollback'] );
+@chmod( $dossier, 0700 );
+
+// ====== 80 · le point G n'est plus annulé =================================
+$tr = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		"		if ( 'reserved' === \$etat ) {" => "		if ( 'reserved' === \$etat && 'committed' !== ( SubmissionRepository::transaction( \$id )['state'] ?? '' ) ) {",
+	)
+);
+
+/** Transaction committed dont la référence est restée reserved. */
+function point_g( int $vieux ): array {
+	neuf_fichiers();
+	$v = \Urbizen\Platform\Forms\Validator::validate(
+		\Urbizen\Platform\Forms\FormRegistry::get( 'conception' ),
+		array( 'nature' => 'maison', 'situation' => 'terrain_nu', 'a_terrain' => 'non', 'nom' => 'Camille Fictif', 'email' => 'camille@exemple.test', 'rgpd' => '1' )
+	);
+	$c = SubmissionRepository::create( $v['clean'], $v['pricing'], array( 'now' => $vieux, 'files_status' => 'pending', 'finalize' => false, 'transaction' => 'tx-g' ) );
+
+	$tx          = SubmissionRepository::transaction( (int) $c['id'] );
+	$tx['state'] = 'committed';
+	update_post_meta( (int) $c['id'], '_urbizen_transaction', (string) wp_json_encode( $tx ) );
+
+	return $c;
+}
+
+$c = point_g( $vieux_m );
+$tr::run( wpd_now() );
+
+check( '80 · exception rétablie → LE POINT G SUBSISTE INDÉFINIMENT', null !== get_post( (int) $c['id'] ) );
+
+$c = point_g( $vieux_m );
+$bilan_g = TR::run( wpd_now() );
+
+check( '80 · le dépôt annule la transaction', 1 === $bilan_g['rollback'] );
+check( '80 · le post a disparu', null === get_post( (int) $c['id'] ) );
+check( '80 · la réservation est libérée', null === get_option( SubmissionRepository::RESERVATION_PREFIX . $c['reference'], null ) );
+
+// ====== 81 · une référence attributed est annulée par le rollback =========
+$tr = mutant(
+	'src/Submissions/TransactionRecovery.php',
+	'TransactionRecovery',
+	array(
+		"		if ( 'attributed' !== \$etat ) {
+			return self::INCONSIST;
+		}
+
+		return self::is_coherent( \$id, \$reference ) ? self::COHERENT : self::INCONSIST;" =>
+		'		return self::ROLLBACK;',
+	)
+);
+
+neuf_fichiers();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_status', SubmissionPostType::STATUS_PROCESSING );
+update_post_meta( $r->id(), '_urbizen_created_at_gmt', gmdate( 'Y-m-d H:i:s', $vieux_m ) );
+$tr::run( wpd_now() );
+
+check( '81 · muté → UNE RÉFÉRENCE ATTRIBUÉE EST ANNULÉE', null === get_post( $r->id() ) );
+
+neuf_fichiers();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_status', SubmissionPostType::STATUS_PROCESSING );
+update_post_meta( $r->id(), '_urbizen_created_at_gmt', gmdate( 'Y-m-d H:i:s', $vieux_m ) );
+TR::run( wpd_now() );
+
+check( '81 · le dépôt la conserve et la normalise', null !== get_post( $r->id() ) );
+check( '81 · son statut redevient received', SubmissionPostType::STATUS_RECEIVED === get_post_meta( $r->id(), '_urbizen_status', true ) );
+check( '81 · la référence reste attribuée', 'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $r->reference() )['state'] ?? '' ) );
+
 
 verdict();

@@ -33,7 +33,7 @@ Validation et stockage privé des documents joints à une demande.
 - `tests/submissions/test-documents.php` (130 contrôles),
   `test-transaction.php` (144), `test-interruption.php` (66), `fixtures.php` :
   fichiers d'essai portant de **véritables signatures de format**, pour que
-  `finfo` réagisse comme en production. **1 045 contrôles**, dont **211
+  `finfo` réagisse comme en production. **1 174 contrôles**, dont **238
   mutations**.
 
 ### Modifié
@@ -71,6 +71,23 @@ place · `deleted` après effacement.
 - **Paramètres signés durcis** : formes strictement canoniques exigées avant
   tout calcul — aucune coercition PHP dans la chaîne signée.
 - `src/Support/PhpLimits.php` : lecture et interprétation des limites du serveur.
+
+### Récupération transactionnelle (seconde revue de la PR #19)
+- **Le point de non-retour est l'attribution**, non le marqueur `committed` :
+  une transaction dont la référence est restée `reserved` est **annulée**,
+  quoi que dise son marqueur (D-030).
+- `src/Submissions/TransactionRecovery.php` : trois issues — annulation,
+  normalisation idempotente, conservation prudente. **Fermé par défaut** : un
+  nettoyage partiel n'est jamais un succès, et laisse `recovery_failed`.
+- **Neuf conditions cumulatives** avant tout téléchargement, et un verrou
+  `deleting` posé **avant le premier `unlink`** (D-031).
+- États : `processing`, `deleting`, `delete_failed`, `recovery_failed`,
+  `incoherent`, `received`, `converted`, `closed`. Seuls les trois derniers
+  autorisent la consultation.
+- `delete_failed` devient purgeable : une suppression échouée doit être
+  retentée, sans quoi la demande resterait figée hors de portée de la rétention.
+- **`max_file_uploads = 20`** en production, soit le plafond exact : prérequis
+  bloquant **avant publication** du formulaire (D-032).
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.

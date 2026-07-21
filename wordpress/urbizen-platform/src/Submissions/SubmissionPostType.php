@@ -43,6 +43,7 @@ final class SubmissionPostType {
 	 * États métier d'une demande.
 	 */
 	public const STATUS_PROCESSING = 'processing';
+	public const STATUS_DELETING   = 'deleting';
 	public const STATUS_RECEIVED  = 'received';
 	public const STATUS_CONVERTED = 'converted';
 	public const STATUS_CLOSED    = 'closed';
@@ -142,5 +143,18 @@ final class SubmissionPostType {
 	 */
 	public static function statuses(): array {
 		return array( self::STATUS_PROCESSING, self::STATUS_RECEIVED, self::STATUS_CONVERTED, self::STATUS_CLOSED );
+	}
+
+	/**
+	 * États d'une demande dont les documents sont consultables.
+	 *
+	 * Liste **fermée** : tout ce qui n'y figure pas interdit le téléchargement,
+	 * y compris un état inconnu. Mieux vaut refuser un document légitime qu'en
+	 * servir un pendant une suppression ou après une incohérence.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function downloadable_statuses(): array {
+		return array( self::STATUS_RECEIVED, self::STATUS_CONVERTED, self::STATUS_CLOSED );
 	}
 }

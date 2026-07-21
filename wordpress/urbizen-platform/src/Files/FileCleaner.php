@@ -49,6 +49,11 @@ final class FileCleaner {
 	public const OK = array( self::SUCCESS, self::ALREADY_DELETED );
 
 	/**
+	 * Métadonnée mémorisant le statut métier d'avant la suppression.
+	 */
+	public const STATUS_BACKUP = '_urbizen_status_before_delete';
+
+	/**
 	 * Demandes en cours de nettoyage, pour éviter la réentrance.
 	 *
 	 * @var array<int, bool>
@@ -90,7 +95,6 @@ final class FileCleaner {
 
 		// Fermé par défaut : plutôt une demande qui subsiste qu'un document
 		// devenu introuvable.
-		update_post_meta( $id, '_urbizen_files_status', 'delete_failed' );
 		Logger::error( sprintf( 'suppression bloquée pour #%d : %s', $id, $resultat['code'] ) );
 
 		return false;
@@ -133,6 +137,27 @@ final class FileCleaner {
 
 		self::$en_cours[ $submission ] = true;
 
+		// Verrou d'accès posé **avant** le premier unlink. À partir de cet
+		// instant, aucun lien signé ne fonctionne plus — y compris pour les
+		// fichiers qui n'ont pas encore été touchés. Un téléchargement en
+		// cours de suppression servirait un document à moitié effacé, ou un
+		// document dont la personne vient de demander l'effacement.
+		// Le statut métier d'origine est mémorisé à part, et **une seule fois** :
+		// une seconde tentative après un échec ne doit pas prendre
+		// `delete_failed` pour l'état à restaurer.
+		$memoire = (string) get_post_meta( $submission, self::STATUS_BACKUP, true );
+
+		if ( '' === $memoire ) {
+			$courant = (string) get_post_meta( $submission, '_urbizen_status', true );
+			$memoire = in_array( $courant, SubmissionPostType::downloadable_statuses(), true )
+				? $courant
+				: SubmissionPostType::STATUS_RECEIVED;
+
+			update_post_meta( $submission, self::STATUS_BACKUP, $memoire );
+		}
+
+		update_post_meta( $submission, '_urbizen_status', SubmissionPostType::STATUS_DELETING );
+
 		$effaces = 0;
 		$echecs  = 0;
 		$code    = self::SUCCESS;
@@ -169,6 +194,11 @@ final class FileCleaner {
 		if ( $echecs > 0 ) {
 			// Les métadonnées sont **conservées** : elles sont la seule chose
 			// qui permettra de retrouver les fichiers restants et de retenter.
+			// L'état reste bloquant : les fichiers encore présents ne doivent
+			// pas redevenir téléchargeables.
+			update_post_meta( $submission, '_urbizen_status', 'delete_failed' );
+			update_post_meta( $submission, '_urbizen_files_status', 'delete_failed' );
+
 			return array(
 				'code'    => self::PARTIAL_FAILURE === $code || $effaces > 0 ? self::PARTIAL_FAILURE : $code,
 				'deleted' => $effaces,
@@ -182,6 +212,11 @@ final class FileCleaner {
 		update_post_meta( $submission, '_urbizen_files_count', 0 );
 		update_post_meta( $submission, '_urbizen_files_total_size', 0 );
 		update_post_meta( $submission, '_urbizen_files_status', 'deleted' );
+
+		// Nettoyage complet : le statut métier retrouve sa valeur d'origine, ce
+		// qui laisse WordPress poursuivre la suppression du contenu.
+		update_post_meta( $submission, '_urbizen_status', $memoire );
+		delete_post_meta( $submission, self::STATUS_BACKUP );
 
 		Logger::info( sprintf( 'demande %s : %d document(s) effacé(s)', $reference, $effaces ) );
 
