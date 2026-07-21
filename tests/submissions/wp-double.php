@@ -46,6 +46,12 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_cron_single'] = array();
 	$GLOBALS['wpd_cron_args']   = array();
 	$GLOBALS['wpd_mail_retour'] = true;
+	$GLOBALS['wpd_styles']      = array();
+	$GLOBALS['wpd_scripts']     = array();
+	$GLOBALS['wpd_styles_reg']  = array();
+	$GLOBALS['wpd_scripts_reg'] = array();
+	$GLOBALS['wpd_inline']      = array();
+	$GLOBALS['wpd_logged_in']   = false;
 	$GLOBALS['wpd_redirect_leve'] = false;
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
@@ -944,6 +950,78 @@ function esc_url( $url, $protocols = null, $context = 'display' ) {
 
 function wp_nonce_url( $url, $action = -1 ) {
 	return add_query_arg( '_wpnonce', wp_create_nonce( $action ), $url );
+}
+
+// ------------------------------------------------------------- ressources ---
+/**
+ * Doublure du chargement de ressources.
+ *
+ * Elle ne charge rien : elle **compte**. Un banc doit pouvoir prouver qu'aucun
+ * script ni feuille de style n'est mis en file pour un visiteur anonyme.
+ */
+function wp_register_style( $handle, $src = '', $deps = array(), $ver = false ) {
+	$GLOBALS['wpd_styles_reg'][ $handle ] = $src;
+	return true;
+}
+
+function wp_register_script( $handle, $src = '', $deps = array(), $ver = false, $footer = false ) {
+	$GLOBALS['wpd_scripts_reg'][ $handle ] = $src;
+	return true;
+}
+
+function wp_enqueue_style( $handle ) {
+	$GLOBALS['wpd_styles'][] = $handle;
+}
+
+function wp_enqueue_script( $handle ) {
+	$GLOBALS['wpd_scripts'][] = $handle;
+}
+
+function wp_style_is( $handle, $liste = 'enqueued' ) {
+	return 'registered' === $liste
+		? isset( $GLOBALS['wpd_styles_reg'][ $handle ] )
+		: in_array( $handle, $GLOBALS['wpd_styles'], true );
+}
+
+function wp_script_is( $handle, $liste = 'enqueued' ) {
+	return 'registered' === $liste
+		? isset( $GLOBALS['wpd_scripts_reg'][ $handle ] )
+		: in_array( $handle, $GLOBALS['wpd_scripts'], true );
+}
+
+function wp_add_inline_script( $handle, $donnees, $position = 'after' ) {
+	$GLOBALS['wpd_inline'][ $handle ][] = (string) $donnees;
+	return true;
+}
+
+function wp_nonce_field( $action = -1, $nom = '_wpnonce', $referer = true, $echo = true ) {
+	$html = sprintf(
+		'<input type="hidden" name="%s" value="%s">',
+		esc_attr( (string) $nom ),
+		esc_attr( wp_create_nonce( $action ) )
+	);
+
+	if ( $echo ) {
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	return $html;
+}
+
+function get_permalink( $post = 0 ) {
+	return $GLOBALS['wpd_permalink'] ?? 'https://urbizen.test/apercu/';
+}
+
+function is_user_logged_in() {
+	return (bool) ( $GLOBALS['wpd_logged_in'] ?? false );
+}
+
+function esc_attr__( $texte, $domaine = 'default' ) {
+	return esc_attr( $texte );
+}
+
+function plugin_dir_url( $fichier ) {
+	return 'https://urbizen.test/wp-content/plugins/urbizen-platform/';
 }
 
 // ---------------------------------------------------------------- $wpdb -----

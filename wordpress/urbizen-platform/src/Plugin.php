@@ -13,6 +13,7 @@ use Urbizen\Platform\Blocks\FormBlock;
 use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
+use Urbizen\Platform\Conception\ConceptionAssets;
 use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Privacy\Retention;
 use Urbizen\Platform\Submissions\SubmissionPostType;
@@ -114,6 +115,7 @@ final class Plugin {
 		TrashGuard::register();
 		Retention::register();
 		MailScheduler::register();
+		ConceptionAssets::register();
 
 		if ( is_admin() ) {
 			SubmissionsAdmin::register();

@@ -1,0 +1,274 @@
+/*
+ * Formulaire de conception.
+ *
+ * Tout est porté par `.urbizen-conception` : aucune règle ne vise un élément
+ * global, ni l'en-tête, ni le pied de page, ni les formulaires antérieurs.
+ * Palette Urbizen, lisible dès 320 px, et rien qui repose sur la seule
+ * couleur pour transmettre une information.
+ */
+
+.urbizen-conception {
+	--uc-marine: #0b1f3a;
+	--uc-menthe: #7bdcb5;
+	--uc-gris: #f6f8fb;
+	--uc-blanc: #fff;
+	--uc-erreur: #8a1c1c;
+
+	box-sizing: border-box;
+	color: var(--uc-marine);
+	font-size: 1rem;
+	line-height: 1.5;
+	max-width: 46rem;
+}
+
+.urbizen-conception *,
+.urbizen-conception *::before,
+.urbizen-conception *::after {
+	box-sizing: inherit;
+}
+
+.urbizen-conception__apercu,
+.urbizen-conception__noscript {
+	background: var(--uc-gris);
+	border-left: 3px solid var(--uc-marine);
+	margin: 0 0 1rem;
+	padding: 0.75rem 1rem;
+}
+
+/* --- progression --- */
+.urbizen-conception__progression ol {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	list-style: none;
+	margin: 0 0 1.5rem;
+	padding: 0;
+}
+
+.urbizen-conception__progression-item {
+	align-items: center;
+	background: var(--uc-gris);
+	border: 1px solid rgba(11, 31, 58, 0.15);
+	border-radius: 4px;
+	display: flex;
+	font-size: 0.875rem;
+	gap: 0.4rem;
+	padding: 0.4rem 0.7rem;
+}
+
+/* L'étape courante se signale par le fond, la bordure ET le texte gras :
+   jamais par la seule couleur. */
+.urbizen-conception__progression-item[aria-current="step"] {
+	background: var(--uc-marine);
+	border-color: var(--uc-marine);
+	color: var(--uc-blanc);
+	font-weight: 700;
+}
+
+.urbizen-conception__progression-rang {
+	font-variant-numeric: tabular-nums;
+}
+
+/* --- étapes --- */
+.urbizen-conception__etape {
+	border: 1px solid rgba(11, 31, 58, 0.15);
+	border-radius: 6px;
+	margin: 0 0 1.5rem;
+	padding: 1.25rem;
+}
+
+.urbizen-conception__etape[hidden] {
+	display: none;
+}
+
+.urbizen-conception__etape-titre {
+	font-size: 1.125rem;
+	font-weight: 700;
+	padding: 0 0.4rem;
+}
+
+.urbizen-conception__etape-titre:focus-visible {
+	outline: 3px solid var(--uc-menthe);
+	outline-offset: 2px;
+}
+
+/* --- champs --- */
+.urbizen-conception__champ {
+	margin: 0 0 1.25rem;
+}
+
+.urbizen-conception__champ[hidden] {
+	display: none;
+}
+
+.urbizen-conception__label {
+	display: block;
+	font-weight: 600;
+	margin: 0 0 0.35rem;
+}
+
+.urbizen-conception__requis {
+	font-weight: 400;
+	font-size: 0.875rem;
+}
+
+.urbizen-conception__groupe {
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+
+.urbizen-conception__choix {
+	align-items: center;
+	display: flex;
+	gap: 0.5rem;
+	/* Zone cliquable confortable, y compris au doigt. */
+	min-height: 2.75rem;
+}
+
+.urbizen-conception__choix label {
+	cursor: pointer;
+	flex: 1;
+	padding: 0.4rem 0;
+}
+
+.urbizen-conception input[type="text"],
+.urbizen-conception input[type="number"],
+.urbizen-conception select,
+.urbizen-conception textarea {
+	background: var(--uc-blanc);
+	border: 1px solid rgba(11, 31, 58, 0.35);
+	border-radius: 4px;
+	color: inherit;
+	font: inherit;
+	max-width: 100%;
+	min-height: 2.75rem;
+	padding: 0.5rem 0.65rem;
+	width: 100%;
+}
+
+.urbizen-conception input:focus-visible,
+.urbizen-conception select:focus-visible,
+.urbizen-conception textarea:focus-visible,
+.urbizen-conception button:focus-visible {
+	outline: 3px solid var(--uc-menthe);
+	outline-offset: 2px;
+}
+
+.urbizen-conception [aria-invalid="true"] {
+	border-color: var(--uc-erreur);
+	border-width: 2px;
+}
+
+.urbizen-conception__erreur {
+	color: var(--uc-erreur);
+	font-size: 0.9375rem;
+	font-weight: 600;
+	margin: 0.35rem 0 0;
+}
+
+.urbizen-conception__erreur[hidden] {
+	display: none;
+}
+
+/* --- résumé d'erreurs --- */
+.urbizen-conception__erreurs {
+	border: 2px solid var(--uc-erreur);
+	border-radius: 6px;
+	margin: 0 0 1.5rem;
+	padding: 1rem;
+}
+
+.urbizen-conception__erreurs[hidden] {
+	display: none;
+}
+
+.urbizen-conception__erreurs-titre {
+	font-size: 1rem;
+	margin: 0 0 0.5rem;
+}
+
+/* --- pot de miel --- */
+.urbizen-conception__miel {
+	height: 1px;
+	left: -9999px;
+	overflow: hidden;
+	position: absolute;
+	width: 1px;
+}
+
+/* --- documents --- */
+.urbizen-conception__consignes {
+	background: var(--uc-gris);
+	border-radius: 4px;
+	font-size: 0.9375rem;
+	margin: 0 0 1.25rem;
+	padding: 0.75rem 1rem;
+}
+
+.urbizen-conception__fichiers {
+	list-style: none;
+	margin: 0.5rem 0 0;
+	padding: 0;
+}
+
+.urbizen-conception__fichiers li {
+	align-items: center;
+	border-bottom: 1px solid rgba(11, 31, 58, 0.12);
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.5rem 0;
+	/* Un nom de document très long ne doit pas déborder. */
+	word-break: break-word;
+}
+
+/* --- navigation --- */
+.urbizen-conception__navigation {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin: 1.5rem 0 0;
+}
+
+.urbizen-conception__bouton {
+	background: var(--uc-marine);
+	border: 2px solid var(--uc-marine);
+	border-radius: 4px;
+	color: var(--uc-blanc);
+	cursor: pointer;
+	font: inherit;
+	font-weight: 600;
+	min-height: 2.75rem;
+	padding: 0.6rem 1.2rem;
+}
+
+.urbizen-conception__bouton--precedent {
+	background: transparent;
+	color: var(--uc-marine);
+}
+
+.urbizen-conception__bouton[hidden] {
+	display: none;
+}
+
+.urbizen-conception__bouton[disabled] {
+	cursor: not-allowed;
+	opacity: 0.6;
+}
+
+.urbizen-conception__estimation {
+	flex: 1 1 12rem;
+	font-weight: 700;
+	min-width: 12rem;
+}
+
+@media (max-width: 26rem) {
+	.urbizen-conception__etape {
+		padding: 1rem 0.75rem;
+	}
+
+	.urbizen-conception__navigation .urbizen-conception__bouton {
+		flex: 1 1 100%;
+	}
+}
