@@ -122,6 +122,7 @@ final class ConceptionRenderer {
 			$html[] = self::etape( $def, $etape, $rang, $id, $rang === $dernier );
 		}
 
+		$html[] = self::brouillon( $id );
 		$html[] = self::navigation( $id );
 		$html[] = '</form>';
 		$html[] = sprintf(
@@ -490,6 +491,38 @@ final class ConceptionRenderer {
 			default:
 				return sprintf( '<input type="text"%s>', $commun );
 		}
+	}
+
+	/**
+	 * Consentement et information de brouillon.
+	 *
+	 * Le consentement à la sauvegarde sur l'appareil est **distinct** du
+	 * consentement contractuel du formulaire, et décoché par défaut : rien
+	 * n'est écrit durablement tant qu'il n'est pas donné.
+	 *
+	 * @param string $id Identifiant d'instance.
+	 * @return string
+	 */
+	private static function brouillon( string $id ): string {
+		return sprintf(
+			'<div class="%1$s__brouillon">'
+				. '<div class="%1$s__choix">'
+				. '<input type="checkbox" id="%2$s-brouillon" data-role="consentement-brouillon">'
+				. '<label for="%2$s-brouillon">%3$s</label>'
+				. '</div>'
+				. '<p class="%1$s__brouillon-note">%4$s</p>'
+				. '<button type="button" class="%1$s__lien" data-action="effacer-brouillon">%5$s</button>'
+				. '<p class="%1$s__brouillon-info" data-role="info-brouillon" role="status" aria-live="polite"></p>'
+				. '</div>',
+			esc_attr( self::RACINE ),
+			esc_attr( $id ),
+			esc_html__( 'Conserver mes réponses sur cet appareil pendant 7 jours', 'urbizen-platform' ),
+			esc_html__(
+				'Vos réponses restent sur votre appareil : elles ne sont pas envoyées à Urbizen tant que vous n’avez pas validé le formulaire. À éviter sur un ordinateur partagé. Les documents joints ne sont jamais conservés.',
+				'urbizen-platform'
+			),
+			esc_html__( 'Supprimer le brouillon', 'urbizen-platform' )
+		);
 	}
 
 	/**

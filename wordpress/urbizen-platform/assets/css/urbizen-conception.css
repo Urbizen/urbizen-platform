@@ -272,3 +272,31 @@
 		flex: 1 1 100%;
 	}
 }
+
+/* --- brouillon --- */
+.urbizen-conception__brouillon {
+	background: var(--uc-gris);
+	border-radius: 6px;
+	margin: 1.5rem 0 0;
+	padding: 1rem;
+}
+
+.urbizen-conception__brouillon-note {
+	font-size: 0.9375rem;
+	margin: 0.5rem 0;
+}
+
+.urbizen-conception__brouillon-info:empty {
+	display: none;
+}
+
+.urbizen-conception__lien {
+	background: none;
+	border: 0;
+	color: var(--uc-marine);
+	cursor: pointer;
+	font: inherit;
+	min-height: 2.75rem;
+	padding: 0.4rem 0;
+	text-decoration: underline;
+}

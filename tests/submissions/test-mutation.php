@@ -247,7 +247,7 @@ $lot_svg = array(
 );
 
 neuf();
-check( '9 · validation neutralisée → un SVG passe en silence', $c::process( soumission(), $lot_svg, serveur(), wpd_now() )->is_success() );
+check( '9 · validation neutralisée → un SVG passe en silence', $c::process( soumission() + array( \Urbizen\Platform\Files\UploadManifest::FIELD => fx_manifeste( $lot_svg ) ), $lot_svg, serveur(), wpd_now() )->is_success() );
 
 neuf();
 check( '9 · le dépôt refuse le SVG', 'upload_invalid_extension' === traiter( soumission(), $lot_svg )->code() );
@@ -1367,7 +1367,7 @@ $c = mutant(
 
 neuf_fichiers();
 $GLOBALS['wpd_meta_fail'] = '_urbizen_files';
-$c::process( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
+$c::process( soumission() + array( \Urbizen\Platform\Files\UploadManifest::FIELD => fx_manifeste( un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) ) ), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
 $GLOBALS['wpd_meta_fail'] = '';
 
 check( '50 · nettoyage retiré → un staging subsiste après échec', fx_compte_staging() > 0 );
@@ -1394,7 +1394,7 @@ $c = mutant(
 // décompte, écrit par set_files et non par create().
 neuf_fichiers();
 $GLOBALS['wpd_meta_fail'] = '_urbizen_files_count';
-$c::process( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
+$c::process( soumission() + array( \Urbizen\Platform\Files\UploadManifest::FIELD => fx_manifeste( un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) ) ), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ), serveur(), wpd_now() );
 $GLOBALS['wpd_meta_fail'] = '';
 
 check( '51 · abandon retiré → une demande partielle subsiste', 1 === count( $GLOBALS['wpd_posts'] ) );
@@ -1460,7 +1460,7 @@ $c = mutant(
 );
 
 neuf_fichiers();
-$c::process( soumission(), un_doc( 'photos', 'Secret Client.pdf', fx_copie( fx_pdf() ) ), serveur(), wpd_now() );
+$c::process( soumission() + array( \Urbizen\Platform\Files\UploadManifest::FIELD => fx_manifeste( un_doc( 'photos', 'Secret Client.pdf', fx_copie( fx_pdf() ) ) ) ), un_doc( 'photos', 'Secret Client.pdf', fx_copie( fx_pdf() ) ), serveur(), wpd_now() );
 
 check( '53 · muté → le nom d’origine entre dans le journal', str_contains( journal(), 'Secret Client' ) );
 

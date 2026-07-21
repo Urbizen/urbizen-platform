@@ -199,7 +199,13 @@ check( '4 · seize champs conditionnels', 16 === substr_count( $rendu, 'data-vis
 // ======================================================================
 check( '5 · un seul formulaire', 1 === substr_count( $rendu, '<form ' ) );
 check( '5 · un seul bouton submit', 1 === substr_count( $rendu, 'type="submit"' ) );
-check( '5 · Précédent et Suivant sont des boutons simples', 2 === substr_count( $rendu, 'type="button"' ) );
+// Quatre boutons simples : Précédent, Suivant, suppression du brouillon, et
+// le bouton d'envoi n'en fait pas partie — c'est le seul `submit`.
+check( '5 · Précédent et Suivant sont des boutons simples',
+	str_contains( $rendu, 'data-action="precedent"' ) && str_contains( $rendu, 'data-action="suivant"' ) );
+check( '5 · aucun autre submit que l’envoi', 1 === substr_count( $rendu, 'type="submit"' ) );
+check( '5 · les actions secondaires sont des boutons simples',
+	3 === substr_count( $rendu, 'type="button"' ) );
 check( '5 · zone aria-live pour les annonces', str_contains( $rendu, 'aria-live="polite"' ) );
 check( '5 · résumé d’erreurs en alerte', str_contains( $rendu, 'role="alert"' ) && str_contains( $rendu, 'aria-live="assertive"' ) );
 check( '5 · l’étape active porte aria-current', 1 === substr_count( $rendu, 'aria-current="step"' ) );

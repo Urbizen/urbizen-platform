@@ -64,6 +64,14 @@ if [ "$JSDOM_REEL" != "$JSDOM_ATTENDU" ]; then
 fi
 
 # --- Fixture : le HTML réel de Renderer.php, régénéré à chaque exécution ---
+titre "Fixture — rendu réel de ConceptionRenderer.php"
+if "$PHP_BIN" make-fixture-conception.php > fixture-conception.html; then
+	printf '✓ fixture-conception.html régénérée (%s octets)\n' "$(wc -c < fixture-conception.html | tr -d ' ')"
+else
+	printf '\033[31m✗ génération de la fixture conception impossible\033[0m\n'
+	exit 1
+fi
+
 titre "Fixture — rendu réel de Renderer.php"
 if "$PHP_BIN" make-fixture.php > fixture.html; then
 	printf '✓ fixture.html régénérée (%s octets)\n' "$(wc -c < fixture.html | tr -d ' ')"
@@ -81,6 +89,10 @@ titre "2/4 — Formulaire, comportement JavaScript (sur le HTML réel)"
 node test-form.mjs
 verdict $? "test-form.mjs"
 
+titre "Parcours de conception — DOM simulé"
+node test-conception.mjs
+verdict $? "test-conception.mjs"
+
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php
 verdict $? "test-render.php"
@@ -92,7 +104,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 4 bancs passent.\033[0m\n'
+	printf '\033[32mLes 5 bancs passent.\033[0m\n'
 	exit 0
 fi
 

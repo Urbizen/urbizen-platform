@@ -53,3 +53,7 @@ backups/
 
 # Fixture de test régénérée à chaque exécution (tests/cadastre/run-all.sh)
 tests/cadastre/fixture.html
+
+# Fixtures régénérées à chaque exécution des bancs : jamais versionnées,
+# pour qu'aucune divergence avec le rendu réel ne puisse s'installer.
+tests/cadastre/fixture-conception.html
