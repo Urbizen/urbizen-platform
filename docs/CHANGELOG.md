@@ -148,6 +148,9 @@ place · `deleted` après effacement.
 - La doublure WordPress applique désormais le défaut `draft` du cœur et
   **respecte les priorités des filtres** : sans cette fidélité, le défaut
   restait invisible.
+- Treize mutations couvrent le correctif, dont le retrait du filtre, un
+  `accepted_args` ramené à 2, un retour `draft` puis `publish`, la suppression
+  de la barrière postérieure, et un autre type de contenu forcé à `private`.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.

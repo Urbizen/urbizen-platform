@@ -3168,4 +3168,105 @@ check( '110 · et elle respecte les priorités des filtres',
 	str_contains( $source_double, 'function wpd_trier' ) && str_contains( $source_double, "wpd_trier( \$GLOBALS['wpd_filters']" ) );
 
 
+// ====== 111 · accepted_args ramené à 2 ====================================
+// WordPress plafonne ce qu'il transmet au nombre annoncé : le statut natif
+// précédent n'arrive plus, et la valeur par défaut vide fait tomber le
+// contrôle. Une demande cohérente n'est alors plus ramenée à private.
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "'untrash_status' ), 20, 3 );" => "'untrash_status' ), 20, 2 );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '111 · accepted_args = 2 → LE PRÉCÉDENT NATIF N’ARRIVE PLUS, RETOUR EN DRAFT',
+	'draft' === get_post( $r->id() )->post_status );
+check( '111 · et la restauration applicative est refusée',
+	! in_array( get_post_meta( $r->id(), '_urbizen_status', true ), SubmissionPostType::downloadable_statuses(), true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '111 · le dépôt déclare bien trois arguments', 'private' === get_post( $d['id'] )->post_status );
+check( '111 · et restaure le statut métier', 'received' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// ====== 112 · le filtre retourne publish ==================================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		return SubmissionPostType::POST_STATUS;
+	}
+
+	/**
+	 * Rétablit l" => "		return 'publish';
+	}
+
+	/**
+	 * Rétablit l" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '112 · publish rendu → LA DEMANDE DEVIENT PUBLIQUE', 'publish' === get_post( $r->id() )->post_status );
+check( '112 · mais la barrière postérieure refuse la restauration applicative',
+	TransactionRecovery::INCOHERENT === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '112 · le dépôt ne rend jamais publish', 'publish' !== get_post( $d['id'] )->post_status );
+check( '112 · il rend private', 'private' === get_post( $d['id'] )->post_status );
+
+// ====== 113 · un autre type de contenu est forcé à private ================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		// Tout autre type garde le statut que WordPress a choisi.
+		if ( ! self::is_ours( \$post ) ) {
+			return \$nouveau;
+		}
+
+		if ( 'trash' !== (string) \$post->post_status ) {
+			return \$nouveau;
+		}
+
+		if ( SubmissionPostType::POST_STATUS !== (string) \$precedent ) {
+			return \$nouveau;
+		}" => "		// contrôles de périmètre retirés.",
+		"		if ( null !== self::coherence_blocker( \$id ) ) {
+			// Conditions non réunies : on ne choisit surtout pas un statut qui
+			// rouvrirait l'accès aux documents.
+			return \$nouveau;
+		}" => '		// contrôle de cohérence retiré.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+
+$page = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'trash', 'post_title' => 'Page de test' ) );
+
+check( '113 · périmètre retiré → UNE PAGE EST FORCÉE À PRIVATE',
+	'private' === $tg::untrash_status( 'draft', $page, 'publish' ) );
+
+check( '113 · le dépôt laisse la page en draft', 'draft' === TG::untrash_status( 'draft', $page, 'publish' ) );
+check( '113 · et lui laisse un publish proposé', 'publish' === TG::untrash_status( 'publish', $page, 'publish' ) );
+check( '113 · un article n’est pas davantage touché',
+	'draft' === TG::untrash_status( 'draft', wp_insert_post( array( 'post_type' => 'post', 'post_status' => 'trash', 'post_title' => 'Article' ) ), 'publish' ) );
+
+
 verdict();
