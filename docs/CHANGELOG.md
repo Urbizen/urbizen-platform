@@ -121,6 +121,34 @@ place · `deleted` après effacement.
 - La doublure WordPress sait désormais simuler un échec natif de
   `wp_trash_post()` après l'invalidation applicative.
 
+### Statut natif après restauration (cinquième revue de la PR #19)
+- Une demande finalisée porte le statut natif **`private`** : elle n'est
+  lisible que par un compte autorisé, et jamais servie au public. C'est ce
+  statut, et lui seul, qui conditionne la remise des documents.
+- Depuis WordPress 5.6, un contenu non joint sorti de la Corbeille **retombe en
+  `draft`**, pas dans son statut d'origine. Sans correctif, une demande
+  restaurée devenait `draft` et ses documents **définitivement inaccessibles**,
+  sans le moindre message d'erreur (D-035).
+- Filtre `wp_untrash_post_status` (priorité 20, trois arguments) : il rétablit
+  `private` **uniquement** pour une demande Urbizen encore à la Corbeille, dont
+  le statut natif précédent était `private` et dont tous les contrôles de
+  cohérence passent. Tout autre type de contenu et toute autre situation
+  gardent le statut choisi par WordPress.
+- Le filtre **ne suffit pas** : `untrashed_post` relit le `post_status`
+  réellement écrit. Un greffon tiers exécuté après nous ne peut donc pas
+  rouvrir l'accès aux documents — la sécurité ne repose sur aucune priorité.
+- Le **statut natif** (`private`) et le **statut métier** (`received`,
+  `converted`, `closed`) sont deux notions distinctes : la première décide de
+  la visibilité WordPress, la seconde de l'avancement du dossier. Les deux sont
+  restaurées, dans cet ordre, et l'échec de l'une annule l'autre.
+- Le téléchargement ne redevient possible qu'après la réussite **complète** des
+  deux restaurations. Toute défaillance marque la demande `incoherent`,
+  conserve l'intégralité des métadonnées de diagnostic, et laisse l'accès
+  fermé.
+- La doublure WordPress applique désormais le défaut `draft` du cœur et
+  **respecte les priorités des filtres** : sans cette fidélité, le défaut
+  restait invisible.
+
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.
 - Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`

@@ -19,6 +19,7 @@ use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
+use Urbizen\Platform\Submissions\TransactionRecovery;
 
 $compteur = 0;
 
@@ -2879,6 +2880,292 @@ TG::guard_trash( null, get_post( $d['id'] ), 'private' );
 check( '100 · le dépôt reste idempotent', 'closed' === get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
 check( '100 · une seule transition cohérente', TG::PREPARED === ( TG::transition( $d['id'] )['state'] ?? '' ) );
 check( '100 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 101 · le filtre wp_untrash_post_status n'est pas enregistré ======
+// La mutation qui compte le plus : c'est l'état d'avant ce correctif.
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		add_filter( 'wp_untrash_post_status', array( self::class, 'untrash_status' ), 20, 3 );" => '		// filtre de statut natif retiré.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '101 · filtre retiré → LE POST RESTAURÉ TOMBE EN DRAFT', 'draft' === get_post( $r->id() )->post_status );
+check( '101 · et le statut métier n’est pas rétabli',
+	! in_array( get_post_meta( $r->id(), '_urbizen_status', true ), SubmissionPostType::downloadable_statuses(), true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '101 · le dépôt restaure private', 'private' === get_post( $d['id'] )->post_status );
+check( '101 · le statut métier exact', 'received' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '101 · et le téléchargement redevient possible', null !== D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 102 · le filtre renvoie draft au lieu de private ==================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		return SubmissionPostType::POST_STATUS;
+	}
+
+	/**
+	 * Rétablit l" => "		return 'draft';
+	}
+
+	/**
+	 * Rétablit l" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '102 · draft rendu → la barrière postérieure refuse',
+	TransactionRecovery::INCOHERENT === get_post_meta( $r->id(), '_urbizen_status', true ) );
+check( '102 · le post reste en draft', 'draft' === get_post( $r->id() )->post_status );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '102 · le dépôt rend private', 'private' === get_post( $d['id'] )->post_status );
+check( '102 · et le téléchargement redevient possible', null !== D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 103 · le filtre ne vérifie plus le statut natif précédent =========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( SubmissionPostType::POST_STATUS !== (string) \$precedent ) {
+			return \$nouveau;
+		}
+
+		if ( null !== self::coherence_blocker( \$id ) ) {" => "		if ( null !== self::coherence_blocker( \$id ) ) {" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+
+check( '103 · contrôle retiré → un précédent publish donnerait quand même private',
+	'private' === $tg::untrash_status( 'draft', $r->id(), 'publish' ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+
+check( '103 · le dépôt refuse un précédent publish', 'draft' === TG::untrash_status( 'draft', $d['id'], 'publish' ) );
+check( '103 · un précédent draft', 'draft' === TG::untrash_status( 'draft', $d['id'], 'draft' ) );
+check( '103 · un précédent vide', 'draft' === TG::untrash_status( 'draft', $d['id'], '' ) );
+
+// ====== 104 · le filtre ne consulte plus la cohérence =====================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( null !== self::coherence_blocker( \$id ) ) {
+			// Conditions non réunies : on ne choisit surtout pas un statut qui
+			// rouvrirait l'accès aux documents.
+			return \$nouveau;
+		}" => '		// contrôle de cohérence retiré du filtre.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+update_post_meta( $r->id(), '_urbizen_reference', 'URB-2026-9999' );
+
+check( '104 · cohérence retirée → une demande contradictoire obtiendrait private',
+	'private' === $tg::untrash_status( 'draft', $r->id(), 'private' ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+update_post_meta( $d['id'], '_urbizen_reference', 'URB-2026-9999' );
+
+check( '104 · le dépôt refuse', 'draft' === TG::untrash_status( 'draft', $d['id'], 'private' ) );
+
+// ====== 105 · la barrière postérieure de statut natif est retirée =========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( SubmissionPostType::POST_STATUS !== (string) \$post->post_status ) {
+			self::echec_restauration( \$id, sprintf( 'statut natif final « %s »', (string) \$post->post_status ) );
+
+			return;
+		}" => '		// barrière postérieure retirée.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+// Un greffon tiers, exécuté après nous, impose publish.
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'publish', 30, 3 );
+wp_untrash_post( $r->id() );
+
+check( '105 · barrière retirée → LE STATUT MÉTIER EST RESTAURÉ SUR UN POST PUBLISH',
+	'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+check( '105 · la demande est publique', 'publish' === get_post( $r->id() )->post_status );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'publish', 30, 3 );
+wp_untrash_post( $d['id'] );
+
+check( '105 · le dépôt refuse la restauration applicative',
+	TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '105 · et aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 106 · la barrière postérieure ne consulte plus la cohérence =======
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		\$motif = self::coherence_blocker( \$id );
+
+		if ( null !== \$motif ) {
+			self::echec_restauration( \$id, \$motif );
+
+			return;
+		}" => '		// contrôle de cohérence postérieur retiré.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+update_post_meta( $r->id(), '_urbizen_files_status', 'delete_failed' );
+get_post( $r->id() )->post_status = 'private';
+$tg::after_untrash( $r->id(), 'private' );
+
+check( '106 · cohérence postérieure retirée → un état contradictoire redevient received',
+	'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+update_post_meta( $d['id'], '_urbizen_files_status', 'delete_failed' );
+get_post( $d['id'] )->post_status = 'private';
+TG::after_untrash( $d['id'], 'private' );
+
+check( '106 · le dépôt refuse', TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '106 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 107 · un échec de restauration laisse un statut téléchargeable ====
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		update_post_meta( \$id, '_urbizen_status', TransactionRecovery::INCOHERENT );" => "		update_post_meta( \$id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'draft', 30, 3 );
+wp_untrash_post( $r->id() );
+
+check( '107 · marquage muté → UN ÉCHEC LAISSE UN STATUT TÉLÉCHARGEABLE',
+	'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'draft', 30, 3 );
+wp_untrash_post( $d['id'] );
+
+check( '107 · le dépôt ferme l’accès', TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '107 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 108 · les métadonnées partent avant la réussite complète =========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		\$memoire = (string) get_post_meta( \$id, self::PRE_TRASH, true );
+
+		if ( ! in_array( \$memoire, self::restorable_statuses(), true ) ) {" => "		\$memoire = (string) get_post_meta( \$id, self::PRE_TRASH, true );
+
+		delete_post_meta( \$id, self::PRE_TRASH );
+		delete_post_meta( \$id, self::TRANSITION );
+
+		if ( ! in_array( \$memoire, self::restorable_statuses(), true ) ) {" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_meta_fail'] = '_urbizen_status';
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '108 · nettoyage anticipé → LE DIAGNOSTIC EST PERDU APRÈS UN ÉCHEC',
+	'' === get_post_meta( $r->id(), TG::PRE_TRASH, true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta_fail'] = '_urbizen_status';
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '108 · le dépôt conserve le statut mémorisé', '' !== get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
+check( '108 · et la transition', array() !== TG::transition( $d['id'] ) );
+
+// ====== 109 · guard_untrash ne vérifie plus le statut natif précédent =====
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( SubmissionPostType::POST_STATUS !== (string) \$precedent ) {
+			Logger::error( sprintf( 'restauration refusée pour #%d : statut natif précédent inattendu', \$id ) );
+
+			return false;
+		}" => '		// contrôle du précédent natif retiré du garde.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_meta'][ $r->id() ]['_wp_trash_meta_status'] = 'draft';
+
+check( '109 · garde muté → une restauration au précédent draft n’est plus bloquée',
+	false !== wp_untrash_post( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta'][ $d['id'] ]['_wp_trash_meta_status'] = 'draft';
+
+check( '109 · le dépôt bloque', false === wp_untrash_post( $d['id'] ) );
+check( '109 · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->post_status );
+check( '109 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 110 · la doublure elle-même restaure l'ancien statut =============
+// Mutation de l'instrument, pas du dépôt. Une doublure qui remet `private`
+// sans exécuter le filtre rendrait les neuf mutations précédentes muettes :
+// c'est exactement l'infidélité qui masquait le défaut avant ce correctif.
+$source_double = (string) file_get_contents( __DIR__ . '/wp-double.php' );
+
+check( '110 · la doublure applique bien le filtre du cœur',
+	str_contains( $source_double, "apply_filters( 'wp_untrash_post_status', 'draft', \$id, \$precedent )" ) );
+check( '110 · elle part du défaut draft, jamais du statut précédent',
+	! str_contains( $source_double, '$post->post_status = $precedent' ) );
+check( '110 · elle transmet le précédent à untrashed_post',
+	str_contains( $source_double, "do_action( 'untrashed_post', \$id, \$precedent )" ) );
+check( '110 · et elle respecte les priorités des filtres',
+	str_contains( $source_double, 'function wpd_trier' ) && str_contains( $source_double, "wpd_trier( \$GLOBALS['wpd_filters']" ) );
 
 
 verdict();

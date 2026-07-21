@@ -1224,3 +1224,64 @@ ni aux fichiers, ni à la référence, et ne réactive aucun téléchargement.
   `incoherent` une demande invalidée sans transition. Une transition seulement
   préparée est laissée telle quelle, rejouable.
 - La restauration réussie supprime les deux métadonnées temporaires.
+
+---
+
+## D-035 — Deux statuts, deux restaurations
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-034]
+
+**Contexte.** Une demande Urbizen porte deux statuts qu'il ne faut jamais
+confondre :
+
+- le **statut natif** WordPress, `private` — il décide de la visibilité du
+  contenu, et il conditionne la remise des documents ;
+- le **statut métier**, `received` / `converted` / `closed` — il décrit
+  l'avancement du dossier.
+
+Depuis WordPress 5.6, `wp_untrash_post()` ne rend plus son statut d'origine à
+un contenu non joint : il le place en **`draft`**. Le comportement est
+volontaire côté cœur — restaurer un article en `publish` le republierait sans
+que personne l'ait décidé. Pour une demande, la conséquence était l'inverse
+d'une protection : le dossier repassait en `draft`, la condition `private`
+n'était plus remplie, et **tous ses documents devenaient inaccessibles pour
+toujours** — sans erreur, sans trace, sans que la restauration paraisse avoir
+échoué.
+
+**Décision.** Rétablir explicitement `private`, et ne jamais s'y fier seul.
+
+`wp_untrash_post_status` est filtré en **priorité 20**, avec ses trois
+arguments. Il ne rend `private` que si quatre conditions sont réunies : le
+contenu est une demande Urbizen, il est encore à la Corbeille, son statut natif
+précédent était `private`, et aucun contrôle de cohérence ne s'y oppose. Dans
+tous les autres cas, la valeur proposée par WordPress est rendue telle quelle —
+un autre type de contenu n'est jamais touché.
+
+La priorité 20 place notre règle après le défaut du cœur et après la plupart
+des greffons. Elle n'est **pas** une garantie, et n'a pas à en être une : une
+priorité extrême resterait contournable. La véritable barrière est ailleurs.
+
+`untrashed_post` relit le `post_status` **réellement écrit**. S'il ne vaut pas
+`private`, la restauration applicative n'a pas lieu. La sécurité ne dépend donc
+d'aucun ordre d'exécution.
+
+**Conséquences.**
+- Une demande restaurée retrouve `private`, puis son statut métier **exact** —
+  jamais une valeur par défaut, jamais `received` pour un dossier `closed`.
+- Le téléchargement ne redevient possible qu'après la réussite **complète** des
+  deux restaurations. Entre les deux, il reste refusé.
+- Un greffon tiers proposant `draft` ou `publish` avant nous n'a aucun effet.
+  Le même greffon exécuté **après** nous obtient bien son statut — et la
+  demande est alors marquée `incoherent`, accès fermé : nous ne réécrivons pas
+  par-dessus lui, nous refusons de rouvrir les documents.
+- Toute défaillance — écriture native en échec, statut final inattendu,
+  incohérence, statut métier non rétabli — marque la demande `incoherent`,
+  **conserve** l'intégralité des métadonnées de diagnostic, et laisse l'état
+  retentable. Les métadonnées temporaires ne sont supprimées qu'après la
+  réussite complète.
+- `wp_untrash_post_set_previous_status()` n'est **pas** employé : il
+  rétablirait l'ancien statut pour *tous* les contenus du site, bien au-delà de
+  notre domaine.
+- La doublure de test applique le défaut `draft` du cœur et respecte les
+  priorités des filtres. Tant qu'elle restaurait implicitement l'ancien statut,
+  elle rendait le défaut invisible — et neuf mutations muettes.

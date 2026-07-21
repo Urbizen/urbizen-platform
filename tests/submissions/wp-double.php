@@ -57,7 +57,8 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_can']        = true;
 	$GLOBALS['wpd_referer']    = '';
 	$GLOBALS['wpd_mails']      = array();
-	$GLOBALS['wpd_trash_fail'] = false;
+	$GLOBALS['wpd_trash_fail']   = false;
+	$GLOBALS['wpd_untrash_fail'] = false;
 }
 
 wpd_reset();
@@ -76,8 +77,34 @@ function esc_attr( $texte ) { return htmlspecialchars( (string) $texte, ENT_QUOT
 
 // ------------------------------------------------------------ filtres/actions
 function add_filter( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_filters'][ $hook ][] = array( 'cb' => $callback, 'n' => (int) $args );
+	$GLOBALS['wpd_filters'][ $hook ][] = array(
+		'cb'   => $callback,
+		'n'    => (int) $args,
+		'p'    => (int) $priorite,
+		// L'ordre d'inscription départage deux priorités égales, comme dans
+		// WordPress.
+		'rang' => count( $GLOBALS['wpd_filters'][ $hook ] ?? array() ),
+	);
+
 	return true;
+}
+
+/**
+ * Trie des rappels par priorité, puis par ordre d'inscription.
+ *
+ * WordPress exécute les filtres dans l'ordre des priorités, pas dans celui des
+ * appels à `add_filter()`. Ignorer ce tri masquerait tout conflit d'ordre entre
+ * greffons — précisément ce qu'on cherche à éprouver.
+ */
+function wpd_trier( array $entrees ): array {
+	usort(
+		$entrees,
+		static function ( $a, $b ) {
+			return ( $a['p'] ?? 10 ) <=> ( $b['p'] ?? 10 ) ?: ( $a['rang'] ?? 0 ) <=> ( $b['rang'] ?? 0 );
+		}
+	);
+
+	return $entrees;
 }
 
 /**
@@ -90,7 +117,7 @@ function add_filter( $hook, $callback, $priorite = 10, $args = 1 ) {
 function apply_filters( $hook, $valeur, ...$extra ) {
 	$tous = array_merge( array( $valeur ), $extra );
 
-	foreach ( $GLOBALS['wpd_filters'][ $hook ] ?? array() as $entree ) {
+	foreach ( wpd_trier( $GLOBALS['wpd_filters'][ $hook ] ?? array() ) as $entree ) {
 		$args    = array_slice( $tous, 0, max( 1, $entree['n'] ) );
 		$valeur  = $entree['cb']( ...$args );
 		$tous[0] = $valeur;
@@ -100,7 +127,13 @@ function apply_filters( $hook, $valeur, ...$extra ) {
 }
 
 function add_action( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_actions'][ $hook ][] = array( 'cb' => $callback, 'n' => (int) $args );
+	$GLOBALS['wpd_actions'][ $hook ][] = array(
+		'cb'   => $callback,
+		'n'    => (int) $args,
+		'p'    => (int) $priorite,
+		'rang' => count( $GLOBALS['wpd_actions'][ $hook ] ?? array() ),
+	);
+
 	return true;
 }
 
@@ -120,7 +153,7 @@ function do_action( $hook, ...$args ) {
 		$args = array( '' );
 	}
 
-	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+	foreach ( wpd_trier( $GLOBALS['wpd_actions'][ $hook ] ?? array() ) as $entree ) {
 		$entree['cb']( ...array_slice( $args, 0, $entree['n'] ) );
 	}
 }
@@ -133,7 +166,7 @@ function do_action( $hook, ...$args ) {
 function do_action_ref_array( $hook, $args ) {
 	$GLOBALS['wpd_done'][] = array( 'hook' => $hook, 'args' => $args );
 
-	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+	foreach ( wpd_trier( $GLOBALS['wpd_actions'][ $hook ] ?? array() ) as $entree ) {
 		$entree['cb']( ...array_slice( (array) $args, 0, $entree['n'] ) );
 	}
 }
@@ -365,7 +398,13 @@ function wp_trash_post( $id ) {
 }
 
 /**
- * Restauration depuis la Corbeille, fidèle au cœur de WordPress.
+ * Restauration depuis la Corbeille, fidèle à WordPress **moderne**.
+ *
+ * Depuis WordPress 5.6, un contenu non joint restauré ne retrouve **pas** son
+ * ancien statut : il repart en `draft`, sauf si le filtre
+ * `wp_untrash_post_status` en décide autrement. Reproduire l'ancien
+ * comportement — restaurer implicitement le statut d'avant — masquerait
+ * précisément le défaut que ce filtre existe pour corriger.
  */
 function wp_untrash_post( $id ) {
 	$id   = (int) $id;
@@ -375,14 +414,22 @@ function wp_untrash_post( $id ) {
 		return false;
 	}
 
-	$precedent = (string) ( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'] ?? 'draft' );
+	$precedent = (string) ( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'] ?? '' );
 	$court     = apply_filters( 'pre_untrash_post', null, $post, $precedent );
 
 	if ( false === $court ) {
 		return false;
 	}
 
-	$post->post_status = $precedent;
+	// Le défaut du cœur : `draft`, quel que soit le statut d'origine.
+	$nouveau = apply_filters( 'wp_untrash_post_status', 'draft', $id, $precedent );
+
+	// Permet d'éprouver un échec de l'écriture native.
+	if ( ! empty( $GLOBALS['wpd_untrash_fail'] ) ) {
+		return false;
+	}
+
+	$post->post_status = (string) $nouveau;
 	unset( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'], $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_time'] );
 
 	do_action( 'untrashed_post', $id, $precedent );

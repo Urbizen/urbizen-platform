@@ -92,6 +92,13 @@ final class TrashGuard {
 		add_filter( 'pre_trash_post', array( self::class, 'guard_trash' ), 10, 3 );
 		add_action( 'trashed_post', array( self::class, 'after_trash' ), 10, 2 );
 		add_filter( 'pre_untrash_post', array( self::class, 'guard_untrash' ), 10, 3 );
+
+		// Priorité 20, après le défaut du cœur et la plupart des greffons, mais
+		// **sans** chercher à passer en dernier à tout prix : une priorité
+		// extrême resterait contournable. La barrière véritable est le contrôle
+		// postérieur de `after_untrash`, qui relit le statut réellement écrit.
+		add_filter( 'wp_untrash_post_status', array( self::class, 'untrash_status' ), 20, 3 );
+
 		add_action( 'untrashed_post', array( self::class, 'after_untrash' ), 10, 2 );
 	}
 
@@ -324,8 +331,18 @@ final class TrashGuard {
 			return $court_circuit;
 		}
 
-		$id     = (int) $post->ID;
-		$motif  = self::restoration_blocker( $id, $post );
+		$id = (int) $post->ID;
+
+		// Le statut natif d'avant la Corbeille doit être exactement celui que
+		// le repository écrit. Une autre valeur signale des métadonnées natives
+		// altérées, ou une mise à la Corbeille depuis un état imprévu.
+		if ( SubmissionPostType::POST_STATUS !== (string) $precedent ) {
+			Logger::error( sprintf( 'restauration refusée pour #%d : statut natif précédent inattendu', $id ) );
+
+			return false;
+		}
+
+		$motif = self::restoration_blocker( $id, $post );
 
 		if ( null !== $motif ) {
 			Logger::error( sprintf( 'restauration refusée pour #%d : %s', $id, $motif ) );
@@ -348,6 +365,21 @@ final class TrashGuard {
 			return 'le contenu n’est pas à la Corbeille';
 		}
 
+		return self::coherence_blocker( $id );
+	}
+
+	/**
+	 * Motif d'incohérence indépendant du statut natif courant.
+	 *
+	 * Employé aussi bien avant la restauration — le contenu est alors à la
+	 * Corbeille — qu'après, où il en est sorti. Les deux notions de statut
+	 * restent distinctes : `private` est le statut **natif** d'une demande
+	 * active, `received` · `converted` · `closed` sont ses statuts **métier**.
+	 *
+	 * @param int $id Demande.
+	 * @return string|null
+	 */
+	public static function coherence_blocker( int $id ): ?string {
 		if ( self::STATUS_TRASHED !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
 			return 'état applicatif inattendu';
 		}
@@ -405,6 +437,49 @@ final class TrashGuard {
 	}
 
 	/**
+	 * Ramène une demande cohérente au statut natif `private`.
+	 *
+	 * Depuis WordPress 5.6, un contenu non joint restauré repart en `draft`.
+	 * Une demande finalisée porte `private` : sans ce filtre, une restauration
+	 * la laisserait dans un statut que le contrôleur de téléchargement refuse,
+	 * et ses documents deviendraient définitivement inaccessibles.
+	 *
+	 * Le filtre ne touche **que** `urbizen_demande`. Il n'installe pas
+	 * `wp_untrash_post_set_previous_status`, qui changerait le comportement de
+	 * tous les contenus du site.
+	 *
+	 * @param string $nouveau   Statut proposé par WordPress.
+	 * @param int    $post_id   Contenu restauré.
+	 * @param string $precedent Statut natif d'avant la Corbeille.
+	 * @return string
+	 */
+	public static function untrash_status( $nouveau, $post_id = 0, $precedent = '' ) {
+		$id   = (int) $post_id;
+		$post = get_post( $id );
+
+		// Tout autre type garde le statut que WordPress a choisi.
+		if ( ! self::is_ours( $post ) ) {
+			return $nouveau;
+		}
+
+		if ( 'trash' !== (string) $post->post_status ) {
+			return $nouveau;
+		}
+
+		if ( SubmissionPostType::POST_STATUS !== (string) $precedent ) {
+			return $nouveau;
+		}
+
+		if ( null !== self::coherence_blocker( $id ) ) {
+			// Conditions non réunies : on ne choisit surtout pas un statut qui
+			// rouvrirait l'accès aux documents.
+			return $nouveau;
+		}
+
+		return SubmissionPostType::POST_STATUS;
+	}
+
+	/**
 	 * Rétablit le statut applicatif après une restauration réussie.
 	 *
 	 * Le statut mémorisé est rétabli **exactement** : une demande qui était
@@ -423,12 +498,27 @@ final class TrashGuard {
 			return;
 		}
 
+		// Barrière finale, indépendante de l'ordre des filtres : on relit le
+		// statut **réellement écrit**. Un greffon tiers exécuté après nous a pu
+		// le changer ; la sécurité ne doit jamais reposer sur une priorité.
+		if ( SubmissionPostType::POST_STATUS !== (string) $post->post_status ) {
+			self::echec_restauration( $id, sprintf( 'statut natif final « %s »', (string) $post->post_status ) );
+
+			return;
+		}
+
+		$motif = self::coherence_blocker( $id );
+
+		if ( null !== $motif ) {
+			self::echec_restauration( $id, $motif );
+
+			return;
+		}
+
 		$memoire = (string) get_post_meta( $id, self::PRE_TRASH, true );
 
 		if ( ! in_array( $memoire, self::restorable_statuses(), true ) ) {
-			// Sans statut restaurable certain, on ne rouvre pas l'accès.
-			update_post_meta( $id, '_urbizen_status', TransactionRecovery::INCOHERENT );
-			Logger::error( sprintf( 'restauration #%d : aucun statut restaurable, demande marquée incohérente', $id ) );
+			self::echec_restauration( $id, 'aucun statut métier restaurable' );
 
 			return;
 		}
@@ -436,18 +526,33 @@ final class TrashGuard {
 		update_post_meta( $id, '_urbizen_status', $memoire );
 
 		if ( $memoire !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
-			// L'écriture a échoué : on ne laisse surtout pas un état
-			// téléchargeable par défaut.
-			update_post_meta( $id, '_urbizen_status', TransactionRecovery::INCOHERENT );
-			Logger::error( sprintf( 'restauration #%d : statut non rétabli, demande marquée incohérente', $id ) );
+			self::echec_restauration( $id, 'statut métier non rétabli' );
 
 			return;
 		}
 
+		// Les métadonnées temporaires ne partent qu'ici : après la réussite
+		// **complète** des deux restaurations, native et applicative. Les
+		// supprimer plus tôt priverait tout diagnostic ultérieur.
 		delete_post_meta( $id, self::PRE_TRASH );
 		delete_post_meta( $id, self::TRANSITION );
 
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
+	}
+
+	/**
+	 * Ferme l'accès après une restauration défaillante.
+	 *
+	 * Les métadonnées de diagnostic sont conservées, et aucun statut
+	 * téléchargeable n'est posé par défaut.
+	 *
+	 * @param int    $id    Demande.
+	 * @param string $motif Motif technique, sans donnée personnelle.
+	 * @return void
+	 */
+	private static function echec_restauration( int $id, string $motif ): void {
+		update_post_meta( $id, '_urbizen_status', TransactionRecovery::INCOHERENT );
+		Logger::error( sprintf( 'restauration #%d : %s — demande marquée incohérente', $id, $motif ) );
 	}
 
 	/**

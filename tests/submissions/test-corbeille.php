@@ -630,4 +630,234 @@ wp_untrash_post( $d['id'] );
 check( 'concurrence · la restauration rend bien converted', 'converted' === get_post_meta( $d['id'], '_urbizen_status', true ) );
 
 
+// ======================================================================
+// STATUT NATIF APRÈS RESTAURATION
+// ======================================================================
+// Depuis WordPress 5.6, un contenu non joint restauré repart en `draft`. Une
+// demande finalisée porte `private` : sans filtre, ses documents deviendraient
+// définitivement inaccessibles.
+
+// --- 1 · le comportement du cœur, sans notre filtre ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+wpd_clear_filter( 'wp_untrash_post_status' );
+wp_untrash_post( $d['id'] );
+
+check( '1 · sans filtre, WordPress restaure en draft', 'draft' === get_post( $d['id'] )->post_status );
+check( '1 · le statut métier n’est donc PAS restauré', 'received' !== get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '1 · et aucun téléchargement n’est possible', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- 2 · le filtre est enregistré avec trois arguments ---
+$source_tg = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Submissions/TrashGuard.php' );
+
+check( '2 · wp_untrash_post_status est enregistré', str_contains( $source_tg, "add_filter( 'wp_untrash_post_status'" ) );
+check( '2 · avec trois arguments et une priorité assumée', str_contains( $source_tg, "'untrash_status' ), 20, 3 )" ) );
+// Le commentaire a le droit d'expliquer pourquoi on ne l'emploie pas ; le code,
+// non. On compare donc le code, commentaires retirés.
+$code_tg = implode(
+	'',
+	array_map(
+		static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+		token_get_all( $source_tg )
+	)
+);
+
+check( '2 · sans installer wp_untrash_post_set_previous_status globalement',
+	! str_contains( $code_tg, 'wp_untrash_post_set_previous_status' ) );
+
+// --- 3, 4 · le filtre et les autres types de contenu ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+check( '3 · une demande cohérente revient à private', 'private' === TrashGuard::untrash_status( 'draft', $d['id'], 'private' ) );
+
+$page = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'trash', 'post_title' => 'Page' ) );
+
+check( '4 · un autre type garde le draft proposé', 'draft' === TrashGuard::untrash_status( 'draft', $page, 'publish' ) );
+check( '4 · et garde aussi un publish proposé', 'publish' === TrashGuard::untrash_status( 'publish', $page, 'publish' ) );
+
+// --- 5, 6, 7 · le statut natif précédent ---
+check( '5 · précédent private → private', 'private' === TrashGuard::untrash_status( 'draft', $d['id'], 'private' ) );
+
+foreach ( array( 'draft', 'publish', 'pending', 'future', '', 'statut-inconnu' ) as $precedent ) {
+	check( '6/7 · précédent « ' . ( '' === $precedent ? '(vide)' : $precedent ) . ' » → refusé',
+		'draft' === TrashGuard::untrash_status( 'draft', $d['id'], $precedent ) );
+}
+
+// La restauration elle-même est bloquée si le précédent n'est pas private.
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta'][ $d['id'] ]['_wp_trash_meta_status'] = 'draft';
+
+check( '6 · restauration BLOQUÉE si le précédent natif est draft', false === wp_untrash_post( $d['id'] ) );
+check( '6 · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->post_status );
+check( '6 · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- 8 · transition seulement préparée ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$tr          = TrashGuard::transition( $d['id'] );
+$tr['state'] = TrashGuard::PREPARED;
+update_post_meta( $d['id'], TrashGuard::TRANSITION, (string) wp_json_encode( $tr ) );
+
+check( '8 · le filtre refuse une transition préparée', 'draft' === TrashGuard::untrash_status( 'draft', $d['id'], 'private' ) );
+check( '8 · et la restauration est bloquée', false === wp_untrash_post( $d['id'] ) );
+
+// --- 9 à 12 · restauration complète, statut métier exact ---
+foreach ( array( 'received', 'converted', 'closed' ) as $statut ) {
+	neuf();
+	$d = demande( $statut );
+	wp_trash_post( $d['id'] );
+
+	check( "15 · [$statut] téléchargement refusé avant restauration", null === D::locate( $d['params'], wpd_now() ) );
+
+	wp_untrash_post( $d['id'] );
+
+	check( "9 · [$statut] post_status final private", 'private' === get_post( $d['id'] )->post_status );
+	check( "10/11/12 · [$statut] statut métier exact restauré", $statut === get_post_meta( $d['id'], '_urbizen_status', true ) );
+	check( "21 · [$statut] métadonnées temporaires supprimées",
+		'' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) && array() === TrashGuard::transition( $d['id'] ) );
+	check( "18 · [$statut] téléchargement de nouveau possible", null !== D::locate( $d['params'], wpd_now() ) );
+}
+
+// --- 13, 14 · statut natif final inattendu ---
+foreach ( array( 'draft', 'publish', 'pending', 'statut-inconnu' ) as $final ) {
+	neuf();
+	$d = demande();
+	wp_trash_post( $d['id'] );
+
+	// Un greffon tiers, exécuté après le nôtre, impose un autre statut.
+	add_filter( 'wp_untrash_post_status', static fn( $s ) => $final, 30, 3 );
+	wp_untrash_post( $d['id'] );
+
+	check( "13/14 · statut final « $final » → statut métier NON restauré",
+		! in_array( get_post_meta( $d['id'], '_urbizen_status', true ), SubmissionPostType::downloadable_statuses(), true ) );
+	check( "13/14 · statut final « $final » → aucun téléchargement", null === D::locate( $d['params'], wpd_now() ) );
+	check( "13/14 · statut final « $final » → état signalé", TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+	check( "13/14 · statut final « $final » → métadonnées conservées",
+		'' !== get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) && array() !== TrashGuard::transition( $d['id'] ) );
+}
+
+// --- 16, 17 · téléchargement pendant et après la seule restauration native ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+$pendant = null;
+add_filter( 'wp_untrash_post_status', static function ( $s ) use ( $d, &$pendant ) {
+	$pendant = D::locate( $d['params'], wpd_now() );
+	return $s;
+}, 30, 3 );
+
+wp_untrash_post( $d['id'] );
+
+check( '16 · téléchargement refusé PENDANT la restauration', null === $pendant );
+
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+// La restauration native aboutit, mais le hook postérieur n'est pas exécuté.
+get_post( $d['id'] )->post_status = 'private';
+
+check( '17 · après la seule restauration native, téléchargement refusé', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- 19 · l'écriture native échoue ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+$GLOBALS['wpd_untrash_fail'] = true;
+$resultat                    = wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+check( '19 · wp_untrash_post échoue', false === $resultat );
+check( '19 · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->post_status );
+check( '19 · _urbizen_status reste trashed', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '19 · les métadonnées temporaires restent', array() !== TrashGuard::transition( $d['id'] ) );
+check( '19 · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( '19 · une nouvelle tentative aboutit', false !== wp_untrash_post( $d['id'] ) );
+check( '19 · et rétablit private', 'private' === get_post( $d['id'] )->post_status );
+
+// --- 20 · l'écriture du statut métier échoue ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+$GLOBALS['wpd_meta_fail'] = '_urbizen_status';
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '20 · post_status est bien revenu à private', 'private' === get_post( $d['id'] )->post_status );
+check( '20 · le statut métier n’est pas devenu téléchargeable',
+	! in_array( get_post_meta( $d['id'], '_urbizen_status', true ), SubmissionPostType::downloadable_statuses(), true ) );
+check( '20 · les métadonnées temporaires sont conservées',
+	'' !== get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) && array() !== TrashGuard::transition( $d['id'] ) );
+check( '20 · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( '20 · aucun document ni référence supprimé', 1 === fx_compte_fichiers()
+	&& 'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'] )['state'] ?? '' ) );
+
+// --- 22 · action groupée de restauration ---
+neuf();
+$lot = array( demande(), demande( 'converted' ), demande( 'closed' ) );
+
+foreach ( $lot as $une ) {
+	wp_trash_post( $une['id'] );
+}
+
+foreach ( $lot as $une ) {
+	wp_untrash_post( $une['id'] );
+}
+
+$prives = 0;
+$exacts = array( 'received', 'converted', 'closed' );
+
+foreach ( $lot as $i => $une ) {
+	if ( 'private' === get_post( $une['id'] )->post_status && $exacts[ $i ] === get_post_meta( $une['id'], '_urbizen_status', true ) ) {
+		++$prives;
+	}
+}
+
+check( '22 · les trois demandes reviennent indépendamment à private et à leur statut exact', 3 === $prives );
+
+// --- 23, 24 · interopérabilité avec un greffon tiers ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+// Tiers exécuté AVANT le nôtre : notre règle a le dernier mot.
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'publish', 5, 3 );
+wp_untrash_post( $d['id'] );
+
+check( '23 · un tiers proposant publish avant nous → private final', 'private' === get_post( $d['id'] )->post_status );
+check( '23 · la demande ne devient jamais publish', 'publish' !== get_post( $d['id'] )->post_status );
+check( '23 · le statut métier est restauré', 'received' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'draft', 5, 3 );
+wp_untrash_post( $d['id'] );
+
+check( '24 · un tiers proposant draft avant nous → private final', 'private' === get_post( $d['id'] )->post_status );
+check( '24 · le téléchargement redevient possible', null !== D::locate( $d['params'], wpd_now() ) );
+
+// Tiers exécuté APRÈS le nôtre : la barrière postérieure prend le relais.
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+add_filter( 'wp_untrash_post_status', static fn( $s ) => 'publish', 30, 3 );
+wp_untrash_post( $d['id'] );
+
+check( 'interop · un tiers après nous impose publish', 'publish' === get_post( $d['id'] )->post_status );
+check( 'interop · LA BARRIÈRE POSTÉRIEURE REFUSE LA RESTAURATION',
+	TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'interop · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'interop · aucune donnée exposée, métadonnées conservées', array() !== TrashGuard::transition( $d['id'] ) );
+
+
 verdict();
