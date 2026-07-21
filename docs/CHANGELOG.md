@@ -5,6 +5,205 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.7.0] — 20 juillet 2026
+
+Validation et stockage privé des documents joints à une demande.
+
+> **Aucun effet public.** Aucun formulaire n'est rendu, aucune page n'est
+> créée, aucun courriel n'est envoyé, aucun champ de dépôt n'est visible sur le
+> site. Les liens signés sont générables, mais ne sont affichés ni envoyés à
+> personne. Le site est strictement inchangé.
+
+### Ajouté
+- `src/Files/UploadPolicy.php` : source unique de la politique — cinq blocs,
+  cinq formats, correspondances extension/type réel, 10 documents par bloc,
+  20 au total, 10 Mio par document, 25 Mio cumulés (D-023).
+- `src/Files/UploadNormalizer.php` : aplatissement contrôlé de `$_FILES`. Une
+  structure malformée est **refusée**, jamais réparée en silence. Aucun chemin
+  transmis par le navigateur ne subsiste.
+- `src/Files/Storage.php` : stockage **hors de la racine publique**, staging
+  transactionnel, noms techniques imprévisibles, refus de toute sortie de la
+  racine privée et de tout lien symbolique (D-022).
+- `src/Files/SignedLink.php` : liens HMAC de 14 jours, régénérables, sans
+  aucune donnée métier dans l'URL (D-025).
+- `src/Files/FileCleaner.php` : effacement des documents **avec** la demande,
+  branché sur `urbizen_before_submission_delete` et sur `before_delete_post`.
+- `src/Http/FileDownloadController.php` : diffusion par flux, en-têtes de
+  sécurité, réponse générique identique pour toute défaillance.
+- `tests/submissions/test-documents.php` (130 contrôles),
+  `test-transaction.php` (144), `test-interruption.php` (66), `fixtures.php` :
+  fichiers d'essai portant de **véritables signatures de format**, pour que
+  `finfo` réagisse comme en production. **1 435 contrôles**, dont **292
+  mutations**.
+
+### Modifié
+- `SubmissionController` : le refus provisoire `files_not_supported_yet` cède
+  la place au pipeline réel. Les défenses de B1 et leurs garanties d'atomicité
+  sont conservées à l'identique.
+- `SubmissionRepository` : création en deux temps. La référence n'est
+  **attribuée** qu'à la finalisation ; `finalize()`, `set_files()` et
+  `discard()` complètent l'API (D-024).
+- `Retention` : la tâche quotidienne nettoie aussi les stagings abandonnés.
+- `SubmissionsAdmin` : une colonne « Documents » — un décompte et une taille,
+  jamais un nom ni un lien.
+- Version 0.7.0, alignée dans les deux `block.json`. Aucune autre clé ne change.
+
+### États des documents
+`none` sans document · `pending` pendant le traitement · `stored` une fois en
+place · `deleted` après effacement.
+
+### Robustesse (revue de la PR #19)
+- **Récupération après interruption brutale** : état durable
+  `_urbizen_transaction`, état interne `processing`, et un récupérateur
+  quotidien exigeant **sept conditions simultanées**. Neuf points d'arrêt sont
+  éprouvés en abandonnant le traitement sans rollback (D-026).
+- **Suppression fermée par défaut** : le filtre `pre_delete_post`, seul capable
+  de court-circuiter `wp_delete_post()`, remplace `before_delete_post`. Si un
+  fichier résiste, la demande est conservée et l'état passe à `delete_failed`
+  (D-027).
+- **Provenance HTTP obligatoire** : `UploadedFileMover` exige
+  `is_uploaded_file()` puis `move_uploaded_file()`, sans aucun repli sur
+  `rename()`. Un `tmp_name` forgé est refusé (D-028).
+- **Intégrité au téléchargement** : taille et SHA-256 vérifiés sur **un seul
+  descripteur**, avant tout octet diffusé (D-028).
+- **Corps écarté par PHP** : détection précoce, code `request_too_large` au lieu
+  d'un trompeur `invalid_nonce` (D-029).
+- **Paramètres signés durcis** : formes strictement canoniques exigées avant
+  tout calcul — aucune coercition PHP dans la chaîne signée.
+- `src/Support/PhpLimits.php` : lecture et interprétation des limites du serveur.
+
+### Récupération transactionnelle (seconde revue de la PR #19)
+- **Le point de non-retour est l'attribution**, non le marqueur `committed` :
+  une transaction dont la référence est restée `reserved` est **annulée**,
+  quoi que dise son marqueur (D-030).
+- `src/Submissions/TransactionRecovery.php` : trois issues — annulation,
+  normalisation idempotente, conservation prudente. **Fermé par défaut** : un
+  nettoyage partiel n'est jamais un succès, et laisse `recovery_failed`.
+- **Neuf conditions cumulatives** avant tout téléchargement, et un verrou
+  `deleting` posé **avant le premier `unlink`** (D-031).
+- États : `processing`, `deleting`, `delete_failed`, `recovery_failed`,
+  `incoherent`, `received`, `converted`, `closed`. Seuls les trois derniers
+  autorisent la consultation.
+- `delete_failed` devient purgeable : une suppression échouée doit être
+  retentée, sans quoi la demande resterait figée hors de portée de la rétention.
+- **`max_file_uploads = 20`** en production, soit le plafond exact : prérequis
+  bloquant **avant publication** du formulaire (D-032).
+
+### Cycle de Corbeille (troisième revue de la PR #19)
+- `src/Submissions/TrashGuard.php` : `pre_trash_post` et `pre_untrash_post`
+  avec leurs **trois** arguments, `untrashed_post` avec ses deux. Aucun de ces
+  hooks n'était enregistré auparavant (D-033).
+- **Verrou natif** : le téléchargement exige un `post_status` pris dans une
+  liste fermée — `private` uniquement. Il tient même si un autre greffon
+  modifie le statut sans passer par nos hooks.
+- Le statut applicatif précédent est mémorisé **une seule fois** et rétabli
+  **exactement** : `converted` ne redevient pas `received`.
+- Une mise à la Corbeille dont l'invalidation ne peut être vérifiée est
+  **refusée**. Une restauration incohérente aussi.
+- `trashed` rejoint les états purgeables par la rétention.
+- La doublure WordPress reproduit désormais `wp_trash_post()`,
+  `wp_untrash_post()`, `wp_scheduled_delete()` et le respect d'`accepted_args`
+  par `apply_filters()` — cette dernière fidélité a immédiatement révélé qu'une
+  mutation ne mordait pas.
+
+### Transition de Corbeille rejouable (quatrième revue de la PR #19)
+- `_urbizen_trash_transition` : état durable à deux valeurs, `prepared` puis
+  `completed`, confirmé par le hook `trashed_post` — seul hook exécuté après le
+  changement de `post_status` (D-034).
+- Une nouvelle tentative de mise à la Corbeille est **idempotente** : statut
+  précédent réutilisé, aucune seconde transition, aucune métadonnée écrasée.
+- Tant que la transition est `prepared`, l'intention reste **fermée par
+  défaut** : ni téléchargement, ni restauration, ni purge, ni suppression
+  définitive, ni fichier effacé.
+- `TrashGuard::reconcile()` répare sans détruire : confirme une transition dont
+  le `post_status` est passé à `trash`, marque `incoherent` une invalidation
+  sans transition.
+- La doublure WordPress sait désormais simuler un échec natif de
+  `wp_trash_post()` après l'invalidation applicative.
+
+### Statut natif après restauration (cinquième revue de la PR #19)
+- Une demande finalisée porte le statut natif **`private`** : elle n'est
+  lisible que par un compte autorisé, et jamais servie au public. C'est ce
+  statut, et lui seul, qui conditionne la remise des documents.
+- Depuis WordPress 5.6, un contenu non joint sorti de la Corbeille **retombe en
+  `draft`**, pas dans son statut d'origine. Sans correctif, une demande
+  restaurée devenait `draft` et ses documents **définitivement inaccessibles**,
+  sans le moindre message d'erreur (D-035).
+- Filtre `wp_untrash_post_status` (priorité 20, trois arguments) : il rétablit
+  `private` **uniquement** pour une demande Urbizen encore à la Corbeille, dont
+  le statut natif précédent était `private` et dont tous les contrôles de
+  cohérence passent. Tout autre type de contenu et toute autre situation
+  gardent le statut choisi par WordPress.
+- Le filtre **ne suffit pas** : `untrashed_post` relit le `post_status`
+  réellement écrit. Un greffon tiers exécuté après nous ne peut donc pas
+  rouvrir l'accès aux documents — la sécurité ne repose sur aucune priorité.
+- Le **statut natif** (`private`) et le **statut métier** (`received`,
+  `converted`, `closed`) sont deux notions distinctes : la première décide de
+  la visibilité WordPress, la seconde de l'avancement du dossier. Les deux sont
+  restaurées, dans cet ordre, et l'échec de l'une annule l'autre.
+- Le téléchargement ne redevient possible qu'après la réussite **complète** des
+  deux restaurations. Toute défaillance marque la demande `incoherent`,
+  conserve l'intégralité des métadonnées de diagnostic, et laisse l'accès
+  fermé.
+- La doublure WordPress applique désormais le défaut `draft` du cœur et
+  **respecte les priorités des filtres** : sans cette fidélité, le défaut
+  restait invisible.
+- Treize mutations couvrent le correctif, dont le retrait du filtre, un
+  `accepted_args` ramené à 2, un retour `draft` puis `publish`, la suppression
+  de la barrière postérieure, et un autre type de contenu forcé à `private`.
+
+### Persistance et restauration alignées sur le cœur (sixième revue de la PR #19)
+- **Réparation native contrôlée.** `wp_untrash_post()` efface
+  `_wp_trash_meta_status` et `_wp_trash_meta_time` **avant** d'écrire le
+  nouveau statut. Si cette écriture échoue, le contenu reste à la Corbeille
+  sans plus aucune trace de sa provenance, et toute nouvelle tentative est
+  refusée. `TrashGuard::repair_native()` rétablit ces deux métadonnées natives
+  — et elles seules — lorsque toute la cohérence Urbizen est démontrée, sous
+  verrou atomique en `autoload = false` (D-036).
+- La réparation ne touche ni au `post_status`, ni au statut métier, ni aux
+  fichiers, ni à la référence, ni à aucun lien. Elle ne rouvre aucun
+  téléchargement : elle rend seulement le cycle natif rejouable.
+- `_wp_trash_meta_time` reprend l'horodatage consigné par la transition, pas
+  l'heure courante : une réparation ne doit pas prolonger le séjour en
+  Corbeille avant purge automatique.
+- `TrashGuard::reconcile()` répare désormais aussi ces états, et les compte.
+- **Persistance vérifiée.** `update_post_meta()` rend `false` dans deux
+  situations qu'aucun retour ne distingue : l'écriture a échoué, ou la valeur
+  était déjà la bonne. `SubmissionRepository::persist_meta()` écrit puis
+  **relit**, et ne conclut que sur la relecture — dans les deux sens (D-037).
+- Quatre emplacements corrigés : la boucle de `persist()`, `set_files()`, et
+  les trois écritures de `finalize()`.
+- La doublure WordPress est alignée sur le cœur **7.0.2**, source à l'appui :
+  ordre exact de `wp_trash_post()` et `wp_untrash_post()`, court-circuit des
+  filtres `pre_*` sur `null !== $check`, action `untrash_post`, `wp_update_post`
+  réel, `add_post_meta`, sémantique de retour de `update_post_meta()` et
+  `update_option()`, et `wp_scheduled_delete()` fidèle — y compris son appel
+  **sans forçage** et son indifférence aux contenus dépourvus de
+  `_wp_trash_meta_time`.
+- Nouveau banc `tests/integration/` exécuté contre un **vrai** WordPress 7.0.2
+  jetable : 41 contrôles, ordre des hooks, statut `draft` par défaut, moment de
+  suppression des métadonnées natives, et cycle Urbizen complet jusqu'à
+  `private`. Sans installation disponible, il s'abstient sans échouer.
+
+### Volontairement absent
+- Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.
+- Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`
+  déposerait le fichier derrière une URL publique.
+- Aucun rendu public : le garde-fou du `Renderer` reste actif.
+
+### Inchangé
+- `src/Forms/` n'est pas touché ; `localisation` rend le même HTML.
+- Les 583 contrôles de B1, les 260 de la PR A, les 175 du formulaire et du
+  cadastre et les 367 de la page d'accueil passent **sans assouplissement**.
+
+### À venir
+- **PR B3** — courriels : notification à `contact@urbizen.fr` avec les liens
+  signés, confirmation au client, `Reply-To` sur l'adresse validée.
+- **PR C** — interface publique en six étapes, champs de dépôt visibles,
+  traduction des codes internes en messages compréhensibles.
+
+---
+
 ## [0.6.0] — 20 juillet 2026
 
 Réception, protection et conservation des demandes de conception.
@@ -106,6 +305,11 @@ Toutes portent `autoload = false`. Aucune ne contient de donnée personnelle.
   `Validator` sont fonctionnellement identiques.
 - Les 260 contrôles de la PR A, les 175 du formulaire et du cadastre, et les
   367 de la page d'accueil passent **sans le moindre assouplissement**.
+
+> **Correction documentaire.** La sauvegarde `urbizen-platform-20260720-201312`
+> réalisée avant le déploiement de cette version contient la **0.5.0**. La
+> restaurer ramène donc le plugin en 0.5.0, et non en 0.4.0 comme l'indiquait
+> par erreur le compte rendu de déploiement.
 
 ### À venir
 - **PR B2** — fichiers : politique de dépôt, stockage hors racine web, liens

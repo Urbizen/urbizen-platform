@@ -19,10 +19,14 @@
 
 namespace Urbizen\Platform\Privacy;
 
+use Urbizen\Platform\Files\FileCleaner;
+use Urbizen\Platform\Files\Storage;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
+use Urbizen\Platform\Submissions\TransactionRecovery;
+use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -207,26 +211,39 @@ final class Retention {
 	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return array{demandes:int,jetons:int,creneaux:int,references:int}
+	 * @return array{demandes:int,abandons:int,corbeille:int,jetons:int,creneaux:int,references:int,staging:int}
 	 */
 	public static function run_daily( ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
 
+		// L'ordre compte. La récupération passe **avant** le ménage des
+		// réservations : elle s'appuie sur la réservation « reserved » pour
+		// reconnaître une transaction abandonnée, et la libère elle-même. La
+		// nettoyer d'abord la priverait de son seul repère.
 		$bilan = array(
 			'demandes'   => self::purge( $now ),
+			'abandons'   => self::recover_abandoned( $now ),
+			// Réconciliation non destructive des transitions de Corbeille.
+			'corbeille'  => array_sum( TrashGuard::reconcile() ),
 			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
 			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
 			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
+			// Ne nettoie que le staging. Un document final n'est jamais
+			// supprimé au motif qu'une métadonnée semble manquante.
+			'staging'    => Storage::cleanup_staging( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(
-					'ménage : %d jeton(s), %d créneau(x), %d réservation(s) de référence',
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s), %d corbeille',
 					$bilan['jetons'],
 					$bilan['creneaux'],
-					$bilan['references']
+					$bilan['references'],
+					$bilan['staging'],
+					$bilan['abandons'],
+					$bilan['corbeille']
 				)
 			);
 		}
@@ -268,7 +285,38 @@ final class Retention {
 	 * @return array<int, string>
 	 */
 	public static function purgeable_statuses(): array {
-		return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED );
+		// `delete_failed` en fait partie : une suppression qui a échoué hier
+		// doit être retentée demain. Sans cela, une demande resterait figée
+		// hors de portée de la rétention, avec ses données personnelles.
+		// `trashed` en fait partie : une demande à la Corbeille conserve ses
+		// données personnelles. L'en exclure la rendrait immortelle.
+		return array(
+			SubmissionPostType::STATUS_RECEIVED,
+			SubmissionPostType::STATUS_CLOSED,
+			'delete_failed',
+			TrashGuard::STATUS_TRASHED,
+		);
+	}
+
+	/**
+	 * Délai au-delà duquel une transaction reste en plan est jugée abandonnée.
+	 */
+	public const ABANDON_TTL = TransactionRecovery::TTL;
+
+	/**
+	 * Réconcilie les transactions interrompues.
+	 *
+	 * Délègue à `TransactionRecovery`, qui distingue les trois issues possibles :
+	 * annulation complète, normalisation d'une demande valide, ou conservation
+	 * prudente d'un état contradictoire.
+	 *
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return int Nombre de transactions annulées.
+	 */
+	public static function recover_abandoned( ?int $now = null ): int {
+		$bilan = TransactionRecovery::run( $now );
+
+		return $bilan['rollback'];
 	}
 
 	/**
@@ -318,10 +366,29 @@ final class Retention {
 				continue;
 			}
 
+			// Troisième barrière : une mise à la Corbeille préparée mais non
+			// confirmée est ambiguë. On ne purge pas sur une apparence.
+			if ( TrashGuard::is_prepared_only( $id ) ) {
+				continue;
+			}
+
 			$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
 
-			// Les fichiers rattachés s'effacent ici, avant que la demande ne
-			// disparaisse : après, plus rien ne permettrait de les retrouver.
+			// Les fichiers rattachés s'effacent d'abord : après la suppression
+			// de la demande, plus rien ne permettrait de les retrouver.
+			$nettoyage = FileCleaner::delete( $id, $reference );
+
+			if ( ! in_array( $nettoyage['code'], FileCleaner::OK, true ) ) {
+				// Fermé par défaut : la demande est conservée et sera retentée
+				// au passage suivant. Un document qu'on n'a pas su effacer ne
+				// doit jamais devenir orphelin.
+				update_post_meta( $id, '_urbizen_files_status', 'delete_failed' );
+				Logger::error( sprintf( 'rétention : suppression différée pour #%d (%s)', $id, $nettoyage['code'] ) );
+
+				continue;
+			}
+
+			// Le hook reste offert aux tiers, la demande existant encore.
 			do_action( self::BEFORE_DELETE, $id, $reference );
 
 			wp_delete_post( $id, true );

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Lance les sept bancs d'essai de la réception des demandes.
+# Lance les onze bancs d'essai de la réception des demandes.
 #
 #   ./run-all.sh
 #
@@ -33,31 +33,50 @@ command -v "$PHP_BIN" >/dev/null 2>&1 || {
 	exit 2
 }
 
-titre "1/7 — Défenses : jeton, pot de miel, limitation de débit"
+titre "1/11 — Défenses : jeton, pot de miel, limitation de débit"
 "$PHP_BIN" test-security.php
 verdict $? "test-security.php"
 
-titre "2/7 — Conservation : type de contenu privé et repository"
+titre "2/11 — Conservation : type de contenu privé et repository"
 "$PHP_BIN" test-storage.php
 verdict $? "test-storage.php"
 
-titre "3/7 — Contrôleur de soumission"
+titre "3/11 — Contrôleur de soumission"
 "$PHP_BIN" test-controller.php
 verdict $? "test-controller.php"
 
-titre "4/7 — Rétention à 365 jours"
+titre "4/11 — Rétention à 365 jours"
 "$PHP_BIN" test-retention.php
 verdict $? "test-retention.php"
 
-titre "5/7 — Concurrence, atomicité et planification"
+titre "5/11 — Concurrence, atomicité et planification"
 "$PHP_BIN" test-concurrence.php
 verdict $? "test-concurrence.php"
 
-titre "6/7 — Registre des références et verrou de programmation"
+titre "6/11 — Registre des références et verrou de programmation"
 "$PHP_BIN" test-registre.php
 verdict $? "test-registre.php"
 
-titre "7/7 — Compatibilité et absence d'effet public"
+titre "7/11 — Politique, normalisation et stockage des documents"
+"$PHP_BIN" test-documents.php
+verdict $? "test-documents.php"
+
+titre "8/11 — Transaction, liens signés et rétention des documents"
+"$PHP_BIN" test-transaction.php
+verdict $? "test-transaction.php"
+
+titre "9/11 — Interruptions brutales et récupération"
+"$PHP_BIN" test-interruption.php
+verdict $? "test-interruption.php"
+
+titre "10/11 — Cycle de Corbeille WordPress"
+"$PHP_BIN" test-corbeille.php
+verdict $? "test-corbeille.php"
+
+"$PHP_BIN" test-persistance.php
+verdict $? "test-persistance.php"
+
+titre "11/11 — Compatibilité et absence d'effet public"
 "$PHP_BIN" test-compat.php
 verdict $? "test-compat.php"
 
@@ -67,7 +86,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 8 bancs passent.\033[0m\n'
+	printf '\033[32mLes 13 bancs passent.\033[0m\n'
 	exit 0
 fi
 

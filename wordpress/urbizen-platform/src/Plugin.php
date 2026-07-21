@@ -10,9 +10,12 @@ namespace Urbizen\Platform;
 use Urbizen\Platform\Admin\SubmissionsAdmin;
 use Urbizen\Platform\Blocks\CadastreBlock;
 use Urbizen\Platform\Blocks\FormBlock;
+use Urbizen\Platform\Files\FileCleaner;
+use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
 use Urbizen\Platform\Privacy\Retention;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -91,7 +94,7 @@ final class Plugin {
 	 *   4. Http\SubmissionController    — réception des soumissions ← actif
 	 *   5. Privacy\Retention            — purge à 365 jours         ← actif
 	 *   6. Admin\SubmissionsAdmin       — liste des demandes        ← actif
-	 *   7. Files\UploadPolicy           — pièces jointes            ← PR B2
+	 *   7. Files\*                      — documents privés          ← actif
 	 *   8. Mail\Mailer                  — notifications             ← PR B3
 	 *   9. Backend\PythonClient         — génération documentaire
 	 *
@@ -105,13 +108,16 @@ final class Plugin {
 		// contenu doit exister avant qu'une soumission cherche à l'écrire.
 		SubmissionPostType::register();
 		SubmissionController::register();
+		FileDownloadController::register();
+		FileCleaner::register();
+		TrashGuard::register();
 		Retention::register();
 
 		if ( is_admin() ) {
 			SubmissionsAdmin::register();
 		}
 
-		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : cadastre, formulaires et réception des demandes actifs.' );
+		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : cadastre, formulaires, réception et documents privés actifs.' );
 	}
 
 	/**

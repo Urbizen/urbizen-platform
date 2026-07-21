@@ -64,6 +64,8 @@ final class SubmissionRepository {
 	 * @var array<int, string>
 	 */
 	public const REQUIRED_META = array(
+		'_urbizen_files',
+		'_urbizen_transaction',
 		'_urbizen_reference',
 		'_urbizen_form_type',
 		'_urbizen_schema_version',
@@ -92,6 +94,8 @@ final class SubmissionRepository {
 	 * @return array{ok:bool,code:string,id:int,reference:string}
 	 */
 	public static function create( array $clean, array $pricing, array $context = array() ): array {
+		$finaliser = ! array_key_exists( 'finalize', $context ) || false !== $context['finalize'];
+
 		$form_type   = isset( $context['form_type'] ) ? (string) $context['form_type'] : 'conception';
 		$source_path = isset( $context['source_path'] ) ? (string) $context['source_path'] : '';
 		$now         = isset( $context['now'] ) ? (int) $context['now'] : time();
@@ -111,7 +115,7 @@ final class SubmissionRepository {
 				'post_type'    => SubmissionPostType::POST_TYPE,
 				'post_title'   => $reference,
 				'post_name'    => strtolower( $reference ),
-				'post_status'  => 'private',
+				'post_status'  => SubmissionPostType::POST_STATUS,
 				'post_content' => '',
 				'post_excerpt' => '',
 			),
@@ -127,11 +131,26 @@ final class SubmissionRepository {
 
 		$id = (int) $id;
 
+		// La réservation apprend à quelle demande elle appartient. C'est ce qui
+		// permettra au nettoyage de ne pas la libérer sous les pieds d'une
+		// transaction encore en cours, et à la récupération de vérifier qu'elle
+		// traite bien la bonne.
+		update_option(
+			self::RESERVATION_PREFIX . $reference,
+			array( 'state' => 'reserved', 'at' => $now, 'post' => $id ),
+			false
+		);
+
 		$meta = array(
 			'_urbizen_reference'           => $reference,
 			'_urbizen_form_type'           => $form_type,
 			'_urbizen_schema_version'      => self::SCHEMA_VERSION,
-			'_urbizen_status'              => SubmissionPostType::STATUS_RECEIVED,
+			// Tant que la transaction n'est pas achevée, la demande porte
+			// « processing » : c'est ce qui permettra à une requête ultérieure
+			// de la reconnaître si le processus est tué en cours de route.
+			'_urbizen_status'              => $finaliser
+				? SubmissionPostType::STATUS_RECEIVED
+				: SubmissionPostType::STATUS_PROCESSING,
 			'_urbizen_created_at_gmt'      => $horodatage,
 			'_urbizen_last_contact_at_gmt' => $horodatage,
 			'_urbizen_payload'             => (string) wp_json_encode( $clean ),
@@ -139,11 +158,25 @@ final class SubmissionRepository {
 			'_urbizen_consent_at_gmt'      => ! empty( $clean['rgpd'] ) ? $horodatage : '',
 			'_urbizen_source_path'         => $source_path,
 			'_urbizen_mail_status'         => 'not_started',
-			'_urbizen_files_status'        => 'not_started',
+			// `none` tant qu'aucun document n'a été déposé ; `pending` pendant
+			// le traitement d'un lot, puis `stored` à la finalisation.
+			'_urbizen_files_status'        => isset( $context['files_status'] ) ? (string) $context['files_status'] : 'none',
+			'_urbizen_files'               => wp_json_encode( array() ),
+			// État durable de la transaction. Aucun élément personnel : un
+			// identifiant aléatoire, une date, un état et un chemin technique.
+			'_urbizen_transaction'         => (string) wp_json_encode(
+				array(
+					'id'         => isset( $context['transaction'] ) ? (string) $context['transaction'] : '',
+					'started_at' => $horodatage,
+					'state'      => $finaliser ? 'committed' : 'processing',
+					'staging'    => isset( $context['staging'] ) ? (string) $context['staging'] : '',
+					'reference'  => $reference,
+				)
+			),
 		);
 
 		foreach ( $meta as $cle => $valeur ) {
-			if ( ! update_post_meta( $id, $cle, $valeur ) ) {
+			if ( ! self::persist_meta( $id, $cle, $valeur ) ) {
 				// Une demande amputée d'une métadonnée obligatoire est pire
 				// qu'une absence de demande : elle laisse croire que le dossier
 				// est en main. On efface et on annonce l'échec.
@@ -165,10 +198,12 @@ final class SubmissionRepository {
 			return self::echec( 'persistence_failed' );
 		}
 
-		// La référence est désormais attribuée pour de bon.
-		self::confirm_reference( $reference, $id, $now );
-
-		Logger::info( sprintf( 'demande %s enregistrée (#%d, %s)', $reference, $id, $form_type ) );
+		// La référence n'est attribuée définitivement qu'à la finalisation :
+		// tant que des documents restent à déplacer, la demande n'est pas
+		// complète, et son numéro ne doit pas être consommé.
+		if ( $finaliser ) {
+			self::finalize( $id, $reference, (string) $meta['_urbizen_files_status'], $now );
+		}
 
 		return array(
 			'ok'        => true,
@@ -176,6 +211,172 @@ final class SubmissionRepository {
 			'id'        => $id,
 			'reference' => $reference,
 		);
+	}
+
+	/**
+	 * Achève une demande : documents en place, référence attribuée pour de bon.
+	 *
+	 * @param int    $id           Identifiant de la demande.
+	 * @param string $reference    Référence.
+	 * @param string $files_status État final des documents.
+	 * @param int    $now          Horodatage.
+	 * @return bool
+	 */
+	public static function finalize( int $id, string $reference, string $files_status, int $now ): bool {
+		if ( ! self::persist_meta( $id, '_urbizen_files_status', $files_status ) ) {
+			return false;
+		}
+
+		// L'ordre compte : la transaction est marquée validée AVANT que la
+		// référence ne soit attribuée. Une coupure entre les deux laisse une
+		// demande « committed » que la récupération conserve, plutôt qu'une
+		// référence attribuée sans demande complète.
+		$transaction          = self::transaction( $id );
+		$transaction['state'] = 'committed';
+
+		if ( ! self::persist_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $transaction ) ) ) {
+			return false;
+		}
+
+		if ( ! self::persist_meta( $id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED ) ) {
+			return false;
+		}
+
+		self::confirm_reference( $reference, $id, $now );
+
+		Logger::info(
+			sprintf(
+				'demande %s enregistrée (#%d, documents : %s)',
+				$reference,
+				$id,
+				$files_status
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Écrit les métadonnées des documents.
+	 *
+	 * @param int                              $id    Demande.
+	 * @param array<int, array<string, mixed>> $files Métadonnées validées.
+	 * @return bool
+	 */
+	public static function set_files( int $id, array $files ): bool {
+		$total = 0;
+
+		foreach ( $files as $f ) {
+			$total += (int) ( $f['size'] ?? 0 );
+		}
+
+		// Les trois écritures sont solidaires : un décompte non écrit rendrait
+		// la liste et son résumé incohérents, ce qui se verrait plus tard sans
+		// qu'on sache pourquoi.
+		$ecritures = array(
+			'_urbizen_files'            => (string) wp_json_encode( array_values( $files ) ),
+			'_urbizen_files_count'      => count( $files ),
+			'_urbizen_files_total_size' => $total,
+		);
+
+		foreach ( $ecritures as $cle => $valeur ) {
+			if ( ! self::persist_meta( $id, $cle, $valeur ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Écrit une métadonnée et **vérifie par relecture** qu'elle est en place.
+	 *
+	 * Le retour de `update_post_meta()` ne prouve rien. `update_metadata()`
+	 * rend `false` dans **deux** situations qu'il ne faut jamais confondre :
+	 *
+	 * - l'écriture a réellement échoué ;
+	 * - la valeur demandée était **déjà** enregistrée, et aucune modification
+	 *   n'était nécessaire.
+	 *
+	 * Les traiter pareillement fait échouer toute écriture idempotente.
+	 * `finalize()` réécrivait ainsi `_urbizen_files_status` avec la valeur que
+	 * `persist()` venait de poser : sur un vrai WordPress, la transaction
+	 * n'était jamais validée, la référence jamais attribuée, et la
+	 * récupération supprimait le dossier une heure plus tard.
+	 *
+	 * Seule la relecture fait foi — dans les deux sens. Un `false` suivi d'une
+	 * relecture conforme est un **succès** ; un `true`, ou un identifiant,
+	 * suivi d'une relecture divergente est un **échec**.
+	 *
+	 * @param int    $id     Demande.
+	 * @param string $cle    Clé.
+	 * @param mixed  $valeur Valeur attendue.
+	 * @return bool
+	 */
+	public static function persist_meta( int $id, string $cle, $valeur ): bool {
+		update_post_meta( $id, $cle, $valeur );
+
+		return self::meta_equivaut( get_post_meta( $id, $cle, true ), $valeur );
+	}
+
+	/**
+	 * La valeur relue correspond-elle à la valeur voulue ?
+	 *
+	 * WordPress ne restitue pas toujours ce qu'on lui a confié : les scalaires
+	 * reviennent en chaînes, les tableaux reviennent désérialisés. La
+	 * comparaison suit donc le type **écrit**, jamais le type relu.
+	 *
+	 * @param mixed $lu     Valeur relue.
+	 * @param mixed $voulue Valeur écrite.
+	 * @return bool
+	 */
+	private static function meta_equivaut( $lu, $voulue ): bool {
+		// Tableaux et objets : le cœur les sérialise puis les restitue tels
+		// quels. On compare les structures, sans passer par une chaîne.
+		if ( is_array( $voulue ) || is_object( $voulue ) ) {
+			return $lu == $voulue; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison
+		}
+
+		// Booléens : `true` est stocké puis relu comme `'1'`, `false` comme une
+		// chaîne vide.
+		if ( is_bool( $voulue ) ) {
+			return ( $voulue ? '1' : '' ) === (string) $lu;
+		}
+
+		// Chaînes — dont le JSON des transactions et des documents. Comparaison
+		// **stricte**, caractère pour caractère : une différence d'encodage ou
+		// d'échappement est une divergence, pas un détail.
+		if ( is_string( $voulue ) ) {
+			return is_scalar( $lu ) && $voulue === (string) $lu;
+		}
+
+		// Entiers et flottants : relus en chaînes.
+		if ( is_int( $voulue ) || is_float( $voulue ) ) {
+			return is_scalar( $lu ) && (string) $voulue === (string) $lu;
+		}
+
+		// `null` n'est pas une valeur qu'on persiste sciemment.
+		return false;
+	}
+
+	/**
+	 * Supprime une demande inachevée et libère sa référence.
+	 *
+	 * Une demande abandonnée en cours de route ne doit rien laisser : ni post
+	 * partiel, ni numéro consommé.
+	 *
+	 * @param int    $id        Demande.
+	 * @param string $reference Référence.
+	 * @return void
+	 */
+	public static function discard( int $id, string $reference ): void {
+		if ( $id > 0 ) {
+			wp_delete_post( $id, true );
+		}
+
+		if ( '' !== $reference ) {
+			self::release_reference( $reference );
+		}
 	}
 
 	/**
@@ -336,6 +537,15 @@ final class SubmissionRepository {
 				continue;
 			}
 
+			// Une réservation rattachée à une demande qui existe encore n'est
+			// pas orpheline : c'est une transaction en cours ou interrompue, du
+			// ressort de la récupération, pas du ménage.
+			$rattachee = (int) ( $valeur['post'] ?? 0 );
+
+			if ( $rattachee > 0 && null !== get_post( $rattachee ) ) {
+				continue;
+			}
+
 			if ( $now - (int) ( $valeur['at'] ?? 0 ) >= self::RESERVATION_TTL ) {
 				delete_option( $cle );
 				++$liberees;
@@ -396,9 +606,35 @@ final class SubmissionRepository {
 			'source_path'     => (string) get_post_meta( $id, '_urbizen_source_path', true ),
 			'mail_status'     => (string) get_post_meta( $id, '_urbizen_mail_status', true ),
 			'files_status'    => (string) get_post_meta( $id, '_urbizen_files_status', true ),
+			'files'           => self::decode_files( $id ),
+			'transaction'     => self::transaction( $id ),
 			'payload'         => is_array( $payload ) ? $payload : array(),
 			'pricing'         => is_array( $pricing ) ? $pricing : array(),
 		);
+	}
+
+	/**
+	 * État durable de la transaction d'une demande.
+	 *
+	 * @param int $id Demande.
+	 * @return array<string, mixed>
+	 */
+	public static function transaction( int $id ): array {
+		$brut = json_decode( (string) get_post_meta( $id, '_urbizen_transaction', true ), true );
+
+		return is_array( $brut ) ? $brut : array();
+	}
+
+	/**
+	 * Documents d'une demande.
+	 *
+	 * @param int $id Demande.
+	 * @return array<int, array<string, mixed>>
+	 */
+	public static function decode_files( int $id ): array {
+		$brut = json_decode( (string) get_post_meta( $id, '_urbizen_files', true ), true );
+
+		return is_array( $brut ) ? $brut : array();
 	}
 
 	/**

@@ -21,6 +21,9 @@
 
 namespace Urbizen\Platform\Http;
 
+use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Files\UploadNormalizer;
+use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\Pricing;
 use Urbizen\Platform\Forms\Validator;
@@ -28,6 +31,7 @@ use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
+use Urbizen\Platform\Support\PhpLimits;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -148,6 +152,17 @@ final class SubmissionController {
 			return SubmissionResult::failure( SubmissionResult::INVALID_METHOD );
 		}
 
+		// --- 1 bis · corps écarté par PHP ---
+		// Un corps dépassant `post_max_size` est vidé par PHP avant que ce code
+		// ne s'exécute. Sans ce contrôle, la requête se présenterait comme
+		// dépourvue de nonce, et le visiteur recevrait un refus de sécurité
+		// pour un fichier simplement trop lourd.
+		if ( PhpLimits::body_rejected( $post, $files, $server ) ) {
+			Logger::info( 'soumission conception refusée : request_too_large' );
+
+			return SubmissionResult::failure( SubmissionResult::REQUEST_TOO_LARGE );
+		}
+
 		// --- 2 · nonce ---
 		$nonce = isset( $post[ self::NONCE_FIELD ] ) ? (string) $post[ self::NONCE_FIELD ] : '';
 
@@ -207,12 +222,7 @@ final class SubmissionController {
 			return SubmissionResult::failure( $code, $errors );
 		};
 
-		// --- 7 · fichiers : refusés jusqu'à la PR B2 ---
-		if ( self::has_files( $files ) ) {
-			return $renoncer( SubmissionResult::FILES_NOT_SUPPORTED_YET );
-		}
-
-		// --- 8 · définition ---
+		// --- 7 · définition ---
 		$definition = FormRegistry::get( self::FORM_TYPE );
 
 		if ( null === $definition || ! $definition->is_valid() ) {
@@ -221,14 +231,14 @@ final class SubmissionController {
 			return $renoncer( SubmissionResult::INVALID_FORM );
 		}
 
-		// --- 9 · validation ---
+		// --- 8 · validation ---
 		$validation = Validator::validate( $definition, self::strip_technical_fields( $post ) );
 
 		if ( ! $validation['valid'] ) {
 			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] );
 		}
 
-		// --- 10 · prix, recalculé côté serveur ---
+		// --- 9 · prix, recalculé côté serveur ---
 		$pricing = $validation['pricing'];
 
 		if ( ! is_array( $pricing ) || ! isset( $pricing['total'], $pricing['base'] ) ) {
@@ -243,53 +253,142 @@ final class SubmissionController {
 			return $renoncer( SubmissionResult::PRICING_FAILED );
 		}
 
-		// --- 11 et 12 · référence et enregistrement, avant toute action externe ---
+		// --- 10 · documents : normalisation puis politique ---
+		$normalisation = UploadNormalizer::normalize( $files );
+
+		if ( ! $normalisation['ok'] ) {
+			return $renoncer( $normalisation['code'] );
+		}
+
+		$lot     = array();
+		$staging = null;
+
+		if ( array() !== $normalisation['files'] ) {
+			$politique = UploadPolicy::validate( $normalisation['files'] );
+
+			if ( ! $politique['ok'] ) {
+				return $renoncer( $politique['code'] );
+			}
+
+			// --- 11 · dépôt dans un staging privé ---
+			// Les documents quittent le répertoire temporaire de PHP avant que
+			// quoi que ce soit ne soit écrit en base : si la suite échoue, il
+			// n'y a qu'un répertoire à effacer.
+			$staging = Storage::open_staging();
+
+			if ( null === $staging ) {
+				return $renoncer( SubmissionResult::STORAGE_UNAVAILABLE );
+			}
+
+			foreach ( $politique['files'] as $rang => $doc ) {
+				$depose = Storage::stage( $staging, $doc, (int) $rang );
+
+				if ( null === $depose ) {
+					Storage::discard_staging( $staging );
+
+					return $renoncer( SubmissionResult::STORAGE_FAILED );
+				}
+
+				$lot[] = $depose;
+			}
+		}
+
+		/**
+		 * Abandonne le traitement en rendant tout ce qui a été réservé.
+		 *
+		 * @param string $code      Code interne.
+		 * @param int    $id        Demande partielle, ou 0.
+		 * @param string $reference Référence réservée, ou chaîne vide.
+		 * @param array  $deposes   Documents déjà finalisés.
+		 * @return SubmissionResult
+		 */
+		$abandonner = static function ( string $code, int $id = 0, string $reference = '', array $deposes = array() ) use ( $renoncer, $staging ): SubmissionResult {
+			Storage::rollback( $deposes );
+			Storage::discard_staging( $staging );
+
+			if ( $id > 0 || '' !== $reference ) {
+				SubmissionRepository::discard( $id, $reference );
+			}
+
+			return $renoncer( $code );
+		};
+
+		// --- 12 · demande créée, mais pas encore finalisée ---
+		// La référence reste réservée, jamais attribuée : tant que les
+		// documents ne sont pas en place, la demande n'existe pas vraiment.
 		$creation = SubmissionRepository::create(
 			$validation['clean'],
 			$pricing,
 			array(
-				'form_type'   => self::FORM_TYPE,
-				'source_path' => self::source_path( $post, $server ),
-				'now'         => $now,
+				'form_type'    => self::FORM_TYPE,
+				'source_path'  => self::source_path( $post, $server ),
+				'now'          => $now,
+				'files_status' => array() === $lot ? 'none' : 'pending',
+				'finalize'     => false,
+				// État durable : si le processus est tué après ce point, une
+				// requête ultérieure saura retrouver ce qu'il faut nettoyer.
+				'transaction'  => Storage::random_id(),
+				'staging'      => null === $staging ? '' : $staging,
 			)
 		);
 
 		if ( empty( $creation['ok'] ) ) {
-			return $renoncer( SubmissionResult::PERSISTENCE_FAILED );
+			return $abandonner( SubmissionResult::PERSISTENCE_FAILED );
 		}
 
-		// --- 13 · la demande existe : le jeton et le créneau sont acquis ---
+		$id        = (int) $creation['id'];
+		$reference = (string) $creation['reference'];
+
+		// --- 13 · documents déplacés sous la référence ---
+		$metadonnees = array();
+
+		if ( array() !== $lot ) {
+			$metadonnees = Storage::finalize( $staging, $reference, $lot, $now );
+
+			if ( null === $metadonnees ) {
+				return $abandonner( SubmissionResult::STORAGE_FAILED, $id, $reference );
+			}
+
+			if ( ! SubmissionRepository::set_files( $id, $metadonnees ) ) {
+				return $abandonner(
+					SubmissionResult::FILE_METADATA_FAILED,
+					$id,
+					$reference,
+					array_map( static fn( $m ) => (string) Storage::resolve( (string) $m['relative_path'] ), $metadonnees )
+				);
+			}
+		}
+
+		Storage::discard_staging( $staging );
+
+		// --- 14 · finalisation : la référence est attribuée pour de bon ---
+		if ( ! SubmissionRepository::finalize( $id, $reference, array() === $lot ? 'none' : 'stored', $now ) ) {
+			return $abandonner(
+				SubmissionResult::PERSISTENCE_FAILED,
+				$id,
+				$reference,
+				array_map( static fn( $m ) => (string) Storage::resolve( (string) $m['relative_path'] ), $metadonnees )
+			);
+		}
+
+		// --- 15 · la demande existe : le jeton et le créneau sont acquis ---
 		AntiSpam::consume_token( $jeton, $now );
 		RateLimiter::confirm( $creneau, $now );
 
-		// --- 14 · succès. Aucun courriel : ce sera la PR B3. ---
-		return SubmissionResult::success( (string) $creation['reference'], (int) $creation['id'] );
-	}
-
-	/**
-	 * La requête porte-t-elle au moins un fichier réellement transmis ?
-	 *
-	 * Un champ de dépôt laissé vide produit une entrée `$_FILES` avec le code
-	 * `UPLOAD_ERR_NO_FILE` : ce n'est pas un fichier, et le refuser
-	 * empêcherait toute soumission depuis un formulaire qui en déclare.
-	 *
-	 * @param array<string, mixed> $files Superglobale des fichiers.
-	 * @return bool
-	 */
-	public static function has_files( array $files ): bool {
-		foreach ( $files as $champ ) {
-			if ( ! is_array( $champ ) || ! isset( $champ['error'] ) ) {
-				continue;
-			}
-
-			foreach ( (array) $champ['error'] as $erreur ) {
-				if ( UPLOAD_ERR_NO_FILE !== (int) $erreur ) {
-					return true;
-				}
-			}
+		if ( array() !== $metadonnees ) {
+			// Journal : décomptes et identifiants techniques seulement.
+			Logger::info(
+				sprintf(
+					'demande %s : %d document(s), %d octets',
+					$reference,
+					count( $metadonnees ),
+					array_sum( array_column( $metadonnees, 'size' ) )
+				)
+			);
 		}
 
-		return false;
+		// --- 16 · succès. Aucun courriel : ce sera la PR B3. ---
+		return SubmissionResult::success( $reference, $id );
 	}
 
 	/**

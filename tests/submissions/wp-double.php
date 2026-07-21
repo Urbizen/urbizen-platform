@@ -42,6 +42,7 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_meta']       = array();
 	$GLOBALS['wpd_options']    = array();
 	$GLOBALS['wpd_autoload']   = array();
+	$GLOBALS['wpd_meta_lie']   = '';
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
 	$GLOBALS['wpd_actions']    = array();
@@ -57,6 +58,8 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_can']        = true;
 	$GLOBALS['wpd_referer']    = '';
 	$GLOBALS['wpd_mails']      = array();
+	$GLOBALS['wpd_trash_fail']   = false;
+	$GLOBALS['wpd_untrash_fail'] = false;
 }
 
 wpd_reset();
@@ -75,19 +78,63 @@ function esc_attr( $texte ) { return htmlspecialchars( (string) $texte, ENT_QUOT
 
 // ------------------------------------------------------------ filtres/actions
 function add_filter( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_filters'][ $hook ][] = $callback;
+	$GLOBALS['wpd_filters'][ $hook ][] = array(
+		'cb'   => $callback,
+		'n'    => (int) $args,
+		'p'    => (int) $priorite,
+		// L'ordre d'inscription départage deux priorités égales, comme dans
+		// WordPress.
+		'rang' => count( $GLOBALS['wpd_filters'][ $hook ] ?? array() ),
+	);
+
 	return true;
 }
 
+/**
+ * Trie des rappels par priorité, puis par ordre d'inscription.
+ *
+ * WordPress exécute les filtres dans l'ordre des priorités, pas dans celui des
+ * appels à `add_filter()`. Ignorer ce tri masquerait tout conflit d'ordre entre
+ * greffons — précisément ce qu'on cherche à éprouver.
+ */
+function wpd_trier( array $entrees ): array {
+	usort(
+		$entrees,
+		static function ( $a, $b ) {
+			return ( $a['p'] ?? 10 ) <=> ( $b['p'] ?? 10 ) ?: ( $a['rang'] ?? 0 ) <=> ( $b['rang'] ?? 0 );
+		}
+	);
+
+	return $entrees;
+}
+
+/**
+ * Applique un filtre, **fidèlement** à WordPress.
+ *
+ * Le nombre d'arguments transmis est plafonné par `accepted_args`. Déclarer
+ * trop peu d'arguments est une erreur classique — le rappel reçoit alors moins
+ * que prévu, et échoue ou travaille sur des valeurs manquantes.
+ */
 function apply_filters( $hook, $valeur, ...$extra ) {
-	foreach ( $GLOBALS['wpd_filters'][ $hook ] ?? array() as $callback ) {
-		$valeur = $callback( $valeur, ...$extra );
+	$tous = array_merge( array( $valeur ), $extra );
+
+	foreach ( wpd_trier( $GLOBALS['wpd_filters'][ $hook ] ?? array() ) as $entree ) {
+		$args    = array_slice( $tous, 0, max( 1, $entree['n'] ) );
+		$valeur  = $entree['cb']( ...$args );
+		$tous[0] = $valeur;
 	}
+
 	return $valeur;
 }
 
 function add_action( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_actions'][ $hook ][] = array( 'cb' => $callback, 'n' => (int) $args );
+	$GLOBALS['wpd_actions'][ $hook ][] = array(
+		'cb'   => $callback,
+		'n'    => (int) $args,
+		'p'    => (int) $priorite,
+		'rang' => count( $GLOBALS['wpd_actions'][ $hook ] ?? array() ),
+	);
+
 	return true;
 }
 
@@ -107,7 +154,7 @@ function do_action( $hook, ...$args ) {
 		$args = array( '' );
 	}
 
-	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+	foreach ( wpd_trier( $GLOBALS['wpd_actions'][ $hook ] ?? array() ) as $entree ) {
 		$entree['cb']( ...array_slice( $args, 0, $entree['n'] ) );
 	}
 }
@@ -120,7 +167,7 @@ function do_action( $hook, ...$args ) {
 function do_action_ref_array( $hook, $args ) {
 	$GLOBALS['wpd_done'][] = array( 'hook' => $hook, 'args' => $args );
 
-	foreach ( $GLOBALS['wpd_actions'][ $hook ] ?? array() as $entree ) {
+	foreach ( wpd_trier( $GLOBALS['wpd_actions'][ $hook ] ?? array() ) as $entree ) {
 		$entree['cb']( ...array_slice( (array) $args, 0, $entree['n'] ) );
 	}
 }
@@ -186,13 +233,20 @@ function get_option( $cle, $defaut = false ) {
 }
 
 function update_option( $cle, $valeur, $autoload = null ) {
+	// Même ambiguïté que `update_post_meta()` : le cœur rend `false` lorsque la
+	// valeur enregistrée est déjà la bonne. Aucun appel de production ne lit ce
+	// retour aujourd'hui ; la doublure reste néanmoins fidèle, pour qu'un futur
+	// usage fautif tombe ici plutôt qu'en production.
+	$inchangee = array_key_exists( $cle, $GLOBALS['wpd_options'] )
+		&& $GLOBALS['wpd_options'][ $cle ] === $valeur;
+
 	$GLOBALS['wpd_options'][ $cle ] = $valeur;
 
 	if ( null !== $autoload ) {
 		$GLOBALS['wpd_autoload'][ $cle ] = $autoload ? 'yes' : 'no';
 	}
 
-	return true;
+	return ! $inchangee;
 }
 
 /**
@@ -281,14 +335,268 @@ function wp_insert_post( $data, $wp_error = false ) {
 	return $id;
 }
 
+/**
+ * Mise à jour d'un contenu.
+ *
+ * Rend l'identifiant en cas de succès, `0` sinon — comme le cœur.
+ */
+function wp_update_post( $data, $wp_error = false ) {
+	$id   = (int) ( $data['ID'] ?? 0 );
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return $wp_error ? new WP_Error( 'invalid_post', 'contenu introuvable' ) : 0;
+	}
+
+	if ( ! empty( $GLOBALS['wpd_update_fail'] ) ) {
+		return $wp_error ? new WP_Error( 'update_failed', 'échec simulé' ) : 0;
+	}
+
+	foreach ( $data as $cle => $valeur ) {
+		if ( 'ID' !== $cle ) {
+			$post->$cle = $valeur;
+		}
+	}
+
+	return $id;
+}
+
+/**
+ * Appelle `wp_update_post()` en forçant l'échec si le drapeau nommé est levé.
+ *
+ * L'échec se produit **au niveau de `wp_update_post()`**, donc après tout ce
+ * que le cœur a déjà écrit ou effacé.
+ */
+function wpd_update_post_ou_echec( array $data, string $drapeau ) {
+	$anterieur = $GLOBALS['wpd_update_fail'] ?? false;
+
+	if ( ! empty( $GLOBALS[ $drapeau ] ) ) {
+		$GLOBALS['wpd_update_fail'] = true;
+	}
+
+	$resultat = wp_update_post( $data );
+
+	$GLOBALS['wpd_update_fail'] = $anterieur;
+
+	return $resultat;
+}
+
+/**
+ * Ajout d'une métadonnée. Sans unicité demandée, le cœur **ajoute** une valeur
+ * supplémentaire ; `get_post_meta( …, true )` rend alors la première.
+ */
+function add_post_meta( $id, $cle, $valeur, $unique = false ) {
+	$id = (int) $id;
+
+	if ( ! isset( $GLOBALS['wpd_meta'][ $id ] ) ) {
+		$GLOBALS['wpd_meta'][ $id ] = array();
+	}
+
+	if ( $unique && array_key_exists( $cle, $GLOBALS['wpd_meta'][ $id ] ) ) {
+		return false;
+	}
+
+	if ( ! array_key_exists( $cle, $GLOBALS['wpd_meta'][ $id ] ) ) {
+		$GLOBALS['wpd_meta'][ $id ][ $cle ] = $valeur;
+	}
+
+	return true;
+}
+
+function get_post_status( $id ) {
+	$post = get_post( $id );
+
+	return $post ? (string) $post->post_status : false;
+}
+
 function get_post( $id ) {
 	return $GLOBALS['wpd_posts'][ (int) $id ] ?? null;
 }
 
+/**
+ * Suppression définitive, **fidèle** au cœur de WordPress.
+ *
+ * `pre_delete_post` est consulté d'abord : un `false` empêche la suppression.
+ * Sans cette fidélité, un banc croirait qu'un contenu a été supprimé alors
+ * qu'un filtre l'a bloqué.
+ */
 function wp_delete_post( $id, $force = false ) {
-	$id = (int) $id;
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	// Le cœur court-circuite dès que la valeur n'est plus `null` — et il rend
+	// cette valeur telle quelle. Ne réagir qu'à `false` laisserait passer un
+	// greffon qui bloque avec n'importe quelle autre valeur.
+	$court = apply_filters( 'pre_delete_post', null, $post, (bool) $force );
+
+	if ( null !== $court ) {
+		return $court;
+	}
+
 	unset( $GLOBALS['wpd_posts'][ $id ], $GLOBALS['wpd_meta'][ $id ] );
-	return true;
+
+	return $post;
+}
+
+/**
+ * Mise à la Corbeille, fidèle au cœur de WordPress.
+ *
+ * `pre_trash_post` reçoit trois arguments et peut empêcher l'opération. Le
+ * statut précédent est mémorisé dans `_wp_trash_meta_status`, comme le fait
+ * WordPress, afin que la restauration le rétablisse.
+ */
+function wp_trash_post( $id ) {
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return $post;
+	}
+
+	if ( 'trash' === $post->post_status ) {
+		return false;
+	}
+
+	$precedent = (string) $post->post_status;
+	$court     = apply_filters( 'pre_trash_post', null, $post, $precedent );
+
+	if ( null !== $court ) {
+		return $court;
+	}
+
+	do_action( 'wp_trash_post', $id, $precedent );
+
+	// `add_post_meta`, et non `update_post_meta` : le cœur ajoute. Une seconde
+	// tentative après un échec crée donc une seconde valeur, et c'est la
+	// **première** que `get_post_meta( …, true )` rendra.
+	add_post_meta( $id, '_wp_trash_meta_status', $precedent );
+	add_post_meta( $id, '_wp_trash_meta_time', wpd_now() );
+
+	// L'écriture native vient **après** les métadonnées : si elle échoue,
+	// celles-ci subsistent, et le post garde son statut d'origine.
+	$post_updated = wpd_update_post_ou_echec(
+		array(
+			'ID'          => $id,
+			'post_status' => 'trash',
+		),
+		'wpd_trash_fail'
+	);
+
+	if ( ! $post_updated ) {
+		return false;
+	}
+
+	do_action( 'trashed_post', $id, $precedent );
+
+	return $post;
+}
+
+/**
+ * Restauration depuis la Corbeille, fidèle à WordPress **moderne**.
+ *
+ * Depuis WordPress 5.6, un contenu non joint restauré ne retrouve **pas** son
+ * ancien statut : il repart en `draft`, sauf si le filtre
+ * `wp_untrash_post_status` en décide autrement. Reproduire l'ancien
+ * comportement — restaurer implicitement le statut d'avant — masquerait
+ * précisément le défaut que ce filtre existe pour corriger.
+ */
+function wp_untrash_post( $id ) {
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return $post;
+	}
+
+	if ( 'trash' !== $post->post_status ) {
+		return false;
+	}
+
+	$precedent = (string) get_post_meta( $id, '_wp_trash_meta_status', true );
+	$court     = apply_filters( 'pre_untrash_post', null, $post, $precedent );
+
+	if ( null !== $court ) {
+		return $court;
+	}
+
+	do_action( 'untrash_post', $id, $precedent );
+
+	// Le défaut du cœur : `draft` pour tout contenu non joint, quel que soit
+	// le statut d'origine.
+	$propose = 'attachment' === (string) $post->post_type ? 'inherit' : 'draft';
+	$nouveau = apply_filters( 'wp_untrash_post_status', $propose, $id, $precedent );
+
+	// **Point décisif.** Le cœur efface les métadonnées natives de Corbeille
+	// AVANT l'écriture. Si celle-ci échoue, elles sont perdues : le post reste
+	// à la Corbeille, mais plus rien n'indique d'où il venait. Les conserver
+	// ici rendrait possible une reprise que le vrai WordPress ne permet pas.
+	delete_post_meta( $id, '_wp_trash_meta_status' );
+	delete_post_meta( $id, '_wp_trash_meta_time' );
+
+	$post_updated = wpd_update_post_ou_echec(
+		array(
+			'ID'          => $id,
+			'post_status' => (string) $nouveau,
+		),
+		'wpd_untrash_fail'
+	);
+
+	if ( ! $post_updated ) {
+		// `untrashed_post` n'est pas exécuté : le cœur sort ici.
+		return false;
+	}
+
+	do_action( 'untrashed_post', $id, $precedent );
+
+	return $post;
+}
+
+/**
+ * Vidage automatique de la Corbeille.
+ *
+ * Emprunte `wp_delete_post()`, donc le même chemin protégé — comme le fait
+ * `wp_scheduled_delete()` dans WordPress.
+ */
+function wp_scheduled_delete( $jours = 30 ) {
+	$limite    = wpd_now() - ( $jours * DAY_IN_SECONDS );
+	$supprimes = 0;
+
+	foreach ( array_keys( $GLOBALS['wpd_posts'] ) as $id ) {
+		// Le cœur interroge `_wp_trash_meta_time` : **une métadonnée absente
+		// ne remonte pas**. La traiter comme un zéro purgerait des contenus que
+		// le vrai WordPress laisse tranquilles — dont, précisément, ceux dont
+		// une restauration interrompue a effacé l'état natif.
+		if ( ! array_key_exists( '_wp_trash_meta_time', $GLOBALS['wpd_meta'][ $id ] ?? array() ) ) {
+			continue;
+		}
+
+		if ( (int) $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_time'] > $limite ) {
+			continue;
+		}
+
+		$post = get_post( $id );
+
+		// Plus à la Corbeille : le cœur ne supprime pas, il fait le ménage de
+		// ses propres métadonnées.
+		if ( ! $post || 'trash' !== $post->post_status ) {
+			delete_post_meta( $id, '_wp_trash_meta_status' );
+			delete_post_meta( $id, '_wp_trash_meta_time' );
+
+			continue;
+		}
+
+		// `wp_delete_post( $id )` — **sans** forçage, comme le cœur. Le
+		// troisième argument de `pre_delete_post` vaut donc `false`.
+		if ( false !== wp_delete_post( $id ) ) {
+			++$supprimes;
+		}
+	}
+
+	return $supprimes;
 }
 
 // -------------------------------------------------------------- métadonnées -
@@ -298,8 +606,27 @@ function update_post_meta( $id, $cle, $valeur, $prev = '' ) {
 		return false;
 	}
 
-	$GLOBALS['wpd_meta'][ (int) $id ][ $cle ] = $valeur;
-	return 123;
+	$id      = (int) $id;
+	$present = array_key_exists( $cle, $GLOBALS['wpd_meta'][ $id ] ?? array() );
+
+	// Couche de stockage qui **annonce** un succès sans rien écrire. Un code
+	// qui se fie au retour ne le verra jamais ; une relecture, si.
+	if ( '' !== ( $GLOBALS['wpd_meta_lie'] ?? '' ) && $cle === $GLOBALS['wpd_meta_lie'] ) {
+		return $present ? true : 123;
+	}
+
+	// Fidélité à `update_metadata()` : une valeur **identique** rend `false`.
+	// Ce n'est pas un échec, c'est une absence de changement — et tout code qui
+	// lit ce retour comme un échec se trompe.
+	if ( $present && $GLOBALS['wpd_meta'][ $id ][ $cle ] === $valeur ) {
+		return false;
+	}
+
+	$GLOBALS['wpd_meta'][ $id ][ $cle ] = $valeur;
+
+	// Création : le cœur rend l'identifiant de la métadonnée. Mise à jour :
+	// `true`.
+	return $present ? true : 123;
 }
 
 function get_post_meta( $id, $cle = '', $single = false ) {
@@ -501,3 +828,29 @@ class WPDB_Double {
 }
 
 $GLOBALS['wpdb'] = new WPDB_Double();
+
+// ------------------------------------------------------------- divers ------
+function nocache_headers() {}
+function status_header( $code ) { $GLOBALS['wpd_status'] = $code; }
+function admin_url( $chemin = '' ) { return 'https://exemple.test/wp-admin/' . ltrim( $chemin, '/' ); }
+function size_format( $octets, $decimales = 0 ) { return round( $octets / 1024 ) . ' KB'; }
+function _n( $singulier, $pluriel, $nombre, $domaine = '' ) { return $nombre > 1 ? $pluriel : $singulier; }
+
+/**
+ * Contrôle croisé du type de fichier, doublure de WordPress.
+ *
+ * Reproduit le comportement réel : le type est déduit du **contenu**, jamais
+ * de ce que déclare l'appelant, et l'extension proposée doit y correspondre.
+ */
+function wp_check_filetype_and_ext( $fichier, $nom, $mimes = null ) {
+	$reel = \Urbizen\Platform\Files\UploadPolicy::detect_mime( $fichier );
+	$ext  = strtolower( (string) pathinfo( $nom, PATHINFO_EXTENSION ) );
+
+	$attendus = \Urbizen\Platform\Files\UploadPolicy::TYPES;
+
+	if ( ! isset( $attendus[ $ext ] ) || $attendus[ $ext ] !== $reel ) {
+		return array( 'ext' => false, 'type' => false, 'proper_filename' => false );
+	}
+
+	return array( 'ext' => $ext, 'type' => $reel, 'proper_filename' => false );
+}

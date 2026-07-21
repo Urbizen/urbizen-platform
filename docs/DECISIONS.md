@@ -772,3 +772,609 @@ de `option_name`.
   repasse et constate que la tâche existe. Le nombre d'appels réels à
   `wp_schedule_event` est mesuré, et vaut exactement 1.
 - Le verrou ne contient qu'une échéance. Aucune donnée personnelle.
+
+---
+
+## D-022 — Les documents vivent hors de la racine publique
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Croquis, photographies et relevés d'un projet sont des données
+personnelles. La solution courante — un dossier de `wp-content/uploads` au nom
+imprévisible — ne protège rien : un nom fuit par les journaux du serveur, par
+le `Referer`, par une sauvegarde mal placée, par un listing mal configuré. La
+seule barrière solide est qu'**aucun chemin d'URL ne mène au fichier**.
+
+**Décision.** Les documents sont stockés **hors de la racine publique**.
+
+L'emplacement est déduit de l'installation, jamais inscrit en dur : le parent
+de `ABSPATH`, soit `<parent>/private/urbizen-conception`. Sur l'hébergement
+actuel, cela donne un répertoire frère de `public_html` — que l'hébergeur
+lui-même signale comme non servi.
+
+Trois garde-fous entourent la résolution :
+
+1. un chemin situé sous `ABSPATH` est **refusé avant toute création** — le
+   refuser après l'avoir créé laisserait un répertoire dans l'arbre servi ;
+2. un second contrôle après `realpath()` couvre le cas d'un lien symbolique
+   qui ramènerait un chemin d'apparence privée dans la racine publique ;
+3. le répertoire doit être inscriptible.
+
+**En l'absence d'emplacement sûr, le stockage refuse.** Il ne se replie
+**jamais** sur `wp-content/uploads` : une soumission refusée se corrige, un
+document exposé ne se reprend pas. Le code interne est `storage_unavailable`.
+
+Répertoires en `0700`, fichiers en `0600`. Un `index.php` et un `.htaccess`
+sont posés en défense complémentaire — jamais comme protection principale.
+
+**Conséquences.**
+- Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`
+  déposerait le fichier derrière une URL publique. Un banc balaie tout le
+  plugin pour le vérifier.
+- Le seul accès est un lien signé, servi par un contrôleur dédié.
+- Le chemin de stockage est configurable par la constante
+  `URBIZEN_PRIVATE_STORAGE_DIR` et par le filtre
+  `urbizen_private_storage_dir`, mais aucun réglage ne permet de contourner le
+  refus des chemins publics.
+
+---
+
+## D-023 — Extension et contenu doivent concorder
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** `$_FILES['type']` est une **déclaration du navigateur**. Un
+attaquant l'écrit ce qu'il veut. Une extension seule ne vaut pas mieux :
+`photo.jpg` peut contenir du PHP.
+
+**Décision.** Un document n'est accepté que si **trois** choses concordent :
+une extension de la liste blanche, un type réel lu dans le contenu par
+`finfo`, et le contrôle croisé de WordPress.
+
+Formats acceptés : PDF, JPG, JPEG, PNG, WEBP. Refusés : SVG, GIF, HEIC,
+bureautique, archives, exécutables, HTML, JavaScript, PHP, fichiers sans
+extension, extensions doubles trompeuses.
+
+Seule la **dernière** extension compte : `facture.pdf.php` a pour extension
+`php`, et c'est bien ainsi qu'un serveur l'exécuterait.
+
+Limites : 10 documents par bloc, 20 au total, 10 Mio par document, 25 Mio
+cumulés — en octets réels, alignés sur `max_file_uploads` mesuré à 20.
+
+**Conséquences.**
+- Le banc de mutation mesure les deux barrières de type **séparément** :
+  retirer la concordance laisse le contrôle croisé protéger, retirer le
+  contrôle croisé laisse la concordance protéger, retirer les deux laisse
+  passer un PHP renommé en JPG.
+- La taille retenue est celle **du fichier sur le disque**, jamais celle
+  annoncée.
+
+---
+
+## D-024 — Le traitement des documents est transactionnel
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-014] et [D-017]
+
+**Contexte.** Une soumission avec documents enchaîne une dizaine d'opérations
+dont chacune peut échouer. Sans discipline, une panne au milieu laisse un
+fichier sans demande, ou une demande annonçant des documents absents.
+
+**Décision.** Deux temps, et un abandon complet à la moindre panne.
+
+Les fichiers passent d'abord dans un **staging** identifié au hasard, avant
+qu'une seule ligne ne soit écrite en base. Ils ne sont déplacés sous la
+référence qu'une fois la demande créée. La demande, elle, naît en état
+`pending` avec sa référence **simplement réservée** : elle n'est
+**attribuée** qu'à la finalisation, quand tout est en place.
+
+Invariants tenus, chacun éprouvé par un scénario de panne dédié : aucun
+fichier permanent sans demande, aucune demande annoncée réussie avec des
+documents incomplets, aucune référence attribuée avant la finalisation, aucun
+staging résiduel, aucun jeton ni créneau consommé par un échec corrigible.
+
+**Conséquences.**
+- `files_status` suit le cycle `none` · `pending` · `stored` · `deleted`.
+- Les documents sont effacés **avec** la demande, par le hook
+  `urbizen_before_submission_delete` déclenché tant qu'elle existe encore.
+- La réservation `attributed` survit à l'effacement des documents, comme elle
+  survit à celui des données personnelles (D-020).
+- Le nettoyage quotidien ne touche **que** le staging. Un document final n'est
+  jamais supprimé au motif qu'une métadonnée semble manquante : en cas de
+  doute, on conserve et on signale.
+
+---
+
+## D-025 — Les liens de téléchargement sont signés et temporaires
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Les documents étant hors de toute URL, il faut un moyen d'y
+donner accès — notamment depuis un courriel ouvert sans session WordPress.
+
+**Décision.** Un lien HMAC, valable **14 jours**, régénérable.
+
+La signature couvre tous les champs : version du schéma, demande, document,
+échéance. Modifier l'un d'eux invalide le lien. On ne peut ni prolonger une
+échéance, ni glisser vers le document d'une autre demande.
+
+L'URL ne porte **aucune** information métier : ni chemin, ni nom de fichier,
+ni nom de personne, ni adresse, ni empreinte. Une URL se retrouve dans
+l'historique du navigateur, dans les journaux du serveur et dans le `Referer`
+envoyé au site suivant.
+
+**Toute défaillance produit la même réponse** — un 404 identique. Signature
+fausse, lien expiré, demande inexistante, document effacé : distinguer les cas
+révélerait qu'une demande existe, et un identifiant de demande est un entier
+qu'on essaie en quelques secondes.
+
+**Conséquences.**
+- Le contrôleur reconstruit le chemin par `Storage`, qui refuse toute sortie
+  de la racine privée, tout lien symbolique et tout chemin inexistant.
+- Le nom proposé au téléchargement est débarrassé des retours chariot, des
+  guillemets et de tout chemin : il entre dans un en-tête HTTP.
+- Aucun lien n'est affiché ni envoyé en PR B2. La PR B3 les emploiera dans le
+  courriel administrateur.
+
+---
+
+## D-026 — Une interruption brutale se rattrape hors de la requête
+
+**Date** : 20 juillet 2026 · **État** : actée · **Complète** [D-024]
+
+**Contexte.** La PR B2 démontrait le nettoyage après des erreurs **interceptées**.
+Elle ne disait rien d'une coupure de processus. Or quand PHP est tué, que le
+serveur redémarre ou que la connexion tombe pendant l'écriture, ni `catch`, ni
+`finally`, ni destructeur ne s'exécutent. Le rattrapage ne peut donc pas vivre
+dans la requête.
+
+**Décision.** Un **état durable**, relu par une requête ultérieure.
+
+Chaque demande porte `_urbizen_transaction` — identifiant aléatoire, date de
+début, état `processing` ou `committed`, staging, référence — et
+`_urbizen_status = processing` tant que la transaction n'est pas achevée.
+Aucune donnée personnelle n'y figure.
+
+**Sept conditions doivent être réunies simultanément** pour qu'une transaction
+soit jugée abandonnée : bon type de contenu, état `processing`, ancienneté
+supérieure à une heure, absence de marqueur `committed`, référence lisible,
+réservation encore `reserved`, et réservation rattachée à cette demande.
+**Toute incertitude conduit à conserver et à signaler.**
+
+L'ordre de nettoyage compte : le staging, puis les fichiers de la référence,
+puis la demande, puis la réservation. À aucun moment un fichier ne survit à la
+disparition de ce qui permet de le retrouver.
+
+**Conséquences.**
+- Le marqueur `committed` est posé **avant** l'attribution de la référence. Une
+  coupure entre les deux laisse une demande que la récupération conserve,
+  plutôt qu'une référence attribuée sans demande complète.
+- La récupération passe **avant** le ménage des réservations : elle s'appuie
+  sur la réservation `reserved` pour reconnaître une transaction abandonnée.
+- Une réservation rattachée à une demande qui existe encore n'est jamais
+  libérée par le ménage : c'est du ressort de la récupération.
+- Neuf points d'arrêt sont éprouvés, chacun en abandonnant le traitement sans
+  rollback puis en repartant comme d'une nouvelle requête.
+
+---
+
+## D-027 — La suppression est fermée par défaut
+
+**Date** : 20 juillet 2026 · **État** : actée · **Corrige** [D-024]
+
+**Contexte.** Un fichier qu'on ne parvient pas à effacer et dont on supprime
+malgré tout la demande devient un **orphelin** : une donnée personnelle que plus
+rien ne rattache à une personne, donc que plus rien ne permet d'effacer sur
+demande. C'est précisément ce qu'une politique de conservation doit rendre
+impossible.
+
+`before_delete_post` ne pouvait rien empêcher : c'est une action.
+
+**Décision.** Le blocage passe par le filtre **`pre_delete_post`**, seul capable
+de court-circuiter `wp_delete_post()`, déclaré avec ses **trois** arguments.
+
+Une API unique, `FileCleaner::delete()`, renvoie une issue explicite :
+`success`, `already_deleted`, `partial_failure`, `unsafe_path`,
+`filesystem_failure`. Un garde de réentrance évite les doubles nettoyages entre
+la rétention, la suppression manuelle et le hook métier.
+
+**Si le nettoyage échoue, la suppression n'a pas lieu.** La demande, ses
+métadonnées et sa réservation attribuée sont conservées, l'état passe à
+`delete_failed`, un code technique est consigné, et l'opération sera retentée.
+
+---
+
+## D-028 — Provenance HTTP et intégrité à la lecture
+
+**Date** : 20 juillet 2026 · **État** : actée · **Corrige** [D-022]
+
+**Contexte.** Deux fenêtres restaient ouvertes dans la PR B2.
+
+`Storage::move_uploaded()` retombait sur `rename()` lorsque
+`is_uploaded_file()` était faux. Un `tmp_name` forgé — `/etc/passwd`, un fichier
+du dépôt, une sauvegarde — pouvait donc être déplacé dans le stockage privé,
+puis servi par un lien signé.
+
+Le téléchargement, lui, appelait `filesize()` puis `fopen()` : deux ouvertures
+distinctes, sans vérifier l'empreinte. Un document remplacé entre les deux
+aurait été servi sous couvert d'un lien valide.
+
+**Décision.**
+
+**Provenance** : une abstraction `UploadedFileMover`. L'implémentation de
+production exige `is_uploaded_file()` puis `move_uploaded_file()`, **sans aucun
+repli**. L'adaptateur d'essai n'est atteignable ni par filtre, ni par option, ni
+par paramètre : `Storage::set_mover()` exige la ligne de commande ou une
+constante définie hors du dépôt.
+
+**Intégrité** : tout se fait sur **un seul descripteur** — `fstat()` pour la
+taille, le flux pour le SHA-256, `hash_equals()` pour la comparaison, puis
+rembobinage et diffusion. Refermer entre la vérification et la lecture rouvrirait
+la fenêtre qu'on cherche à fermer.
+
+Une atteinte à l'intégrité produit la **même réponse** qu'un document absent, et
+ne journalise qu'un identifiant technique et le code `file_integrity_failed`.
+
+---
+
+## D-029 — Un corps écarté par PHP n'est pas un défaut de sécurité
+
+**Date** : 20 juillet 2026 · **État** : actée
+
+**Contexte.** Un corps de requête dépassant `post_max_size` est vidé par PHP
+**avant** que le code ne s'exécute : `$_POST` et `$_FILES` arrivent vides. La
+soumission se présentait alors comme dépourvue de nonce, et le visiteur recevait
+un refus de sécurité pour un fichier simplement trop lourd — message trompeur et
+incompréhensible.
+
+**Décision.** Une détection précoce reconnaît la signature : requête POST,
+`CONTENT_LENGTH` positif, ni champs ni fichiers, et longueur annoncée supérieure
+à la limite. Le code interne est `request_too_large`, et aucun jeton, créneau ni
+référence n'est consommé.
+
+**Configuration relevée sur l'hébergement**, en lecture seule, sans rien
+modifier : PHP 8.3.30 · `file_uploads` 1 · `upload_max_filesize` 1536M ·
+`post_max_size` 1536M · `max_file_uploads` **20** · `upload_tmp_dir` vide
+(`/tmp`) · `max_input_time` 360 · `max_execution_time` 360 · `memory_limit`
+1536M.
+
+La politique — 10 Mio par document, 25 Mio cumulés, 20 documents — est donc
+applicable. **Un point de vigilance subsiste** : `max_file_uploads` vaut
+exactement 20, soit notre plafond. PHP écarte silencieusement les fichiers
+au-delà ; un envoi de 21 documents en verrait 20 arriver, sans que rien ne
+signale la perte. Porter `max_file_uploads` à 21 permettrait de la détecter.
+La politique serveur n'est pas réduite pour autant.
+
+---
+
+## D-030 — Le point de non-retour est l'attribution, pas le marqueur
+
+**Date** : 21 juillet 2026 · **État** : actée · **Corrige** [D-026]
+
+**Contexte.** La récupération conservait indéfiniment une transaction portant
+`committed` mais dont la référence était restée `reserved`. La revue a montré
+que ce n'était pas un état final acceptable.
+
+Dans le modèle transactionnel, **une réponse de succès ne part qu'après
+l'attribution définitive de la référence**. Une référence encore `reserved`
+signifie donc que la transaction n'a jamais atteint son point irréversible — le
+marqueur `committed` ne suffit pas à la rendre acceptée. La conserver
+maintiendrait des documents et des données personnelles sans aucune finalité.
+
+**Décision.** Trois issues, et trois seulement.
+
+| Situation | Issue |
+|---|---|
+| Référence `reserved`, ancienneté dépassée, réservation rattachée | **annulation complète** |
+| Référence `attributed` et tout concorde | **normalisation idempotente** du statut |
+| Référence `attributed` mais quelque chose ne concorde pas | **conservation prudente**, aucun téléchargement, signalement |
+
+Le point G rejoint donc A à F : aucun post, aucun fichier, aucun staging,
+aucune réservation, aucune donnée personnelle résiduelle.
+
+**Une référence `attributed` n'est jamais annulée.** La cohérence se juge sur
+cinq critères : transaction `committed`, référence identique, `files_status` à
+`stored` ou `none`, métadonnées obligatoires présentes, réservation rattachée au
+bon contenu.
+
+**Le rollback est fermé par défaut.** Si un seul fichier résiste, rien d'autre
+n'est supprimé : la demande passe en `recovery_failed`, ses métadonnées et sa
+réservation `reserved` sont conservées, et la tentative suivante reprendra. Un
+nettoyage partiel n'est **jamais** compté comme un succès.
+
+---
+
+## D-031 — Un lien signé ne suffit pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-025]
+
+**Contexte.** Une signature valable donnait accès au document, sans considérer
+l'état de la demande. Un téléchargement pouvait donc survenir pendant une
+suppression, ou après un nettoyage partiel.
+
+**Décision.** Neuf conditions **cumulatives** avant toute ouverture de fichier :
+bon type de contenu, statut métier dans une liste **fermée**
+(`received`, `converted`, `closed`), transaction `committed`, référence de la
+transaction identique, `files_status` exactement `stored`, réservation
+existante, `attributed`, rattachée au même contenu, et au moins un document
+déclaré.
+
+Toute condition manquante produit **la même réponse** qu'un document absent ou
+qu'une signature fausse.
+
+**Le verrou est posé avant le premier `unlink`.** `_urbizen_status` passe à
+`deleting` : à partir de cet instant, aucun lien ne fonctionne plus, y compris
+pour les documents pas encore touchés. En cas d'échec partiel, l'état devient
+`delete_failed` et le reste inaccessible ; le statut métier d'origine est
+mémorisé à part, pour qu'une seconde tentative ne prenne pas `delete_failed`
+pour l'état à restaurer.
+
+---
+
+## D-032 — `max_file_uploads` : prérequis avant publication
+
+**Date** : 21 juillet 2026 · **État** : consignée
+
+**Constat de production** : `max_file_uploads = 20`, exactement le plafond de la
+politique applicative. PHP écarte **silencieusement** les fichiers au-delà : un
+envoi de 21 documents en verrait 20 arriver, sans que rien ne signale la perte.
+
+Ce point **ne bloque pas** la fusion du backend, le formulaire n'étant pas
+public. Il devient **bloquant avant publication**. Deux voies :
+
+1. porter `max_file_uploads` à **21 au minimum**, idéalement 25 ;
+2. ou, en PR C, faire déclarer au client le nombre de documents par bloc et au
+   total, puis vérifier que le nombre reçu correspond **exactement**.
+
+Le manifeste ne permettrait jamais de dépasser les limites serveur : il sert
+uniquement à détecter une perte silencieuse.
+
+Aucune configuration Hostinger n'a été modifiée.
+
+---
+
+## D-033 — La Corbeille invalide les liens, sur deux verrous
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-031]
+
+**Contexte.** L'audit a confirmé une faille : **aucun** hook de Corbeille
+n'était enregistré — ni `pre_trash_post`, ni `pre_untrash_post`, ni
+`untrashed_post`, ni `transition_post_status`. Le contrôleur de téléchargement
+ne vérifiait que `post_type`, jamais `post_status`.
+
+`wp_trash_post()` change le `post_status` sans toucher à l'état applicatif.
+Une demande mise à la Corbeille — geste banal, souvent le premier réflexe pour
+retirer un dossier — **restait donc téléchargeable** par ses liens signés,
+alors que l'intention était précisément de la retirer.
+
+**Décision.** Deux verrous complémentaires, chacun suffisant seul.
+
+**Verrou applicatif.** `pre_trash_post`, avec ses **trois** arguments, passe
+`_urbizen_status` à `trashed` **avant** que la Corbeille ne soit effective. Le
+statut précédent est mémorisé **une seule fois** dans
+`_urbizen_pre_trash_status`, et seulement s'il appartient à la liste fermée
+`received` · `converted` · `closed`. Un état transitoire ou fautif ne se met
+pas à la Corbeille : on ne saurait pas quoi restaurer ensuite.
+
+Si l'invalidation ne peut être écrite et **vérifiée**, la mise à la Corbeille
+est refusée. Mieux vaut une demande qui reste en place qu'un document
+accessible alors qu'on croyait l'avoir retiré.
+
+**Verrou natif.** Le téléchargement exige en outre un `post_status` figurant
+dans une liste fermée : **`private` uniquement**, seule valeur que le
+repository écrit. Sont refusés `trash`, `draft`, `pending`, `future`,
+`auto-draft`, `inherit`, un statut absent, et tout statut inconnu. Ce verrou
+tient même si un autre greffon ou un appel direct modifie le statut sans passer
+par nos hooks.
+
+**Conséquences.**
+- La mise à la Corbeille ne supprime **aucun fichier** : elle rend seulement
+  les documents inaccessibles. L'effacement physique reste l'affaire de la
+  suppression définitive, qui passe par `FileCleaner`.
+- La restauration exige **onze conditions**, dont la référence `attributed`
+  rattachée au bon contenu. Elle rétablit le statut mémorisé **exactement** :
+  une demande `converted` ne revient pas en `received`.
+- Si le rétablissement échoue, la demande passe en `incoherent` plutôt que de
+  retrouver un statut téléchargeable par défaut.
+- `trashed` rejoint les états purgeables : une demande à la Corbeille conserve
+  ses données personnelles, et l'en exclure la rendrait immortelle.
+- Le vidage automatique emprunte `wp_delete_post()`, donc `pre_delete_post` :
+  aucun second mécanisme de suppression physique n'est introduit.
+
+---
+
+## D-034 — Une mise à la Corbeille se rejoue
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-033]
+
+**Contexte.** L'invalidation applicative précède le changement de
+`post_status` : entre les deux, un autre greffon peut court-circuiter
+`wp_trash_post()`, ou l'écriture native échouer.
+
+L'audit du comportement antérieur montre que l'état n'était **pas bloqué** —
+le téléchargement restait refusé et une nouvelle tentative aboutissait. Mais
+rien ne permettait de **distinguer** une demande simplement *préparée* d'une
+demande réellement *mise à la Corbeille* : aucune trace, aucun hook postérieur.
+La rétention, la suppression définitive et la restauration raisonnaient donc
+sur une apparence.
+
+**Décision.** Un état durable de transition, `_urbizen_trash_transition`, à
+deux valeurs : `prepared` et `completed`. Contenu minimal — un état, le statut
+applicatif précédent, une date technique. Aucune donnée personnelle.
+
+`pre_trash_post` mémorise **une seule fois**, écrit la transition `prepared`,
+invalide, puis **relit chaque écriture**. `trashed_post` — seul hook exécuté
+*après* le changement de `post_status` — confirme en `completed`. Il ne touche
+ni aux fichiers, ni à la référence, et ne réactive aucun téléchargement.
+
+**Conséquences.**
+- Une nouvelle tentative est **idempotente** : elle réutilise le statut
+  mémorisé, ne crée pas de seconde transition, n'écrase rien, et laisse
+  WordPress retenter le passage natif.
+- Tant que la transition est `prepared`, l'intention de suppression reste
+  **fermée par défaut** : aucun téléchargement, aucune restauration
+  automatique, aucune normalisation vers un état téléchargeable, aucun fichier
+  supprimé, aucune référence libérée.
+- La rétention **ne purge pas** un état `prepared` resté en `private` :
+  l'ambiguïté ne se tranche pas toute seule. La suppression définitive y est
+  également bloquée — jamais de post supprimé laissant des fichiers.
+- Une restauration exige la transition **`completed`** : une simple préparation
+  ne vaut pas mise à la Corbeille.
+- `TrashGuard::reconcile()` répare sans rien détruire : elle confirme une
+  transition dont le `post_status` est bien passé à `trash`, et marque
+  `incoherent` une demande invalidée sans transition. Une transition seulement
+  préparée est laissée telle quelle, rejouable.
+- La restauration réussie supprime les deux métadonnées temporaires.
+
+---
+
+## D-035 — Deux statuts, deux restaurations
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-034]
+
+**Contexte.** Une demande Urbizen porte deux statuts qu'il ne faut jamais
+confondre :
+
+- le **statut natif** WordPress, `private` — il décide de la visibilité du
+  contenu, et il conditionne la remise des documents ;
+- le **statut métier**, `received` / `converted` / `closed` — il décrit
+  l'avancement du dossier.
+
+Depuis WordPress 5.6, `wp_untrash_post()` ne rend plus son statut d'origine à
+un contenu non joint : il le place en **`draft`**. Le comportement est
+volontaire côté cœur — restaurer un article en `publish` le republierait sans
+que personne l'ait décidé. Pour une demande, la conséquence était l'inverse
+d'une protection : le dossier repassait en `draft`, la condition `private`
+n'était plus remplie, et **tous ses documents devenaient inaccessibles pour
+toujours** — sans erreur, sans trace, sans que la restauration paraisse avoir
+échoué.
+
+**Décision.** Rétablir explicitement `private`, et ne jamais s'y fier seul.
+
+`wp_untrash_post_status` est filtré en **priorité 20**, avec ses trois
+arguments. Il ne rend `private` que si quatre conditions sont réunies : le
+contenu est une demande Urbizen, il est encore à la Corbeille, son statut natif
+précédent était `private`, et aucun contrôle de cohérence ne s'y oppose. Dans
+tous les autres cas, la valeur proposée par WordPress est rendue telle quelle —
+un autre type de contenu n'est jamais touché.
+
+La priorité 20 place notre règle après le défaut du cœur et après la plupart
+des greffons. Elle n'est **pas** une garantie, et n'a pas à en être une : une
+priorité extrême resterait contournable. La véritable barrière est ailleurs.
+
+`untrashed_post` relit le `post_status` **réellement écrit**. S'il ne vaut pas
+`private`, la restauration applicative n'a pas lieu. La sécurité ne dépend donc
+d'aucun ordre d'exécution.
+
+**Conséquences.**
+- Une demande restaurée retrouve `private`, puis son statut métier **exact** —
+  jamais une valeur par défaut, jamais `received` pour un dossier `closed`.
+- Le téléchargement ne redevient possible qu'après la réussite **complète** des
+  deux restaurations. Entre les deux, il reste refusé.
+- Un greffon tiers proposant `draft` ou `publish` avant nous n'a aucun effet.
+  Le même greffon exécuté **après** nous obtient bien son statut — et la
+  demande est alors marquée `incoherent`, accès fermé : nous ne réécrivons pas
+  par-dessus lui, nous refusons de rouvrir les documents.
+- Toute défaillance — écriture native en échec, statut final inattendu,
+  incohérence, statut métier non rétabli — marque la demande `incoherent`,
+  **conserve** l'intégralité des métadonnées de diagnostic, et laisse l'état
+  retentable. Les métadonnées temporaires ne sont supprimées qu'après la
+  réussite complète.
+- `wp_untrash_post_set_previous_status()` n'est **pas** employé : il
+  rétablirait l'ancien statut pour *tous* les contenus du site, bien au-delà de
+  notre domaine.
+- La doublure de test applique le défaut `draft` du cœur et respecte les
+  priorités des filtres. Tant qu'elle restaurait implicitement l'ancien statut,
+  elle rendait le défaut invisible — et neuf mutations muettes.
+
+---
+
+## D-036 — Une restauration interrompue se répare, elle ne se contourne pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-035]
+
+**Contexte.** Le cœur de WordPress efface `_wp_trash_meta_status` et
+`_wp_trash_meta_time` **avant** d'écrire le statut de sortie de Corbeille. Si
+cette écriture échoue, `wp_untrash_post()` rend `false`, le contenu reste à la
+Corbeille — et plus rien n'indique d'où il venait. Une seconde tentative reçoit
+un statut natif précédent **vide** et se voit refusée. La demande est bloquée
+pour toujours.
+
+Le compte rendu de la revue précédente affirmait le contraire — qu'une seconde
+tentative aboutissait. C'était vrai de la doublure, qui conservait
+artificiellement les métadonnées natives. Ce n'était pas vrai de WordPress.
+
+**Décision.** Une réparation explicite, `TrashGuard::repair_native()`, plutôt
+qu'une restauration interne qui simulerait le cycle du cœur.
+
+Elle ne rétablit que les deux métadonnées natives, et seulement lorsque toute
+la cohérence Urbizen est démontrée : contenu encore à la Corbeille, statut
+applicatif `trashed`, transition `completed`, statut métier mémorisé
+restaurable, transaction `committed`, référence `attributed` et rattachée au
+même contenu, `files_status` final, métadonnées obligatoires complètes, et
+métadonnée native effectivement absente.
+
+**Conséquences.**
+- La réparation ne change pas le `post_status`, ne restaure aucun statut
+  métier, ne supprime aucune métadonnée Urbizen, ne réactive aucun lien, ne
+  touche ni aux fichiers ni à la référence. Elle rend le cycle natif rejouable,
+  rien de plus. Les téléchargements restent fermés jusqu'à la restauration
+  complète.
+- `_wp_trash_meta_time` reprend l'horodatage de la transition, pas l'heure
+  courante : une réparation ne doit ni prolonger ni raccourcir le délai avant
+  purge automatique.
+- Idempotente. Une valeur native déjà correcte est un succès ; une valeur
+  native **inattendue** n'est pas écrasée en silence.
+- Protégée par un verrou `add_option()` par demande, en `autoload = false` et
+  avec expiration. Deux tentatives simultanées ne peuvent pas écrire deux
+  valeurs différentes ; un verrou périmé est repris.
+- Une restauration interne atomique a été écartée : elle aurait dû reproduire
+  toutes les garanties du cycle natif, et aurait supposé d'appeler
+  `untrashed_post` à la main pour simuler une opération du cœur.
+
+---
+
+## D-037 — Le retour d'une écriture ne prouve pas l'écriture
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-036]
+
+**Contexte.** `update_post_meta()` rend `false` dans deux situations que rien
+ne distingue au retour :
+
+- l'écriture a réellement échoué ;
+- la valeur demandée était **déjà** enregistrée, et aucune modification n'était
+  nécessaire.
+
+Le dépôt lisait ce retour comme un booléen de réussite. `finalize()` réécrivait
+`_urbizen_files_status` avec la valeur que `persist()` venait de poser : sur un
+vrai WordPress, la première vérification échouait systématiquement. Toute
+soumission rendait un succès, mais la transaction restait `processing`, la
+référence restait `reserved`, `_urbizen_status` n'atteignait jamais `received`
+— et la récupération transactionnelle supprimait le dossier une heure plus
+tard.
+
+Le défaut était invisible : la doublure rendait un identifiant en toutes
+circonstances. Il a été trouvé par l'audit de parité contre le cœur 7.0.2, et
+n'a jamais atteint la production — `finalize()` est né avec la PR #19.
+
+**Décision.** `SubmissionRepository::persist_meta()` : écrire, relire, et ne
+conclure que sur la relecture.
+
+- Un `false` suivi d'une relecture conforme est un **succès**.
+- Un `true`, ou un identifiant, suivi d'une relecture divergente est un
+  **échec**.
+
+**Conséquences.**
+- Quatre emplacements corrigés : la boucle de `persist()`, `set_files()`, et
+  les trois écritures de `finalize()`. Aucun autre appel du dépôt ne lit ce
+  retour.
+- La comparaison suit le type **écrit**, jamais le type relu : tableaux et
+  objets comparés après restitution, booléens selon la représentation WordPress
+  (`'1'` et chaîne vide), entiers et flottants en chaîne, chaînes — dont le
+  JSON des transactions et des documents — **strictement**, caractère pour
+  caractère. Deux JSON sémantiquement égaux mais textuellement différents ne
+  sont pas équivalents.
+- `update_option()` porte la même ambiguïté. Aucun appel de production n'en
+  dépend aujourd'hui ; la doublure en est néanmoins rendue fidèle, pour qu'un
+  futur usage fautif tombe dans les bancs plutôt qu'en production.
+- Les doublures sont une commodité, pas une preuve. Un banc d'intégration
+  s'exécute désormais contre un vrai WordPress 7.0.2 jetable.

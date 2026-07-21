@@ -9,7 +9,14 @@
  */
 
 require_once __DIR__ . '/logger-double.php';
-require_once __DIR__ . '/wp-double.php';
+// La doublure peut être remplacée par une copie mutée, pour éprouver la
+// fidélité de l'instrument lui-même. Réservé aux bancs : la variable n'existe
+// jamais en dehors d'un sous-processus lancé par `test-mutation.php`.
+$urbizen_doublure = (string) getenv( 'URBIZEN_WP_DOUBLE' );
+
+require_once '' !== $urbizen_doublure && is_readable( $urbizen_doublure )
+	? $urbizen_doublure
+	: __DIR__ . '/wp-double.php';
 
 define( 'URBIZEN_PLATFORM_DIR', dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/' );
 
@@ -27,14 +34,74 @@ foreach (
 		'src/Security/RateLimiter.php',
 		'src/Submissions/SubmissionPostType.php',
 		'src/Submissions/SubmissionRepository.php',
+		'src/Submissions/TransactionRecovery.php',
+		'src/Submissions/TrashGuard.php',
 		'src/Privacy/Retention.php',
 		'src/Admin/SubmissionsAdmin.php',
 		'src/Http/SubmissionResult.php',
+		'src/Support/PhpLimits.php',
+		'src/Files/UploadedFileMover.php',
+		'src/Files/HttpUploadedFileMover.php',
+		'src/Files/UploadPolicy.php',
+		'src/Files/UploadNormalizer.php',
+		'src/Files/Storage.php',
+		'src/Files/SignedLink.php',
+		'src/Files/FileCleaner.php',
 		'src/Http/SubmissionController.php',
+		'src/Http/FileDownloadController.php',
 	) as $fichier
 ) {
 	require_once URBIZEN_PLATFORM_DIR . $fichier;
 }
+
+/**
+ * Racine privée d'essai, hors de l'« ABSPATH » de la doublure.
+ *
+ * La doublure fixe ABSPATH au répertoire des bancs ; un répertoire du dossier
+ * temporaire du système est donc bien à l'extérieur, comme en production.
+ */
+define( 'URBIZEN_TESTING', true );
+define( 'URBIZEN_TEST_STORAGE', sys_get_temp_dir() . '/urbizen-b2-' . getmypid() );
+
+add_filter( 'urbizen_private_storage_dir', static fn() => URBIZEN_TEST_STORAGE );
+
+/**
+ * Efface tout ce qu'un banc a pu écrire sur le disque.
+ *
+ * Outre la racine d'essai, on balaie les emplacements qu'un scénario de refus
+ * ou une classe mutée pourrait créer : un banc ne doit jamais laisser de
+ * fichier dans le dépôt, fût-ce en démontrant qu'un chemin est interdit.
+ */
+function urbizen_test_menage(): void {
+	$cibles = array(
+		URBIZEN_TEST_STORAGE,
+		dirname( rtrim( ABSPATH, '/' ) ) . '/private',
+		rtrim( ABSPATH, '/' ) . '/mutant-public',
+		rtrim( ABSPATH, '/' ) . '/faux-prive',
+		rtrim( ABSPATH, '/' ) . '/interdit',
+	);
+
+	foreach ( $cibles as $racine ) {
+		if ( ! is_dir( $racine ) ) {
+			continue;
+		}
+
+		$it = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $racine, FilesystemIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::CHILD_FIRST
+		);
+
+		foreach ( $it as $f ) {
+			$f->isDir() ? @rmdir( $f->getPathname() ) : @unlink( $f->getPathname() );
+		}
+
+		@rmdir( $racine );
+	}
+}
+
+register_shutdown_function( 'urbizen_test_menage' );
+
+require_once __DIR__ . '/fixtures.php';
 
 $GLOBALS['fail'] = 0;
 

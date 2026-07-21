@@ -33,8 +33,26 @@ final class SubmissionResult {
 	public const DUPLICATE_SUBMISSION    = 'duplicate_submission';
 	public const RATE_LIMITED            = 'rate_limited';
 
-	// --- Refus en cours de traitement ---
-	public const FILES_NOT_SUPPORTED_YET = 'files_not_supported_yet';
+	// --- Documents ---
+	// Le code `files_not_supported_yet` de la PR B1 disparaît ici : les
+	// documents sont désormais réellement traités.
+	public const UPLOAD_TOO_LARGE           = 'upload_too_large';
+	public const UPLOAD_PARTIAL             = 'upload_partial';
+	public const UPLOAD_MISSING_TMP         = 'upload_missing_tmp';
+	public const UPLOAD_WRITE_FAILED        = 'upload_write_failed';
+	public const UPLOAD_BLOCKED             = 'upload_blocked';
+	public const UPLOAD_INVALID_STRUCTURE   = 'upload_invalid_structure';
+	public const UPLOAD_EMPTY_FILE          = 'upload_empty_file';
+	public const UPLOAD_INVALID_EXTENSION   = 'upload_invalid_extension';
+	public const UPLOAD_INVALID_MIME        = 'upload_invalid_mime';
+	public const UPLOAD_COUNT_EXCEEDED      = 'upload_count_exceeded';
+	public const UPLOAD_TOTAL_SIZE_EXCEEDED = 'upload_total_size_exceeded';
+	public const STORAGE_UNAVAILABLE        = 'storage_unavailable';
+	public const STORAGE_FAILED             = 'storage_failed';
+	public const FILE_METADATA_FAILED       = 'file_metadata_failed';
+	public const FILE_INTEGRITY_FAILED      = 'file_integrity_failed';
+	public const REQUEST_TOO_LARGE          = 'request_too_large';
+	public const SERVER_UPLOAD_LIMIT        = 'server_upload_limit_exceeded';
 	public const INVALID_FORM            = 'invalid_form';
 	public const VALIDATION_FAILED       = 'validation_failed';
 	public const PRICING_FAILED          = 'pricing_failed';
@@ -57,7 +75,23 @@ final class SubmissionResult {
 		self::TOKEN_EXPIRED,
 		self::DUPLICATE_SUBMISSION,
 		self::RATE_LIMITED,
-		self::FILES_NOT_SUPPORTED_YET,
+		self::UPLOAD_TOO_LARGE,
+		self::UPLOAD_PARTIAL,
+		self::UPLOAD_MISSING_TMP,
+		self::UPLOAD_WRITE_FAILED,
+		self::UPLOAD_BLOCKED,
+		self::UPLOAD_INVALID_STRUCTURE,
+		self::UPLOAD_EMPTY_FILE,
+		self::UPLOAD_INVALID_EXTENSION,
+		self::UPLOAD_INVALID_MIME,
+		self::UPLOAD_COUNT_EXCEEDED,
+		self::UPLOAD_TOTAL_SIZE_EXCEEDED,
+		self::STORAGE_UNAVAILABLE,
+		self::STORAGE_FAILED,
+		self::FILE_METADATA_FAILED,
+		self::FILE_INTEGRITY_FAILED,
+		self::REQUEST_TOO_LARGE,
+		self::SERVER_UPLOAD_LIMIT,
 		self::INVALID_FORM,
 		self::VALIDATION_FAILED,
 		self::PRICING_FAILED,

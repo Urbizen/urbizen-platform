@@ -122,16 +122,46 @@ if ( array() !== $fautifs ) {
 	echo '    fichier : ' . implode( ' | ', $fautifs ) . "\n";
 }
 
-// ------------------------------------------------ aucun fichier traité ------
-$fichiers = array();
+// -------------------------------------- les documents ne passent pas par WP -
+// B2 traite les documents, mais **jamais** par la médiathèque : un fichier
+// confié à `wp_handle_upload()` atterrirait dans `wp-content/uploads`, donc
+// derrière une URL publique — exactement ce qu'on refuse.
+$mediatheque = array();
 
 foreach ( $sources as $chemin => $contenu ) {
-	if ( preg_match( '/wp_handle_upload|move_uploaded_file|wp_upload_dir|media_handle_upload/', $contenu ) ) {
-		$fichiers[] = $chemin;
+	if ( preg_match( '/wp_handle_upload|wp_upload_dir|media_handle_upload|wp_insert_attachment/', $contenu ) ) {
+		$mediatheque[] = $chemin;
 	}
 }
 
-check( 'aucun traitement de fichier téléversé', array() === $fichiers );
+check( 'aucun document ne passe par la médiathèque WordPress', array() === $mediatheque );
+// `move_uploaded_file()` n'est appelé qu'à un seul endroit : l'adaptateur de
+// production. Storage délègue, et ne connaît plus aucun repli.
+// `move_uploaded_file()` n'est **appelé** qu'à un seul endroit. Le contrat
+// l'évoque en commentaire, ce qui est légitime : on compare donc le code, pas
+// la documentation.
+$appelants = array();
+
+foreach ( $sources as $chemin => $contenu ) {
+	$code = implode(
+		'',
+		array_map(
+			static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+			token_get_all( $contenu )
+		)
+	);
+
+	if ( str_contains( $code, 'move_uploaded_file(' ) ) {
+		$appelants[] = $chemin;
+	}
+}
+
+check( 'move_uploaded_file n’est appelé que dans l’adaptateur de production',
+	array( 'src/Files/HttpUploadedFileMover.php' ) === $appelants );
+check( 'Storage ne déplace plus rien lui-même',
+	! preg_match( '/@rename\( \$source/', $sources['src/Files/Storage.php'] ) );
+check( 'la provenance HTTP est exigée dans l’adaptateur',
+	str_contains( $sources['src/Files/HttpUploadedFileMover.php'], 'is_uploaded_file(' ) );
 
 // ------------------------------------------------ aucune table SQL ----------
 $sql = array();
@@ -166,7 +196,7 @@ preg_match( '/^ \* Version:\s*(.+)$/m', $principal, $mh );
 
 $version = $m[1] ?? '';
 
-check( 'la version du plugin est 0.6.0', '0.6.0' === $version );
+check( 'la version du plugin est 0.7.0', '0.7.0' === $version );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
@@ -204,8 +234,10 @@ $admin_code = implode(
 
 preg_match_all( "/'(_urbizen_[a-z_]+)'/", $admin_code, $lues );
 
-check( 'la liste ne lit que trois métadonnées, toutes non personnelles',
-	array( '_urbizen_form_type', '_urbizen_status', '_urbizen_created_at_gmt' ) === array_values( array_unique( $lues[1] ) ) );
+check( 'la liste ne lit que des métadonnées non personnelles',
+	array( '_urbizen_form_type', '_urbizen_status', '_urbizen_files_count', '_urbizen_files_total_size', '_urbizen_files_status', '_urbizen_created_at_gmt' )
+		=== array_values( array_unique( $lues[1] ) ) );
+check( 'la liste ne lit jamais les documents eux-mêmes', ! preg_match( "/'_urbizen_files'/", $admin_code ) );
 check( 'la liste ne lit jamais le payload', ! str_contains( $admin_code, '_urbizen_payload' ) );
 check( 'la liste vérifie la capacité avant d’afficher', str_contains( $admin_code, 'current_user_can(' ) );
 check( 'la liste échappe tout ce qu’elle affiche',

@@ -108,24 +108,29 @@ check( 'cinq soumissions consécutives réussissent', 5 === $reussies );
 check( 'la sixième est limitée', ! $sixieme->is_success() && SubmissionResult::RATE_LIMITED === $sixieme->code() );
 check( 'cinq demandes en base, pas six', 5 === count( $GLOBALS['wpd_posts'] ) );
 
-// ================================================ FICHIERS REFUSÉS ==========
+// ============================================= DOCUMENTS ACCEPTÉS ==========
+// B2 remplace le refus provisoire de B1 par le traitement réel. Les cas
+// détaillés vivent dans test-documents.php ; on vérifie ici que le contrôleur
+// délègue correctement et respecte les invariants de B1.
 neuf();
+
+$pdf = fx_copie( fx_pdf() );
 
 $avec_fichier = array(
 	'croquis_plans' => array(
 		'name'     => array( 'plan.pdf' ),
 		'type'     => array( 'application/pdf' ),
-		'tmp_name' => array( '/tmp/phpfictif' ),
+		'tmp_name' => array( $pdf ),
 		'error'    => array( UPLOAD_ERR_OK ),
-		'size'     => array( 1024 ),
+		'size'     => array( filesize( $pdf ) ),
 	),
 );
 
 $r = traiter( soumission(), $avec_fichier );
 
-check( 'un fichier joint est explicitement refusé', SubmissionResult::FILES_NOT_SUPPORTED_YET === $r->code() );
-check( 'la demande n’est pas considérée comme réussie', ! $r->is_success() );
-check( 'aucune demande n’est enregistrée', array() === $GLOBALS['wpd_posts'] );
+check( 'une soumission avec un document valide réussit', $r->is_success() );
+check( 'files_status vaut stored', 'stored' === get_post_meta( $r->id(), '_urbizen_files_status', true ) );
+check( 'un document est compté', 1 === (int) get_post_meta( $r->id(), '_urbizen_files_count', true ) );
 check( 'le nom du fichier n’apparaît pas dans le journal', ! str_contains( journal(), 'plan.pdf' ) );
 
 $vide = array(
@@ -142,8 +147,27 @@ neuf();
 $r = traiter( soumission(), $vide );
 
 check( 'un champ de dépôt laissé vide ne bloque pas', $r->is_success() );
-check( 'has_files() distingue un dépôt vide d’un vrai fichier',
-	! SubmissionController::has_files( $vide ) && SubmissionController::has_files( $avec_fichier ) );
+check( 'sans document, files_status vaut none', 'none' === get_post_meta( $r->id(), '_urbizen_files_status', true ) );
+
+// Un document refusé ne doit consommer ni jeton, ni créneau, ni référence.
+neuf();
+$svg = fx_copie( fx_svg() );
+$r   = traiter(
+	soumission(),
+	array(
+		'croquis_plans' => array(
+			'name'     => array( 'dessin.svg' ),
+			'type'     => array( 'image/svg+xml' ),
+			'tmp_name' => array( $svg ),
+			'error'    => array( UPLOAD_ERR_OK ),
+			'size'     => array( filesize( $svg ) ),
+		),
+	)
+);
+
+check( 'un SVG est refusé', ! $r->is_success() && 'upload_invalid_extension' === $r->code() );
+check( 'aucune demande n’est enregistrée', array() === $GLOBALS['wpd_posts'] );
+check( 'aucune référence n’est consommée', false === get_option( \Urbizen\Platform\Submissions\SubmissionRepository::SEQUENCE_OPTION, false ) );
 
 // ================================================== VALIDATION ==============
 neuf();
@@ -341,7 +365,12 @@ check( 'le refus ne nomme pas le champ fautif', ! str_contains( $log, 'chateau_f
 check( 'le refus ne contient aucune donnée personnelle', ! str_contains( $log, 'Camille' ) );
 
 // ================================================== RÉSULTAT STRUCTURÉ ======
-check( 'les quatorze codes internes sont déclarés', 14 === count( SubmissionResult::CODES ) );
+// Treize codes de B1 (files_not_supported_yet a disparu) plus quatorze codes
+// de documents introduits par B2.
+// Vingt-sept codes de B2, plus trois ajoutés par le correctif : intégrité au
+// téléchargement et deux refus liés aux limites du serveur.
+check( 'les trente codes internes sont déclarés', 30 === count( SubmissionResult::CODES ) );
+check( 'le code provisoire de B1 a disparu', ! in_array( 'files_not_supported_yet', SubmissionResult::CODES, true ) );
 check( 'aucun code en double', count( SubmissionResult::CODES ) === count( array_unique( SubmissionResult::CODES ) ) );
 check( 'un échec ne porte ni référence ni identifiant', '' === $echec->reference() && 0 === $echec->id() );
 check( 'le résultat est immuable : with_redirect renvoie une copie',

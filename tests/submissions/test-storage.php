@@ -54,8 +54,10 @@ check( 'lecture et modification réservées à manage_options',
 	&& 'manage_options' === ( $caps['delete_post'] ?? '' ) );
 check( 'personne ne crée une demande à la main', 'do_not_allow' === ( $caps['create_posts'] ?? '' ) );
 check( 'personne ne publie une demande', 'do_not_allow' === ( $caps['publish_posts'] ?? '' ) );
-check( 'les trois états métier sont déclarés',
-	array( 'received', 'converted', 'closed' ) === SubmissionPostType::statuses() );
+// « processing » s'ajoute : c'est l'état durable d'une transaction en cours,
+// que la récupération reconnaît après une interruption brutale.
+check( 'les quatre états métier sont déclarés',
+	array( 'processing', 'received', 'converted', 'closed' ) === SubmissionPostType::statuses() );
 
 // ==================================================== REPOSITORY ============
 wpd_reset();
@@ -110,7 +112,7 @@ check( 'aucune donnée personnelle dans le slug',
 // --- métadonnées ---
 $metas = array_keys( $GLOBALS['wpd_meta'][ $id ] );
 
-check( 'les douze métadonnées obligatoires sont présentes',
+check( 'les métadonnées obligatoires sont présentes',
 	array() === array_diff( SubmissionRepository::REQUIRED_META, $metas ) );
 check( 'aucune métadonnée inattendue', array() === array_diff( $metas, SubmissionRepository::REQUIRED_META ) );
 
@@ -120,7 +122,10 @@ check( 'form_type = conception', 'conception' === $lu['form_type'] );
 check( 'schema_version = 1.0', '1.0' === $lu['schema_version'] );
 check( 'status initial = received', 'received' === $lu['status'] );
 check( 'mail_status = not_started', 'not_started' === $lu['mail_status'] );
-check( 'files_status = not_started', 'not_started' === $lu['files_status'] );
+// B2 §12 : les états des documents sont none / pending / stored / failed /
+// deleted. Sans document, c'est « none » — l'ancien « not_started » de B1 n'a
+// plus cours.
+check( 'files_status = none sans document', 'none' === $lu['files_status'] );
 check( 'created_at et last_contact sont horodatés en UTC',
 	1 === preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $lu['created_at_gmt'] )
 	&& $lu['created_at_gmt'] === $lu['last_contact_at'] );

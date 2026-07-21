@@ -43,7 +43,11 @@ SubmissionPostType::register_post_type();
 check( 'durée par défaut : 365 jours', 365 === Retention::days() );
 check( 'la tâche porte le nom déjà déprogrammé par le Deactivator', 'urbizen_purge_expired' === Retention::HOOK );
 check( 'le hook de pré-suppression est déclaré', 'urbizen_before_submission_delete' === Retention::BEFORE_DELETE );
-check( 'seuls received et closed sont purgeables', array( 'received', 'closed' ) === Retention::purgeable_statuses() );
+// `delete_failed` s'ajoute : une suppression qui a échoué doit être retentée.
+// `trashed` aussi : une demande à la Corbeille conserve ses données
+// personnelles, et l'en exclure la rendrait immortelle.
+check( 'received, closed, delete_failed et trashed sont purgeables',
+	array( 'received', 'closed', 'delete_failed', 'trashed' ) === Retention::purgeable_statuses() );
 check( 'converted n’est jamais purgeable', ! in_array( 'converted', Retention::purgeable_statuses(), true ) );
 
 // ------------------------------------------------------------ purge ---------
