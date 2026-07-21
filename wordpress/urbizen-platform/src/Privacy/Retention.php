@@ -26,6 +26,7 @@ use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Submissions\TransactionRecovery;
+use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -284,7 +285,14 @@ final class Retention {
 		// `delete_failed` en fait partie : une suppression qui a échoué hier
 		// doit être retentée demain. Sans cela, une demande resterait figée
 		// hors de portée de la rétention, avec ses données personnelles.
-		return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed' );
+		// `trashed` en fait partie : une demande à la Corbeille conserve ses
+		// données personnelles. L'en exclure la rendrait immortelle.
+		return array(
+			SubmissionPostType::STATUS_RECEIVED,
+			SubmissionPostType::STATUS_CLOSED,
+			'delete_failed',
+			TrashGuard::STATUS_TRASHED,
+		);
 	}
 
 	/**

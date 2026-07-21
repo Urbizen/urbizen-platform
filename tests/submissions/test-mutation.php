@@ -358,8 +358,10 @@ $p = mutant(
 	'src/Privacy/Retention.php',
 	'Retention',
 	array(
-		"return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed' );" =>
-		"return array( SubmissionPostType::STATUS_RECEIVED, SubmissionPostType::STATUS_CLOSED, 'delete_failed', SubmissionPostType::STATUS_CONVERTED );",
+		"			TrashGuard::STATUS_TRASHED,
+		);" => "			TrashGuard::STATUS_TRASHED,
+			SubmissionPostType::STATUS_CONVERTED,
+		);",
 	)
 );
 
@@ -2305,6 +2307,303 @@ TR::run( wpd_now() );
 check( '81 · le dépôt la conserve et la normalise', null !== get_post( $r->id() ) );
 check( '81 · son statut redevient received', SubmissionPostType::STATUS_RECEIVED === get_post_meta( $r->id(), '_urbizen_status', true ) );
 check( '81 · la référence reste attribuée', 'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $r->reference() )['state'] ?? '' ) );
+
+
+// ======================================================================
+// MUTATIONS DU QUATRIÈME CORRECTIF : CYCLE DE CORBEILLE
+// ======================================================================
+
+use Urbizen\Platform\Submissions\TrashGuard as TG;
+
+/** Demande valide avec gardes de Corbeille enregistrés. */
+function demande_corbeille( string $statut = 'received' ): array {
+	neuf_fichiers();
+	FileCleaner::reset();
+	FileCleaner::register();
+	TG::register();
+
+	$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+
+	if ( 'received' !== $statut ) {
+		update_post_meta( $r->id(), '_urbizen_status', $statut );
+	}
+
+	$lu = SubmissionRepository::get( $r->id() );
+	parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $p );
+
+	return array( 'id' => $r->id(), 'ref' => $r->reference(), 'params' => $p,
+		'dossier' => URBIZEN_TEST_STORAGE . '/conception/' . $r->reference() . '/photos' );
+}
+
+// ====== 82 · le contrôleur ne vérifie plus post_status ====================
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array(
+		'		if ( ! in_array( (string) $post->post_status, SubmissionPostType::downloadable_post_statuses(), true ) ) {
+			return false;
+		}' => '		// contrôle du statut natif retiré.',
+	)
+);
+
+$d = demande_corbeille();
+get_post( $d['id'] )->post_status = 'trash';
+
+check( '82 · contrôle retiré → UN POST À LA CORBEILLE RESTE TÉLÉCHARGEABLE', null !== $dl::locate( $d['params'], wpd_now() ) );
+check( '82 · le dépôt le refuse', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 83 · trash devient un statut WordPress autorisé ===================
+$pt = mutant(
+	'src/Submissions/SubmissionPostType.php',
+	'SubmissionPostType',
+	array( '		return array( self::POST_STATUS );' => "		return array( self::POST_STATUS, 'trash' );" )
+);
+
+check( '83 · muté → trash figure parmi les statuts autorisés', in_array( 'trash', $pt::downloadable_post_statuses(), true ) );
+check( '83 · le dépôt n’autorise que private',
+	array( 'private' ) === SubmissionPostType::downloadable_post_statuses() );
+
+// ====== 84 · pre_trash_post n'est plus enregistré =========================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		add_filter( 'pre_trash_post', array( self::class, 'guard_trash' ), 10, 3 );" => '		// garde de mise à la Corbeille retirée.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r  = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+
+check( '84 · garde retirée → _urbizen_status reste received', 'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+
+check( '84 · le dépôt invalide la demande', TG::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// ====== 85 · accepted_args n'est plus égal à 3 ============================
+$source_tg = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Submissions/TrashGuard.php' );
+
+check( '85 · pre_trash_post déclare trois arguments', str_contains( $source_tg, "'guard_trash' ), 10, 3 )" ) );
+check( '85 · pre_untrash_post déclare trois arguments', str_contains( $source_tg, "'guard_untrash' ), 10, 3 )" ) );
+check( '85 · untrashed_post déclare deux arguments', str_contains( $source_tg, "'after_untrash' ), 10, 2 )" ) );
+
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		add_filter( 'pre_trash_post', array( self::class, 'guard_trash' ), 10, 3 );" => "		add_filter( 'pre_trash_post', array( self::class, 'guard_trash' ), 10, 1 );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r      = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$erreur = false;
+
+try {
+	wp_trash_post( $r->id() );
+} catch ( \Throwable $e ) {
+	$erreur = true;
+}
+
+check( '85 · un argument → le post n’est pas transmis, l’invalidation n’a pas lieu',
+	$erreur || 'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+// ====== 86 · la Corbeille continue malgré l'échec d'invalidation ==========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( self::STATUS_TRASHED !== (string) get_post_meta( \$id, '_urbizen_status', true ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : invalidation impossible', \$id ) );
+
+			return false;
+		}" => '		// vérification de l\'invalidation retirée.',
+		"			if ( \$courant !== (string) get_post_meta( \$id, self::PRE_TRASH, true ) ) {
+				Logger::error( sprintf( 'corbeille refusée pour #%d : mémorisation impossible', \$id ) );
+
+				return false;
+			}" => '			// vérification de la mémorisation retirée.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+
+$GLOBALS['wpd_meta_fail'] = '_urbizen_status';
+$resultat_m               = wp_trash_post( $r->id() );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '86 · vérifications retirées → la Corbeille aboutit malgré l’échec', false !== $resultat_m );
+
+$d = demande_corbeille();
+$GLOBALS['wpd_meta_fail'] = '_urbizen_status';
+$resultat_s               = wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta_fail'] = '';
+
+check( '86 · le dépôt bloque la mise à la Corbeille', false === $resultat_s );
+check( '86 · et conserve le statut private', SubmissionPostType::POST_STATUS === get_post( $d['id'] )->post_status );
+
+// ====== 87 · _urbizen_status reste received après la Corbeille ============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		update_post_meta( \$id, '_urbizen_status', self::STATUS_TRASHED );" => '		// invalidation applicative retirée.',
+		"		if ( self::STATUS_TRASHED !== (string) get_post_meta( \$id, '_urbizen_status', true ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : invalidation impossible', \$id ) );
+
+			return false;
+		}" => '		// vérification retirée : sans elle, la Corbeille aboutit.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r  = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$lu = SubmissionRepository::get( $r->id() );
+parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $pm );
+wp_trash_post( $r->id() );
+
+check( '87 · invalidation retirée → l’état reste received', 'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+// Le verrou natif protège encore : c'est la seconde barrière.
+check( '87 · le verrou natif protège malgré tout', null === D2::locate( $pm, wpd_now() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+check( '87 · le dépôt invalide bien l’état', TG::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// ====== 88 · un lien reste valide pendant la Corbeille ====================
+// Les deux verrous retirés ensemble : plus rien ne protège.
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array(
+		'		if ( ! in_array( (string) $post->post_status, SubmissionPostType::downloadable_post_statuses(), true ) ) {
+			return false;
+		}' => '		// contrôle natif retiré.',
+		"		if ( ! in_array( (string) ( \$demande['status'] ?? '' ), SubmissionPostType::downloadable_statuses(), true ) ) {
+			return false;
+		}" => '		// contrôle applicatif retiré.',
+	)
+);
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+
+check( '88 · LES DEUX VERROUS RETIRÉS → le lien reste valide à la Corbeille', null !== $dl::locate( $d['params'], wpd_now() ) );
+check( '88 · le dépôt le refuse', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 89 · pre_untrash_post ne vérifie plus la référence attribuée ======
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( ! is_array( \$reservation ) || 'attributed' !== ( \$reservation['state'] ?? '' ) ) {
+			return 'référence non attribuée';
+		}" => '		// contrôle de la référence retiré.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+update_option( SubmissionRepository::RESERVATION_PREFIX . $r->reference(), array( 'state' => 'reserved', 'at' => 0, 'post' => $r->id() ), false );
+
+check( '89 · contrôle retiré → une restauration incohérente est acceptée', false !== wp_untrash_post( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+update_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'], array( 'state' => 'reserved', 'at' => 0, 'post' => $d['id'] ), false );
+
+check( '89 · le dépôt la refuse', false === wp_untrash_post( $d['id'] ) );
+check( '89 · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->post_status );
+
+// ====== 90 · le statut précédent n'est pas restauré exactement ============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		update_post_meta( \$id, '_urbizen_status', \$memoire );" => "		update_post_meta( \$id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED );",
+		"		if ( \$memoire !== (string) get_post_meta( \$id, '_urbizen_status', true ) ) {" => '		if ( false ) {',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_status', 'converted' );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '90 · muté → converted devient received', 'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille( 'converted' );
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '90 · LE DÉPÔT RESTAURE EXACTEMENT CONVERTED', 'converted' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// ====== 91 · une suppression définitive échouée supprime le post ==========
+$fc = mutant(
+	'src/Files/FileCleaner.php',
+	'FileCleaner',
+	array(
+		'		if ( in_array( $resultat[\'code\'], self::OK, true ) ) {
+			return $court_circuit;
+		}' => '		return $court_circuit;',
+	)
+);
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+@chmod( $d['dossier'], 0500 );
+wpd_clear_filter( 'pre_delete_post' );
+$GLOBALS['wpd_actions']['pre_delete_post'] = array();
+add_filter( 'pre_delete_post', array( $fc, 'guard_delete' ), 10, 3 );
+$resultat_m = wp_delete_post( $d['id'], true );
+@chmod( $d['dossier'], 0700 );
+
+check( '91 · contrôle retiré → le post est supprimé malgré l’échec', false !== $resultat_m );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+@chmod( $d['dossier'], 0500 );
+$resultat_s = wp_delete_post( $d['id'], true );
+@chmod( $d['dossier'], 0700 );
+
+check( '91 · le dépôt bloque la suppression', false === $resultat_s );
+check( '91 · le post reste à la Corbeille', null !== get_post( $d['id'] ) );
+
+// ====== 92 · le vidage automatique contourne FileCleaner =================
+// Le vidage emprunte wp_delete_post, donc le filtre pre_delete_post. On le
+// vérifie en mesurant qu'un nettoyage impossible empêche la suppression.
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta'][ $d['id'] ]['_wp_trash_meta_time'] = wpd_now() - ( 40 * 86400 );
+@chmod( $d['dossier'], 0500 );
+$supprimes = wp_scheduled_delete( 30 );
+@chmod( $d['dossier'], 0700 );
+
+check( '92 · le vidage automatique respecte le garde', 0 === $supprimes );
+check( '92 · le post est conservé', null !== get_post( $d['id'] ) );
+check( '92 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+FileCleaner::reset();
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_meta'][ $d['id'] ]['_wp_trash_meta_time'] = wpd_now() - ( 40 * 86400 );
+
+check( '92 · sans obstacle, le vidage aboutit', 1 === wp_scheduled_delete( 30 ) );
+check( '92 · le document est effacé', 0 === fx_compte_fichiers() );
 
 
 verdict();

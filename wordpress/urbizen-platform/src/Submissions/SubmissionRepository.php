@@ -115,7 +115,7 @@ final class SubmissionRepository {
 				'post_type'    => SubmissionPostType::POST_TYPE,
 				'post_title'   => $reference,
 				'post_name'    => strtolower( $reference ),
-				'post_status'  => 'private',
+				'post_status'  => SubmissionPostType::POST_STATUS,
 				'post_content' => '',
 				'post_excerpt' => '',
 			),

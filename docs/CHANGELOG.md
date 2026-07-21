@@ -33,7 +33,7 @@ Validation et stockage privé des documents joints à une demande.
 - `tests/submissions/test-documents.php` (130 contrôles),
   `test-transaction.php` (144), `test-interruption.php` (66), `fixtures.php` :
   fichiers d'essai portant de **véritables signatures de format**, pour que
-  `finfo` réagisse comme en production. **1 174 contrôles**, dont **238
+  `finfo` réagisse comme en production. **1 339 contrôles**, dont **269
   mutations**.
 
 ### Modifié
@@ -88,6 +88,23 @@ place · `deleted` après effacement.
   retentée, sans quoi la demande resterait figée hors de portée de la rétention.
 - **`max_file_uploads = 20`** en production, soit le plafond exact : prérequis
   bloquant **avant publication** du formulaire (D-032).
+
+### Cycle de Corbeille (troisième revue de la PR #19)
+- `src/Submissions/TrashGuard.php` : `pre_trash_post` et `pre_untrash_post`
+  avec leurs **trois** arguments, `untrashed_post` avec ses deux. Aucun de ces
+  hooks n'était enregistré auparavant (D-033).
+- **Verrou natif** : le téléchargement exige un `post_status` pris dans une
+  liste fermée — `private` uniquement. Il tient même si un autre greffon
+  modifie le statut sans passer par nos hooks.
+- Le statut applicatif précédent est mémorisé **une seule fois** et rétabli
+  **exactement** : `converted` ne redevient pas `received`.
+- Une mise à la Corbeille dont l'invalidation ne peut être vérifiée est
+  **refusée**. Une restauration incohérente aussi.
+- `trashed` rejoint les états purgeables par la rétention.
+- La doublure WordPress reproduit désormais `wp_trash_post()`,
+  `wp_untrash_post()`, `wp_scheduled_delete()` et le respect d'`accepted_args`
+  par `apply_filters()` — cette dernière fidélité a immédiatement révélé qu'une
+  mutation ne mordait pas.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.

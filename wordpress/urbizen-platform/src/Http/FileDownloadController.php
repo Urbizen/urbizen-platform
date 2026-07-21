@@ -157,6 +157,14 @@ final class FileDownloadController {
 			return false;
 		}
 
+		// 1 bis · le statut WordPress natif, pris dans une liste fermée.
+		// Ce contrôle est volontairement redondant avec l'état applicatif :
+		// il tient même si un autre greffon ou un appel direct met la demande
+		// à la Corbeille sans passer par nos hooks.
+		if ( ! in_array( (string) $post->post_status, SubmissionPostType::downloadable_post_statuses(), true ) ) {
+			return false;
+		}
+
 		// 2 · un statut métier final et exploitable — liste fermée.
 		if ( ! in_array( (string) ( $demande['status'] ?? '' ), SubmissionPostType::downloadable_statuses(), true ) ) {
 			return false;

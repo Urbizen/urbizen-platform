@@ -75,14 +75,26 @@ function esc_attr( $texte ) { return htmlspecialchars( (string) $texte, ENT_QUOT
 
 // ------------------------------------------------------------ filtres/actions
 function add_filter( $hook, $callback, $priorite = 10, $args = 1 ) {
-	$GLOBALS['wpd_filters'][ $hook ][] = $callback;
+	$GLOBALS['wpd_filters'][ $hook ][] = array( 'cb' => $callback, 'n' => (int) $args );
 	return true;
 }
 
+/**
+ * Applique un filtre, **fidèlement** à WordPress.
+ *
+ * Le nombre d'arguments transmis est plafonné par `accepted_args`. Déclarer
+ * trop peu d'arguments est une erreur classique — le rappel reçoit alors moins
+ * que prévu, et échoue ou travaille sur des valeurs manquantes.
+ */
 function apply_filters( $hook, $valeur, ...$extra ) {
-	foreach ( $GLOBALS['wpd_filters'][ $hook ] ?? array() as $callback ) {
-		$valeur = $callback( $valeur, ...$extra );
+	$tous = array_merge( array( $valeur ), $extra );
+
+	foreach ( $GLOBALS['wpd_filters'][ $hook ] ?? array() as $entree ) {
+		$args    = array_slice( $tous, 0, max( 1, $entree['n'] ) );
+		$valeur  = $entree['cb']( ...$args );
+		$tous[0] = $valeur;
 	}
+
 	return $valeur;
 }
 
@@ -285,10 +297,120 @@ function get_post( $id ) {
 	return $GLOBALS['wpd_posts'][ (int) $id ] ?? null;
 }
 
+/**
+ * Suppression définitive, **fidèle** au cœur de WordPress.
+ *
+ * `pre_delete_post` est consulté d'abord : un `false` empêche la suppression.
+ * Sans cette fidélité, un banc croirait qu'un contenu a été supprimé alors
+ * qu'un filtre l'a bloqué.
+ */
 function wp_delete_post( $id, $force = false ) {
-	$id = (int) $id;
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	$court = apply_filters( 'pre_delete_post', null, $post, (bool) $force );
+
+	if ( false === $court ) {
+		return false;
+	}
+
 	unset( $GLOBALS['wpd_posts'][ $id ], $GLOBALS['wpd_meta'][ $id ] );
-	return true;
+
+	return $post;
+}
+
+/**
+ * Mise à la Corbeille, fidèle au cœur de WordPress.
+ *
+ * `pre_trash_post` reçoit trois arguments et peut empêcher l'opération. Le
+ * statut précédent est mémorisé dans `_wp_trash_meta_status`, comme le fait
+ * WordPress, afin que la restauration le rétablisse.
+ */
+function wp_trash_post( $id ) {
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post ) {
+		return false;
+	}
+
+	if ( 'trash' === $post->post_status ) {
+		return false;
+	}
+
+	$court = apply_filters( 'pre_trash_post', null, $post, $post->post_status );
+
+	if ( false === $court ) {
+		return false;
+	}
+
+	$GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'] = $post->post_status;
+	$GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_time']   = wpd_now();
+
+	$post->post_status = 'trash';
+
+	do_action( 'trashed_post', $id, $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'] );
+
+	return $post;
+}
+
+/**
+ * Restauration depuis la Corbeille, fidèle au cœur de WordPress.
+ */
+function wp_untrash_post( $id ) {
+	$id   = (int) $id;
+	$post = get_post( $id );
+
+	if ( ! $post || 'trash' !== $post->post_status ) {
+		return false;
+	}
+
+	$precedent = (string) ( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'] ?? 'draft' );
+	$court     = apply_filters( 'pre_untrash_post', null, $post, $precedent );
+
+	if ( false === $court ) {
+		return false;
+	}
+
+	$post->post_status = $precedent;
+	unset( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_status'], $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_time'] );
+
+	do_action( 'untrashed_post', $id, $precedent );
+
+	return $post;
+}
+
+/**
+ * Vidage automatique de la Corbeille.
+ *
+ * Emprunte `wp_delete_post()`, donc le même chemin protégé — comme le fait
+ * `wp_scheduled_delete()` dans WordPress.
+ */
+function wp_scheduled_delete( $jours = 30 ) {
+	$limite    = wpd_now() - ( $jours * DAY_IN_SECONDS );
+	$supprimes = 0;
+
+	foreach ( array_keys( $GLOBALS['wpd_posts'] ) as $id ) {
+		$post = get_post( $id );
+
+		if ( ! $post || 'trash' !== $post->post_status ) {
+			continue;
+		}
+
+		if ( (int) ( $GLOBALS['wpd_meta'][ $id ]['_wp_trash_meta_time'] ?? 0 ) > $limite ) {
+			continue;
+		}
+
+		if ( false !== wp_delete_post( $id, true ) ) {
+			++$supprimes;
+		}
+	}
+
+	return $supprimes;
 }
 
 // -------------------------------------------------------------- métadonnées -

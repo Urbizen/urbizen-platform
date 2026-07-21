@@ -1129,3 +1129,53 @@ Le manifeste ne permettrait jamais de dépasser les limites serveur : il sert
 uniquement à détecter une perte silencieuse.
 
 Aucune configuration Hostinger n'a été modifiée.
+
+---
+
+## D-033 — La Corbeille invalide les liens, sur deux verrous
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-031]
+
+**Contexte.** L'audit a confirmé une faille : **aucun** hook de Corbeille
+n'était enregistré — ni `pre_trash_post`, ni `pre_untrash_post`, ni
+`untrashed_post`, ni `transition_post_status`. Le contrôleur de téléchargement
+ne vérifiait que `post_type`, jamais `post_status`.
+
+`wp_trash_post()` change le `post_status` sans toucher à l'état applicatif.
+Une demande mise à la Corbeille — geste banal, souvent le premier réflexe pour
+retirer un dossier — **restait donc téléchargeable** par ses liens signés,
+alors que l'intention était précisément de la retirer.
+
+**Décision.** Deux verrous complémentaires, chacun suffisant seul.
+
+**Verrou applicatif.** `pre_trash_post`, avec ses **trois** arguments, passe
+`_urbizen_status` à `trashed` **avant** que la Corbeille ne soit effective. Le
+statut précédent est mémorisé **une seule fois** dans
+`_urbizen_pre_trash_status`, et seulement s'il appartient à la liste fermée
+`received` · `converted` · `closed`. Un état transitoire ou fautif ne se met
+pas à la Corbeille : on ne saurait pas quoi restaurer ensuite.
+
+Si l'invalidation ne peut être écrite et **vérifiée**, la mise à la Corbeille
+est refusée. Mieux vaut une demande qui reste en place qu'un document
+accessible alors qu'on croyait l'avoir retiré.
+
+**Verrou natif.** Le téléchargement exige en outre un `post_status` figurant
+dans une liste fermée : **`private` uniquement**, seule valeur que le
+repository écrit. Sont refusés `trash`, `draft`, `pending`, `future`,
+`auto-draft`, `inherit`, un statut absent, et tout statut inconnu. Ce verrou
+tient même si un autre greffon ou un appel direct modifie le statut sans passer
+par nos hooks.
+
+**Conséquences.**
+- La mise à la Corbeille ne supprime **aucun fichier** : elle rend seulement
+  les documents inaccessibles. L'effacement physique reste l'affaire de la
+  suppression définitive, qui passe par `FileCleaner`.
+- La restauration exige **onze conditions**, dont la référence `attributed`
+  rattachée au bon contenu. Elle rétablit le statut mémorisé **exactement** :
+  une demande `converted` ne revient pas en `received`.
+- Si le rétablissement échoue, la demande passe en `incoherent` plutôt que de
+  retrouver un statut téléchargeable par défaut.
+- `trashed` rejoint les états purgeables : une demande à la Corbeille conserve
+  ses données personnelles, et l'en exclure la rendrait immortelle.
+- Le vidage automatique emprunte `wp_delete_post()`, donc `pre_delete_post` :
+  aucun second mécanisme de suppression physique n'est introduit.

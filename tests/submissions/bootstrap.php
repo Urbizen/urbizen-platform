@@ -28,6 +28,7 @@ foreach (
 		'src/Submissions/SubmissionPostType.php',
 		'src/Submissions/SubmissionRepository.php',
 		'src/Submissions/TransactionRecovery.php',
+		'src/Submissions/TrashGuard.php',
 		'src/Privacy/Retention.php',
 		'src/Admin/SubmissionsAdmin.php',
 		'src/Http/SubmissionResult.php',

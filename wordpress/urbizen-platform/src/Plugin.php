@@ -15,6 +15,7 @@ use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
 use Urbizen\Platform\Privacy\Retention;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -109,6 +110,7 @@ final class Plugin {
 		SubmissionController::register();
 		FileDownloadController::register();
 		FileCleaner::register();
+		TrashGuard::register();
 		Retention::register();
 
 		if ( is_admin() ) {

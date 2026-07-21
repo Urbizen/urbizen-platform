@@ -157,4 +157,28 @@ final class SubmissionPostType {
 	public static function downloadable_statuses(): array {
 		return array( self::STATUS_RECEIVED, self::STATUS_CONVERTED, self::STATUS_CLOSED );
 	}
+
+	/**
+	 * Statut WordPress d'une demande finalisée.
+	 *
+	 * Une seule valeur est jamais écrite par le repository, et c'est la seule
+	 * qui autorise la consultation des documents.
+	 */
+	public const POST_STATUS = 'private';
+
+	/**
+	 * Statuts WordPress natifs autorisant la consultation des documents.
+	 *
+	 * Liste **fermée**, source unique. Tout le reste est refusé : `trash`,
+	 * `draft`, `pending`, `future`, `auto-draft`, `inherit`, un statut absent,
+	 * un statut inconnu, ou un statut qu'un autre greffon aurait posé.
+	 *
+	 * Ce contrôle est délibérément redondant avec l'état applicatif : il tient
+	 * même si le `post_status` est modifié sans passer par nos hooks.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function downloadable_post_statuses(): array {
+		return array( self::POST_STATUS );
+	}
 }
