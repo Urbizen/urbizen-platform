@@ -337,7 +337,29 @@ check( 'R · les métadonnées sont conservées', 1 === (int) get_post_meta( $d[
 
 // Le vidage emprunte bien le chemin protégé : aucun second mécanisme.
 $code_double = (string) file_get_contents( __DIR__ . '/wp-double.php' );
-check( 'Q/R · le vidage automatique passe par wp_delete_post', str_contains( $code_double, 'wp_delete_post( $id, true )' ) );
+// Le cœur appelle `wp_delete_post( $id )` **sans** forçage : le chemin protégé
+// par `pre_delete_post` est donc bien emprunté, et son troisième argument vaut
+// `false`.
+check( 'Q/R · le vidage automatique passe par wp_delete_post', str_contains( $code_double, 'wp_delete_post( $id )' ) );
+check( 'Q/R · sans forçage, comme le cœur', ! str_contains( $code_double, 'wp_delete_post( $id, true )' ) );
+
+$force_vu = null;
+add_filter( 'pre_delete_post', static function ( $c, $p, $f ) use ( &$force_vu ) { $force_vu = $f; return $c; }, 1, 3 );
+
+$e = demande();
+wp_trash_post( $e['id'] );
+$GLOBALS['wpd_meta'][ $e['id'] ]['_wp_trash_meta_time'] = wpd_now() - ( 40 * 86400 );
+wp_scheduled_delete( 30 );
+
+check( 'Q/R · pre_delete_post reçoit bien force = false', false === $force_vu );
+
+// Une demande sans `_wp_trash_meta_time` n'est pas remontée par la requête du
+// cœur : elle ne doit pas être purgée.
+$f = demande();
+wp_trash_post( $f['id'] );
+unset( $GLOBALS['wpd_meta'][ $f['id'] ]['_wp_trash_meta_time'] );
+
+check( 'Q/R · sans _wp_trash_meta_time, aucune purge', 0 === wp_scheduled_delete( 30 ) && null !== get_post( $f['id'] ) );
 
 // ======================================================================
 // T · APPEL DIRECT SUR UNE DEMANDE À LA CORBEILLE
@@ -780,7 +802,14 @@ check( '19 · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->
 check( '19 · _urbizen_status reste trashed', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
 check( '19 · les métadonnées temporaires restent', array() !== TrashGuard::transition( $d['id'] ) );
 check( '19 · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
-check( '19 · une nouvelle tentative aboutit', false !== wp_untrash_post( $d['id'] ) );
+// Le cœur a effacé ses métadonnées natives AVANT d'échouer : sans réparation,
+// une seconde tentative reçoit un statut natif précédent vide et se voit
+// refusée. Ce n'est pas un assouplissement du contrôle, c'est sa correction.
+check( '19 · les métadonnées natives ont bien disparu',
+	'' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( '19 · une seconde tentative SANS réparation est refusée', false === wp_untrash_post( $d['id'] ) );
+check( '19 · après réparation, la tentative aboutit',
+	TrashGuard::repair_native( $d['id'], wpd_now() ) && false !== wp_untrash_post( $d['id'] ) );
 check( '19 · et rétablit private', 'private' === get_post( $d['id'] )->post_status );
 
 // --- 20 · l'écriture du statut métier échoue ---
@@ -858,6 +887,206 @@ check( 'interop · LA BARRIÈRE POSTÉRIEURE REFUSE LA RESTAURATION',
 	TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
 check( 'interop · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
 check( 'interop · aucune donnée exposée, métadonnées conservées', array() !== TrashGuard::transition( $d['id'] ) );
+
+
+// ======================================================================
+// RESTAURATION NATIVE INTERROMPUE
+// ======================================================================
+// Le cœur efface `_wp_trash_meta_status` et `_wp_trash_meta_time` AVANT
+// d'écrire le nouveau statut. Un échec de cette écriture laisse le contenu à
+// la Corbeille sans aucune trace native de sa provenance.
+
+// --- fidélité de la doublure, contrôle nommé exigé ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+$hooks                       = array();
+add_action( 'untrashed_post', static function ( $id ) use ( &$hooks ) { $hooks[] = 'untrashed_post'; }, 99, 2 );
+add_action( 'untrash_post', static function ( $id ) use ( &$hooks ) { $hooks[] = 'untrash_post'; }, 99, 2 );
+
+$GLOBALS['wpd_untrash_fail'] = true;
+$resultat                    = wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+check( 'fidélité · wp_untrash_post rend false', false === $resultat );
+check( 'fidélité · le post est encore trash', 'trash' === get_post( $d['id'] )->post_status );
+check( 'fidélité · _wp_trash_meta_status est absent', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( 'fidélité · _wp_trash_meta_time est absente', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true ) );
+check( 'fidélité · untrash_post a été exécuté', in_array( 'untrash_post', $hooks, true ) );
+check( 'fidélité · untrashed_post n’a PAS été exécuté', ! in_array( 'untrashed_post', $hooks, true ) );
+
+$vu = null;
+add_filter( 'pre_untrash_post', static function ( $c, $p, $prec ) use ( &$vu ) { $vu = $prec; return $c; }, 1, 3 );
+wp_untrash_post( $d['id'] );
+
+check( 'fidélité · un nouvel appel natif reçoit un previous_status vide', '' === $vu );
+
+// --- A · premier échec après suppression des métadonnées natives ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+check( 'A · post_status = trash', 'trash' === get_post( $d['id'] )->post_status );
+check( 'A · métadonnées natives absentes',
+	'' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) && '' === get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true ) );
+check( 'A · _urbizen_status reste trashed', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'A · transition completed conservée', TrashGuard::COMPLETED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'A · statut métier mémorisé conservé', 'received' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'A · téléchargement refusé', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- B · seconde tentative sans réparation ---
+check( 'B · restauration refusée', false === wp_untrash_post( $d['id'] ) );
+check( 'B · le post reste trash', 'trash' === get_post( $d['id'] )->post_status );
+check( 'B · aucune réactivation', null === D::locate( $d['params'], wpd_now() ) );
+check( 'B · statut métier toujours non restauré', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// --- C · réparation cohérente ---
+check( 'C · la réparation aboutit', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'C · _wp_trash_meta_status redevient private', 'private' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( 'C · _wp_trash_meta_time reprend l’heure de la mise à la Corbeille',
+	(int) get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true ) <= wpd_now() );
+check( 'C · post_status inchangé', 'trash' === get_post( $d['id'] )->post_status );
+check( 'C · statut métier inchangé', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'C · aucun téléchargement avant la fin', null === D::locate( $d['params'], wpd_now() ) );
+check( 'C · aucun verrou résiduel', false === get_option( TrashGuard::REPAIR_LOCK_PREFIX . $d['id'], false ) );
+check( 'C · réparation idempotente', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'C · toujours une seule valeur native', 'private' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+
+// --- D · réparation puis nouvel échec natif ---
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+check( 'D · l’état reste fermé', 'trash' === get_post( $d['id'] )->post_status );
+check( 'D · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'D · aucune perte des métadonnées Urbizen',
+	'received' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true )
+	&& TrashGuard::COMPLETED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'D · la réparation reste possible', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+
+// --- E · réparation puis restauration complète ---
+check( 'E · la restauration aboutit', false !== wp_untrash_post( $d['id'] ) );
+check( 'E · post_status = private', 'private' === get_post( $d['id'] )->post_status );
+check( 'E · statut métier exact restauré', 'received' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'E · métadonnées natives supprimées par WordPress',
+	'' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) && '' === get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true ) );
+check( 'E · métadonnées temporaires Urbizen supprimées',
+	'' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) && array() === TrashGuard::transition( $d['id'] ) );
+check( 'E · téléchargement de nouveau possible', null !== D::locate( $d['params'], wpd_now() ) );
+
+// --- E bis · le statut métier exact survit au cycle complet ---
+foreach ( array( 'converted', 'closed' ) as $statut ) {
+	neuf();
+	$d = demande( $statut );
+	wp_trash_post( $d['id'] );
+	$GLOBALS['wpd_untrash_fail'] = true;
+	wp_untrash_post( $d['id'] );
+	$GLOBALS['wpd_untrash_fail'] = false;
+	TrashGuard::repair_native( $d['id'], wpd_now() );
+	wp_untrash_post( $d['id'] );
+
+	check( "E · [$statut] restauré exactement après réparation", $statut === get_post_meta( $d['id'], '_urbizen_status', true ) );
+	check( "E · [$statut] post_status = private", 'private' === get_post( $d['id'] )->post_status );
+}
+
+// --- F · demande incohérente ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $d['id'], '_urbizen_status', TransactionRecovery::INCOHERENT );
+
+check( 'F · aucune réparation', false === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'F · métadonnées natives toujours absentes', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( 'F · aucune restauration', false === wp_untrash_post( $d['id'] ) );
+check( 'F · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- G · référence non attributed ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+$cle          = SubmissionRepository::RESERVATION_PREFIX . $d['ref'];
+$reservation  = get_option( $cle );
+$reservation['state'] = 'reserved';
+update_option( $cle, $reservation );
+
+check( 'G · réparation refusée si la référence est reserved', false === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'G · aucune métadonnée native écrite', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+
+// --- H · files_status non final ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $d['id'], '_urbizen_files_status', 'pending' );
+
+check( 'H · réparation refusée si files_status = pending', false === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'H · aucune métadonnée native écrite', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+
+// --- I · deux réparations concurrentes ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+// Une première requête prend le verrou et ne le rend pas : elle est encore en
+// vol lorsque la seconde arrive.
+$occupe = add_option( TrashGuard::REPAIR_LOCK_PREFIX . $d['id'], array( 'expires' => wpd_now() + 60 ), '', false );
+
+check( 'I · le verrou est bien pris', true === $occupe );
+check( 'I · la seconde tentative n’écrit rien', false === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'I · aucune valeur contradictoire', '' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+
+delete_option( TrashGuard::REPAIR_LOCK_PREFIX . $d['id'] );
+TrashGuard::repair_native( $d['id'], wpd_now() );
+
+check( 'I · une fois le verrou rendu, la réparation aboutit', 'private' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( 'I · une seule valeur native, jamais draft ni publish',
+	! in_array( get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ), array( 'draft', 'publish' ), true ) );
+check( 'I · la seconde constate simplement que c’est déjà fait', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+check( 'I · aucun verrou résiduel', false === get_option( TrashGuard::REPAIR_LOCK_PREFIX . $d['id'], false ) );
+
+// Un verrou périmé ne bloque pas éternellement.
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+add_option( TrashGuard::REPAIR_LOCK_PREFIX . $d['id'], array( 'expires' => wpd_now() - 1 ), '', false );
+
+check( 'I · un verrou périmé est repris', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
+
+// --- reconcile répare automatiquement ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+$bilan = TrashGuard::reconcile();
+
+check( 'reconcile · la demande est comptée réparée', 1 === ( $bilan['reparees'] ?? 0 ) );
+check( 'reconcile · l’état natif est rétabli', 'private' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
+check( 'reconcile · aucun téléchargement pour autant', null === D::locate( $d['params'], wpd_now() ) );
+check( 'reconcile · le statut métier n’est pas restauré par la réparation',
+	TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'reconcile · idempotente', 0 === ( TrashGuard::reconcile()['reparees'] ?? -1 ) );
 
 
 verdict();

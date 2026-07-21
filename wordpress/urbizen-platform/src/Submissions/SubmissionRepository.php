@@ -176,7 +176,7 @@ final class SubmissionRepository {
 		);
 
 		foreach ( $meta as $cle => $valeur ) {
-			if ( ! update_post_meta( $id, $cle, $valeur ) ) {
+			if ( ! self::persist_meta( $id, $cle, $valeur ) ) {
 				// Une demande amputée d'une métadonnée obligatoire est pire
 				// qu'une absence de demande : elle laisse croire que le dossier
 				// est en main. On efface et on annonce l'échec.
@@ -223,7 +223,7 @@ final class SubmissionRepository {
 	 * @return bool
 	 */
 	public static function finalize( int $id, string $reference, string $files_status, int $now ): bool {
-		if ( ! update_post_meta( $id, '_urbizen_files_status', $files_status ) ) {
+		if ( ! self::persist_meta( $id, '_urbizen_files_status', $files_status ) ) {
 			return false;
 		}
 
@@ -234,11 +234,11 @@ final class SubmissionRepository {
 		$transaction          = self::transaction( $id );
 		$transaction['state'] = 'committed';
 
-		if ( ! update_post_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $transaction ) ) ) {
+		if ( ! self::persist_meta( $id, '_urbizen_transaction', (string) wp_json_encode( $transaction ) ) ) {
 			return false;
 		}
 
-		if ( ! update_post_meta( $id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED ) ) {
+		if ( ! self::persist_meta( $id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED ) ) {
 			return false;
 		}
 
@@ -280,12 +280,83 @@ final class SubmissionRepository {
 		);
 
 		foreach ( $ecritures as $cle => $valeur ) {
-			if ( ! update_post_meta( $id, $cle, $valeur ) ) {
+			if ( ! self::persist_meta( $id, $cle, $valeur ) ) {
 				return false;
 			}
 		}
 
 		return true;
+	}
+
+	/**
+	 * Écrit une métadonnée et **vérifie par relecture** qu'elle est en place.
+	 *
+	 * Le retour de `update_post_meta()` ne prouve rien. `update_metadata()`
+	 * rend `false` dans **deux** situations qu'il ne faut jamais confondre :
+	 *
+	 * - l'écriture a réellement échoué ;
+	 * - la valeur demandée était **déjà** enregistrée, et aucune modification
+	 *   n'était nécessaire.
+	 *
+	 * Les traiter pareillement fait échouer toute écriture idempotente.
+	 * `finalize()` réécrivait ainsi `_urbizen_files_status` avec la valeur que
+	 * `persist()` venait de poser : sur un vrai WordPress, la transaction
+	 * n'était jamais validée, la référence jamais attribuée, et la
+	 * récupération supprimait le dossier une heure plus tard.
+	 *
+	 * Seule la relecture fait foi — dans les deux sens. Un `false` suivi d'une
+	 * relecture conforme est un **succès** ; un `true`, ou un identifiant,
+	 * suivi d'une relecture divergente est un **échec**.
+	 *
+	 * @param int    $id     Demande.
+	 * @param string $cle    Clé.
+	 * @param mixed  $valeur Valeur attendue.
+	 * @return bool
+	 */
+	public static function persist_meta( int $id, string $cle, $valeur ): bool {
+		update_post_meta( $id, $cle, $valeur );
+
+		return self::meta_equivaut( get_post_meta( $id, $cle, true ), $valeur );
+	}
+
+	/**
+	 * La valeur relue correspond-elle à la valeur voulue ?
+	 *
+	 * WordPress ne restitue pas toujours ce qu'on lui a confié : les scalaires
+	 * reviennent en chaînes, les tableaux reviennent désérialisés. La
+	 * comparaison suit donc le type **écrit**, jamais le type relu.
+	 *
+	 * @param mixed $lu     Valeur relue.
+	 * @param mixed $voulue Valeur écrite.
+	 * @return bool
+	 */
+	private static function meta_equivaut( $lu, $voulue ): bool {
+		// Tableaux et objets : le cœur les sérialise puis les restitue tels
+		// quels. On compare les structures, sans passer par une chaîne.
+		if ( is_array( $voulue ) || is_object( $voulue ) ) {
+			return $lu == $voulue; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison
+		}
+
+		// Booléens : `true` est stocké puis relu comme `'1'`, `false` comme une
+		// chaîne vide.
+		if ( is_bool( $voulue ) ) {
+			return ( $voulue ? '1' : '' ) === (string) $lu;
+		}
+
+		// Chaînes — dont le JSON des transactions et des documents. Comparaison
+		// **stricte**, caractère pour caractère : une différence d'encodage ou
+		// d'échappement est une divergence, pas un détail.
+		if ( is_string( $voulue ) ) {
+			return is_scalar( $lu ) && $voulue === (string) $lu;
+		}
+
+		// Entiers et flottants : relus en chaînes.
+		if ( is_int( $voulue ) || is_float( $voulue ) ) {
+			return is_scalar( $lu ) && (string) $voulue === (string) $lu;
+		}
+
+		// `null` n'est pas une valeur qu'on persiste sciemment.
+		return false;
 	}
 
 	/**

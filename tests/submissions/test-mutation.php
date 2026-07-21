@@ -3159,7 +3159,9 @@ check( '109 · aucun téléchargement', null === D2::locate( $d['params'], wpd_n
 $source_double = (string) file_get_contents( __DIR__ . '/wp-double.php' );
 
 check( '110 · la doublure applique bien le filtre du cœur',
-	str_contains( $source_double, "apply_filters( 'wp_untrash_post_status', 'draft', \$id, \$precedent )" ) );
+	str_contains( $source_double, "apply_filters( 'wp_untrash_post_status', \$propose, \$id, \$precedent )" ) );
+check( '110 · elle propose draft pour un contenu non joint',
+	str_contains( $source_double, "'attachment' === (string) \$post->post_type ? 'inherit' : 'draft'" ) );
 check( '110 · elle part du défaut draft, jamais du statut précédent',
 	! str_contains( $source_double, '$post->post_status = $precedent' ) );
 check( '110 · elle transmet le précédent à untrashed_post',
@@ -3267,6 +3269,442 @@ check( '113 · le dépôt laisse la page en draft', 'draft' === TG::untrash_stat
 check( '113 · et lui laisse un publish proposé', 'publish' === TG::untrash_status( 'publish', $page, 'publish' ) );
 check( '113 · un article n’est pas davantage touché',
 	'draft' === TG::untrash_status( 'draft', wp_insert_post( array( 'post_type' => 'post', 'post_status' => 'trash', 'post_title' => 'Article' ) ), 'publish' ) );
+
+
+// ====== 114 à 116 · mutations de la DOUBLURE, exécutées pour de vrai =======
+// La doublure ne peut pas être mutée en mémoire — ses fonctions sont globales
+// et déjà déclarées. On écrit donc une copie mutée hors du dépôt, et on
+// exécute le banc de fidélité dans un sous-processus : la mutation doit le
+// faire tomber, avec un code de sortie non nul.
+
+/**
+ * Exécute `fidelite-corbeille.php` avec une doublure éventuellement mutée.
+ *
+ * @param array<string, string> $remplacements Motif exact => remplacement.
+ * @return int Code de sortie du sous-processus.
+ */
+function fidelite_avec( array $remplacements ): int {
+	global $compteur;
+
+	$source = (string) file_get_contents( __DIR__ . '/wp-double.php' );
+
+	foreach ( $remplacements as $de => $vers ) {
+		if ( ! str_contains( $source, $de ) ) {
+			throw new RuntimeException( 'motif introuvable dans la doublure : ' . $de );
+		}
+
+		$source = str_replace( $de, $vers, $source );
+	}
+
+	$fichier = sys_get_temp_dir() . '/urbizen-double-' . getmypid() . '-' . ( ++$compteur ) . '.php';
+	file_put_contents( $fichier, $source );
+
+	$commande = sprintf(
+		'URBIZEN_WP_DOUBLE=%s %s %s 2>/dev/null',
+		escapeshellarg( $fichier ),
+		escapeshellarg( PHP_BINARY ),
+		escapeshellarg( __DIR__ . '/fidelite-corbeille.php' )
+	);
+
+	exec( $commande, $sortie, $code );
+	unlink( $fichier );
+
+	return (int) $code;
+}
+
+check( '114 · la doublure du dépôt satisfait le contrat du cœur 7.0.2', 0 === fidelite_avec( array() ) );
+
+// 114 · les métadonnées natives sont conservées après l'échec.
+check( '114 · doublure conservant _wp_trash_meta_status → LE BANC DE FIDÉLITÉ TOMBE',
+	0 !== fidelite_avec(
+		array(
+			"	delete_post_meta( \$id, '_wp_trash_meta_status' );
+	delete_post_meta( \$id, '_wp_trash_meta_time' );
+
+	\$post_updated = wpd_update_post_ou_echec(" => "	\$post_updated = wpd_update_post_ou_echec(",
+		)
+	) );
+
+// 115 · untrashed_post exécuté malgré l'échec.
+check( '115 · doublure exécutant untrashed_post malgré l’échec → le banc tombe',
+	0 !== fidelite_avec(
+		array(
+			"	if ( ! \$post_updated ) {
+		// `untrashed_post` n'est pas exécuté : le cœur sort ici.
+		return false;
+	}
+
+	do_action( 'untrashed_post', \$id, \$precedent );" => "	do_action( 'untrashed_post', \$id, \$precedent );
+
+	if ( ! \$post_updated ) {
+		return false;
+	}",
+		)
+	) );
+
+// 116 · l'action untrash_post disparaît.
+check( '116 · doublure sans untrash_post → le banc tombe',
+	0 !== fidelite_avec( array( "	do_action( 'untrash_post', \$id, \$precedent );" => '	// action untrash_post retirée.' ) ) );
+
+// ====== 117 · la seconde tentative reçoit encore private sans réparation ==
+// Mutation de la doublure : elle reconstruit implicitement le précédent depuis
+// le statut applicatif, ce qui rendrait la réparation inutile — et masquerait
+// le blocage réel.
+check( '117 · doublure reconstruisant le précédent → le banc tombe',
+	0 !== fidelite_avec(
+		array(
+			"	\$precedent = (string) get_post_meta( \$id, '_wp_trash_meta_status', true );" =>
+			"	\$precedent = (string) get_post_meta( \$id, '_wp_trash_meta_status', true );
+	\$precedent = '' === \$precedent ? 'private' : \$precedent;",
+		)
+	) );
+
+// ====== 118 · la réparation accepte une demande incohérente ===============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		\$motif = self::coherence_blocker( \$id );
+
+		if ( null !== \$motif ) {
+			Logger::error( sprintf( 'réparation refusée pour #%d : %s', \$id, \$motif ) );
+
+			return false;
+		}" => '		// contrôle de cohérence de la réparation retiré.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $r->id(), '_urbizen_status', TransactionRecovery::INCOHERENT );
+
+check( '118 · cohérence retirée → UNE DEMANDE INCOHÉRENTE EST RÉPARÉE',
+	true === $tg::repair_native( $r->id(), wpd_now() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $d['id'], '_urbizen_status', TransactionRecovery::INCOHERENT );
+
+check( '118 · le dépôt refuse', false === TG::repair_native( $d['id'], wpd_now() ) );
+check( '118 · aucune métadonnée native écrite', '' === get_post_meta( $d['id'], TG::NATIVE_STATUS, true ) );
+check( '118 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 119 · la réparation écrit draft au lieu de private ================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "			update_post_meta( \$id, self::NATIVE_STATUS, SubmissionPostType::POST_STATUS );" => "			update_post_meta( \$id, self::NATIVE_STATUS, 'draft' );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$tg::repair_native( $r->id(), wpd_now() );
+
+check( '119 · draft écrit → la métadonnée native devient draft', 'draft' === get_post_meta( $r->id(), TG::NATIVE_STATUS, true ) );
+check( '119 · et la restauration suivante est refusée', false === wp_untrash_post( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+TG::repair_native( $d['id'], wpd_now() );
+
+check( '119 · le dépôt écrit private', 'private' === get_post_meta( $d['id'], TG::NATIVE_STATUS, true ) );
+check( '119 · et la restauration aboutit', false !== wp_untrash_post( $d['id'] ) );
+
+// ====== 120 · la réparation réactive directement le statut métier =========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "			update_post_meta( \$id, self::NATIVE_TIME, \$horo );" =>
+		"			update_post_meta( \$id, self::NATIVE_TIME, \$horo );
+			update_post_meta( \$id, '_urbizen_status', (string) get_post_meta( \$id, self::PRE_TRASH, true ) );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$tg::repair_native( $r->id(), wpd_now() );
+
+check( '120 · réactivation directe → LE STATUT MÉTIER REVIENT SANS RESTAURATION',
+	'received' === get_post_meta( $r->id(), '_urbizen_status', true ) );
+check( '120 · alors que le post est encore à la Corbeille', 'trash' === get_post( $r->id() )->post_status );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+TG::repair_native( $d['id'], wpd_now() );
+
+check( '120 · le dépôt laisse le statut métier à trashed', TG::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( '120 · et aucun téléchargement n’est possible', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 121 · le téléchargement rouvre avant la restauration complète =====
+// La barrière est le statut natif du post, contrôlé par le téléchargeur. On la
+// retire pour vérifier qu'elle porte bien seule ce refus.
+$dl = mutant(
+	'src/Http/FileDownloadController.php',
+	'FileDownloadController',
+	array( "SubmissionPostType::downloadable_post_statuses()" => "array( 'private', 'trash', 'draft' )" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+TG::register();
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+TG::repair_native( $d['id'], wpd_now() );
+
+check( '121 · le dépôt refuse le téléchargement pendant tout le cycle', null === D2::locate( $d['params'], wpd_now() ) );
+check( '121 · statuts natifs téléchargeables élargis → la barrière native tombe seule',
+	array( 'private' ) === SubmissionPostType::downloadable_post_statuses() );
+
+// ====== 122 · une référence reserved permet la réparation =================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( ! is_array( \$reservation ) || 'attributed' !== ( \$reservation['state'] ?? '' ) ) {
+			return 'référence non attribuée';
+		}" => '		// contrôle de l\'attribution retiré.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$ref = (string) get_post_meta( $r->id(), '_urbizen_reference', true );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$res          = get_option( SubmissionRepository::RESERVATION_PREFIX . $ref );
+$res['state'] = 'reserved';
+update_option( SubmissionRepository::RESERVATION_PREFIX . $ref, $res );
+
+check( '122 · attribution retirée → une référence reserved est réparée',
+	true === $tg::repair_native( $r->id(), wpd_now() ) );
+
+$d            = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+$res          = get_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'] );
+$res['state'] = 'reserved';
+update_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'], $res );
+
+check( '122 · le dépôt refuse', false === TG::repair_native( $d['id'], wpd_now() ) );
+check( '122 · aucune métadonnée native écrite', '' === get_post_meta( $d['id'], TG::NATIVE_STATUS, true ) );
+
+// ====== 123 · files_status pending permet la réparation ===================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		if ( ! in_array( (string) \$demande['files_status'], array( 'stored', 'none' ), true ) ) {
+			return 'documents dans un état non final';
+		}" => '		// contrôle de l\'état des documents retiré.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $r->id(), '_urbizen_files_status', 'pending' );
+
+check( '123 · contrôle retiré → files_status pending est réparé', true === $tg::repair_native( $r->id(), wpd_now() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $d['id'], '_urbizen_files_status', 'pending' );
+
+check( '123 · le dépôt refuse', false === TG::repair_native( $d['id'], wpd_now() ) );
+check( '123 · aucune métadonnée native écrite', '' === get_post_meta( $d['id'], TG::NATIVE_STATUS, true ) );
+
+// ====== 124 · les métadonnées Urbizen sont supprimées pendant la réparation
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "			update_post_meta( \$id, self::NATIVE_STATUS, SubmissionPostType::POST_STATUS );" =>
+		"			delete_post_meta( \$id, self::TRANSITION );
+			update_post_meta( \$id, self::NATIVE_STATUS, SubmissionPostType::POST_STATUS );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+$tg::repair_native( $r->id(), wpd_now() );
+
+check( '124 · suppression pendant la réparation → LA TRANSITION EST PERDUE', array() === $tg::transition( $r->id() ) );
+check( '124 · et la restauration suivante devient impossible',
+	'received' !== get_post_meta( $r->id(), '_urbizen_status', true ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+TG::repair_native( $d['id'], wpd_now() );
+
+check( '124 · le dépôt conserve la transition', TG::COMPLETED === ( TG::transition( $d['id'] )['state'] ?? '' ) );
+check( '124 · et le statut mémorisé', 'received' === get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
+check( '124 · la restauration aboutit ensuite', false !== wp_untrash_post( $d['id'] ) );
+check( '124 · avec le statut métier exact', 'received' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+// ====== 125 · deux réparations concurrentes sans verrou ===================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( ! self::acquire_repair_lock( \$id, \$now ) ) {
+			// Une autre tentative répare en ce moment même. On ne force rien.
+			return false;
+		}" => '		// verrou de réparation retiré.',
+		"		if ( '' !== \$natif ) {
+			// Une valeur native inattendue ne se corrige pas en silence : on ne
+			// sait pas qui l'a écrite, ni pourquoi.
+			Logger::error( sprintf( 'réparation refusée pour #%d : statut natif mémorisé inattendu', \$id ) );
+
+			return false;
+		}" => '		// contrôle de la valeur native retiré.',
+		"			if ( '' !== \$natif ) {
+				return false;
+			}" => '			// relecture sous verrou retirée.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $r->id() );
+$GLOBALS['wpd_untrash_fail'] = false;
+
+// Une requête concurrente a déjà écrit une valeur, correcte ou non.
+update_post_meta( $r->id(), TG::NATIVE_STATUS, 'draft' );
+
+check( '125 · verrou et garde retirés → LA SECONDE ÉCRASE LA PREMIÈRE',
+	true === $tg::repair_native( $r->id(), wpd_now() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+update_post_meta( $d['id'], TG::NATIVE_STATUS, 'draft' );
+
+check( '125 · le dépôt refuse d’écraser une valeur native inattendue',
+	false === TG::repair_native( $d['id'], wpd_now() ) );
+
+// Verrou seul : la concurrence réelle.
+$d2 = demande_corbeille();
+wp_trash_post( $d2['id'] );
+$GLOBALS['wpd_untrash_fail'] = true;
+wp_untrash_post( $d2['id'] );
+$GLOBALS['wpd_untrash_fail'] = false;
+add_option( TG::REPAIR_LOCK_PREFIX . $d2['id'], array( 'expires' => wpd_now() + 60 ), '', false );
+
+check( '125 · le verrou du dépôt bloque la seconde tentative', false === TG::repair_native( $d2['id'], wpd_now() ) );
+check( '125 · aucune valeur contradictoire', '' === get_post_meta( $d2['id'], TG::NATIVE_STATUS, true ) );
+check( '125 · le verrou est en autoload = false',
+	'no' === wpd_autoload( TG::REPAIR_LOCK_PREFIX . $d2['id'] ) );
+check( '125 · et il porte une expiration',
+	0 < (int) ( get_option( TG::REPAIR_LOCK_PREFIX . $d2['id'] )['expires'] ?? 0 ) );
+
+
+// ====== 126 · persist_meta se fie au retour d'update_post_meta ============
+// La mutation qui reproduit le défaut trouvé par l'audit de parité.
+$sr = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		update_post_meta( \$id, \$cle, \$valeur );
+
+		return self::meta_equivaut( get_post_meta( \$id, \$cle, true ), \$valeur );" =>
+		"		return (bool) update_post_meta( \$id, \$cle, \$valeur );" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$id = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+update_post_meta( $id, '_essai', 'identique' );
+
+check( '126 · retour brut → UNE VALEUR DÉJÀ EN PLACE PASSE POUR UN ÉCHEC',
+	false === $sr::persist_meta( $id, '_essai', 'identique' ) );
+check( '126 · le dépôt y voit un succès', true === SubmissionRepository::persist_meta( $id, '_essai', 'identique' ) );
+
+// Conséquence complète : la finalisation d'une soumission réelle.
+neuf_fichiers();
+FileCleaner::reset();
+$r   = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$ref = (string) get_post_meta( $r->id(), '_urbizen_reference', true );
+
+check( '126 · le dépôt atteint bien received',
+	SubmissionPostType::STATUS_RECEIVED === get_post_meta( $r->id(), '_urbizen_status', true ) );
+check( '126 · et attributed',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $ref )['state'] ?? '' ) );
+check( '126 · et survit à la récupération',
+	0 === TransactionRecovery::run( wpd_now() + TransactionRecovery::TTL + 10 )['rollback'] );
+
+// ====== 127 · comparaison laxiste de la valeur relue ======================
+$sr = mutant(
+	'src/Submissions/SubmissionRepository.php',
+	'SubmissionRepository',
+	array( "		if ( is_string( \$voulue ) ) {
+			return is_scalar( \$lu ) && \$voulue === (string) \$lu;
+		}" => "		if ( is_string( \$voulue ) ) {
+			return \$lu == \$voulue; // phpcs:ignore WordPress.PHP.StrictComparisons.LooseComparison
+		}" )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$id = wp_insert_post( array( 'post_type' => SubmissionPostType::POST_TYPE, 'post_status' => 'private' ) );
+
+update_post_meta( $id, '_laxiste', '0' );
+$GLOBALS['wpd_meta_lie'] = '_laxiste';
+
+check( '127 · comparaison laxiste → « 0 » passe pour « 0.0 »', true === $sr::persist_meta( $id, '_laxiste', '0.0' ) );
+check( '127 · le dépôt refuse', false === SubmissionRepository::persist_meta( $id, '_laxiste', '0.0' ) );
+
+$GLOBALS['wpd_meta_lie'] = '';
 
 
 verdict();

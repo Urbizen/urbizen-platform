@@ -1285,3 +1285,96 @@ d'aucun ordre d'exécution.
 - La doublure de test applique le défaut `draft` du cœur et respecte les
   priorités des filtres. Tant qu'elle restaurait implicitement l'ancien statut,
   elle rendait le défaut invisible — et neuf mutations muettes.
+
+---
+
+## D-036 — Une restauration interrompue se répare, elle ne se contourne pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-035]
+
+**Contexte.** Le cœur de WordPress efface `_wp_trash_meta_status` et
+`_wp_trash_meta_time` **avant** d'écrire le statut de sortie de Corbeille. Si
+cette écriture échoue, `wp_untrash_post()` rend `false`, le contenu reste à la
+Corbeille — et plus rien n'indique d'où il venait. Une seconde tentative reçoit
+un statut natif précédent **vide** et se voit refusée. La demande est bloquée
+pour toujours.
+
+Le compte rendu de la revue précédente affirmait le contraire — qu'une seconde
+tentative aboutissait. C'était vrai de la doublure, qui conservait
+artificiellement les métadonnées natives. Ce n'était pas vrai de WordPress.
+
+**Décision.** Une réparation explicite, `TrashGuard::repair_native()`, plutôt
+qu'une restauration interne qui simulerait le cycle du cœur.
+
+Elle ne rétablit que les deux métadonnées natives, et seulement lorsque toute
+la cohérence Urbizen est démontrée : contenu encore à la Corbeille, statut
+applicatif `trashed`, transition `completed`, statut métier mémorisé
+restaurable, transaction `committed`, référence `attributed` et rattachée au
+même contenu, `files_status` final, métadonnées obligatoires complètes, et
+métadonnée native effectivement absente.
+
+**Conséquences.**
+- La réparation ne change pas le `post_status`, ne restaure aucun statut
+  métier, ne supprime aucune métadonnée Urbizen, ne réactive aucun lien, ne
+  touche ni aux fichiers ni à la référence. Elle rend le cycle natif rejouable,
+  rien de plus. Les téléchargements restent fermés jusqu'à la restauration
+  complète.
+- `_wp_trash_meta_time` reprend l'horodatage de la transition, pas l'heure
+  courante : une réparation ne doit ni prolonger ni raccourcir le délai avant
+  purge automatique.
+- Idempotente. Une valeur native déjà correcte est un succès ; une valeur
+  native **inattendue** n'est pas écrasée en silence.
+- Protégée par un verrou `add_option()` par demande, en `autoload = false` et
+  avec expiration. Deux tentatives simultanées ne peuvent pas écrire deux
+  valeurs différentes ; un verrou périmé est repris.
+- Une restauration interne atomique a été écartée : elle aurait dû reproduire
+  toutes les garanties du cycle natif, et aurait supposé d'appeler
+  `untrashed_post` à la main pour simuler une opération du cœur.
+
+---
+
+## D-037 — Le retour d'une écriture ne prouve pas l'écriture
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-036]
+
+**Contexte.** `update_post_meta()` rend `false` dans deux situations que rien
+ne distingue au retour :
+
+- l'écriture a réellement échoué ;
+- la valeur demandée était **déjà** enregistrée, et aucune modification n'était
+  nécessaire.
+
+Le dépôt lisait ce retour comme un booléen de réussite. `finalize()` réécrivait
+`_urbizen_files_status` avec la valeur que `persist()` venait de poser : sur un
+vrai WordPress, la première vérification échouait systématiquement. Toute
+soumission rendait un succès, mais la transaction restait `processing`, la
+référence restait `reserved`, `_urbizen_status` n'atteignait jamais `received`
+— et la récupération transactionnelle supprimait le dossier une heure plus
+tard.
+
+Le défaut était invisible : la doublure rendait un identifiant en toutes
+circonstances. Il a été trouvé par l'audit de parité contre le cœur 7.0.2, et
+n'a jamais atteint la production — `finalize()` est né avec la PR #19.
+
+**Décision.** `SubmissionRepository::persist_meta()` : écrire, relire, et ne
+conclure que sur la relecture.
+
+- Un `false` suivi d'une relecture conforme est un **succès**.
+- Un `true`, ou un identifiant, suivi d'une relecture divergente est un
+  **échec**.
+
+**Conséquences.**
+- Quatre emplacements corrigés : la boucle de `persist()`, `set_files()`, et
+  les trois écritures de `finalize()`. Aucun autre appel du dépôt ne lit ce
+  retour.
+- La comparaison suit le type **écrit**, jamais le type relu : tableaux et
+  objets comparés après restitution, booléens selon la représentation WordPress
+  (`'1'` et chaîne vide), entiers et flottants en chaîne, chaînes — dont le
+  JSON des transactions et des documents — **strictement**, caractère pour
+  caractère. Deux JSON sémantiquement égaux mais textuellement différents ne
+  sont pas équivalents.
+- `update_option()` porte la même ambiguïté. Aucun appel de production n'en
+  dépend aujourd'hui ; la doublure en est néanmoins rendue fidèle, pour qu'un
+  futur usage fautif tombe dans les bancs plutôt qu'en production.
+- Les doublures sont une commodité, pas une preuve. Un banc d'intégration
+  s'exécute désormais contre un vrai WordPress 7.0.2 jetable.

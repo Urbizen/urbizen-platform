@@ -9,7 +9,14 @@
  */
 
 require_once __DIR__ . '/logger-double.php';
-require_once __DIR__ . '/wp-double.php';
+// La doublure peut être remplacée par une copie mutée, pour éprouver la
+// fidélité de l'instrument lui-même. Réservé aux bancs : la variable n'existe
+// jamais en dehors d'un sous-processus lancé par `test-mutation.php`.
+$urbizen_doublure = (string) getenv( 'URBIZEN_WP_DOUBLE' );
+
+require_once '' !== $urbizen_doublure && is_readable( $urbizen_doublure )
+	? $urbizen_doublure
+	: __DIR__ . '/wp-double.php';
 
 define( 'URBIZEN_PLATFORM_DIR', dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/' );
 

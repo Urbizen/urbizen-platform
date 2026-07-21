@@ -68,6 +68,22 @@ final class TrashGuard {
 	public const COMPLETED = 'completed';
 
 	/**
+	 * Métadonnées **natives** de Corbeille, écrites et effacées par WordPress.
+	 *
+	 * À ne jamais confondre avec les métadonnées Urbizen : celles-ci portent le
+	 * statut **natif** précédent (`private`), celles-là le statut **métier**
+	 * précédent (`received`, `converted`, `closed`).
+	 */
+	public const NATIVE_STATUS = '_wp_trash_meta_status';
+	public const NATIVE_TIME   = '_wp_trash_meta_time';
+
+	/**
+	 * Verrou de réparation, par demande.
+	 */
+	public const REPAIR_LOCK_PREFIX = 'urbizen_repair_untrash_';
+	public const REPAIR_LOCK_TTL    = 60;
+
+	/**
 	 * Statuts applicatifs qu'une restauration peut rétablir.
 	 *
 	 * Liste **fermée**. Un état transitoire ou fautif — `processing`,
@@ -275,7 +291,7 @@ final class TrashGuard {
 	 * @return array{confirmees:int,incoherentes:int}
 	 */
 	public static function reconcile(): array {
-		$bilan = array( 'confirmees' => 0, 'incoherentes' => 0 );
+		$bilan = array( 'confirmees' => 0, 'incoherentes' => 0, 'reparees' => 0 );
 
 		$candidats = get_posts(
 			array(
@@ -312,6 +328,20 @@ final class TrashGuard {
 			if ( self::PREPARED === $etat && 'trash' === (string) $post->post_status ) {
 				self::after_trash( $id, '' );
 				++$bilan['confirmees'];
+
+				continue;
+			}
+
+			// Corbeille confirmée, contenu encore à la Corbeille, mais l'état
+			// natif a disparu : c'est la trace d'une restauration interrompue
+			// après que le cœur a effacé ses propres métadonnées. On rend le
+			// cycle rejouable, sans rien restaurer soi-même.
+			if ( self::COMPLETED === $etat
+				&& 'trash' === (string) $post->post_status
+				&& '' === (string) get_post_meta( $id, self::NATIVE_STATUS, true )
+				&& self::repair_native( $id )
+			) {
+				++$bilan['reparees'];
 			}
 		}
 
@@ -538,6 +568,150 @@ final class TrashGuard {
 		delete_post_meta( $id, self::TRANSITION );
 
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
+	}
+
+	/**
+	 * Répare les métadonnées natives de Corbeille perdues par un échec natif.
+	 *
+	 * Le cœur de WordPress efface `_wp_trash_meta_status` et
+	 * `_wp_trash_meta_time` **avant** d'écrire le nouveau statut. Si cette
+	 * écriture échoue, `wp_untrash_post()` rend `false` et le contenu reste à
+	 * la Corbeille — mais plus rien n'indique d'où il venait. Une seconde
+	 * tentative reçoit alors un statut natif précédent **vide**, et se voit
+	 * refusée : sans réparation, la demande est bloquée pour toujours.
+	 *
+	 * La réparation ne restaure que ces deux métadonnées natives, et seulement
+	 * lorsque toute la cohérence Urbizen est démontrée. Elle ne touche ni au
+	 * `post_status`, ni au statut métier, ni aux fichiers, ni à la référence,
+	 * ni à aucun lien. Elle ne rouvre aucun téléchargement : elle rend
+	 * seulement le cycle natif rejouable.
+	 *
+	 * Idempotente, et protégée par un verrou atomique : deux tentatives
+	 * simultanées ne peuvent pas écrire deux valeurs différentes.
+	 *
+	 * @param int      $id  Demande.
+	 * @param int|null $now Horodatage courant (tests).
+	 * @return bool Vrai si l'état natif permet désormais une nouvelle tentative.
+	 */
+	public static function repair_native( int $id, ?int $now = null ): bool {
+		$now  = null === $now ? time() : $now;
+		$post = get_post( $id );
+
+		if ( ! self::is_ours( $post ) ) {
+			return false;
+		}
+
+		// La réparation ne concerne qu'un contenu resté à la Corbeille.
+		if ( 'trash' !== (string) $post->post_status ) {
+			return false;
+		}
+
+		$natif = (string) get_post_meta( $id, self::NATIVE_STATUS, true );
+
+		// Déjà réparée, ou jamais perdue : rien à faire, et c'est un succès.
+		if ( SubmissionPostType::POST_STATUS === $natif ) {
+			return true;
+		}
+
+		if ( '' !== $natif ) {
+			// Une valeur native inattendue ne se corrige pas en silence : on ne
+			// sait pas qui l'a écrite, ni pourquoi.
+			Logger::error( sprintf( 'réparation refusée pour #%d : statut natif mémorisé inattendu', $id ) );
+
+			return false;
+		}
+
+		$motif = self::coherence_blocker( $id );
+
+		if ( null !== $motif ) {
+			Logger::error( sprintf( 'réparation refusée pour #%d : %s', $id, $motif ) );
+
+			return false;
+		}
+
+		if ( ! self::acquire_repair_lock( $id, $now ) ) {
+			// Une autre tentative répare en ce moment même. On ne force rien.
+			return false;
+		}
+
+		try {
+			// Relecture sous verrou : l'autre tentative a pu aboutir entre-temps.
+			$natif = (string) get_post_meta( $id, self::NATIVE_STATUS, true );
+
+			if ( SubmissionPostType::POST_STATUS === $natif ) {
+				return true;
+			}
+
+			if ( '' !== $natif ) {
+				return false;
+			}
+
+			// Horodatage **sûr** : celui de la mise à la Corbeille elle-même,
+			// tel que la transition l'a consigné. Écrire l'heure courante
+			// prolongerait d'autant le séjour en Corbeille avant purge
+			// automatique ; une réparation ne doit rien changer à la durée de
+			// conservation. À défaut de transition lisible, on retombe sur
+			// l'heure courante, qui ne raccourcit jamais ce délai.
+			$prepare = (string) ( self::transition( $id )['prepared_at'] ?? '' );
+			$horo    = '' === $prepare ? $now : (int) strtotime( $prepare . ' UTC' );
+
+			if ( $horo <= 0 || $horo > $now ) {
+				$horo = $now;
+			}
+
+			update_post_meta( $id, self::NATIVE_STATUS, SubmissionPostType::POST_STATUS );
+			update_post_meta( $id, self::NATIVE_TIME, $horo );
+
+			// Relecture : sans écriture certaine, on ne déclare pas réparé.
+			if ( SubmissionPostType::POST_STATUS !== (string) get_post_meta( $id, self::NATIVE_STATUS, true ) ) {
+				Logger::error( sprintf( 'réparation #%d : statut natif non réécrit', $id ) );
+
+				return false;
+			}
+
+			Logger::info( sprintf( 'demande #%d : état natif de Corbeille réparé, restauration de nouveau possible', $id ) );
+
+			return true;
+		} finally {
+			self::release_repair_lock( $id );
+		}
+	}
+
+	/**
+	 * Prend le verrou de réparation d'une demande.
+	 *
+	 * `add_option()` n'aboutit qu'une fois pour un même nom : c'est la seule
+	 * primitive réellement atomique dont on dispose sans table dédiée. Le
+	 * verrou est en `autoload = false` et porte sa propre expiration.
+	 *
+	 * @param int $id  Demande.
+	 * @param int $now Horodatage courant.
+	 * @return bool
+	 */
+	private static function acquire_repair_lock( int $id, int $now ): bool {
+		$cle      = self::REPAIR_LOCK_PREFIX . $id;
+		$existant = get_option( $cle, null );
+
+		if ( is_array( $existant ) ) {
+			if ( $now < (int) ( $existant['expires'] ?? 0 ) ) {
+				return false;
+			}
+
+			// Verrou périmé : une requête interrompue l'a laissé derrière elle.
+			delete_option( $cle );
+		}
+
+		return (bool) add_option( $cle, array( 'expires' => $now + self::REPAIR_LOCK_TTL ), '', false );
+	}
+
+	/**
+	 * Rend le verrou de réparation.
+	 *
+	 * @param int $id Demande.
+	 * @return void
+	 */
+	private static function release_repair_lock( int $id ): void {
+		delete_option( self::REPAIR_LOCK_PREFIX . $id );
 	}
 
 	/**

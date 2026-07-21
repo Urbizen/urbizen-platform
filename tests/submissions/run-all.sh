@@ -73,6 +73,9 @@ titre "10/11 — Cycle de Corbeille WordPress"
 "$PHP_BIN" test-corbeille.php
 verdict $? "test-corbeille.php"
 
+"$PHP_BIN" test-persistance.php
+verdict $? "test-persistance.php"
+
 titre "11/11 — Compatibilité et absence d'effet public"
 "$PHP_BIN" test-compat.php
 verdict $? "test-compat.php"
@@ -83,7 +86,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 12 bancs passent.\033[0m\n'
+	printf '\033[32mLes 13 bancs passent.\033[0m\n'
 	exit 0
 fi
 

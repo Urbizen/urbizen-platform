@@ -152,6 +152,39 @@ place · `deleted` après effacement.
   `accepted_args` ramené à 2, un retour `draft` puis `publish`, la suppression
   de la barrière postérieure, et un autre type de contenu forcé à `private`.
 
+### Persistance et restauration alignées sur le cœur (sixième revue de la PR #19)
+- **Réparation native contrôlée.** `wp_untrash_post()` efface
+  `_wp_trash_meta_status` et `_wp_trash_meta_time` **avant** d'écrire le
+  nouveau statut. Si cette écriture échoue, le contenu reste à la Corbeille
+  sans plus aucune trace de sa provenance, et toute nouvelle tentative est
+  refusée. `TrashGuard::repair_native()` rétablit ces deux métadonnées natives
+  — et elles seules — lorsque toute la cohérence Urbizen est démontrée, sous
+  verrou atomique en `autoload = false` (D-036).
+- La réparation ne touche ni au `post_status`, ni au statut métier, ni aux
+  fichiers, ni à la référence, ni à aucun lien. Elle ne rouvre aucun
+  téléchargement : elle rend seulement le cycle natif rejouable.
+- `_wp_trash_meta_time` reprend l'horodatage consigné par la transition, pas
+  l'heure courante : une réparation ne doit pas prolonger le séjour en
+  Corbeille avant purge automatique.
+- `TrashGuard::reconcile()` répare désormais aussi ces états, et les compte.
+- **Persistance vérifiée.** `update_post_meta()` rend `false` dans deux
+  situations qu'aucun retour ne distingue : l'écriture a échoué, ou la valeur
+  était déjà la bonne. `SubmissionRepository::persist_meta()` écrit puis
+  **relit**, et ne conclut que sur la relecture — dans les deux sens (D-037).
+- Quatre emplacements corrigés : la boucle de `persist()`, `set_files()`, et
+  les trois écritures de `finalize()`.
+- La doublure WordPress est alignée sur le cœur **7.0.2**, source à l'appui :
+  ordre exact de `wp_trash_post()` et `wp_untrash_post()`, court-circuit des
+  filtres `pre_*` sur `null !== $check`, action `untrash_post`, `wp_update_post`
+  réel, `add_post_meta`, sémantique de retour de `update_post_meta()` et
+  `update_option()`, et `wp_scheduled_delete()` fidèle — y compris son appel
+  **sans forçage** et son indifférence aux contenus dépourvus de
+  `_wp_trash_meta_time`.
+- Nouveau banc `tests/integration/` exécuté contre un **vrai** WordPress 7.0.2
+  jetable : 41 contrôles, ordre des hooks, statut `draft` par défaut, moment de
+  suppression des métadonnées natives, et cycle Urbizen complet jusqu'à
+  `private`. Sans installation disponible, il s'abstient sans échouer.
+
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.
 - Aucun document ne passe par la médiathèque WordPress : `wp_handle_upload()`
