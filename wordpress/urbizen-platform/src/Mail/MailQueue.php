@@ -340,30 +340,126 @@ final class MailQueue {
 	}
 
 	/**
-	 * Exécute un travail en section critique.
+	 * Exécute un travail sous les **deux** couches de verrouillage.
 	 *
-	 * Le rappel reçoit le jeton propriétaire ; il lui appartient de vérifier
-	 * `owns_lock()` avant toute écriture décisive, car un verrou expiré peut
-	 * avoir été repris entre-temps.
+	 * Ordre d'acquisition **unique**, respecté par tous les composants :
 	 *
-	 * @param int          $id      Demande.
-	 * @param callable     $travail Rappel, recevant le jeton.
-	 * @param int|null     $now     Horodatage courant.
+	 * 1. le **mutex de processus** (`flock`), qui dit si une opération est
+	 *    réellement en cours ;
+	 * 2. le **verrou d'option**, qui porte le propriétaire logique et le bail.
+	 *
+	 * Un ordre unique, c'est l'absence d'interblocage. Le mutex est l'autorité :
+	 * tant qu'il est détenu, aucune transition concurrente n'est permise, même
+	 * si le bail d'option est dépassé. Le bail, lui, sert à l'observabilité, à
+	 * la réconciliation différée et à la coordination durable.
+	 *
+	 * Fermé par défaut : si le mutex ne peut être ni créé ni acquis pour une
+	 * raison technique, le travail n'a pas lieu.
+	 *
+	 * @param int      $id      Demande.
+	 * @param callable $travail Rappel, recevant la poignée.
+	 * @param int|null $now     Horodatage courant.
 	 * @return array{ok:bool,code:string,valeur:mixed}
 	 */
-	public static function with_lock( int $id, callable $travail, ?int $now = null ) {
-		$now   = null === $now ? time() : $now;
-		$jeton = self::acquire_lock( $id, $now );
+	public static function with_process_lock( int $id, callable $travail, ?int $now = null ) {
+		$now     = null === $now ? time() : $now;
+		$poignee = MailProcessLock::acquire( $id );
 
-		if ( null === $jeton ) {
-			return array( 'ok' => false, 'code' => 'verrou_occupe', 'valeur' => null );
+		if ( null === $poignee ) {
+			return array( 'ok' => false, 'code' => 'mutex_indisponible', 'valeur' => null );
 		}
 
 		try {
-			return array( 'ok' => true, 'code' => 'ok', 'valeur' => $travail( $jeton ) );
+			// Le bail d'option est **réconcilié** sous le mutex : un bail périmé
+			// laissé par une tentative précédente n'appartient plus à personne,
+			// puisque personne ne détenait le mutex.
+			$jeton = self::acquire_lock( $id, $now );
+
+			if ( null === $jeton ) {
+				$jeton = self::reconcile_lease( $id, $now );
+			}
+
+			if ( null === $jeton ) {
+				return array( 'ok' => false, 'code' => 'bail_indisponible', 'valeur' => null );
+			}
+
+			$poignee->set_jeton( $jeton );
+
+			try {
+				return array( 'ok' => true, 'code' => 'ok', 'valeur' => $travail( $poignee ) );
+			} finally {
+				self::release_lock( $id, $jeton );
+			}
 		} finally {
-			self::release_lock( $id, $jeton );
+			MailProcessLock::release( $poignee );
 		}
+	}
+
+	/**
+	 * Rafraîchit le bail d'option, sous mutex détenu.
+	 *
+	 * Le bail a pu expirer pendant un appel au transport plus long que prévu.
+	 * Le mutex prouvant que ce processus est bien le seul aux commandes, il a
+	 * le droit — et le devoir — de remettre son bail à jour avant d'écrire son
+	 * résultat.
+	 *
+	 * @param MailLockHandle $poignee Poignée détenue.
+	 * @param int            $now     Horodatage courant.
+	 * @return bool
+	 */
+	public static function refresh_lease( MailLockHandle $poignee, int $now ): bool {
+		if ( ! $poignee->est_detenu() ) {
+			return false;
+		}
+
+		$id = $poignee->submission();
+
+		if ( self::owns_lock( $id, $poignee->jeton(), $now ) ) {
+			return true;
+		}
+
+		$jeton = self::reconcile_lease( $id, $now );
+
+		if ( null === $jeton ) {
+			return false;
+		}
+
+		$poignee->set_jeton( $jeton );
+
+		return true;
+	}
+
+	/**
+	 * Reprend le bail d'option, sous mutex détenu.
+	 *
+	 * Détenir le mutex prouve qu'aucun autre processus ne travaille : un bail
+	 * qui subsiste est donc celui d'un processus disparu, et peut être repris
+	 * quelle que soit son échéance.
+	 *
+	 * @param int $id  Demande.
+	 * @param int $now Horodatage courant.
+	 * @return string|null
+	 */
+	private static function reconcile_lease( int $id, int $now ): ?string {
+		delete_option( MailPolicy::LOCK_PREFIX . $id );
+
+		return self::acquire_lock( $id, $now );
+	}
+
+	/**
+	 * Exécute un travail en section critique.
+	 *
+	 * Alias de `with_process_lock()` : **toutes** les transitions de
+	 * notification passent par les deux couches. Aucun chemin ne se contente
+	 * du bail d'option.
+	 *
+	 * @param int      $id      Demande.
+	 * @param callable $travail Rappel, recevant la poignée.
+	 * @param int|null $now     Horodatage courant.
+	 * @return array{ok:bool,code:string,valeur:mixed}
+	 */
+	public static function with_lock( int $id, callable $travail, ?int $now = null ) {
+		return self::with_process_lock( $id, $travail, $now );
 	}
 
 	/**
@@ -378,6 +474,12 @@ final class MailQueue {
 	 * @return bool
 	 */
 	public static function is_locked( int $id, ?int $now = null ): bool {
+		// **Le mutex fait autorité.** Un bail périmé ne prouve pas que son
+		// propriétaire est mort ; un mutex détenu prouve qu'il est vivant.
+		if ( MailProcessLock::is_held( $id ) ) {
+			return true;
+		}
+
 		$now      = null === $now ? time() : $now;
 		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
 

@@ -37,6 +37,8 @@ foreach (
 		'src/Submissions/TransactionRecovery.php',
 		'src/Submissions/TrashGuard.php',
 		'src/Mail/MailPolicy.php',
+		'src/Mail/MailLockHandle.php',
+		'src/Mail/MailProcessLock.php',
 		'src/Mail/MailQueue.php',
 		'src/Mail/MailRenderer.php',
 		'src/Mail/MailTransport.php',

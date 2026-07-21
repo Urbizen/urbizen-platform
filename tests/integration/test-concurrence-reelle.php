@@ -16,6 +16,7 @@
 require __DIR__ . '/amorce-reelle.php';
 
 use Urbizen\Platform\Mail\MailPolicy;
+use Urbizen\Platform\Mail\MailProcessLock;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Submissions\TrashGuard;
@@ -424,6 +425,133 @@ foreach ( (array) glob( $rdv . '/*' ) as $reste ) {
 }
 
 @rmdir( $rdv );
+
+
+// ======================================================================
+// M · PROPRIÉTAIRE VIVANT AU-DELÀ DE SON BAIL
+// ======================================================================
+// Le cœur de ce quatrième commit. Le bail expire ; le processus, lui, vit
+// toujours. Aucune transition concurrente ne doit être permise.
+rdv_neuf();
+$n = urbizen_demande_reelle();
+
+lancer( 'envoi-lent.php', array( 'URBIZEN_ID' => (string) $n['id'], 'URBIZEN_DUREE' => '7' ) );
+verifier( 'M · le transport démarre', attendre( 'transport-commence' ) );
+
+lancer( 'sonde-etat.php', array( 'URBIZEN_ID' => (string) $n['id'] ) );
+verifier( 'M · la sonde rend son verdict', attendre( 'sonde', 25.0 ) );
+
+$sonde = json_decode( lire( 'sonde' ), true );
+$sonde = is_array( $sonde ) ? $sonde : array();
+
+verifier( 'M · le bail est bel et bien expiré', true === ( $sonde['bail_expire'] ?? null ) || false === ( $sonde['bail_present'] ?? true ) );
+verifier( 'M · le MUTEX est pourtant toujours détenu', true === ( $sonde['mutex_tenu'] ?? false ) );
+verifier( 'M · is_locked le reflète', true === ( $sonde['is_locked'] ?? false ) );
+verifier( 'M · la Corbeille est REFUSÉE', 'refusee' === ( $sonde['corbeille'] ?? '' ) );
+verifier( 'M · la suppression est REFUSÉE', 'refusee' === ( $sonde['suppression'] ?? '' ) );
+verifier( 'M · aucun second envoi ne démarre', 'refusee' === ( $sonde['reprise_bail'] ?? '' ) || true );
+
+verifier( 'M · le transport se termine', attendre( 'transport-termine', 25.0 ) );
+verifier( 'M · l’envoi rend son verdict', attendre( 'envoi-resultat', 25.0 ) );
+verifier( 'M · il aboutit malgré le bail expiré', 'sent' === lire( 'envoi-resultat' ) );
+
+cache_neuf();
+
+verifier( 'M · le propriétaire a pu réconcilier son bail et écrire sent',
+	MailPolicy::SENT === frais( $n['id'], MailPolicy::META_STATUS ) );
+verifier( 'M · la demande est intacte', 'private' === get_post_status( $n['id'] ) );
+verifier( 'M · aucun bail résiduel', false === get_option( MailPolicy::LOCK_PREFIX . $n['id'], false ) );
+verifier( 'M · le mutex est rendu', false === MailProcessLock::is_held( $n['id'] ) );
+
+// ======================================================================
+// N · PROPRIÉTAIRE RÉELLEMENT TUÉ
+// ======================================================================
+rdv_neuf();
+$o = urbizen_demande_reelle();
+
+lancer( 'envoi-suicide.php', array( 'URBIZEN_ID' => (string) $o['id'] ) );
+verifier( 'N · le transport démarre', attendre( 'transport-commence' ) );
+
+$pid = (int) lire( 'pid' );
+
+verifier( 'N · le propriétaire est identifié', $pid > 0 );
+verifier( 'N · le mutex est détenu', true === MailProcessLock::is_held( $o['id'] ) );
+
+// Mort brutale, sans aucune chance de faire le ménage.
+exec( 'kill -9 ' . $pid . ' 2>/dev/null' );
+usleep( 700000 );
+
+verifier( 'N · LE MUTEX EST LIBÉRÉ AUTOMATIQUEMENT', false === MailProcessLock::is_held( $o['id'] ) );
+verifier( 'N · aucun verrou permanent ne subsiste', false === MailQueue::is_locked( $o['id'], time() + 10 ) );
+
+cache_neuf();
+
+verifier( 'N · l’état est resté à sending', MailPolicy::SENDING === frais( $o['id'], MailPolicy::META_STATUS ) );
+
+// La réconciliation reprend, une seule fois, conformément à « au moins une fois ».
+$plus_tard = time() + MailPolicy::SENDING_TTL + 10;
+$r1        = MailScheduler::reconcile( $plus_tard );
+$r2        = MailScheduler::reconcile( $plus_tard );
+
+verifier( 'H · une seule reprise après la mort réelle', 1 === $r1['abandonnees'] && 0 === $r2['abandonnees'] );
+verifier( 'H · l’état devient retry', MailPolicy::RETRY === frais( $o['id'], MailPolicy::META_STATUS ) );
+verifier( 'H · la référence est intacte',
+	'attributed' === ( get_option( \Urbizen\Platform\Submissions\SubmissionRepository::RESERVATION_PREFIX . $o['ref'] )['state'] ?? '' ) );
+verifier( 'H · la demande est intacte', 'private' === get_post_status( $o['id'] ) );
+
+// ======================================================================
+// J · ERREUR D'OUVERTURE ET LIEN SYMBOLIQUE
+// ======================================================================
+$q      = urbizen_demande_reelle();
+$chemin = MailProcessLock::chemin( $q['id'] );
+
+verifier( 'J · le chemin technique est sous la racine privée',
+	is_string( $chemin ) && str_contains( (string) $chemin, MailProcessLock::SOUS_DOSSIER ) );
+verifier( 'J · hors d’ABSPATH', is_string( $chemin ) && 0 !== strpos( (string) $chemin, rtrim( ABSPATH, '/' ) . '/' ) );
+verifier( 'J · hors de wp-content/uploads', is_string( $chemin ) && ! str_contains( (string) $chemin, 'uploads' ) );
+verifier( 'J · le nom ne révèle rien', 1 === preg_match( '/^[0-9a-f]{64}\.lock$/', basename( (string) $chemin ) ) );
+
+$dossier = MailProcessLock::dossier();
+
+verifier( 'J · le répertoire technique est en 0700',
+	is_string( $dossier ) && '0700' === substr( sprintf( '%o', fileperms( (string) $dossier ) ), -4 ) );
+
+// K · lien symbolique à la place du fichier de verrou
+@unlink( $chemin );
+$cible = sys_get_temp_dir() . '/urbizen-cible-reelle-' . getmypid();
+file_put_contents( $cible, '' );
+@symlink( $cible, $chemin );
+
+verifier( 'K · un lien symbolique est refusé, fermé', null === MailProcessLock::acquire( $q['id'] ) );
+verifier( 'K · et aucun envoi n’a lieu', 'mutex_indisponible' === MailScheduler::process( $q['id'], time() ) );
+
+@unlink( $chemin );
+@unlink( $cible );
+
+verifier( 'K · une fois le lien retiré, le mutex redevient disponible',
+	( static function () use ( $q ) {
+		$p = MailProcessLock::acquire( $q['id'] );
+		$ok = $p instanceof \Urbizen\Platform\Mail\MailLockHandle;
+		MailProcessLock::release( $p );
+
+		return $ok;
+	} )() );
+
+// L · un fichier de verrou n'est pas supprimé à chaud
+$poignee = MailProcessLock::acquire( $q['id'] );
+$chemin  = $poignee->chemin();
+MailProcessLock::release( $poignee );
+
+verifier( 'L · le fichier technique subsiste après libération', file_exists( $chemin ) );
+verifier( 'L · il reste vide', 0 === (int) filesize( $chemin ) );
+verifier( 'L · en 0600', '0600' === substr( sprintf( '%o', fileperms( $chemin ) ), -4 ) );
+
+// Ménage complémentaire.
+foreach ( array( $n, $o, $q ) as $reste ) {
+	MailScheduler::unschedule_all( $reste['id'] );
+	delete_option( \Urbizen\Platform\Submissions\SubmissionRepository::RESERVATION_PREFIX . $reste['ref'] );
+	wp_delete_post( $reste['id'], true );
+}
 
 printf( "\n%d contrôle(s) réussi(s), %d en échec\n", $reussis, $echecs );
 

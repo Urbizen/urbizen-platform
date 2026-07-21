@@ -1483,3 +1483,58 @@ fichiers le faisait, sans le savoir.
   juste avant une interruption, sans que `sent` ait été écrit. Dans cet état,
   nous ne connaissons pas la livraison réelle, et nous ne prétendons pas la
   connaître.
+
+---
+
+## D-040 — Un bail n'est pas une preuve de vie
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-039]
+
+**Contexte.** La sérialisation de D-039 reposait sur un bail : une option
+portant un propriétaire et une échéance. Le raisonnement était que
+`LOCK_TTL = 600` dépassant `max_execution_time = 360`, un propriétaire dont le
+bail a expiré est nécessairement mort.
+
+Ce raisonnement est faux hors Windows. `max_execution_time` ne comptabilise pas
+le temps passé dans certaines opérations système — flux, réseau, appels
+externes. Un envoi bloqué dans un transport peut donc survivre à son bail.
+Deux processus se croient alors simultanément légitimes : l'un envoie, l'autre
+ferme le dossier.
+
+Reproduit avec deux processus réels, bail volontairement court, transport
+volontairement long : le bail expirait, le propriétaire vivait, et rien ne les
+distinguait.
+
+**Décision.** Une exclusion mutuelle dont la propriété est **liée à la vie du
+processus** : `flock()` sur un fichier technique.
+
+La détention est attachée au descripteur ouvert. Le noyau la refuse tant que le
+propriétaire vit, et la libère à sa disparition — fin normale, coupure ou
+`kill -9`. C'est exactement la question qu'un bail ne sait pas poser.
+
+Vérifié en lecture seule sur l'environnement cible : ext4 local, refus
+inter-processus, libération automatique après terminaison forcée.
+
+**Conséquences.**
+- **Ordre d'acquisition unique** : mutex de processus, puis bail d'option. Posé
+  en un seul endroit — `MailQueue::with_lock()` —, ce qui exclut l'interblocage.
+  Aucun composant ne prend l'une des deux couches directement.
+- **Le mutex fait autorité.** Le bail décrit le propriétaire logique et sert à
+  l'observabilité et à la réconciliation différée ; il ne décide plus rien seul.
+  Une expiration de bail, mutex encore détenu, ne permet aucune transition.
+- Le propriétaire vivant réconcilie son bail sous le mutex avant d'écrire
+  `sent`, `retry` ou `failed`.
+- Après une mort réelle, le mutex se libère seul ; le bail subsiste jusqu'à son
+  échéance, puis la réconciliation constate que plus personne ne travaille et
+  reprend l'état `sending` — politique « au moins une fois » inchangée.
+- Les fichiers techniques vivent sous la racine privée, en `0700` / `0600`,
+  vides, nommés par HMAC. Ils ne sont pas supprimés à chaud : sur un système
+  POSIX, supprimer puis recréer un chemin pendant qu'un autre processus détient
+  encore l'inode donnerait deux verrous indépendants portant le même nom. Seule
+  la suppression définitive d'une demande les efface, sous le mutex acquis.
+- **Mode dégradé fermé.** Racine indisponible, répertoire non créable, chemin
+  non confiné, lien symbolique, ouverture refusée : rien n'a lieu. Jamais de
+  repli silencieux sur le bail seul.
+- Le plancher de durée du bail demeure, comme précaution secondaire. Il ne se
+  lève que sous `URBIZEN_TESTING`, constante définie hors du dépôt — le mode CLI
+  seul ne suffit pas, les tâches planifiées s'y exécutant aussi.

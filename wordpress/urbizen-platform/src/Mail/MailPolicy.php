@@ -105,7 +105,28 @@ final class MailPolicy {
 	public static function lock_ttl(): int {
 		$filtre = (int) apply_filters( 'urbizen_mail_lock_ttl', self::LOCK_TTL );
 
-		return max( self::MAX_EXECUTION + 1, $filtre );
+		// Le plancher ne se lève **que** sous la constante d'essai, définie
+		// hors du dépôt et jamais en production. Le mode CLI ne suffit pas :
+		// les tâches planifiées s'y exécutent aussi.
+		if ( defined( 'URBIZEN_TESTING' ) ) {
+			return max( 1, $filtre );
+		}
+
+		return max( self::lock_floor(), $filtre );
+	}
+
+	/**
+	 * Plancher de durée du bail.
+	 *
+	 * Un bail ne doit jamais expirer pendant que son propriétaire peut encore
+	 * s'exécuter. Ce plancher reste une **précaution secondaire** : depuis
+	 * D-040, l'autorité est le mutex de processus, qui ne repose sur aucune
+	 * hypothèse de durée.
+	 *
+	 * @return int
+	 */
+	public static function lock_floor(): int {
+		return self::MAX_EXECUTION + 1;
 	}
 
 	/**

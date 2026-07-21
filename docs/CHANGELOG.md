@@ -73,6 +73,35 @@ Notification administrative fiable d'une demande de conception acceptée.
   distincts**, synchronisés par fichiers de rendez-vous, contre un vrai
   WordPress 7.0.2.
 
+### Verrou lié à la vie du processus (seconde revue de la PR #20)
+- **`MailProcessLock` / `MailLockHandle`** : exclusion mutuelle par `flock()`,
+  détenue pendant toute la section critique — des contrôles initiaux jusqu'à la
+  persistance du résultat, appel au transport compris (D-040).
+- Un bail temporel ne prouve rien sur la vie de son propriétaire :
+  `max_execution_time` ne comptabilise pas, hors Windows, le temps passé dans
+  les flux, le réseau ou les appels externes. Le mutex, lui, est libéré par le
+  noyau à la disparition réelle du processus — y compris sur `kill -9`.
+- Ordre d'acquisition **unique** : mutex de processus, puis bail d'option.
+  Posé en un seul endroit, `MailQueue::with_lock()`.
+- Le mutex fait autorité : tant qu'il est détenu, ni Corbeille, ni suppression,
+  ni restauration, ni reprise administrative, ni réconciliation, ni second
+  transport — **même si le bail a expiré**.
+- Le propriétaire vivant réconcilie son bail sous le mutex avant d'écrire son
+  résultat.
+- Fichiers techniques sous `<racine privée>/locks/mail/`, noms dérivés par HMAC,
+  répertoires `0700`, fichiers `0600`, vides, hors d'`ABSPATH` et de
+  `wp-content/uploads`, confinés par `realpath`, liens symboliques refusés.
+- Ils ne sont **pas** supprimés à chaud : supprimer puis recréer un chemin
+  pendant qu'un autre processus détient l'inode donnerait deux verrous
+  indépendants. Seule la suppression définitive d'une demande les efface, et
+  uniquement sous le mutex acquis.
+- **Mode dégradé fermé** : si le mutex ne peut être ni créé ni acquis pour une
+  raison technique, rien n'a lieu — ni envoi, ni Corbeille, ni suppression, ni
+  replanification.
+- `flock` vérifié en lecture seule sur l'environnement cible : ext4 local, refus
+  inter-processus pendant la vie du propriétaire, libération après terminaison
+  forcée.
+
 ### Volontairement absent
 - Aucun courriel au demandeur. Aucune pièce jointe. Aucun accusé de réception.
 - Aucune modification de l'adresse `From` globale de WordPress.

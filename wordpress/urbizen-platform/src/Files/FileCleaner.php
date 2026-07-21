@@ -26,6 +26,8 @@ namespace Urbizen\Platform\Files;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Submissions\TrashGuard;
+use Urbizen\Platform\Mail\MailLockHandle;
+use Urbizen\Platform\Mail\MailProcessLock;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Support\Logger;
@@ -113,10 +115,17 @@ final class FileCleaner {
 		// Un envoi ultérieur relira cet état et ne fera rien.
 		MailQueue::with_lock(
 			$id,
-			static function ( string $jeton ) use ( $id ) {
+			static function ( MailLockHandle $poignee ) use ( $id ) {
 				// `sent` est une preuve historique : elle n'est pas effacée.
 				MailQueue::cancel( $id, 'demande_supprimee' );
 				MailScheduler::unschedule_all( $id );
+
+				// Le fichier technique de verrou n'est supprimé qu'ici, et
+				// seulement parce que nous venons d'obtenir le mutex : aucun
+				// autre processus ne le détient ni ne l'attend. Le supprimer à
+				// chaud, après un simple `LOCK_UN`, donnerait deux verrous
+				// indépendants portant le même nom.
+				MailProcessLock::discard( $poignee );
 
 				return true;
 			}

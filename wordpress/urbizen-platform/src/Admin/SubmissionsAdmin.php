@@ -16,6 +16,7 @@
 
 namespace Urbizen\Platform\Admin;
 
+use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
@@ -163,7 +164,7 @@ final class SubmissionsAdmin {
 		// pas dépendre d'un serveur de messagerie.
 		$resultat = MailQueue::with_lock(
 			$id,
-			static function ( string $jeton ) use ( $id ) {
+			static function ( MailLockHandle $poignee ) use ( $id ) {
 				// Relecture sous verrou : l'état a pu changer depuis le
 				// contrôle d'éligibilité, et `sent` ne se reprend jamais.
 				$statut = (string) get_post_meta( $id, MailPolicy::META_STATUS, true );
@@ -176,7 +177,7 @@ final class SubmissionsAdmin {
 					return false;
 				}
 
-				return MailScheduler::schedule_unique( $id, null, $jeton );
+				return MailScheduler::schedule_unique( $id, null, $poignee );
 			}
 		);
 

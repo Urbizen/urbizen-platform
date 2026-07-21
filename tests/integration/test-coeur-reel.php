@@ -14,6 +14,12 @@
  * Toutes les données sont fictives.
  */
 
+// Banc d'essai : la constante lève le plancher de durée des baux. Elle
+// n'existe jamais en production.
+if ( ! defined( 'URBIZEN_TESTING' ) ) {
+	define( 'URBIZEN_TESTING', true );
+}
+
 $racine = (string) getenv( 'URBIZEN_WP_ROOT' );
 
 if ( '' === $racine || ! is_readable( $racine . '/wp-load.php' ) ) {
@@ -59,6 +65,8 @@ foreach (
 		'src/Files/Storage.php',
 		'src/Files/SignedLink.php',
 		'src/Mail/MailPolicy.php',
+		'src/Mail/MailLockHandle.php',
+		'src/Mail/MailProcessLock.php',
 		'src/Mail/MailQueue.php',
 		'src/Mail/MailRenderer.php',
 		'src/Mail/MailTransport.php',

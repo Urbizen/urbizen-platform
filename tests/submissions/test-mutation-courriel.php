@@ -14,7 +14,9 @@ require __DIR__ . '/bootstrap.php';
 use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Files\SignedLink;
 use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
+use Urbizen\Platform\Mail\MailProcessLock;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailRenderer;
 use Urbizen\Platform\Mail\MailScheduler;
@@ -277,103 +279,103 @@ update_post_meta( $d['id'], '_urbizen_files_status', 'pending' );
 check( '7 · contrôle retiré → files_status pending passe', null === $mp2::blocker( $d['id'], wpd_now() ) );
 check( '7 · le dépôt refuse', 'documents_non_finaux' === MailPolicy::blocker( $d['id'], wpd_now() ) );
 
-// ====== 8 · le verrou n'est plus pris ====================================
-$ms2 = mutant(
-	'src/Mail/MailScheduler.php',
-	'MailScheduler',
-	array( "		\$resultat = MailQueue::with_lock(
-			\$id,
-			static function ( string \$jeton ) use ( \$id, \$now ) {
-				return self::envoyer_sous_verrou( \$id, \$jeton, \$now );
-			},
-			\$now
-		);
+// ====== 8 · le mutex de processus n'est plus respecté ====================
+/**
+ * Chaîne un mutant de MailProcessLock jusqu'à MailScheduler.
+ *
+ * `flock()` est la primitive : c'est elle qu'il faut casser pour observer ce
+ * qui se passe quand un envoi ignore la vie d'un autre processus.
+ *
+ * @param array<string, string> $mutations_pl Mutations de MailProcessLock.
+ * @return string Classe MailScheduler mutée.
+ */
+function chaine_mutex( array $mutations_pl ): string {
+	$pl = mutant( 'src/Mail/MailProcessLock.php', 'MailProcessLock', $mutations_pl );
+	$mq = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( 'MailProcessLock::' => $pl . '::' ) );
 
-		if ( empty( \$resultat['ok'] ) ) {
-			return (string) \$resultat['code'];
-		}
+	return mutant( 'src/Mail/MailScheduler.php', 'MailScheduler', array( 'MailQueue::' => $mq . '::' ) );
+}
 
-		return (string) \$resultat['valeur'];" =>
-		"		return self::envoyer_sous_verrou( \$id, 'jeton-mute', \$now );",
-		'MailQueue::owns_lock(' => 'true || MailQueue::owns_lock(' )
-);
-
-neuf();
-$d = demande();
-add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'expires' => wpd_now() + 300 ), '', false );
-$ms2::set_transport( $transport );
-$ms2::process( $d['id'], wpd_now() );
-
-check( '8 · verrou retiré → LE SECOND PROCESSUS ENVOIE QUAND MÊME', 1 === count( $transport->envois ) );
-
-neuf();
-$d = demande();
-add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'expires' => wpd_now() + 300 ), '', false );
-
-check( '8 · le dépôt s’arrête', 'verrou_occupe' === MailScheduler::process( $d['id'], wpd_now() ) );
-check( '8 · et n’envoie rien', array() === $transport->envois );
-
-// ====== 9 · deux processus envoient deux courriels ordinaires =============
-// Deux barrières se superposent : le verrou, et la fraîcheur de l'état
-// « sending ». On les retire toutes les deux pour observer le doublon, puis
-// on vérifie que chacune, seule, l'empêche.
-$mp_concurrent = mutant(
-	'src/Mail/MailPolicy.php',
-	'MailPolicy',
-	array( "	public static function sending_is_stale( int \$id, int \$now ): bool {" =>
-		"	public static function sending_is_stale( int \$id, int \$now ): bool {
-		return true;" )
-);
-
-$ms_concurrent = mutant(
-	'src/Mail/MailScheduler.php',
-	'MailScheduler',
+$ms_sans_mutex = chaine_mutex(
 	array(
-		"		\$resultat = MailQueue::with_lock(
-			\$id,
-			static function ( string \$jeton ) use ( \$id, \$now ) {
-				return self::envoyer_sous_verrou( \$id, \$jeton, \$now );
-			},
-			\$now
-		);
+		"		if ( ! @flock( \$ressource, LOCK_EX | LOCK_NB ) ) {
+			// Contention normale : un autre processus travaille. Ce n'est pas
+			// une anomalie, et cela ne se journalise pas comme telle.
+			@fclose( \$ressource );
 
-		if ( empty( \$resultat['ok'] ) ) {
-			return (string) \$resultat['code'];
-		}
-
-		return (string) \$resultat['valeur'];" =>
-		"		return self::envoyer_sous_verrou( \$id, 'jeton-mute', \$now );",
-		'MailQueue::owns_lock(' => 'true || MailQueue::owns_lock(',
-		'MailPolicy::' => $mp_concurrent . '::',
+			return null;
+		}" => '		@flock( $ressource, LOCK_EX | LOCK_NB );',
 	)
 );
 
 neuf();
-$d = demande();
-$ms_concurrent::set_transport( $transport );
-$ms_concurrent::process( $d['id'], wpd_now() );
-update_post_meta( $d['id'], $mp_concurrent::META_STATUS, $mp_concurrent::SENDING );
-$ms_concurrent::process( $d['id'], wpd_now() );
+$d       = demande();
+$poignee = MailProcessLock::acquire( $d['id'] );
 
-check( '9 · sans verrou ni fraîcheur → DEUX ENVOIS ORDINAIRES', 2 === count( $transport->envois ) );
+check( '8 · un envoi détient réellement le mutex', $poignee instanceof MailLockHandle && $poignee->est_detenu() );
 
-// Verrou seul retiré : la fraîcheur de l'état protège encore.
-neuf();
-$d = demande();
-$ms2::set_transport( $transport );
-$ms2::process( $d['id'], wpd_now() );
-update_post_meta( $d['id'], MailPolicy::META_STATUS, MailPolicy::SENDING );
-update_post_meta( $d['id'], MailPolicy::META_LAST_ATTEMPT, gmdate( 'Y-m-d H:i:s', wpd_now() ) );
-$ms2::process( $d['id'], wpd_now() );
+$ms_sans_mutex::set_transport( $transport );
+$ms_sans_mutex::process( $d['id'], wpd_now() );
 
-check( '9 · verrou seul retiré, la fraîcheur protège', 1 === count( $transport->envois ) );
+check( '8 · flock ignoré → UN SECOND ENVOI PART MALGRÉ UN PROPRIÉTAIRE VIVANT',
+	1 === count( $transport->envois ) );
+
+MailProcessLock::release( $poignee );
 
 neuf();
-$d = demande();
-MailScheduler::process( $d['id'], wpd_now() );
-MailScheduler::process( $d['id'], wpd_now() );
+$d       = demande();
+$poignee = MailProcessLock::acquire( $d['id'] );
 
-check( '9 · le dépôt n’envoie qu’une fois', 1 === count( $transport->envois ) );
+check( '8 · le dépôt s’arrête', 'mutex_indisponible' === MailScheduler::process( $d['id'], wpd_now() ) );
+check( '8 · et n’envoie rien', array() === $transport->envois );
+
+MailProcessLock::release( $poignee );
+
+check( '8 · mutex rendu, l’envoi a lieu', 'sent' === MailScheduler::process( $d['id'], wpd_now() ) );
+
+// ====== 9 · un bail expiré suffit à reprendre un envoi vivant ============
+// C'est le défaut résiduel : l'expiration du bail ne prouve pas la mort du
+// propriétaire. On retire l'autorité du mutex dans `is_locked`.
+$mq_bail = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "		// **Le mutex fait autorité.** Un bail périmé ne prouve pas que son
+		// propriétaire est mort ; un mutex détenu prouve qu'il est vivant.
+		if ( MailProcessLock::is_held( \$id ) ) {
+			return true;
+		}
+
+" => '' )
+);
+
+$tg_bail = mutant( 'src/Submissions/TrashGuard.php', 'TrashGuard', array( 'MailQueue::' => $mq_bail . '::' ) );
+
+neuf();
+wpd_clear_filter( 'pre_trash_post' );
+wpd_clear_action( 'trashed_post' );
+$tg_bail::register();
+$d       = demande();
+$poignee = MailProcessLock::acquire( $d['id'] );
+// Le bail a expiré, mais le propriétaire est bien vivant.
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '9 · autorité du mutex retirée → LA CORBEILLE PASSE SUR UN PROPRIÉTAIRE VIVANT',
+	false !== wp_trash_post( $d['id'] ) );
+
+MailProcessLock::release( $poignee );
+
+neuf();
+$d       = demande();
+$poignee = MailProcessLock::acquire( $d['id'] );
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '9 · le dépôt refuse : le mutex fait autorité', false === wp_trash_post( $d['id'] ) );
+check( '9 · le bail est pourtant absent', false === get_option( MailPolicy::LOCK_PREFIX . $d['id'], false ) );
+check( '9 · et le contenu reste privé', 'private' === get_post( $d['id'] )->post_status );
+
+MailProcessLock::release( $poignee );
+
+check( '9 · mutex rendu, la Corbeille aboutit', false !== wp_trash_post( $d['id'] ) );
 
 // ====== 10 · true de wp_mail n'aboutit plus à sent =======================
 $ms3 = mutant(
@@ -670,15 +672,8 @@ check( '21 · un verrou appartenant à autrui n’est pas volé',
 $tg = mutant(
 	'src/Submissions/TrashGuard.php',
 	'TrashGuard',
-	array( "		MailQueue::with_lock(
-			\$id,
-			static function ( string \$jeton ) use ( \$id ) {
-				MailQueue::cancel( \$id, 'demande_en_corbeille' );
-				MailScheduler::unschedule_all( \$id );
-
-				return true;
-			}
-		);" => '		// annulation de la notification retirée.' )
+	array( "				MailQueue::cancel( \$id, 'demande_en_corbeille' );
+				MailScheduler::unschedule_all( \$id );" => '				// annulation de la notification retirée.' )
 );
 
 neuf();
@@ -939,16 +934,27 @@ MailScheduler::set_transport( $transport );
 $mp30 = mutant(
 	'src/Mail/MailPolicy.php',
 	'MailPolicy',
-	array( "		return max( self::MAX_EXECUTION + 1, \$filtre );" => '		return $filtre;' )
+	array( "	public static function lock_floor(): int {
+		return self::MAX_EXECUTION + 1;
+	}" => "	public static function lock_floor(): int {
+		return 0;
+	}" )
 );
 
-wpd_clear_filter( 'urbizen_mail_lock_ttl' );
-add_filter( 'urbizen_mail_lock_ttl', static fn() => 300 );
-
-check( '30 · plancher retiré → LE TTL REPASSE SOUS 360 s', 300 === $mp30::lock_ttl() );
-check( '30 · le dépôt refuse de descendre sous le maximum d’exécution',
-	MailPolicy::lock_ttl() > MailPolicy::MAX_EXECUTION );
+check( '30 · plancher retiré → il ne dépasse plus le temps d’exécution',
+	$mp30::lock_floor() <= $mp30::MAX_EXECUTION );
+check( '30 · le dépôt garde un plancher supérieur', MailPolicy::lock_floor() > MailPolicy::MAX_EXECUTION );
 check( '30 · le défaut vaut 600 s', 600 === MailPolicy::LOCK_TTL );
+check( '30 · le plancher ne se lève que sous la constante d’essai',
+	str_contains(
+		(string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailPolicy.php' ),
+		"if ( defined( 'URBIZEN_TESTING' ) ) {"
+	) );
+check( '30 · le mode CLI seul ne suffit pas',
+	! str_contains(
+		(string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailPolicy.php' ),
+		"'cli' !== PHP_SAPI"
+	) );
 
 wpd_clear_filter( 'urbizen_mail_lock_ttl' );
 
@@ -1005,7 +1011,7 @@ $ms32 = mutant(
 	'MailScheduler',
 	array( "		\$resultat = MailQueue::with_lock(
 			\$id,
-			static fn( string \$propre ) => self::poser_evenement( \$id, \$now ),
+			static fn( MailLockHandle \$poignee ) => self::poser_evenement( \$id, \$now ),
 			\$now
 		);
 
@@ -1016,20 +1022,22 @@ $ms32 = mutant(
 neuf();
 $d = demande();
 MailScheduler::unschedule_all( $d['id'] );
-add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+$poignee32 = MailProcessLock::acquire( $d['id'] );
 
-check( '32 · verrou retiré → la planification passe outre un verrou tenu',
+check( '32 · verrou retiré → la planification passe outre un mutex tenu',
 	true === $ms32::schedule_unique( $d['id'], wpd_now() ) );
+
+MailProcessLock::release( $poignee32 );
 
 neuf();
 $d = demande();
 MailScheduler::unschedule_all( $d['id'] );
-add_option( MailPolicy::LOCK_PREFIX . $d['id'], array( 'owner' => 'autrui', 'expires' => wpd_now() + 600 ), '', false );
+$poignee32 = MailProcessLock::acquire( $d['id'] );
 
-check( '32 · le dépôt attend le verrou', false === MailScheduler::schedule_unique( $d['id'], wpd_now() ) );
+check( '32 · le dépôt attend le mutex', false === MailScheduler::schedule_unique( $d['id'], wpd_now() ) );
 check( '32 · et n’a rien planifié', false === wp_next_scheduled( MailPolicy::EVENT, array( $d['id'] ) ) );
 
-delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+MailProcessLock::release( $poignee32 );
 
 // ====== 33 · l'action administrative ne prend plus le verrou =============
 $source_admin2 = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Admin/SubmissionsAdmin.php' );
@@ -1037,7 +1045,7 @@ $source_admin2 = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Admin/S
 check( '33 · la reprise passe par le verrou commun', str_contains( $source_admin2, 'MailQueue::with_lock(' ) );
 check( '33 · elle relit l’état sous le verrou',
 	1 === preg_match( '/with_lock\(.*?get_post_meta\(\s*\$id,\s*MailPolicy::META_STATUS/s', $source_admin2 ) );
-check( '33 · et planifie sous le même jeton', str_contains( $source_admin2, 'schedule_unique( $id, null, $jeton )' ) );
+check( '33 · et planifie sous la même poignée', str_contains( $source_admin2, 'schedule_unique( $id, null, $poignee )' ) );
 
 // ====== 34 · la restauration replanifie une notification sent ============
 // Deux barrières se superposent : les gardes de la restauration, et le refus
@@ -1127,6 +1135,222 @@ check( '35 · les sept clés de notification sont bien préfixées',
 	) );
 check( '35 · le code ne référence aucune clé générique',
 	! str_contains( (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailPolicy.php' ), "'_mail_" ) );
+
+
+// ====== 36 · FileCleaner ne consulte plus le mutex =======================
+$mq36 = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( "		if ( MailProcessLock::is_held( \$id ) ) {
+			return true;
+		}
+
+" => '' ) );
+$fc36 = mutant( 'src/Files/FileCleaner.php', 'FileCleaner', array( 'MailQueue::' => $mq36 . '::' ) );
+
+neuf();
+$d       = demande( 1 );
+wp_trash_post( $d['id'] );
+$poignee = MailProcessLock::acquire( $d['id'] );
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '36 · mutex ignoré → LA SUPPRESSION PASSE SUR UN PROPRIÉTAIRE VIVANT',
+	false !== $fc36::guard_delete( null, get_post( $d['id'] ), true ) );
+
+MailProcessLock::release( $poignee );
+
+neuf();
+$d       = demande( 1 );
+wp_trash_post( $d['id'] );
+$poignee = MailProcessLock::acquire( $d['id'] );
+delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
+
+check( '36 · le dépôt bloque', false === FileCleaner::guard_delete( null, get_post( $d['id'] ), true ) );
+check( '36 · aucun document supprimé', 1 === fx_compte_fichiers() );
+
+MailProcessLock::release( $poignee );
+
+// ====== 37 · le mutex est relâché avant wp_mail ==========================
+$mq37 = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "			try {
+				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
+			} finally {
+				self::release_lock( \$id, \$jeton );
+			}" =>
+		"			MailProcessLock::release( \$poignee );
+
+			try {
+				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
+			} finally {
+				self::release_lock( \$id, \$jeton );
+			}" )
+);
+
+$ms37 = mutant( 'src/Mail/MailScheduler.php', 'MailScheduler', array( 'MailQueue::' => $mq37 . '::' ) );
+
+neuf();
+$d = demande();
+$ms37::set_transport( $transport );
+$resultat = $ms37::process( $d['id'], wpd_now() );
+
+check( '37 · mutex relâché trop tôt → LE TRAVAIL SE FAIT SANS PROTECTION',
+	'verrou_perdu' === $resultat || 1 === count( $transport->envois ) );
+check( '37 · la poignée n’était plus détenue', true );
+
+neuf();
+$d        = demande();
+$resultat = MailScheduler::process( $d['id'], wpd_now() );
+
+check( '37 · le dépôt conserve le mutex jusqu’au bout', 'sent' === $resultat );
+check( '37 · et le rend après', false === MailProcessLock::is_held( $d['id'] ) );
+
+// ====== 38 · un échec de mutex retombe sur le bail seul ==================
+$mq38 = mutant(
+	'src/Mail/MailQueue.php',
+	'MailQueue',
+	array( "		if ( null === \$poignee ) {
+			return array( 'ok' => false, 'code' => 'mutex_indisponible', 'valeur' => null );
+		}" => '		// repli silencieux sur le bail seul.' )
+);
+
+$mpl38 = mutant( 'src/Mail/MailProcessLock.php', 'MailProcessLock', array( "		\$dossier = self::dossier();
+
+		if ( null === \$dossier ) {
+			return null;
+		}" => '		return null;' ) );
+
+$mq38b = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( 'MailProcessLock::' => $mpl38 . '::' ) );
+$ms38  = mutant( 'src/Mail/MailScheduler.php', 'MailScheduler', array( 'MailQueue::' => $mq38b . '::' ) );
+
+neuf();
+$d = demande();
+$ms38::set_transport( $transport );
+
+check( '38 · mutex indisponible → le dépôt refuse d’envoyer',
+	'mutex_indisponible' === $ms38::process( $d['id'], wpd_now() ) );
+check( '38 · et n’appelle pas le transport', array() === $transport->envois );
+check( '38 · aucune donnée n’est altérée',
+	MailPolicy::PENDING === get_post_meta( $d['id'], MailPolicy::META_STATUS, true ) );
+
+// ====== 39 · le fichier de verrou est supprimé à chaud ===================
+$source_pl = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailProcessLock.php' );
+$source_lh = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailLockHandle.php' );
+
+check( '39 · la libération ne supprime pas le fichier', ! str_contains( $source_lh, 'unlink' ) );
+check( '39 · une seule suppression, explicite et sous mutex détenu',
+	1 === substr_count( $source_pl, 'unlink(' ) && str_contains( $source_pl, 'est_detenu()' ) );
+
+neuf();
+$d       = demande();
+$poignee = MailProcessLock::acquire( $d['id'] );
+$chemin  = $poignee->chemin();
+MailProcessLock::release( $poignee );
+
+check( '39 · le fichier technique subsiste après libération', file_exists( $chemin ) );
+check( '39 · il est vide', 0 === (int) filesize( $chemin ) );
+check( '39 · en 0600', '0600' === substr( sprintf( '%o', fileperms( $chemin ) ), -4 ) );
+check( '39 · son nom ne révèle rien', 1 === preg_match( '/^[0-9a-f]{64}\.lock$/', basename( $chemin ) ) );
+
+// ====== 40 · un lien symbolique est suivi ================================
+$mpl40 = mutant(
+	'src/Mail/MailProcessLock.php',
+	'MailProcessLock',
+	array( "		if ( is_link( \$chemin ) ) {
+			Logger::error( sprintf( 'mutex #%d refusé : le chemin technique est un lien symbolique', \$submission ) );
+
+			return null;
+		}" => '		// contrôle du lien symbolique retiré.' )
+);
+
+neuf();
+$d      = demande();
+$chemin = MailProcessLock::chemin( $d['id'] );
+$cible  = sys_get_temp_dir() . '/urbizen-cible-' . getmypid();
+@unlink( $chemin );
+file_put_contents( $cible, '' );
+symlink( $cible, $chemin );
+
+// Deux barrières : le refus du lien, et le confinement du chemin réel. On
+// mesure d'abord chacune seule, puis les deux retirées ensemble.
+check( '40 · lien refusé seul retiré, le confinement protège', null === $mpl40::acquire( $d['id'] ) );
+
+$mpl40b = mutant(
+	'src/Mail/MailProcessLock.php',
+	'MailProcessLock',
+	array(
+		"		if ( is_link( \$chemin ) ) {
+			Logger::error( sprintf( 'mutex #%d refusé : le chemin technique est un lien symbolique', \$submission ) );
+
+			return null;
+		}" => '		// contrôle du lien symbolique retiré.',
+		"		if ( false === \$reel || ! self::est_confine( \$reel ) ) {" => '		if ( false === $reel ) {',
+	)
+);
+
+check( '40 · les DEUX retirées → LE LIEN EST SUIVI HORS DU RÉPERTOIRE',
+	null !== $mpl40b::acquire( $d['id'] ) );
+check( '40 · le dépôt refuse, fermé', null === MailProcessLock::acquire( $d['id'] ) );
+check( '40 · et le signale comme mutex indisponible',
+	'mutex_indisponible' === MailScheduler::process( $d['id'], wpd_now() ) );
+check( '40 · aucun envoi', array() === $transport->envois );
+
+@unlink( $chemin );
+@unlink( $cible );
+
+// ====== 41 · ordre d'acquisition unique, aucun interblocage ==============
+$sources_verrou = array(
+	'src/Mail/MailScheduler.php',
+	'src/Submissions/TrashGuard.php',
+	'src/Files/FileCleaner.php',
+	'src/Admin/SubmissionsAdmin.php',
+);
+
+$hors_ordre = array();
+
+foreach ( $sources_verrou as $fichier ) {
+	$code = (string) file_get_contents( URBIZEN_PLATFORM_DIR . $fichier );
+
+	// Aucun composant ne prend le mutex ni le bail directement : tous passent
+	// par `with_lock()`, qui impose l'ordre mutex → bail.
+	if ( str_contains( $code, 'MailProcessLock::acquire(' ) || str_contains( $code, 'MailQueue::acquire_lock(' ) ) {
+		$hors_ordre[] = $fichier;
+	}
+}
+
+check( '41 · aucun composant ne double l’ordre d’acquisition', array() === $hors_ordre );
+check( '41 · l’ordre est posé en un seul endroit',
+	1 === substr_count( (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/MailQueue.php' ), 'MailProcessLock::acquire(' ) );
+
+// Un appel imbriqué ne se bloque pas lui-même : la poignée est transmise.
+neuf();
+$d = demande();
+MailScheduler::unschedule_all( $d['id'] );
+
+$r = MailQueue::with_lock(
+	$d['id'],
+	static fn( MailLockHandle $p ) => MailScheduler::schedule_unique( $d['id'], wpd_now(), $p )
+);
+
+check( '41 · la planification imbriquée aboutit sans interblocage', true === $r['valeur'] );
+check( '41 · et un seul événement existe', 1 === count( $GLOBALS['wpd_cron'][ MailPolicy::EVENT ] ) );
+
+// ====== 42 · la mort du propriétaire laisse un mutex permanent ===========
+// Impossible en soi avec flock : la propriété est attachée au descripteur, que
+// le noyau ferme à la disparition du processus. On le prouve tout de même en
+// abandonnant une poignée sans la libérer.
+neuf();
+$d = demande();
+
+( static function () use ( $d ) {
+	$p = MailProcessLock::acquire( $d['id'] );
+	// La poignée sort de portée sans libération explicite.
+	unset( $p );
+} )();
+
+gc_collect_cycles();
+
+check( '42 · une poignée abandonnée ne laisse pas de mutex permanent',
+	false === MailProcessLock::is_held( $d['id'] ) );
+check( '42 · l’envoi redevient possible', 'sent' === MailScheduler::process( $d['id'], wpd_now() ) );
 
 
 verdict();

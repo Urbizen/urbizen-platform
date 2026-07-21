@@ -27,6 +27,7 @@
 
 namespace Urbizen\Platform\Submissions;
 
+use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
@@ -259,7 +260,7 @@ final class TrashGuard {
 		// parti, le nier serait faux.
 		MailQueue::with_lock(
 			$id,
-			static function ( string $jeton ) use ( $id ) {
+			static function ( MailLockHandle $poignee ) use ( $id ) {
 				MailQueue::cancel( $id, 'demande_en_corbeille' );
 				MailScheduler::unschedule_all( $id );
 
@@ -600,7 +601,7 @@ final class TrashGuard {
 		// réémise automatiquement.
 		MailQueue::with_lock(
 			$id,
-			static function ( string $jeton ) use ( $id ) {
+			static function ( MailLockHandle $poignee ) use ( $id ) {
 				// Relecture **sous verrou** : un envoi a pu aboutir entre-temps.
 				if ( MailPolicy::CANCELLED !== (string) get_post_meta( $id, MailPolicy::META_STATUS, true ) ) {
 					return false;
@@ -614,7 +615,7 @@ final class TrashGuard {
 					return false;
 				}
 
-				return MailScheduler::schedule_unique( $id, null, $jeton );
+				return MailScheduler::schedule_unique( $id, null, $poignee );
 			}
 		);
 

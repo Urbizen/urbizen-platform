@@ -16,6 +16,12 @@ if ( '' === $racine || ! is_readable( $racine . '/wp-load.php' ) ) {
 
 require $racine . '/wp-load.php';
 
+// Banc d'essai : la constante lève le plancher de durée des baux, jamais la
+// protection elle-même. Elle n'existe pas en production.
+if ( ! defined( 'URBIZEN_TESTING' ) ) {
+	define( 'URBIZEN_TESTING', true );
+}
+
 if ( ! defined( 'URBIZEN_PLATFORM_DIR' ) ) {
 	define( 'URBIZEN_PLATFORM_DIR', dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/' );
 }
@@ -40,6 +46,8 @@ foreach (
 		'src/Files/SignedLink.php',
 		'src/Files/FileCleaner.php',
 		'src/Mail/MailPolicy.php',
+		'src/Mail/MailLockHandle.php',
+		'src/Mail/MailProcessLock.php',
 		'src/Mail/MailQueue.php',
 		'src/Mail/MailRenderer.php',
 		'src/Mail/MailTransport.php',

@@ -89,20 +89,21 @@ final class MailScheduler {
 	 *
 	 * @param int         $id    Demande.
 	 * @param int|null    $now   Horodatage courant.
-	 * @param string|null $jeton Jeton propriétaire, si le verrou est déjà tenu.
+	 * @param MailLockHandle|null $poignee Poignée, si le mutex est déjà tenu.
 	 * @return bool Vrai si un événement est programmé après cet appel.
 	 */
-	public static function schedule_unique( int $id, ?int $now = null, ?string $jeton = null ): bool {
+	public static function schedule_unique( int $id, ?int $now = null, ?MailLockHandle $poignee = null ): bool {
 		$now = null === $now ? time() : $now;
 
-		// Verrou déjà tenu par l'appelant : on travaille directement.
-		if ( null !== $jeton && MailQueue::owns_lock( $id, $jeton, $now ) ) {
+		// Mutex déjà tenu par l'appelant : on travaille directement, sans
+		// chercher à le reprendre — ce serait un interblocage.
+		if ( null !== $poignee && $poignee->est_detenu() ) {
 			return self::poser_evenement( $id, $now );
 		}
 
 		$resultat = MailQueue::with_lock(
 			$id,
-			static fn( string $propre ) => self::poser_evenement( $id, $now ),
+			static fn( MailLockHandle $poignee ) => self::poser_evenement( $id, $now ),
 			$now
 		);
 
@@ -229,8 +230,8 @@ final class MailScheduler {
 
 		$resultat = MailQueue::with_lock(
 			$id,
-			static function ( string $jeton ) use ( $id, $now ) {
-				return self::envoyer_sous_verrou( $id, $jeton, $now );
+			static function ( MailLockHandle $poignee ) use ( $id, $now ) {
+				return self::envoyer_sous_verrou( $id, $poignee, $now );
 			},
 			$now
 		);
@@ -246,11 +247,11 @@ final class MailScheduler {
 	 * Séquence d'envoi, exécutée en section critique.
 	 *
 	 * @param int    $id    Demande.
-	 * @param string $jeton Jeton propriétaire.
+	 * @param MailLockHandle $poignee Poignée détenue.
 	 * @param int    $now   Horodatage courant.
 	 * @return string Code technique.
 	 */
-	private static function envoyer_sous_verrou( int $id, string $jeton, int $now ): string {
+	private static function envoyer_sous_verrou( int $id, MailLockHandle $poignee, int $now ): string {
 		// Relecture sous verrou : l'état a pu changer entre le contrôle
 		// préalable et l'obtention du verrou.
 		$motif = MailPolicy::blocker( $id, $now );
@@ -283,7 +284,7 @@ final class MailScheduler {
 		// prendre du temps ; une mise à la Corbeille a pu aboutir. On relit
 		// l'état réel, cache vidé, et on renonce plutôt que d'envoyer la
 		// notification d'un dossier retiré.
-		if ( ! MailQueue::owns_lock( $id, $jeton, $now ) ) {
+		if ( ! $poignee->est_detenu() || ! MailQueue::owns_lock( $id, $poignee->jeton(), $now ) ) {
 			return 'verrou_perdu';
 		}
 
@@ -311,11 +312,16 @@ final class MailScheduler {
 
 		// Le verrou a-t-il tenu pendant l'appel ? S'il a été repris, un autre
 		// processus est aux commandes : on n'écrase pas son travail.
-		if ( ! MailQueue::owns_lock( $id, $jeton, $now ) ) {
-			Logger::error( sprintf( 'notification #%d : verrou perdu pendant l’envoi', $id ) );
+		// Le mutex a-t-il tenu ? Il est l'autorité : le bail d'option a pu
+		// expirer pendant l'appel sans que cela change quoi que ce soit.
+		if ( ! $poignee->est_detenu() ) {
+			Logger::error( sprintf( 'notification #%d : mutex perdu pendant l’envoi', $id ) );
 
 			return 'verrou_perdu';
 		}
+
+		// Le bail, lui, se réconcilie sous le mutex.
+		MailQueue::refresh_lease( $poignee, $now );
 
 		// Dernière garantie avant d'écrire : la demande ne doit pas s'être
 		// fermée pendant l'appel. Si elle l'a fait, l'envoi a bien eu lieu — la
@@ -423,7 +429,7 @@ final class MailScheduler {
 				// nouveau traitable, sous verrou, avec le même identifiant.
 				$reprise = MailQueue::with_lock(
 					$id,
-					static function ( string $jeton ) use ( $id, $now ) {
+					static function ( MailLockHandle $poignee ) use ( $id, $now ) {
 						if ( MailPolicy::SENDING !== (string) get_post_meta( $id, MailPolicy::META_STATUS, true ) ) {
 							return false;
 						}
