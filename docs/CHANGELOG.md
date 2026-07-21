@@ -5,6 +5,110 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.8.0] — 21 juillet 2026
+
+Notification administrative fiable d'une demande de conception acceptée.
+
+> **Aucun effet public.** Aucun courriel n'est envoyé au demandeur. Aucun
+> document n'est joint à un message. Aucun formulaire conception n'est rendu,
+> aucune page n'est créée. Le site est strictement inchangé.
+
+### Ajouté
+- `src/Mail/MailPolicy.php` : source serveur unique des états, des délais de
+  reprise, du destinataire et des conditions d'éligibilité.
+- `src/Mail/MailQueue.php` : persistance de l'état des notifications, verrou
+  atomique par demande. Toutes les écritures passent par `persist_meta()`.
+- `src/Mail/MailRenderer.php` : rendu déterministe du sujet, du corps et des
+  en-têtes, avec un échappement choisi selon la destination — texte, attribut,
+  URL, sujet, en-tête.
+- `src/Mail/MailTransport.php` : contrat de transport, qui rend toute la
+  mécanique éprouvable sans jamais envoyer de courriel.
+- `src/Mail/WordPressMailTransport.php` : **seul** composant du greffon qui
+  appelle `wp_mail()`. Un contrôle de compatibilité le vérifie.
+- `src/Mail/MailScheduler.php` : planification d'un événement unique
+  `urbizen_send_submission_mail`, envoi sous verrou, et réconciliation de
+  sécurité (D-038).
+- Colonne « Notification » dans la liste des demandes : état, nombre de
+  tentatives, date d'envoi. Ni destinataire, ni corps, ni lien signé, ni
+  détail d'erreur.
+- Action administrative « Réessayer la notification », en POST, avec nonce,
+  capacité `manage_options` et identifiant canonique. Elle remet la
+  notification en attente et replanifie — elle n'envoie rien elle-même.
+- Banc `tests/submissions/test-courriel.php` (260 contrôles) et
+  `test-mutation-courriel.php` (24 mutations).
+
+### Modifié
+- `SubmissionRepository::finalize()` enregistre la notification `pending`
+  **avant** de déclarer la demande reçue : une demande reçue sans notification
+  serait un dossier que personne ne saurait avoir à traiter.
+- `TrashGuard` annule la notification à la mise à la Corbeille et la
+  replanifie à la restauration — sauf si un envoi a déjà été accepté.
+- `FileCleaner` retire l'événement et le verrou lors d'une suppression
+  définitive, sans toucher à la réservation attribuée.
+- La tâche quotidienne réconcilie aussi les notifications.
+
+### Sérialisation des transitions (revue de la PR #20)
+- **Verrou commun par notification**, à jeton propriétaire. Toutes les
+  opérations qui touchent l'état d'une notification passent par lui : envoi,
+  annulation à la Corbeille, suppression définitive, restauration, action
+  administrative, planification, déplanification, réconciliation (D-039).
+- API centrale dans `MailQueue` : `acquire_lock()` rend un jeton,
+  `owns_lock()`, `release_lock()` vérifie le jeton, `with_lock()` encadre un
+  travail, `is_locked()` répond sans prétendre à la propriété.
+- **Un processus ne peut plus supprimer le verrou d'un autre.** Le nettoyage de
+  fichiers le faisait sans le savoir.
+- TTL porté de **300 à 600 secondes**, avec un plancher à
+  `max_execution_time + 1` : un verrou de 300 s pouvait être repris alors que
+  son propriétaire, autorisé à 360 s, s'exécutait encore.
+- Mise à la Corbeille et suppression définitive **refusées** tant qu'un envoi
+  est en vol ; toutes deux restent rejouables ensuite.
+- **Ultime vérification d'éligibilité immédiatement avant l'appel au
+  transport**, cache d'objets purgé, puis contrôle postérieur : un courriel ne
+  part jamais pour un dossier fermé entre-temps, et `sent` n'écrase jamais une
+  annulation légitime.
+- `schedule_unique()` encadre la vérification et la création par le verrou :
+  `wp_next_scheduled()` suivi de `wp_schedule_single_event()` n'est pas
+  atomique. `unschedule_all()` retire tous les événements résiduels.
+- Banc `tests/integration/test-concurrence-reelle.php` : **processus PHP
+  distincts**, synchronisés par fichiers de rendez-vous, contre un vrai
+  WordPress 7.0.2.
+
+### Verrou lié à la vie du processus (seconde revue de la PR #20)
+- **`MailProcessLock` / `MailLockHandle`** : exclusion mutuelle par `flock()`,
+  détenue pendant toute la section critique — des contrôles initiaux jusqu'à la
+  persistance du résultat, appel au transport compris (D-040).
+- Un bail temporel ne prouve rien sur la vie de son propriétaire :
+  `max_execution_time` ne comptabilise pas, hors Windows, le temps passé dans
+  les flux, le réseau ou les appels externes. Le mutex, lui, est libéré par le
+  noyau à la disparition réelle du processus — y compris sur `kill -9`.
+- Ordre d'acquisition **unique** : mutex de processus, puis bail d'option.
+  Posé en un seul endroit, `MailQueue::with_lock()`.
+- Le mutex fait autorité : tant qu'il est détenu, ni Corbeille, ni suppression,
+  ni restauration, ni reprise administrative, ni réconciliation, ni second
+  transport — **même si le bail a expiré**.
+- Le propriétaire vivant réconcilie son bail sous le mutex avant d'écrire son
+  résultat.
+- Fichiers techniques sous `<racine privée>/locks/mail/`, noms dérivés par HMAC,
+  répertoires `0700`, fichiers `0600`, vides, hors d'`ABSPATH` et de
+  `wp-content/uploads`, confinés par `realpath`, liens symboliques refusés.
+- Ils ne sont **pas** supprimés à chaud : supprimer puis recréer un chemin
+  pendant qu'un autre processus détient l'inode donnerait deux verrous
+  indépendants. Seule la suppression définitive d'une demande les efface, et
+  uniquement sous le mutex acquis.
+- **Mode dégradé fermé** : si le mutex ne peut être ni créé ni acquis pour une
+  raison technique, rien n'a lieu — ni envoi, ni Corbeille, ni suppression, ni
+  replanification.
+- `flock` vérifié en lecture seule sur l'environnement cible : ext4 local, refus
+  inter-processus pendant la vie du propriétaire, libération après terminaison
+  forcée.
+
+### Volontairement absent
+- Aucun courriel au demandeur. Aucune pièce jointe. Aucun accusé de réception.
+- Aucune modification de l'adresse `From` globale de WordPress.
+- Aucun CC, aucun BCC.
+
+---
+
 ## [0.7.0] — 20 juillet 2026
 
 Validation et stockage privé des documents joints à une demande.

@@ -14,6 +14,7 @@ require __DIR__ . '/bootstrap.php';
 use Urbizen\Platform\Http\SubmissionController;
 use Urbizen\Platform\Http\SubmissionResult;
 use Urbizen\Platform\Security\AntiSpam;
+use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
@@ -36,7 +37,13 @@ check( 'un identifiant est renvoyé', $r->id() > 0 );
 check( 'aucune erreur de validation', array() === $r->errors() );
 check( 'la demande existe en base', 1 === count( $GLOBALS['wpd_posts'] ) );
 check( 'aucun courriel n’est envoyé', array() === $GLOBALS['wpd_mails'] );
-check( 'mail_status reste not_started', 'not_started' === get_post_meta( $r->id(), '_urbizen_mail_status', true ) );
+// B3 : une demande finalisée porte une notification en attente, et un
+// identifiant de notification. Aucun courriel n'est parti pour autant : le
+// contrôleur ne rend rien et n'appelle aucun transport.
+check( 'mail_status = pending', MailPolicy::PENDING === get_post_meta( $r->id(), '_urbizen_mail_status', true ) );
+check( 'un identifiant de notification est attribué',
+	1 === preg_match( '/^[0-9a-f]{32}$/', (string) get_post_meta( $r->id(), MailPolicy::META_ID, true ) ) );
+check( 'aucun courriel envoyé par le contrôleur', array() === $GLOBALS['wpd_mails'] );
 
 // ================================================== ORDRE DES REFUS =========
 // Chaque refus est éprouvé sur une soumission par ailleurs parfaite : ce qui

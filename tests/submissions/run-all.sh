@@ -76,6 +76,12 @@ verdict $? "test-corbeille.php"
 "$PHP_BIN" test-persistance.php
 verdict $? "test-persistance.php"
 
+"$PHP_BIN" test-courriel.php
+verdict $? "test-courriel.php"
+
+"$PHP_BIN" test-mutation-courriel.php
+verdict $? "test-mutation-courriel.php"
+
 titre "11/11 — Compatibilité et absence d'effet public"
 "$PHP_BIN" test-compat.php
 verdict $? "test-compat.php"
@@ -86,7 +92,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 13 bancs passent.\033[0m\n'
+	printf '\033[32mLes 15 bancs passent.\033[0m\n'
 	exit 0
 fi
 

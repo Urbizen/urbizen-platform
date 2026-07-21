@@ -8,7 +8,7 @@ bancs PHP, les services IGN sont simulés dans les bancs JavaScript.
 
 ```bash
 cd tests/cadastre
-npm install     # une seule fois : installe jsdom
+npm ci          # une seule fois : installe jsdom à la version verrouillée
 npm test        # équivaut à ./run-all.sh
 ```
 
@@ -22,7 +22,7 @@ en échec, `2` prérequis manquant.
 | Outil | Version | Rôle |
 |---|---|---|
 | Node | 18 ou plus | exécution des bancs JavaScript |
-| jsdom | ^27 | DOM simulé — `npm install` |
+| jsdom | **27.4.0 exactement** | DOM simulé — `npm ci` depuis `tests/cadastre/` |
 | PHP | 8.1 ou plus | bancs de rendu et génération de la fixture |
 
 macOS ne fournit plus PHP depuis Monterey. Désignez le vôtre si besoin :

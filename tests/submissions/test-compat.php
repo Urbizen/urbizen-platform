@@ -99,6 +99,7 @@ foreach ( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( URBIZEN
 }
 
 $fautifs = array();
+$directs = array();
 
 foreach ( $sources as $chemin => $contenu ) {
 	// On retire les commentaires : parler de « courriel » est permis, en
@@ -111,12 +112,31 @@ foreach ( $sources as $chemin => $contenu ) {
 		)
 	);
 
-	if ( preg_match( '/\bwp_mail\s*\(|\bmail\s*\(|Mailer::/', $code ) ) {
+	if ( preg_match( '/\bwp_mail\s*\(/', $code ) ) {
 		$fautifs[] = $chemin;
+	}
+
+	// `mail()` contournerait les filtres de WordPress, la configuration SMTP du
+	// site et toute extension de messagerie. Elle n'a sa place nulle part.
+	if ( preg_match( '/(?<![\w>$:])mail\s*\(/', $code ) ) {
+		$directs[] = $chemin;
 	}
 }
 
-check( 'aucun envoi de courriel dans tout le plugin', array() === $fautifs );
+// B3 introduit un envoi — mais **un seul point d'envoi**. Concentrer l'appel
+// permet de prouver par simple lecture qu'aucun autre chemin du greffon
+// n'émet de courriel.
+check( 'wp_mail n’est appelée que dans un seul fichier', array( 'src/Mail/WordPressMailTransport.php' ) === $fautifs );
+check( 'aucun appel direct à mail()', array() === $directs );
+
+// Le contrôleur de soumission et le dépôt ne construisent ni n'envoient rien.
+foreach ( array( 'src/Http/SubmissionController.php', 'src/Submissions/SubmissionRepository.php' ) as $interdit ) {
+	check(
+		sprintf( '%s n’appelle aucun transport', $interdit ),
+		! str_contains( $sources[ $interdit ] ?? '', 'wp_mail' )
+		&& ! str_contains( $sources[ $interdit ] ?? '', 'MailRenderer' )
+	);
+}
 
 if ( array() !== $fautifs ) {
 	echo '    fichier : ' . implode( ' | ', $fautifs ) . "\n";
@@ -196,7 +216,7 @@ preg_match( '/^ \* Version:\s*(.+)$/m', $principal, $mh );
 
 $version = $m[1] ?? '';
 
-check( 'la version du plugin est 0.7.0', '0.7.0' === $version );
+check( 'la version du plugin est 0.8.0', '0.8.0' === $version );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {

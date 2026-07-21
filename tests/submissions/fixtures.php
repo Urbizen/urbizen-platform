@@ -155,14 +155,39 @@ function fx_compte_fichiers(): int {
 
 	$n = 0;
 
+	$technique = $racine . '/' . \Urbizen\Platform\Mail\MailProcessLock::SOUS_DOSSIER;
+
 	foreach ( new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $racine, FilesystemIterator::SKIP_DOTS ) ) as $f ) {
 		// index.php et .htaccess sont les défenses posées par Storage.
-		if ( $f->isFile() && ! in_array( $f->getFilename(), array( 'index.php', '.htaccess' ), true ) ) {
-			++$n;
+		if ( ! $f->isFile() || in_array( $f->getFilename(), array( 'index.php', '.htaccess' ), true ) ) {
+			continue;
 		}
+
+		// Les verrous de notification sont des fichiers **techniques**, vides,
+		// sans donnée personnelle. Ce compteur mesure les documents clients.
+		if ( 0 === strpos( (string) $f->getPathname(), $technique . '/' ) ) {
+			continue;
+		}
+
+		++$n;
 	}
 
 	return $n;
+}
+
+/**
+ * Compte les fichiers techniques de verrou.
+ *
+ * @return int
+ */
+function fx_compte_verrous(): int {
+	$base = URBIZEN_TEST_STORAGE . '/' . \Urbizen\Platform\Mail\MailProcessLock::SOUS_DOSSIER;
+
+	if ( ! is_dir( $base ) ) {
+		return 0;
+	}
+
+	return count( array_diff( (array) scandir( $base ), array( '.', '..' ) ) );
 }
 
 /**

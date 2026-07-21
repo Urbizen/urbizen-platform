@@ -14,6 +14,7 @@ use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\Pricing;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 SubmissionPostType::register_post_type();
@@ -114,14 +115,34 @@ $metas = array_keys( $GLOBALS['wpd_meta'][ $id ] );
 
 check( 'les métadonnées obligatoires sont présentes',
 	array() === array_diff( SubmissionRepository::REQUIRED_META, $metas ) );
-check( 'aucune métadonnée inattendue', array() === array_diff( $metas, SubmissionRepository::REQUIRED_META ) );
+// B3 ajoute l'état de notification. Ces clés sont **techniques** : un état, un
+// identifiant sans donnée personnelle, des compteurs et des horodatages.
+$attendues = array_merge(
+	SubmissionRepository::REQUIRED_META,
+	array(
+		MailPolicy::META_ID,
+		MailPolicy::META_ATTEMPTS,
+		MailPolicy::META_NEXT_ATTEMPT,
+		MailPolicy::META_LAST_ERROR,
+	)
+);
+
+check( 'aucune métadonnée inattendue', array() === array_diff( $metas, $attendues ) );
+check( 'la notification porte un identifiant', 32 === strlen( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ) );
+check( 'l’identifiant ne contient aucune donnée personnelle',
+	1 === preg_match( '/^[0-9a-f]{32}$/', (string) get_post_meta( $id, MailPolicy::META_ID, true ) ) );
+check( 'aucun corps, lien, signature ni destinataire n’est stocké',
+	array() === array_filter( $metas, static fn( $c ) => in_array( $c, array( '_urbizen_mail_body', '_urbizen_mail_to', '_urbizen_mail_links', '_urbizen_mail_subject' ), true ) ) );
 
 $lu = SubmissionRepository::get( $id );
 
 check( 'form_type = conception', 'conception' === $lu['form_type'] );
 check( 'schema_version = 1.0', '1.0' === $lu['schema_version'] );
 check( 'status initial = received', 'received' === $lu['status'] );
-check( 'mail_status = not_started', 'not_started' === $lu['mail_status'] );
+// B3 : la notification est enregistrée **pendant** la finalisation. Le dossier
+// est donc reçu et une notification l'attend — mais rien n'est encore parti.
+check( 'mail_status = pending après finalisation', MailPolicy::PENDING === $lu['mail_status'] );
+check( 'aucun courriel n’a pourtant été envoyé', array() === $GLOBALS['wpd_mails'] );
 // B2 §12 : les états des documents sont none / pending / stored / failed /
 // deleted. Sans document, c'est « none » — l'ancien « not_started » de B1 n'a
 // plus cours.

@@ -27,4 +27,5 @@ if [ -z "${URBIZEN_WP_ROOT:-}" ]; then
 	exit 0
 fi
 
-"$PHP_BIN" "$ICI/test-coeur-reel.php"
+"$PHP_BIN" "$ICI/test-coeur-reel.php" || exit 1
+"$PHP_BIN" "$ICI/test-concurrence-reelle.php"

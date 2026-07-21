@@ -27,6 +27,10 @@
 
 namespace Urbizen\Platform\Submissions;
 
+use Urbizen\Platform\Mail\MailLockHandle;
+use Urbizen\Platform\Mail\MailPolicy;
+use Urbizen\Platform\Mail\MailQueue;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -132,6 +136,16 @@ final class TrashGuard {
 		}
 
 		$id      = (int) $post->ID;
+
+		// Un envoi est en vol : son propriétaire tient le verrou et peut être
+		// à l'intérieur du transport. Modifier la notification maintenant
+		// reviendrait à écrire par-dessus lui. On refuse, proprement — la mise
+		// à la Corbeille reste rejouable dès que le verrou est rendu.
+		if ( MailQueue::is_locked( $id ) ) {
+			Logger::error( sprintf( 'corbeille différée pour #%d : notification en cours d’envoi', $id ) );
+
+			return false;
+		}
 		$courant = (string) get_post_meta( $id, '_urbizen_status', true );
 
 		// Déjà invalidée : la préparation existe. On laisse WordPress retenter
@@ -238,6 +252,21 @@ final class TrashGuard {
 
 		$transition['state'] = self::COMPLETED;
 		update_post_meta( $id, self::TRANSITION, (string) wp_json_encode( $transition ) );
+
+		// Une demande retirée ne se notifie pas. Tout se passe **sous le verrou
+		// commun** : sans lui, un envoi concurrent pourrait écrire `sent`
+		// par-dessus l'annulation, et un courriel partirait pour un dossier
+		// retiré. Un envoi déjà accepté n'est jamais annulé : le message est
+		// parti, le nier serait faux.
+		MailQueue::with_lock(
+			$id,
+			static function ( MailLockHandle $poignee ) use ( $id ) {
+				MailQueue::cancel( $id, 'demande_en_corbeille' );
+				MailScheduler::unschedule_all( $id );
+
+				return true;
+			}
+		);
 
 		Logger::info( sprintf( 'demande #%d : mise à la Corbeille confirmée', $id ) );
 	}
@@ -566,6 +595,29 @@ final class TrashGuard {
 		// supprimer plus tôt priverait tout diagnostic ultérieur.
 		delete_post_meta( $id, self::PRE_TRASH );
 		delete_post_meta( $id, self::TRANSITION );
+
+		// La notification annulée par la mise à la Corbeille reprend son cours,
+		// avec le même identifiant. Une notification déjà `sent` n'est jamais
+		// réémise automatiquement.
+		MailQueue::with_lock(
+			$id,
+			static function ( MailLockHandle $poignee ) use ( $id ) {
+				// Relecture **sous verrou** : un envoi a pu aboutir entre-temps.
+				if ( MailPolicy::CANCELLED !== (string) get_post_meta( $id, MailPolicy::META_STATUS, true ) ) {
+					return false;
+				}
+
+				if ( '' !== (string) get_post_meta( $id, MailPolicy::META_SENT_AT, true ) ) {
+					return false;
+				}
+
+				if ( ! MailQueue::requeue( $id ) ) {
+					return false;
+				}
+
+				return MailScheduler::schedule_unique( $id, null, $poignee );
+			}
+		);
 
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
 	}

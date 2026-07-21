@@ -1378,3 +1378,163 @@ conclure que sur la relecture.
   futur usage fautif tombe dans les bancs plutôt qu'en production.
 - Les doublures sont une commodité, pas une preuve. Un banc d'intégration
   s'exécute désormais contre un vrai WordPress 7.0.2 jetable.
+
+---
+
+## D-038 — Une notification est une conséquence, jamais une condition
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-037]
+
+**Contexte.** Urbizen doit être prévenue lorsqu'un dossier est accepté. La
+tentation est de faire de l'envoi une étape de la soumission. Ce serait une
+faute : un serveur de messagerie indisponible transformerait alors une demande
+parfaitement valide en soumission échouée, et le demandeur, qui n'y est pour
+rien, recommencerait.
+
+**Décision.** Séparer ce qui doit être garanti de ce qui doit être retenté.
+
+Ce qui est **garanti** : à la finalisation, une notification `pending` est
+enregistrée durablement, avec un identifiant serveur, **avant** que la demande
+ne soit déclarée reçue. Si cette écriture échoue, la finalisation échoue et le
+retour arrière transactionnel s'applique. Le succès garantit donc simultanément
+transaction `committed`, référence `attributed`, statut `received`,
+`files_status` final, identifiant de notification et `mail_status` `pending`.
+
+Ce qui est **retenté** : l'envoi lui-même. Cinq tentatives au plus, espacées de
+0, 5 min, 30 min, 2 h et 12 h, puis `failed`. Chaque tentative relit
+l'éligibilité complète, prend un verrou atomique et relit l'état sous ce
+verrou.
+
+**Conséquences.**
+- Un transport indisponible ne change rien au dossier : il reste `received`, sa
+  référence reste attribuée, ses documents restent en place.
+- Rien n'est envoyé pour une demande qui n'est pas, à l'instant même,
+  pleinement cohérente. Une transition de Corbeille, même seulement préparée,
+  suffit à tout suspendre.
+- **La garantie est « au moins une fois », et c'est assumé.** `wp_mail()` ne
+  permet pas mieux : une interruption peut survenir après l'appel et avant
+  l'écriture de `sent`. Un état `sending` abandonné est donc repris. Un doublon
+  exceptionnel, reconnaissable à son en-tête `X-Urbizen-Notification-ID`, vaut
+  mieux qu'une notification définitivement perdue.
+- `wp_mail()` rendant `true` signifie que **WordPress a accepté la requête
+  d'envoi** — pas que le message est arrivé. L'état `sent` ne prétend rien de
+  plus, et la documentation le dit.
+- Le destinataire vient d'une constante serveur, d'un filtre, ou de
+  `admin_email` — jamais d'une donnée de formulaire. Sans adresse valide,
+  l'envoi est refusé, fermé, avec le code `recipient_unavailable`.
+- Aucune pièce jointe : les documents restent derrière les liens signés de B2,
+  générés au moment du rendu, jamais stockés, jamais journalisés.
+- La base ne conserve que des états, des compteurs et des horodatages. Ni
+  corps, ni destinataire, ni lien, ni signature, ni chemin — rien qui ferait
+  d'elle une seconde copie des données personnelles.
+- Le journal du serveur web n'étant pas lisible en SSH chez l'hébergeur,
+  l'exploitation ne peut pas en dépendre : tout l'état utile est **persisté et
+  consultable depuis l'administration**.
+
+---
+
+## D-039 — Un état partagé se sérialise, il ne se surveille pas
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-038]
+
+**Contexte.** La première version de la notification prenait un verrou pour
+l'envoi, et pour lui seul. Tout le reste — annulation à la Corbeille,
+restauration, reprise administrative, suppression, planification — écrivait le
+même état sans coordination.
+
+Le défaut a été reproduit sur un vrai WordPress, avec **deux processus
+distincts** : l'un arrêté juste avant le transport, l'autre mettant la demande
+à la Corbeille. Résultat mesuré : la Corbeille aboutissait, `mail_status`
+passait à `cancelled`, puis l'envoi reprenait la main, appelait `wp_mail()` et
+écrivait `sent` **par-dessus** l'annulation. Un courriel partait pour un
+dossier retiré, et la base affirmait le contraire de ce qui s'était passé.
+
+Deux appels successifs dans un même processus n'auraient jamais montré cela :
+ils partagent le cache d'objets, les variables statiques et l'ordre
+d'exécution.
+
+**Décision.** Un **verrou commun par notification**, et toute transition passe
+par lui.
+
+Le verrou porte un jeton propriétaire aléatoire et une échéance — rien d'autre,
+et surtout aucune donnée personnelle. `release_lock()` vérifie le jeton :
+un processus ne peut plus supprimer le verrou d'un autre. Le nettoyage de
+fichiers le faisait, sans le savoir.
+
+**Conséquences.**
+- Mise à la Corbeille et suppression définitive sont **refusées** tant qu'un
+  envoi est en vol. Elles restent rejouables dès le verrou rendu : différer
+  vaut mieux qu'écrire par-dessus quelqu'un.
+- L'éligibilité est relue une dernière fois **immédiatement avant** l'appel au
+  transport, cache d'objets purgé — puis une nouvelle fois après, avant
+  d'écrire `sent`. Si la demande s'est fermée pendant l'appel, le courriel est
+  parti — la politique « au moins une fois » l'assume — mais l'annulation n'est
+  pas écrasée, et le fait est consigné.
+- Le TTL passe de 300 à **600 secondes**, avec un plancher à
+  `max_execution_time + 1`. Un verrou ne doit jamais expirer pendant que son
+  propriétaire peut encore s'exécuter : la production autorise 360 secondes.
+- `schedule_unique()` encadre `wp_next_scheduled()` et
+  `wp_schedule_single_event()` par le verrou. Pris séparément, ces deux appels
+  ne sont pas atomiques : deux processus peuvent constater la même absence.
+- **`sent` est une preuve historique.** Ni la Corbeille, ni la restauration, ni
+  l'action administrative ne l'effacent ou ne le rejouent. `cancelled` ne
+  concerne que `pending`, `retry` et `sending`.
+- La limite demeure, et doit être dite : `wp_mail()` peut avoir rendu `true`
+  juste avant une interruption, sans que `sent` ait été écrit. Dans cet état,
+  nous ne connaissons pas la livraison réelle, et nous ne prétendons pas la
+  connaître.
+
+---
+
+## D-040 — Un bail n'est pas une preuve de vie
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-039]
+
+**Contexte.** La sérialisation de D-039 reposait sur un bail : une option
+portant un propriétaire et une échéance. Le raisonnement était que
+`LOCK_TTL = 600` dépassant `max_execution_time = 360`, un propriétaire dont le
+bail a expiré est nécessairement mort.
+
+Ce raisonnement est faux hors Windows. `max_execution_time` ne comptabilise pas
+le temps passé dans certaines opérations système — flux, réseau, appels
+externes. Un envoi bloqué dans un transport peut donc survivre à son bail.
+Deux processus se croient alors simultanément légitimes : l'un envoie, l'autre
+ferme le dossier.
+
+Reproduit avec deux processus réels, bail volontairement court, transport
+volontairement long : le bail expirait, le propriétaire vivait, et rien ne les
+distinguait.
+
+**Décision.** Une exclusion mutuelle dont la propriété est **liée à la vie du
+processus** : `flock()` sur un fichier technique.
+
+La détention est attachée au descripteur ouvert. Le noyau la refuse tant que le
+propriétaire vit, et la libère à sa disparition — fin normale, coupure ou
+`kill -9`. C'est exactement la question qu'un bail ne sait pas poser.
+
+Vérifié en lecture seule sur l'environnement cible : ext4 local, refus
+inter-processus, libération automatique après terminaison forcée.
+
+**Conséquences.**
+- **Ordre d'acquisition unique** : mutex de processus, puis bail d'option. Posé
+  en un seul endroit — `MailQueue::with_lock()` —, ce qui exclut l'interblocage.
+  Aucun composant ne prend l'une des deux couches directement.
+- **Le mutex fait autorité.** Le bail décrit le propriétaire logique et sert à
+  l'observabilité et à la réconciliation différée ; il ne décide plus rien seul.
+  Une expiration de bail, mutex encore détenu, ne permet aucune transition.
+- Le propriétaire vivant réconcilie son bail sous le mutex avant d'écrire
+  `sent`, `retry` ou `failed`.
+- Après une mort réelle, le mutex se libère seul ; le bail subsiste jusqu'à son
+  échéance, puis la réconciliation constate que plus personne ne travaille et
+  reprend l'état `sending` — politique « au moins une fois » inchangée.
+- Les fichiers techniques vivent sous la racine privée, en `0700` / `0600`,
+  vides, nommés par HMAC. Ils ne sont pas supprimés à chaud : sur un système
+  POSIX, supprimer puis recréer un chemin pendant qu'un autre processus détient
+  encore l'inode donnerait deux verrous indépendants portant le même nom. Seule
+  la suppression définitive d'une demande les efface, sous le mutex acquis.
+- **Mode dégradé fermé.** Racine indisponible, répertoire non créable, chemin
+  non confiné, lien symbolique, ouverture refusée : rien n'a lieu. Jamais de
+  repli silencieux sur le bail seul.
+- Le plancher de durée du bail demeure, comme précaution secondaire. Il ne se
+  lève que sous `URBIZEN_TESTING`, constante définie hors du dépôt — le mode CLI
+  seul ne suffit pas, les tâches planifiées s'y exécutant aussi.

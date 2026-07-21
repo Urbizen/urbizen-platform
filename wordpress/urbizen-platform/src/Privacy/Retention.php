@@ -26,6 +26,7 @@ use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Submissions\TransactionRecovery;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
@@ -225,6 +226,10 @@ final class Retention {
 			'abandons'   => self::recover_abandoned( $now ),
 			// Réconciliation non destructive des transitions de Corbeille.
 			'corbeille'  => array_sum( TrashGuard::reconcile() ),
+			// Filet des notifications : une planification perdue, une reprise
+			// échue, un envoi abandonné. Les demandes récentes n'en dépendent
+			// pas — elles ont leur propre événement unique.
+			'courriels'  => array_sum( MailScheduler::reconcile( $now ) ),
 			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
 			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
 			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
@@ -233,17 +238,18 @@ final class Retention {
 			'staging'    => Storage::cleanup_staging( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] || $bilan['courriels'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(
-					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s), %d corbeille',
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s), %d corbeille, %d notification(s)',
 					$bilan['jetons'],
 					$bilan['creneaux'],
 					$bilan['references'],
 					$bilan['staging'],
 					$bilan['abandons'],
-					$bilan['corbeille']
+					$bilan['corbeille'],
+					$bilan['courriels']
 				)
 			);
 		}

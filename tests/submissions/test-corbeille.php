@@ -947,8 +947,20 @@ check( 'B · statut métier toujours non restauré', TrashGuard::STATUS_TRASHED 
 // --- C · réparation cohérente ---
 check( 'C · la réparation aboutit', true === TrashGuard::repair_native( $d['id'], wpd_now() ) );
 check( 'C · _wp_trash_meta_status redevient private', 'private' === get_post_meta( $d['id'], TrashGuard::NATIVE_STATUS, true ) );
-check( 'C · _wp_trash_meta_time reprend l’heure de la mise à la Corbeille',
-	(int) get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true ) <= wpd_now() );
+// L'horodatage natif doit être **exactement** celui de la mise à la Corbeille,
+// converti en timestamp Unix. Une borne large ne prouverait rien : la chaîne
+// GMT « 2026-07-21 09:52:27 » passe un `(int) … <= now` en valant 2026.
+$prepare_c = (string) ( TrashGuard::transition( $d['id'] )['prepared_at'] ?? '' );
+$attendu_c = (int) strtotime( $prepare_c . ' UTC' );
+$ecrit_c   = get_post_meta( $d['id'], TrashGuard::NATIVE_TIME, true );
+
+check( 'C · prepared_at est bien une chaîne GMT', 1 === preg_match( '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $prepare_c ) );
+check( 'C · _wp_trash_meta_time égale strtotime(prepared_at UTC)', $attendu_c === (int) $ecrit_c );
+check( 'C · c’est un entier, pas la chaîne GMT', is_int( $ecrit_c ) );
+check( 'C · la chaîne GMT n’est jamais écrite telle quelle', $prepare_c !== (string) $ecrit_c );
+check( 'C · valeur strictement positive', (int) $ecrit_c > 0 );
+check( 'C · aucune substitution par l’heure courante', (int) $ecrit_c !== wpd_now() || $attendu_c === wpd_now() );
+check( 'C · aucune prolongation du séjour en Corbeille', (int) $ecrit_c <= $attendu_c );
 check( 'C · post_status inchangé', 'trash' === get_post( $d['id'] )->post_status );
 check( 'C · statut métier inchangé', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
 check( 'C · aucun téléchargement avant la fin', null === D::locate( $d['params'], wpd_now() ) );

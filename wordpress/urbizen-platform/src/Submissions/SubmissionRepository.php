@@ -21,6 +21,8 @@
 
 namespace Urbizen\Platform\Submissions;
 
+use Urbizen\Platform\Mail\MailQueue;
+use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Support\Logger;
 use Urbizen\Platform\Support\OptionsScan;
 use Urbizen\Platform\Support\Reference;
@@ -238,11 +240,27 @@ final class SubmissionRepository {
 			return false;
 		}
 
+		// La notification est enregistrée **avant** que la demande ne soit
+		// déclarée reçue. Une demande reçue sans notification en attente serait
+		// un dossier que personne ne saurait avoir à traiter ; si cette
+		// écriture échoue, la finalisation échoue, et le retour arrière
+		// transactionnel reste applicable (D-038).
+		if ( ! MailQueue::create_pending( $id, $now ) ) {
+			Logger::error( sprintf( 'demande %s : notification non enregistrée, finalisation abandonnée', $reference ) );
+
+			return false;
+		}
+
 		if ( ! self::persist_meta( $id, '_urbizen_status', SubmissionPostType::STATUS_RECEIVED ) ) {
 			return false;
 		}
 
 		self::confirm_reference( $reference, $id, $now );
+
+		// La planification vient **après** le point de non-retour. Une panne
+		// entre les deux laisse une notification « pending » non planifiée, que
+		// la réconciliation retrouvera.
+		MailScheduler::schedule( $id, $now );
 
 		Logger::info(
 			sprintf(

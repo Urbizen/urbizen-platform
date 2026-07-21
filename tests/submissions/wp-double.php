@@ -43,6 +43,10 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_options']    = array();
 	$GLOBALS['wpd_autoload']   = array();
 	$GLOBALS['wpd_meta_lie']   = '';
+	$GLOBALS['wpd_cron_single'] = array();
+	$GLOBALS['wpd_cron_args']   = array();
+	$GLOBALS['wpd_mail_retour'] = true;
+	$GLOBALS['wpd_redirect_leve'] = false;
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
 	$GLOBALS['wpd_actions']    = array();
@@ -179,6 +183,10 @@ function has_action( $hook ) {
 /**
  * Retire tous les filtres d'un hook (isolation entre scénarios).
  */
+function wpd_clear_action( string $hook ): void {
+	unset( $GLOBALS['wpd_actions'][ $hook ] );
+}
+
 function wpd_clear_filter( string $hook ): void {
 	unset( $GLOBALS['wpd_filters'][ $hook ] );
 }
@@ -737,8 +745,24 @@ function remove_query_arg( $cles, $url = '' ) {
 	return $base . ( $existants ? '?' . http_build_query( $existants ) : '' );
 }
 
+/**
+ * Exception de redirection.
+ *
+ * Le code de production fait suivre `wp_safe_redirect()` d'un `exit`. Un banc
+ * ne peut donc pas observer ce qui se passe après — ni même atteindre son
+ * propre verdict. La doublure lève, ce qui rend le `exit` inatteignable et
+ * laisse le banc reprendre la main. Le code de production n'en sait rien : il
+ * n'a aucun aménagement pour les tests.
+ */
+class WPD_Redirection extends RuntimeException {}
+
 function wp_safe_redirect( $url, $statut = 302 ) {
 	$GLOBALS['wpd_redirects'][] = $url;
+
+	if ( ! empty( $GLOBALS['wpd_redirect_leve'] ) ) {
+		throw new WPD_Redirection( (string) $url );
+	}
+
 	return true;
 }
 
@@ -751,12 +775,27 @@ function current_user_can( $capacite ) { return (bool) $GLOBALS['wpd_can']; }
 function is_admin() { return false; }
 
 // -------------------------------------------------------------------- cron --
+/**
+ * Clé d'un événement, comme le cœur : le crochet **et** ses arguments.
+ *
+ * Deux événements du même crochet portant des arguments différents sont deux
+ * événements distincts. Les confondre masquerait toute déduplication fautive.
+ */
+function wpd_cle_cron( array $args ): string {
+	return md5( (string) wp_json_encode( array_values( $args ) ) );
+}
+
 function wp_next_scheduled( $hook, $args = array() ) {
-	return $GLOBALS['wpd_cron'][ $hook ] ?? false;
+	$cle = wpd_cle_cron( (array) $args );
+
+	return $GLOBALS['wpd_cron'][ $hook ][ $cle ] ?? false;
 }
 
 function wp_schedule_event( $timestamp, $recurrence, $hook, $args = array() ) {
-	$GLOBALS['wpd_cron'][ $hook ] = $timestamp;
+	$cle = wpd_cle_cron( (array) $args );
+
+	$GLOBALS['wpd_cron'][ $hook ][ $cle ]      = (int) $timestamp;
+	$GLOBALS['wpd_cron_args'][ $hook ][ $cle ] = array_values( (array) $args );
 
 	// Compte les appels réels : c'est ce qui distingue une programmation
 	// idempotente d'une reprogrammation à chaque chargement.
@@ -765,9 +804,70 @@ function wp_schedule_event( $timestamp, $recurrence, $hook, $args = array() ) {
 	return true;
 }
 
-function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
-	unset( $GLOBALS['wpd_cron'][ $hook ] );
+/**
+ * Événement unique. Le cœur le stocke exactement comme un événement récurrent,
+ * à ceci près qu'il n'est pas reprogrammé après exécution.
+ */
+function wp_schedule_single_event( $timestamp, $hook, $args = array() ) {
+	$cle = wpd_cle_cron( (array) $args );
+
+	$GLOBALS['wpd_cron'][ $hook ][ $cle ]        = (int) $timestamp;
+	$GLOBALS['wpd_cron_args'][ $hook ][ $cle ]   = array_values( (array) $args );
+	$GLOBALS['wpd_cron_single'][ $hook ][ $cle ] = true;
+	$GLOBALS['wpd_cron_calls'][ $hook ]          = ( $GLOBALS['wpd_cron_calls'][ $hook ] ?? 0 ) + 1;
+
 	return true;
+}
+
+function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
+	$cle = wpd_cle_cron( (array) $args );
+
+	unset( $GLOBALS['wpd_cron'][ $hook ][ $cle ], $GLOBALS['wpd_cron_single'][ $hook ][ $cle ] );
+
+	if ( isset( $GLOBALS['wpd_cron'][ $hook ] ) && array() === $GLOBALS['wpd_cron'][ $hook ] ) {
+		unset( $GLOBALS['wpd_cron'][ $hook ] );
+	}
+
+	return true;
+}
+
+/**
+ * Exécute les événements dus, comme le ferait wp-cron.
+ *
+ * Un événement unique est retiré **avant** son exécution, exactement comme le
+ * cœur : le crochet ne doit pas se voir reprogrammé par sa propre exécution.
+ *
+ * @return int Nombre d'événements exécutés.
+ */
+function wpd_executer_cron( ?string $hook = null ): int {
+	$executes = 0;
+
+	foreach ( $GLOBALS['wpd_cron'] as $crochet => $entrees ) {
+		if ( null !== $hook && $crochet !== $hook ) {
+			continue;
+		}
+
+		foreach ( $entrees as $cle => $timestamp ) {
+			if ( (int) $timestamp > wpd_now() ) {
+				continue;
+			}
+
+			$unique = ! empty( $GLOBALS['wpd_cron_single'][ $crochet ][ $cle ] );
+
+			if ( $unique ) {
+				unset( $GLOBALS['wpd_cron'][ $crochet ][ $cle ], $GLOBALS['wpd_cron_single'][ $crochet ][ $cle ] );
+
+				if ( array() === $GLOBALS['wpd_cron'][ $crochet ] ) {
+					unset( $GLOBALS['wpd_cron'][ $crochet ] );
+				}
+			}
+
+			do_action_ref_array( $crochet, $GLOBALS['wpd_cron_args'][ $crochet ][ $cle ] ?? array() );
+			++$executes;
+		}
+	}
+
+	return $executes;
 }
 
 // ------------------------------------------------------------- courriels ----
@@ -779,7 +879,71 @@ function wp_unschedule_event( $timestamp, $hook, $args = array() ) {
  */
 function wp_mail( $to, $subject, $message, $headers = '', $attachments = array() ) {
 	$GLOBALS['wpd_mails'][] = array( 'to' => $to, 'subject' => $subject );
-	return true;
+
+	// Le cœur peut rendre `false`, et une extension de messagerie peut lever.
+	// Les deux doivent être éprouvés.
+	$retour = $GLOBALS['wpd_mail_retour'] ?? true;
+
+	if ( 'exception' === $retour ) {
+		throw new RuntimeException( 'transport simulé en panne' );
+	}
+
+	return (bool) $retour;
+}
+
+/**
+ * Validation d'adresse, alignée sur le cœur pour ce que les bancs éprouvent :
+ * une partie locale, une arobase, un domaine pointé.
+ */
+function is_email( $adresse ) {
+	if ( ! is_string( $adresse ) || strlen( $adresse ) < 6 || ! str_contains( $adresse, '@' ) ) {
+		return false;
+	}
+
+	if ( 1 === preg_match( '/[\r\n\s]/', $adresse ) ) {
+		return false;
+	}
+
+	return 1 === preg_match( '/^[^@]+@[^@.]+(\.[^@.]+)+$/', $adresse ) ? $adresse : false;
+}
+
+/**
+ * Retire toutes les balises, comme `wp_strip_all_tags()`.
+ */
+function wp_strip_all_tags( $texte, $remove_breaks = false ) {
+	$texte = preg_replace( '@<(script|style)[^>]*?>.*?</\\1>@si', '', (string) $texte );
+	$texte = strip_tags( (string) $texte );
+
+	return $remove_breaks ? trim( (string) preg_replace( '/[\r\n\t ]+/', ' ', $texte ) ) : $texte;
+}
+
+/**
+ * Mot de passe aléatoire, employé comme repli d'entropie.
+ */
+function wp_generate_password( $longueur = 12, $speciaux = true, $extra = false ) {
+	return substr( bin2hex( random_bytes( (int) ceil( max( 1, $longueur ) / 2 ) ) ), 0, (int) $longueur );
+}
+
+/**
+ * Échappement d'URL. Comme le cœur : seuls quelques protocoles sont permis,
+ * et le reste est encodé.
+ */
+function esc_url( $url, $protocols = null, $context = 'display' ) {
+	$url = str_replace( array( "\r", "\n", "\t", ' ' ), '', (string) $url );
+
+	if ( '' === $url ) {
+		return '';
+	}
+
+	if ( 1 !== preg_match( '#^(https?|mailto):#i', $url ) ) {
+		return '';
+	}
+
+	return str_replace( array( '&', '"', "'", '<', '>' ), array( '&#038;', '&quot;', '&#039;', '&lt;', '&gt;' ), $url );
+}
+
+function wp_nonce_url( $url, $action = -1 ) {
+	return add_query_arg( '_wpnonce', wp_create_nonce( $action ), $url );
 }
 
 // ---------------------------------------------------------------- $wpdb -----
