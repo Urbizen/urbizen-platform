@@ -300,3 +300,11 @@
 	padding: 0.4rem 0;
 	text-decoration: underline;
 }
+
+/* `display:flex` posé sur la classe l'emporte sur la règle `[hidden]` du
+   navigateur : sans cette règle, la navigation masquée par le serveur
+   resterait visible, et le message « JavaScript nécessaire » serait démenti
+   par un bouton « Envoyer » bien présent. */
+.urbizen-conception__navigation[hidden] {
+	display: none;
+}

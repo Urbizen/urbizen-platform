@@ -85,6 +85,9 @@ verdict $? "test-conception-rendu.php"
 "$PHP_BIN" test-manifeste.php
 verdict $? "test-manifeste.php"
 
+"$PHP_BIN" test-mutation-conception.php
+verdict $? "test-mutation-conception.php"
+
 "$PHP_BIN" test-mutation-courriel.php
 verdict $? "test-mutation-courriel.php"
 
@@ -98,7 +101,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 17 bancs passent.\033[0m\n'
+	printf '\033[32mLes 18 bancs passent.\033[0m\n'
 	exit 0
 fi
 

@@ -117,3 +117,5 @@ function urbizen_attendre( string $chemin, float $secondes = 15.0 ): bool {
 function urbizen_jalon( string $chemin ): void {
 	file_put_contents( $chemin, (string) getmypid() );
 }
+
+require_once __DIR__ . '/amorce-outils.php';

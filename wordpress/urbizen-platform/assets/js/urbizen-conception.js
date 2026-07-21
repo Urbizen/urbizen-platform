@@ -371,6 +371,13 @@
 			self.envoyerFormulaire();
 		} );
 
+		// Le script est là : la navigation peut apparaître.
+		var nav = this.racine.querySelector( '.' + RACINE + '__navigation' );
+
+		if ( nav ) {
+			nav.hidden = false;
+		}
+
 		this.brancherFichiers();
 		this.brancherBrouillon();
 		this.restaurer();
@@ -839,9 +846,14 @@
 		}
 
 		var tarifs = this.schema.pricing;
-		var choisies = valeursDe( this.form, 'options' );
+
+		// Les deux champs de la définition serveur : les prestations tarifées
+		// et celles qui relèvent d'un devis. Lire un champ « options » qui
+		// n'existe pas laissait l'estimation figée sur le prix de base.
+		var choisies = valeursDe( this.form, 'options_tarifees' );
+		var devis = valeursDe( this.form, 'options_sur_devis' );
 		var total = tarifs.base;
-		var surDevis = false;
+		var surDevis = devis.length > 0;
 
         // Le pack remplace les prestations qu'il contient : on ne les compte
         // pas deux fois.

@@ -111,7 +111,7 @@ function declaration( array $blocs, $total_c = null, $total_s = null, $version =
 function reel( array $files ): array {
 	$n = UploadNormalizer::normalize( $files );
 
-	return UploadManifest::from_files( $n['files'] );
+	return (array) UploadManifest::from_files( $n['files'] );
 }
 
 /**
@@ -175,15 +175,18 @@ check( '2 · le document est stocké', 1 === fx_compte_fichiers() );
 neuf();
 // Vingt documents : deux blocs de dix, la politique plafonnant à dix par bloc.
 $vingt = lot( 'photos', 10 ) + lot( 'plan_terrain', 10 );
-$r     = soumettre( $vingt, fx_manifeste( $vingt ) );
 
-check( '2 · vingt documents, manifeste exact', $r->is_success() );
-check( '2 · les vingt sont stockés', 20 === fx_compte_fichiers() );
-
+// Le manifeste serveur se mesure **avant** la soumission : après, les fichiers
+// temporaires ont été déplacés dans le staging privé.
 $m = reel( $vingt );
 
 check( '2 · le manifeste serveur compte vingt', 20 === $m['total_count'] );
 check( '2 · et deux blocs', 2 === count( $m['blocks'] ) );
+
+$r = soumettre( $vingt, fx_manifeste( $vingt ) );
+
+check( '2 · vingt documents, manifeste exact', $r->is_success() );
+check( '2 · les vingt sont stockés', 20 === fx_compte_fichiers() );
 
 // ======================================================================
 // 3 · LA PROPRIÉTÉ CHERCHÉE PAR D-032 : 20 ANNONCÉS, 19 REÇUS
@@ -430,5 +433,111 @@ $decode = json_decode( $json, true );
 
 check( '10 · exactement quatre clés', array( 'version', 'total_count', 'total_size', 'blocks' ) === array_keys( $decode ) );
 check( '10 · exactement deux clés par bloc', array( 'count', 'size' ) === array_keys( $decode['blocks']['photos'] ) );
+
+// ======================================================================
+// 11 · UN FICHIER REÇU MAIS NON MESURABLE
+// ======================================================================
+// `false` n'est pas zéro, et `declared_size` n'est pas une mesure. Sans mesure
+// certaine, il n'y a pas de comparaison possible : on refuse.
+
+$cas = array();
+
+// a · fichier temporaire supprimé entre la normalisation et la mesure.
+$cas['temporaire supprimé'] = static function () {
+	$f = lot( 'photos', 1 );
+	unlink( $f['photos']['tmp_name'][0] );
+
+	return $f;
+};
+
+// b · chemin temporaire vide.
+$cas['chemin vide'] = static function () {
+	$f                          = lot( 'photos', 1 );
+	$f['photos']['tmp_name'][0] = '';
+
+	return $f;
+};
+
+// c · chemin pointant vers un répertoire.
+$cas['chemin vers un répertoire'] = static function () {
+	$f                          = lot( 'photos', 1 );
+	$f['photos']['tmp_name'][0] = sys_get_temp_dir();
+
+	return $f;
+};
+
+// d · fichier illisible.
+$cas['fichier illisible'] = static function () {
+	$f = lot( 'photos', 1 );
+	@chmod( $f['photos']['tmp_name'][0], 0000 );
+
+	return $f;
+};
+
+// e · chemin inexistant.
+$cas['chemin inexistant'] = static function () {
+	$f                          = lot( 'photos', 1 );
+	$f['photos']['tmp_name'][0] = sys_get_temp_dir() . '/urbizen-jamais-' . getmypid();
+
+	return $f;
+};
+
+foreach ( $cas as $quoi => $fabriquer ) {
+	neuf();
+	$avant_warnings = count( $GLOBALS['wpd_logs'] ?? array() );
+	$files          = $fabriquer();
+
+	// Le navigateur, lui, a mesuré son objet File : il déclare une taille.
+	$declaration = declaration( array( 'photos' => array( 'count' => 1, 'size' => 117 ) ) );
+	$r           = soumettre( $files, $declaration );
+
+	check( "11 · [$quoi] refus", ! $r->is_success() );
+	check( "11 · [$quoi] aucune conversion en zéro : refus, pas acceptation",
+		in_array( $r->code(), array( SubmissionResult::UPLOAD_INCOMPLETE, SubmissionResult::UPLOAD_INVALID_STRUCTURE, SubmissionResult::UPLOAD_MISSING_TMP, SubmissionResult::UPLOAD_BLOCKED, SubmissionResult::UPLOAD_EMPTY_FILE ), true ) );
+	check( "11 · [$quoi] aucune demande", array() === $GLOBALS['wpd_posts'] );
+	check( "11 · [$quoi] aucun document final", 0 === fx_compte_fichiers() );
+	check( "11 · [$quoi] aucun staging", 0 === fx_compte_staging() );
+	check( "11 · [$quoi] aucun courriel", array() === $GLOBALS['wpd_mails'] );
+	check( "11 · [$quoi] rien n’a été créé", rien_cree() );
+}
+
+// Mesure directe : `from_files` rend `null`, jamais un zéro complaisant.
+$absent = array(
+	array( 'block' => 'photos', 'tmp_name' => sys_get_temp_dir() . '/urbizen-absent-' . getmypid(), 'declared_size' => 4242 ),
+);
+
+check( '11 · from_files rend null sur un document non mesurable', null === UploadManifest::from_files( $absent ) );
+
+$repertoire = array(
+	array( 'block' => 'photos', 'tmp_name' => sys_get_temp_dir(), 'declared_size' => 4242 ),
+);
+
+check( '11 · null aussi sur un répertoire', null === UploadManifest::from_files( $repertoire ) );
+
+$vide = array(
+	array( 'block' => 'photos', 'tmp_name' => '', 'declared_size' => 4242 ),
+);
+
+check( '11 · null aussi sur un chemin vide', null === UploadManifest::from_files( $vide ) );
+
+// Et surtout : la déclaration HTTP n'est jamais employée comme repli.
+$source = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Files/UploadManifest.php' );
+$code   = implode(
+	'',
+	array_map(
+		static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+		token_get_all( $source )
+	)
+);
+
+check( '11 · declared_size n’est plus lu du tout', ! str_contains( $code, 'declared_size' ) );
+
+// Un document mesurable donne bien une mesure.
+$reelle = lot( 'photos', 1 );
+$n      = UploadNormalizer::normalize( $reelle );
+$mesure = UploadManifest::from_files( $n['files'] );
+
+check( '11 · un document lisible est mesuré', is_array( $mesure ) && $mesure['total_size'] > 0 );
+
 
 verdict();

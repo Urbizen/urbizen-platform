@@ -1538,3 +1538,58 @@ inter-processus, libération automatique après terminaison forcée.
 - Le plancher de durée du bail demeure, comme précaution secondaire. Il ne se
   lève que sous `URBIZEN_TESTING`, constante définie hors du dépôt — le mode CLI
   seul ne suffit pas, les tâches planifiées s'y exécutant aussi.
+
+---
+
+## D-042 — `max_file_uploads` : le manifeste clôt D-032
+
+**Date** : 21 juillet 2026 · **État** : actée · **Clôt** [D-032]
+
+**Contexte.** `max_file_uploads` vaut 20 en production. Au-delà, PHP livre une
+partie des fichiers **sans le signaler**. Le serveur ne peut pas connaître un
+fichier qui ne lui est jamais parvenu : rien ne distingue « l'utilisateur en a
+joint 19 » de « il en a joint 20 et l'un s'est perdu ».
+
+**Décision.** Le navigateur déclare ce qu'il envoie ; le serveur compare avec
+ce qu'il reçoit. Cette comparaison clôt D-032, sans toucher à Hostinger.
+
+**Preuves, sur un vrai WordPress 7.0.2, par requêtes multipart écrites octet
+par octet et envoyées sur une socket :**
+
+- manifeste 20, corps contenant 19 parties → **`upload_incomplete`** ;
+- dernière partie coupée en plein contenu → **`upload_partial`** ;
+- **témoin** manifeste 20, corps contenant 20 parties → succès complet :
+  demande finalisée, référence `attributed`, notification `pending`, un
+  événement mail, vingt documents stockés, aucun courriel externe.
+
+Le témoin est indispensable : sans lui, les deux refus auraient pu venir d'une
+cause parasite. Ils l'ont d'ailleurs fait une fois — `token_too_fast` — et
+c'est le témoin qui l'a révélé.
+
+**Ce que le manifeste est, et n'est pas.**
+
+- Il est **contrôlé mais non fiable par nature** : un client peut y écrire
+  n'importe quoi. Sa forme est validée strictement — clés exactes, entiers
+  canoniques, cohérence du total avec la somme des blocs, blocs connus — mais
+  son contenu reste une affirmation.
+- Il exprime **ce que le navigateur affirme avoir sélectionné**, avant
+  transport.
+- Il sert uniquement à **détecter une différence** entre cette affirmation et
+  ce que PHP a réellement reçu.
+- Il **ne valide aucun fichier** et **ne remplace jamais `UploadPolicy`** :
+  extension réelle, type réel, provenance HTTP, tailles et nombres continuent
+  de s'appliquer intégralement. Un manifeste parfaitement exact ne fait passer
+  ni un SVG, ni un onzième document dans un bloc.
+
+**Les tailles comparées sont mesurées**, par `filesize()` sur le fichier
+temporaire — jamais `declared_size`, qui n'est qu'une prétention de la requête.
+Une mesure impossible — fichier absent, effacé, illisible, chemin vide,
+répertoire — refuse la soumission plutôt que de convertir `false` en zéro.
+
+**Conséquences.**
+- `max_file_uploads` reste à **20**. Aucune modification Hostinger n'a été
+  nécessaire, ni demandée.
+- Le formulaire limite le client à vingt documents ; le manifeste détecte les
+  réceptions partielles ; le refus est transactionnel — ni demande finalisée,
+  ni référence attribuée, ni notification, ni document, ni staging.
+- Aucun faux succès n'est possible : sans comparaison certaine, on refuse.

@@ -29,6 +29,9 @@ if ( '' === $racine || ! is_readable( $racine . '/wp-load.php' ) ) {
 
 require $racine . '/wp-load.php';
 
+require __DIR__ . '/amorce-outils.php';
+
+// État propre à l'entrée, rendu à la sortie : aucun banc ne dépend de l'ordre.
 $reussis = 0;
 $echecs  = 0;
 
@@ -398,6 +401,20 @@ foreach ( array( $mid, $mid2 ) as $reste ) {
 
 foreach ( array( $mref, $mref2, $mref3 ) as $r ) {
 	delete_option( SubmissionRepository::RESERVATION_PREFIX . $r );
+}
+
+// Constat de sortie : rien ne subsiste pour le banc suivant.
+if ( function_exists( 'urbizen_banc_reset' ) ) {
+	urbizen_banc_exiger_cron_desactive();
+urbizen_banc_reset();
+	$reste = urbizen_banc_etat();
+
+	verifier( 'sortie · zéro demande', 0 === $reste['demandes'] );
+	verifier( 'sortie · zéro référence', 0 === $reste['references'] );
+	verifier( 'sortie · zéro notification', 0 === $reste['notifs'] );
+	verifier( 'sortie · zéro événement mail', 0 === $reste['evenements'] );
+	verifier( 'sortie · zéro document', 0 === $reste['documents'] );
+	verifier( 'sortie · zéro verrou', 0 === $reste['verrous_opt'] );
 }
 
 printf( "\n%d contrôle(s) réussi(s), %d en échec\n", $reussis, $echecs );

@@ -23,6 +23,8 @@
 
 namespace Urbizen\Platform\Files;
 
+use Urbizen\Platform\Support\Logger;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -84,6 +86,12 @@ final class UploadManifest {
 	public static function verify( $declaration, array $recus ): array {
 		$reel = self::from_files( $recus );
 
+		// Un document reçu mais non mesurable interdit toute comparaison. Le
+		// code reste générique : il ne dit pas au client ce qui a échoué.
+		if ( null === $reel ) {
+			return array( 'ok' => false, 'code' => self::INCOMPLETE );
+		}
+
 		// Aucun fichier reçu et aucune déclaration : le parcours historique
 		// sans document reste compatible. C'est le seul cas où l'absence de
 		// manifeste est tolérée — et il ne peut rien cacher, puisqu'une
@@ -129,10 +137,14 @@ final class UploadManifest {
 	/**
 	 * Calcule le manifeste des fichiers réellement reçus.
 	 *
+	 * Rend `null` si **un seul** document ne peut pas être mesuré : sans mesure
+	 * certaine, il n'y a pas de comparaison possible, et l'on refuse plutôt que
+	 * de deviner.
+	 *
 	 * @param array<int, array<string, mixed>> $recus Documents normalisés.
-	 * @return array{version:int,total_count:int,total_size:int,blocks:array<string,array{count:int,size:int}>}
+	 * @return array{version:int,total_count:int,total_size:int,blocks:array<string,array{count:int,size:int}>}|null
 	 */
-	public static function from_files( array $recus ): array {
+	public static function from_files( array $recus ): ?array {
 		$blocs = array();
 		$total = 0;
 
@@ -146,6 +158,12 @@ final class UploadManifest {
 
 			if ( '' === $bloc ) {
 				continue;
+			}
+
+			if ( null === $taille ) {
+				Logger::error( 'manifeste : document reçu non mesurable' );
+
+				return null;
 			}
 
 			if ( ! isset( $blocs[ $bloc ] ) ) {
@@ -179,18 +197,26 @@ final class UploadManifest {
 	 * @param array<string, mixed> $document Document normalisé.
 	 * @return int
 	 */
-	private static function taille_reelle( array $document ): int {
+	private static function taille_reelle( array $document ): ?int {
 		$tmp = (string) ( $document['tmp_name'] ?? '' );
 
-		if ( '' !== $tmp && is_file( $tmp ) ) {
-			$taille = @filesize( $tmp );
-
-			if ( false !== $taille ) {
-				return (int) $taille;
-			}
+		if ( '' === $tmp ) {
+			return null;
 		}
 
-		return (int) ( $document['declared_size'] ?? 0 );
+		// `is_file()` écarte du même geste un chemin absent et un répertoire.
+		if ( ! @is_file( $tmp ) || ! @is_readable( $tmp ) ) {
+			return null;
+		}
+
+		$taille = @filesize( $tmp );
+
+		// **Aucun repli.** `false` n'est pas zéro, et `declared_size` n'est pas
+		// une mesure : c'est ce que la requête prétend. Retomber dessus ferait
+		// passer une mesure impossible pour une mesure réussie, et un manifeste
+		// calé sur la déclaration serait accepté alors que le fichier n'est
+		// plus là.
+		return false === $taille ? null : (int) $taille;
 	}
 
 	/**

@@ -15,6 +15,11 @@
 
 require __DIR__ . '/amorce-reelle.php';
 
+// État propre à l'entrée, rendu à la sortie : aucun banc ne dépend de l'ordre.
+urbizen_banc_exiger_cron_desactive();
+urbizen_banc_reset();
+urbizen_banc_menage_a_la_sortie();
+
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailProcessLock;
 use Urbizen\Platform\Mail\MailQueue;
@@ -551,6 +556,19 @@ foreach ( array( $n, $o, $q ) as $reste ) {
 	MailScheduler::unschedule_all( $reste['id'] );
 	delete_option( \Urbizen\Platform\Submissions\SubmissionRepository::RESERVATION_PREFIX . $reste['ref'] );
 	wp_delete_post( $reste['id'], true );
+}
+
+// Constat de sortie : rien ne subsiste pour le banc suivant.
+if ( function_exists( 'urbizen_banc_reset' ) ) {
+	urbizen_banc_reset();
+	$reste = urbizen_banc_etat();
+
+	verifier( 'sortie · zéro demande', 0 === $reste['demandes'] );
+	verifier( 'sortie · zéro référence', 0 === $reste['references'] );
+	verifier( 'sortie · zéro notification', 0 === $reste['notifs'] );
+	verifier( 'sortie · zéro événement mail', 0 === $reste['evenements'] );
+	verifier( 'sortie · zéro document', 0 === $reste['documents'] );
+	verifier( 'sortie · zéro verrou', 0 === $reste['verrous_opt'] );
 }
 
 printf( "\n%d contrôle(s) réussi(s), %d en échec\n", $reussis, $echecs );

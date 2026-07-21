@@ -267,26 +267,44 @@ final class SubmissionController {
 		// fichier qui ne lui est jamais parvenu ; seule la déclaration
 		// préalable du navigateur permet de constater l'écart (D-032).
 		//
-		// Ce contrôle vient **après** la normalisation — les tailles comparées
-		// sont celles des fichiers réellement reçus — et **avant** tout dépôt :
-		// un refus ne laisse ni staging, ni référence, ni notification.
-		$manifeste = UploadManifest::verify(
-			$post[ UploadManifest::FIELD ] ?? null,
-			$normalisation['files']
-		);
+		// Le contrôle vient **après** la normalisation — les tailles comparées
+		// sont mesurées sur les fichiers réellement reçus — et **avant** tout
+		// dépôt : un refus ne laisse ni staging, ni référence, ni notification.
+		// Il vient aussi après les barrières de `UploadPolicy`, pour que le
+		// motif rendu reste le plus précis possible ; il ne les remplace pas.
+		$verifier_manifeste = static function () use ( $post, $normalisation, $renoncer ) {
+			$manifeste = UploadManifest::verify(
+				$post[ UploadManifest::FIELD ] ?? null,
+				$normalisation['files']
+			);
 
-		if ( ! $manifeste['ok'] ) {
-			return $renoncer( $manifeste['code'] );
-		}
+			return $manifeste['ok'] ? null : $renoncer( $manifeste['code'] );
+		};
 
 		$lot     = array();
 		$staging = null;
+
+		if ( array() === $normalisation['files'] ) {
+			// Aucun fichier reçu : c'est précisément le cas où un manifeste
+			// annonçant des documents doit être refusé.
+			$refus = $verifier_manifeste();
+
+			if ( null !== $refus ) {
+				return $refus;
+			}
+		}
 
 		if ( array() !== $normalisation['files'] ) {
 			$politique = UploadPolicy::validate( $normalisation['files'] );
 
 			if ( ! $politique['ok'] ) {
 				return $renoncer( $politique['code'] );
+			}
+
+			$refus = $verifier_manifeste();
+
+			if ( null !== $refus ) {
+				return $refus;
 			}
 
 			// --- 11 · dépôt dans un staging privé ---

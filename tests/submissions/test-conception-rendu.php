@@ -220,6 +220,8 @@ check( '5 · le pot de miel est hors du parcours clavier',
 // ======================================================================
 // 6 · SANS JAVASCRIPT
 // ======================================================================
+// Sans JavaScript, aucun bouton ne doit laisser croire que l'envoi marchera.
+check( '6 · la navigation est masquée par le serveur', str_contains( $rendu, '__navigation" hidden>' ) );
 check( '6 · un message noscript explicite', str_contains( $rendu, '<noscript>' ) && str_contains( $rendu, 'nécessite JavaScript' ) );
 check( '6 · les six étapes sont dans le document', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
 check( '6 · aucune étape masquée côté serveur', ! str_contains( $rendu, '__etape" id="urbizen-conception-1-etape-pieces" data-step="pieces" data-rang="1" hidden' ) );
@@ -307,6 +309,8 @@ check( '10 · toutes les règles sont sous la classe racine', array() === $hors_
 check( '10 · la palette Urbizen est employée',
 	str_contains( $css, '#0b1f3a' ) && str_contains( $css, '#7bdcb5' ) && str_contains( $css, '#f6f8fb' ) );
 check( '10 · une adaptation mobile est prévue', str_contains( $css, '@media' ) );
+check( '10 · la navigation masquée le reste vraiment',
+	str_contains( $css, '.urbizen-conception__navigation[hidden]' ) );
 check( '10 · aucune règle sur body, header ou footer',
 	! preg_match( '/(^|[\s,])(body|header|footer|html)\s*\{/m', $css ) );
 

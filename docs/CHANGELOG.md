@@ -5,6 +5,37 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.9.0] — 21 juillet 2026
+
+Formulaire de conception en six étapes, brouillon local et manifeste de dépôt.
+
+> **Aucun effet public.** Le formulaire n'est pas rendu pour un visiteur
+> anonyme : ni balise, ni schéma, ni nonce, ni jeton, ni feuille de style.
+> Aucune page n'est créée, l'accueil, le menu et le pied de page sont
+> inchangés.
+
+### Ajouté
+- `src/Conception/` : `ConceptionAvailability` (garde serveur, fermée par
+  défaut), `ConceptionSchema` (réduction de la définition, jamais une seconde
+  source), `ConceptionAssets` (chargement conditionnel), `ConceptionRenderer`
+  (six `fieldset`, `aria-current`, `aria-live`, résumé d'erreurs, `noscript`).
+- `src/Files/UploadManifest.php` : déclaration client confrontée aux fichiers
+  réellement reçus, tailles **mesurées** par `filesize()` (D-042).
+- Brouillon de session automatique ; brouillon persistant sous consentement
+  explicite, décoché par défaut, sept jours ; restauration **tout ou rien**
+  en cas de schéma incompatible.
+- Bancs : rendu, manifeste, mutations PR C, parcours JavaScript sous jsdom,
+  multipart réel sur socket, isolation des bancs et garde `DISABLE_WP_CRON`.
+
+### Corrigé
+- L'estimation tarifaire lisait un champ `options` inexistant et restait figée
+  sur le prix de base — défaut trouvé par la revue visuelle en navigateur réel.
+- Sans JavaScript, la navigation restait visible et démentait le message
+  `noscript` : elle est désormais masquée par le serveur et révélée par le
+  script.
+
+---
+
 ## [0.8.0] — 21 juillet 2026
 
 Notification administrative fiable d'une demande de conception acceptée.

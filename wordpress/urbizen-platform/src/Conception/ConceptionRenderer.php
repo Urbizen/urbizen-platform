@@ -536,7 +536,11 @@ final class ConceptionRenderer {
 	 */
 	private static function navigation( string $id ): string {
 		return sprintf(
-			'<div class="%1$s__navigation">'
+			// La navigation est masquée par le serveur et révélée par le
+			// script. Sans JavaScript, aucun bouton n'apparaît : le message
+			// `noscript` dit que l'envoi ne fonctionnera pas, il ne doit pas
+			// être démenti par un bouton « Envoyer » bien visible.
+			'<div class="%1$s__navigation" hidden>'
 				. '<button type="button" class="%1$s__bouton %1$s__bouton--precedent" data-action="precedent">%2$s</button>'
 				. '<div class="%1$s__estimation" id="%3$s-estimation" aria-live="polite"></div>'
 				. '<button type="button" class="%1$s__bouton %1$s__bouton--suivant" data-action="suivant">%4$s</button>'
