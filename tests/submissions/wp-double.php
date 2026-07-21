@@ -57,6 +57,7 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_can']        = true;
 	$GLOBALS['wpd_referer']    = '';
 	$GLOBALS['wpd_mails']      = array();
+	$GLOBALS['wpd_trash_fail'] = false;
 }
 
 wpd_reset();
@@ -345,6 +346,11 @@ function wp_trash_post( $id ) {
 	$court = apply_filters( 'pre_trash_post', null, $post, $post->post_status );
 
 	if ( false === $court ) {
+		return false;
+	}
+
+	// Permet d'éprouver une écriture native défaillante après l'invalidation.
+	if ( ! empty( $GLOBALS['wpd_trash_fail'] ) ) {
 		return false;
 	}
 

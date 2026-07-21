@@ -327,8 +327,9 @@ check( '6 · plus aucune option technique ne subsiste',
 
 $second = Retention::run_daily( $plus_tard );
 
-// Six compteurs : demandes, jetons, créneaux, références, staging, abandons.
-check( '6 · le passage est idempotent', array( 0, 0, 0, 0, 0, 0 ) === array_values( $second ) );
+// Sept compteurs : demandes, abandons, corbeille, jetons, créneaux,
+// références, staging.
+check( '6 · le passage est idempotent', array( 0, 0, 0, 0, 0, 0, 0 ) === array_values( $second ) );
 check( '6 · le journal ne cite ni jeton, ni condensat, ni référence',
 	! preg_match( '/urbizen_tok_[0-9a-f]|urbizen_rl_[0-9a-f]|URB-2026-0900/', journal() ) );
 check( '6 · le journal ne donne que des décomptes', str_contains( journal(), 'ménage :' ) );

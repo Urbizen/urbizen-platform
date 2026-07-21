@@ -211,7 +211,7 @@ final class Retention {
 	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return array{demandes:int,jetons:int,creneaux:int,references:int,staging:int,abandons:int}
+	 * @return array{demandes:int,abandons:int,corbeille:int,jetons:int,creneaux:int,references:int,staging:int}
 	 */
 	public static function run_daily( ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
@@ -223,6 +223,8 @@ final class Retention {
 		$bilan = array(
 			'demandes'   => self::purge( $now ),
 			'abandons'   => self::recover_abandoned( $now ),
+			// Réconciliation non destructive des transitions de Corbeille.
+			'corbeille'  => array_sum( TrashGuard::reconcile() ),
 			'jetons'     => AntiSpam::cleanup_expired_tokens( $now ),
 			'creneaux'   => RateLimiter::cleanup_expired_slots( $now ),
 			'references' => SubmissionRepository::cleanup_abandoned_references( $now ),
@@ -231,16 +233,17 @@ final class Retention {
 			'staging'    => Storage::cleanup_staging( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(
-					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s)',
+					'ménage : %d jeton(s), %d créneau(x), %d réservation(s), %d staging, %d transaction(s), %d corbeille',
 					$bilan['jetons'],
 					$bilan['creneaux'],
 					$bilan['references'],
 					$bilan['staging'],
-					$bilan['abandons']
+					$bilan['abandons'],
+					$bilan['corbeille']
 				)
 			);
 		}
@@ -360,6 +363,12 @@ final class Retention {
 			// Seconde barrière : une requête méta mal interprétée ne doit pas
 			// pouvoir emporter un dossier client.
 			if ( ! in_array( $statut, self::purgeable_statuses(), true ) ) {
+				continue;
+			}
+
+			// Troisième barrière : une mise à la Corbeille préparée mais non
+			// confirmée est ambiguë. On ne purge pas sur une apparence.
+			if ( TrashGuard::is_prepared_only( $id ) ) {
 				continue;
 			}
 

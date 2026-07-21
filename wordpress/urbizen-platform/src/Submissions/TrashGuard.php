@@ -47,6 +47,27 @@ final class TrashGuard {
 	public const PRE_TRASH = '_urbizen_pre_trash_status';
 
 	/**
+	 * État durable de la transition vers la Corbeille.
+	 *
+	 * L'invalidation applicative précède le changement de `post_status` : entre
+	 * les deux, un autre filtre peut court-circuiter `wp_trash_post()`, ou
+	 * l'écriture native échouer. Sans marqueur, rien ne distinguerait alors une
+	 * demande **préparée** d'une demande réellement **mise à la Corbeille** — et
+	 * la rétention comme la restauration raisonneraient sur une apparence.
+	 */
+	public const TRANSITION = '_urbizen_trash_transition';
+
+	/**
+	 * L'invalidation est écrite, la Corbeille native n'est pas confirmée.
+	 */
+	public const PREPARED = 'prepared';
+
+	/**
+	 * La Corbeille native a bien eu lieu.
+	 */
+	public const COMPLETED = 'completed';
+
+	/**
 	 * Statuts applicatifs qu'une restauration peut rétablir.
 	 *
 	 * Liste **fermée**. Un état transitoire ou fautif — `processing`,
@@ -69,6 +90,7 @@ final class TrashGuard {
 		// Trois arguments : WordPress plafonne ce qu'il transmet au nombre
 		// déclaré, et le troisième porte le statut précédent.
 		add_filter( 'pre_trash_post', array( self::class, 'guard_trash' ), 10, 3 );
+		add_action( 'trashed_post', array( self::class, 'after_trash' ), 10, 2 );
 		add_filter( 'pre_untrash_post', array( self::class, 'guard_untrash' ), 10, 3 );
 		add_action( 'untrashed_post', array( self::class, 'after_untrash' ), 10, 2 );
 	}
@@ -89,9 +111,20 @@ final class TrashGuard {
 		$id      = (int) $post->ID;
 		$courant = (string) get_post_meta( $id, '_urbizen_status', true );
 
-		// Déjà à la Corbeille : rien à refaire, et surtout rien à mémoriser —
-		// écraser la mémoire écraserait le statut à restaurer.
+		// Déjà invalidée : la préparation existe. On laisse WordPress retenter
+		// le passage natif — la mémoire et la transition restent intactes, et
+		// une nouvelle tentative n'écrase rien.
 		if ( self::STATUS_TRASHED === $courant ) {
+			$transition = self::transition( $id );
+
+			if ( array() === $transition ) {
+				// Invalidée sans transition : état contradictoire, on ne
+				// devine pas ce qu'il faudrait restaurer.
+				Logger::error( sprintf( 'corbeille refusée pour #%d : invalidation sans transition', $id ) );
+
+				return false;
+			}
+
 			return $court_circuit;
 		}
 
@@ -114,6 +147,22 @@ final class TrashGuard {
 			}
 		}
 
+		// Transition marquée « préparée » : elle survit à une coupure et permet
+		// de reconnaître, plus tard, une mise à la Corbeille inachevée.
+		$transition = array(
+			'state'       => self::PREPARED,
+			'previous'    => $courant,
+			'prepared_at' => gmdate( 'Y-m-d H:i:s' ),
+		);
+
+		update_post_meta( $id, self::TRANSITION, (string) wp_json_encode( $transition ) );
+
+		if ( self::PREPARED !== ( self::transition( $id )['state'] ?? '' ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : transition non enregistrée', $id ) );
+
+			return false;
+		}
+
 		update_post_meta( $id, '_urbizen_status', self::STATUS_TRASHED );
 
 		// Vérification : sans invalidation certaine, on n'avance pas. Mieux
@@ -126,6 +175,140 @@ final class TrashGuard {
 		}
 
 		return $court_circuit;
+	}
+
+	/**
+	 * Confirme la transition, une fois la Corbeille réellement effective.
+	 *
+	 * Seul ce hook s'exécute **après** que WordPress a changé le
+	 * `post_status`. C'est donc le seul endroit où l'on sait que la mise à la
+	 * Corbeille a bien eu lieu.
+	 *
+	 * Il ne touche ni aux fichiers, ni à la référence, et ne réactive aucun
+	 * téléchargement.
+	 *
+	 * @param int    $post_id   Demande.
+	 * @param string $precedent Statut WordPress précédent.
+	 * @return void
+	 */
+	public static function after_trash( $post_id, $precedent = '' ): void {
+		$id   = (int) $post_id;
+		$post = get_post( $id );
+
+		if ( ! self::is_ours( $post ) ) {
+			return;
+		}
+
+		if ( 'trash' !== (string) $post->post_status ) {
+			return;
+		}
+
+		if ( self::STATUS_TRASHED !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
+			return;
+		}
+
+		$transition = self::transition( $id );
+
+		if ( self::PREPARED !== ( $transition['state'] ?? '' ) ) {
+			return;
+		}
+
+		$transition['state'] = self::COMPLETED;
+		update_post_meta( $id, self::TRANSITION, (string) wp_json_encode( $transition ) );
+
+		Logger::info( sprintf( 'demande #%d : mise à la Corbeille confirmée', $id ) );
+	}
+
+	/**
+	 * État durable de la transition.
+	 *
+	 * @param int $id Demande.
+	 * @return array<string, mixed>
+	 */
+	public static function transition( int $id ): array {
+		$brut = json_decode( (string) get_post_meta( $id, self::TRANSITION, true ), true );
+
+		return is_array( $brut ) ? $brut : array();
+	}
+
+	/**
+	 * La demande est-elle préparée mais pas réellement à la Corbeille ?
+	 *
+	 * État transitoire : l'invalidation est écrite, le passage natif n'a pas
+	 * abouti. Rien ne doit y toucher automatiquement — ni la rétention, ni la
+	 * suppression définitive.
+	 *
+	 * @param int $id Demande.
+	 * @return bool
+	 */
+	public static function is_prepared_only( int $id ): bool {
+		$post = get_post( $id );
+
+		if ( ! self::is_ours( $post ) ) {
+			return false;
+		}
+
+		return self::PREPARED === ( self::transition( $id )['state'] ?? '' )
+			&& 'trash' !== (string) $post->post_status;
+	}
+
+	/**
+	 * Réconcilie les transitions restées en plan, sans rien détruire.
+	 *
+	 * Deux situations, deux traitements :
+	 *
+	 * - le `post_status` est passé à `trash` mais la confirmation n'a pas eu
+	 *   lieu — le hook postérieur a échoué : on confirme ;
+	 * - la demande est invalidée sans aucune transition — état contradictoire :
+	 *   on marque `incoherent` et on attend une intervention.
+	 *
+	 * Une transition simplement préparée est **laissée telle quelle** : elle est
+	 * rejouable, et l'intention de suppression reste fermée par défaut.
+	 *
+	 * @return array{confirmees:int,incoherentes:int}
+	 */
+	public static function reconcile(): array {
+		$bilan = array( 'confirmees' => 0, 'incoherentes' => 0 );
+
+		$candidats = get_posts(
+			array(
+				'post_type'        => SubmissionPostType::POST_TYPE,
+				'post_status'      => 'any',
+				'posts_per_page'   => 200,
+				'fields'           => 'ids',
+				'no_found_rows'    => true,
+				'suppress_filters' => true,
+				'meta_key'         => '_urbizen_status', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key
+				'meta_value'       => self::STATUS_TRASHED, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+			)
+		);
+
+		foreach ( $candidats as $id ) {
+			$id   = (int) $id;
+			$post = get_post( $id );
+
+			if ( ! $post ) {
+				continue;
+			}
+
+			$etat = (string) ( self::transition( $id )['state'] ?? '' );
+
+			if ( '' === $etat ) {
+				// Invalidée sans transition : on ne sait pas quoi restaurer.
+				update_post_meta( $id, '_urbizen_status', TransactionRecovery::INCOHERENT );
+				Logger::error( sprintf( 'demande #%d : invalidée sans transition, marquée incohérente', $id ) );
+				++$bilan['incoherentes'];
+
+				continue;
+			}
+
+			if ( self::PREPARED === $etat && 'trash' === (string) $post->post_status ) {
+				self::after_trash( $id, '' );
+				++$bilan['confirmees'];
+			}
+		}
+
+		return $bilan;
 	}
 
 	/**
@@ -167,6 +350,12 @@ final class TrashGuard {
 
 		if ( self::STATUS_TRASHED !== (string) get_post_meta( $id, '_urbizen_status', true ) ) {
 			return 'état applicatif inattendu';
+		}
+
+		// Une transition seulement préparée ne vaut pas mise à la Corbeille :
+		// restaurer reviendrait à rouvrir l'accès sur la foi d'une apparence.
+		if ( self::COMPLETED !== ( self::transition( $id )['state'] ?? '' ) ) {
+			return 'mise à la Corbeille non confirmée';
 		}
 
 		$memoire = (string) get_post_meta( $id, self::PRE_TRASH, true );
@@ -256,6 +445,8 @@ final class TrashGuard {
 		}
 
 		delete_post_meta( $id, self::PRE_TRASH );
+		delete_post_meta( $id, self::TRANSITION );
+
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
 	}
 

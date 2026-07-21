@@ -33,7 +33,7 @@ Validation et stockage privé des documents joints à une demande.
 - `tests/submissions/test-documents.php` (130 contrôles),
   `test-transaction.php` (144), `test-interruption.php` (66), `fixtures.php` :
   fichiers d'essai portant de **véritables signatures de format**, pour que
-  `finfo` réagisse comme en production. **1 339 contrôles**, dont **269
+  `finfo` réagisse comme en production. **1 435 contrôles**, dont **292
   mutations**.
 
 ### Modifié
@@ -105,6 +105,21 @@ place · `deleted` après effacement.
   `wp_untrash_post()`, `wp_scheduled_delete()` et le respect d'`accepted_args`
   par `apply_filters()` — cette dernière fidélité a immédiatement révélé qu'une
   mutation ne mordait pas.
+
+### Transition de Corbeille rejouable (quatrième revue de la PR #19)
+- `_urbizen_trash_transition` : état durable à deux valeurs, `prepared` puis
+  `completed`, confirmé par le hook `trashed_post` — seul hook exécuté après le
+  changement de `post_status` (D-034).
+- Une nouvelle tentative de mise à la Corbeille est **idempotente** : statut
+  précédent réutilisé, aucune seconde transition, aucune métadonnée écrasée.
+- Tant que la transition est `prepared`, l'intention reste **fermée par
+  défaut** : ni téléchargement, ni restauration, ni purge, ni suppression
+  définitive, ni fichier effacé.
+- `TrashGuard::reconcile()` répare sans détruire : confirme une transition dont
+  le `post_status` est passé à `trash`, marque `incoherent` une invalidation
+  sans transition.
+- La doublure WordPress sait désormais simuler un échec natif de
+  `wp_trash_post()` après l'invalidation applicative.
 
 ### Volontairement absent
 - Aucun envoi de courriel : un banc balaie tout le plugin, commentaires retirés.

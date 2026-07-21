@@ -2606,4 +2606,279 @@ check( '92 · sans obstacle, le vidage aboutit', 1 === wp_scheduled_delete( 30 )
 check( '92 · le document est effacé', 0 === fx_compte_fichiers() );
 
 
+// ======================================================================
+// MUTATIONS DU CINQUIÈME CORRECTIF : TRANSITION DE CORBEILLE
+// ======================================================================
+
+/** Sabote la mise à la Corbeille après notre garde. */
+function saboter(): void {
+	add_filter(
+		'pre_trash_post',
+		static function ( $court, $post = null, $prec = '' ) {
+			return ( is_object( $post ) && 'urbizen_demande' === $post->post_type ) ? false : $court;
+		},
+		20,
+		3
+	);
+}
+
+// ====== 93 · trashed_post n'est plus enregistré ===========================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		add_action( 'trashed_post', array( self::class, 'after_trash' ), 10, 2 );" => '		// confirmation retirée.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+
+check( '93 · confirmation retirée → la transition reste prepared', TG::PREPARED === ( $tg::transition( $r->id() )['state'] ?? '' ) );
+check( '93 · la restauration est alors bloquée', false === wp_untrash_post( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+
+check( '93 · le dépôt confirme la transition', TG::COMPLETED === ( TG::transition( $d['id'] )['state'] ?? '' ) );
+
+// ====== 94 · une transition prepared est prise pour completed =============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( self::COMPLETED !== ( self::transition( \$id )['state'] ?? '' ) ) {
+			return 'mise à la Corbeille non confirmée';
+		}" => '		// contrôle de confirmation retiré.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+$tr          = TG::transition( $r->id() );
+$tr['state'] = TG::PREPARED;
+update_post_meta( $r->id(), TG::TRANSITION, (string) wp_json_encode( $tr ) );
+
+check( '94 · contrôle retiré → une transition préparée autorise la restauration', false !== wp_untrash_post( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+$tr          = TG::transition( $d['id'] );
+$tr['state'] = TG::PREPARED;
+update_post_meta( $d['id'], TG::TRANSITION, (string) wp_json_encode( $tr ) );
+
+check( '94 · le dépôt la refuse', false === wp_untrash_post( $d['id'] ) );
+
+// ====== 95 · le statut précédent est écrasé à chaque tentative ============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( '' === (string) get_post_meta( \$id, self::PRE_TRASH, true ) ) {
+			update_post_meta( \$id, self::PRE_TRASH, \$courant );" =>
+		"		if ( true ) {
+			update_post_meta( \$id, self::PRE_TRASH, \$courant );",
+		"		if ( self::STATUS_TRASHED === \$courant ) {" => '		if ( false ) {',
+		"		if ( ! in_array( \$courant, self::restorable_statuses(), true ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : état applicatif non restaurable', \$id ) );
+
+			return false;
+		}" => '		// garde d\'état restaurable retirée.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_status', 'converted' );
+saboter();
+wp_trash_post( $r->id() );
+// Deuxième tentative : le statut courant est désormais « trashed ».
+wp_trash_post( $r->id() );
+
+check( '95 · mémorisation systématique → converted est écrasé par trashed',
+	'converted' !== get_post_meta( $r->id(), TG::PRE_TRASH, true ) );
+
+$d = demande_corbeille( 'converted' );
+saboter();
+wp_trash_post( $d['id'] );
+wp_trash_post( $d['id'] );
+
+check( '95 · le dépôt conserve converted', 'converted' === get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
+
+// ====== 96 · une seconde tentative est refusée ============================
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( self::STATUS_TRASHED === \$courant ) {
+			\$transition = self::transition( \$id );
+
+			if ( array() === \$transition ) {" =>
+		"		if ( self::STATUS_TRASHED === \$courant ) {
+			\$transition = self::transition( \$id );
+
+			if ( true ) {",
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+saboter();
+wp_trash_post( $r->id() );
+wpd_clear_filter( 'pre_trash_post' );
+$tg::register();
+
+check( '96 · muté → la seconde tentative est REFUSÉE', false === wp_trash_post( $r->id() ) );
+check( '96 · la demande reste bloquée en private', 'private' === get_post( $r->id() )->post_status );
+
+$d = demande_corbeille();
+saboter();
+wp_trash_post( $d['id'] );
+wpd_clear_filter( 'pre_trash_post' );
+TG::register();
+
+check( '96 · le dépôt autorise la seconde tentative', false !== wp_trash_post( $d['id'] ) );
+check( '96 · et elle aboutit', 'trash' === get_post( $d['id'] )->post_status );
+
+// ====== 97 · une transition prepared réactive les téléchargements =========
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( "		update_post_meta( \$id, '_urbizen_status', self::STATUS_TRASHED );" => '		// invalidation retirée.',
+		"		if ( self::STATUS_TRASHED !== (string) get_post_meta( \$id, '_urbizen_status', true ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : invalidation impossible', \$id ) );
+
+			return false;
+		}" => '		// vérification retirée.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r  = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+$lu = SubmissionRepository::get( $r->id() );
+parse_str( (string) wp_parse_url( SignedLink::url( $r->id(), $lu['files'][0]['id'], wpd_now() ), PHP_URL_QUERY ), $pm );
+saboter();
+wp_trash_post( $r->id() );
+
+check( '97 · invalidation retirée → le lien reste actif en état préparé', null !== D2::locate( $pm, wpd_now() ) );
+
+$d = demande_corbeille();
+saboter();
+wp_trash_post( $d['id'] );
+
+check( '97 · le dépôt refuse le lien', null === D2::locate( $d['params'], wpd_now() ) );
+
+// ====== 98 · la rétention supprime un état private + prepared =============
+$ret = mutant(
+	'src/Privacy/Retention.php',
+	'Retention',
+	array(
+		'			if ( TrashGuard::is_prepared_only( $id ) ) {
+				continue;
+			}' => '			// garde de transition retirée.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+TG::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+saboter();
+wp_trash_post( $r->id() );
+wpd_clear_filter( 'pre_trash_post' );
+update_post_meta( $r->id(), '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+$ret::purge( wpd_now() );
+
+check( '98 · garde retirée → LA RÉTENTION SUPPRIME UN ÉTAT AMBIGU', null === get_post( $r->id() ) );
+
+$d = demande_corbeille();
+saboter();
+wp_trash_post( $d['id'] );
+wpd_clear_filter( 'pre_trash_post' );
+update_post_meta( $d['id'], '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+Retention::purge( wpd_now() );
+
+check( '98 · le dépôt conserve la demande', null !== get_post( $d['id'] ) );
+check( '98 · et son document', 1 === fx_compte_fichiers() );
+
+// ====== 99 · les métadonnées de transition restent après restauration =====
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array( '		delete_post_meta( $id, self::TRANSITION );' => '		// nettoyage de la transition retiré.' )
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+wp_trash_post( $r->id() );
+wp_untrash_post( $r->id() );
+
+check( '99 · nettoyage retiré → la transition subsiste après restauration', array() !== $tg::transition( $r->id() ) );
+
+$d = demande_corbeille();
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( '99 · le dépôt la supprime', array() === TG::transition( $d['id'] ) );
+check( '99 · et supprime aussi le statut mémorisé', '' === get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
+
+// ====== 100 · deux tentatives créent des états contradictoires ============
+$tg = mutant(
+	'src/Submissions/TrashGuard.php',
+	'TrashGuard',
+	array(
+		"		if ( self::STATUS_TRASHED === \$courant ) {
+			\$transition = self::transition( \$id );
+
+			if ( array() === \$transition ) {
+				// Invalidée sans transition : état contradictoire, on ne
+				// devine pas ce qu'il faudrait restaurer.
+				Logger::error( sprintf( 'corbeille refusée pour #%d : invalidation sans transition', \$id ) );
+
+				return false;
+			}
+
+			return \$court_circuit;
+		}" => '		// court-circuit d\'idempotence retiré.',
+		"		if ( '' === (string) get_post_meta( \$id, self::PRE_TRASH, true ) ) {" => '		if ( true ) {',
+		"		if ( ! in_array( \$courant, self::restorable_statuses(), true ) ) {
+			Logger::error( sprintf( 'corbeille refusée pour #%d : état applicatif non restaurable', \$id ) );
+
+			return false;
+		}" => '		// garde d\'état restaurable retirée.',
+	)
+);
+
+neuf_fichiers();
+FileCleaner::reset();
+$tg::register();
+$r = traiter( soumission(), un_doc( 'photos', 'p.jpg', fx_copie( fx_jpeg() ) ) );
+update_post_meta( $r->id(), '_urbizen_status', 'closed' );
+saboter();
+$tg::guard_trash( null, get_post( $r->id() ), 'private' );
+$tg::guard_trash( null, get_post( $r->id() ), 'private' );
+
+check( '100 · idempotence retirée → le statut précédent devient contradictoire',
+	'closed' !== get_post_meta( $r->id(), TG::PRE_TRASH, true ) );
+
+$d = demande_corbeille( 'closed' );
+TG::guard_trash( null, get_post( $d['id'] ), 'private' );
+TG::guard_trash( null, get_post( $d['id'] ), 'private' );
+
+check( '100 · le dépôt reste idempotent', 'closed' === get_post_meta( $d['id'], TG::PRE_TRASH, true ) );
+check( '100 · une seule transition cohérente', TG::PREPARED === ( TG::transition( $d['id'] )['state'] ?? '' ) );
+check( '100 · aucun téléchargement', null === D2::locate( $d['params'], wpd_now() ) );
+
+
 verdict();

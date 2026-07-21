@@ -25,6 +25,7 @@ namespace Urbizen\Platform\Files;
 
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
+use Urbizen\Platform\Submissions\TrashGuard;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -84,10 +85,21 @@ final class FileCleaner {
 			return $court_circuit;
 		}
 
-		$id        = (int) $post->ID;
+		$id = (int) $post->ID;
+
+		// Une mise à la Corbeille préparée mais non confirmée est un état
+		// transitoire : on ne sait pas si l'intention était de retirer le
+		// dossier ou si l'opération a simplement échoué. En cas d'ambiguïté, on
+		// conserve — la mise à la Corbeille reste rejouable.
+		if ( TrashGuard::is_prepared_only( $id ) ) {
+			Logger::error( sprintf( 'suppression bloquée pour #%d : transition de Corbeille non confirmée', $id ) );
+
+			return false;
+		}
+
 		$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
 
-		$resultat = self::delete( $id, $reference );
+		$resultat  = self::delete( $id, $reference );
 
 		if ( in_array( $resultat['code'], self::OK, true ) ) {
 			return $court_circuit;

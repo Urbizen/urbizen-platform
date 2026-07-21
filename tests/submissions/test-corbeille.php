@@ -386,4 +386,248 @@ check( 'rétention · son document est effacé', 0 === fx_compte_fichiers() );
 check( 'rétention · sa référence attribuée survit',
 	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'] )['state'] ?? '' ) );
 
+// ======================================================================
+// TRANSITION DURABLE : PREPARED CONTRE COMPLETED
+// ======================================================================
+
+/**
+ * Ajoute un filtre qui court-circuite la mise à la Corbeille après la nôtre.
+ *
+ * Reproduit exactement le cas redouté : notre invalidation est écrite, puis
+ * un tiers empêche WordPress de changer le `post_status`.
+ *
+ * @return void
+ */
+function saboter_corbeille(): void {
+	add_filter(
+		'pre_trash_post',
+		static function ( $court, $post = null, $prec = '' ) {
+			return ( is_object( $post ) && SubmissionPostType::POST_TYPE === $post->post_type ) ? false : $court;
+		},
+		20,
+		3
+	);
+}
+
+// --- A · mise à la Corbeille normale ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+check( 'A · la transition est confirmée', TrashGuard::COMPLETED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'A · le statut précédent y figure', 'received' === ( TrashGuard::transition( $d['id'] )['previous'] ?? '' ) );
+check( 'A · la transition porte une date technique', 1 === preg_match( '/^\d{4}-\d{2}-\d{2} /', (string) ( TrashGuard::transition( $d['id'] )['prepared_at'] ?? '' ) ) );
+check( 'A · aucune donnée personnelle dans la transition',
+	array( 'state', 'previous', 'prepared_at' ) === array_keys( TrashGuard::transition( $d['id'] ) ) );
+check( 'A · elle n’est plus seulement préparée', ! TrashGuard::is_prepared_only( $d['id'] ) );
+
+// --- B et C · un tiers court-circuite la mise à la Corbeille ---
+neuf();
+$d = demande();
+saboter_corbeille();
+
+$resultat = wp_trash_post( $d['id'] );
+
+check( 'B · la mise à la Corbeille échoue', false === $resultat );
+check( 'B · le post_status reste private', SubmissionPostType::POST_STATUS === get_post( $d['id'] )->post_status );
+check( 'C · _urbizen_status reste trashed', TrashGuard::STATUS_TRASHED === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'C · AUCUN TÉLÉCHARGEMENT', null === D::locate( $d['params'], wpd_now() ) );
+check( 'C · le statut précédent est conservé', 'received' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'C · la transition reste prepared', TrashGuard::PREPARED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'C · l’état transitoire est reconnaissable', TrashGuard::is_prepared_only( $d['id'] ) );
+
+// --- D et E · nouvelle tentative ---
+wpd_clear_filter( 'pre_trash_post' );
+TrashGuard::register();
+
+$avant_memoire    = get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true );
+$avant_transition = TrashGuard::transition( $d['id'] );
+$resultat         = wp_trash_post( $d['id'] );
+
+check( 'D · la nouvelle tentative est autorisée', false !== $resultat );
+check( 'E · le post passe à trash', 'trash' === get_post( $d['id'] )->post_status );
+check( 'E · la transition est confirmée', TrashGuard::COMPLETED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'E · le statut précédent n’a pas changé', $avant_memoire === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'E · la date de préparation est conservée',
+	( $avant_transition['prepared_at'] ?? '' ) === ( TrashGuard::transition( $d['id'] )['prepared_at'] ?? '' ) );
+check( 'E · toujours aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- F · trois tentatives échouées de suite ---
+neuf();
+$d = demande( 'converted' );
+saboter_corbeille();
+
+for ( $i = 1; $i <= 3; $i++ ) {
+	wp_trash_post( $d['id'] );
+}
+
+check( 'F · un seul statut précédent mémorisé', 'converted' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'F · une seule transition, restée prepared', TrashGuard::PREPARED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'F · le statut précédent de la transition est exact', 'converted' === ( TrashGuard::transition( $d['id'] )['previous'] ?? '' ) );
+check( 'F · aucune réactivation du lien', null === D::locate( $d['params'], wpd_now() ) );
+check( 'F · le post reste private', SubmissionPostType::POST_STATUS === get_post( $d['id'] )->post_status );
+
+// --- G · l'écriture native échoue après l'invalidation ---
+neuf();
+$d = demande();
+$GLOBALS['wpd_trash_fail'] = true;
+$resultat = wp_trash_post( $d['id'] );
+$GLOBALS['wpd_trash_fail'] = false;
+
+check( 'G · la mise à la Corbeille échoue', false === $resultat );
+check( 'G · l’état préparé est conservé', TrashGuard::PREPARED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'G · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'G · la tentative est rejouable', false !== wp_trash_post( $d['id'] ) );
+check( 'G · et aboutit', 'trash' === get_post( $d['id'] )->post_status );
+
+// --- H · invalidée sans transition ---
+neuf();
+$d = demande();
+update_post_meta( $d['id'], '_urbizen_status', TrashGuard::STATUS_TRASHED );
+
+check( 'H · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'H · la mise à la Corbeille est refusée', false === wp_trash_post( $d['id'] ) );
+
+$bilan = TrashGuard::reconcile();
+
+check( 'H · la réconciliation la marque incohérente', 1 === $bilan['incoherentes'] );
+check( 'H · l’état devient incoherent', TransactionRecovery::INCOHERENT === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'H · le document est conservé', 1 === fx_compte_fichiers() );
+check( 'H · le post est conservé', null !== get_post( $d['id'] ) );
+check( 'H · toujours aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- I · à la Corbeille mais transition seulement préparée ---
+neuf();
+$d = demande();
+wp_trash_post( $d['id'] );
+
+// On force le retour en arrière de la confirmation, comme si trashed_post
+// n'avait pas abouti.
+$tr          = TrashGuard::transition( $d['id'] );
+$tr['state'] = TrashGuard::PREPARED;
+update_post_meta( $d['id'], TrashGuard::TRANSITION, (string) wp_json_encode( $tr ) );
+
+check( 'I · la restauration est BLOQUÉE', false === wp_untrash_post( $d['id'] ) );
+check( 'I · le post reste à la Corbeille', 'trash' === get_post( $d['id'] )->post_status );
+check( 'I · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// --- K · réconciliation d'un hook postérieur défaillant ---
+$bilan = TrashGuard::reconcile();
+
+check( 'K · la réconciliation confirme la transition', 1 === $bilan['confirmees'] );
+check( 'K · la transition devient completed', TrashGuard::COMPLETED === ( TrashGuard::transition( $d['id'] )['state'] ?? '' ) );
+check( 'K · aucun document n’a été touché', 1 === fx_compte_fichiers() );
+check( 'K · toujours aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'K · la restauration redevient possible', false !== wp_untrash_post( $d['id'] ) );
+
+// --- J · restauration d'une transition confirmée ---
+neuf();
+$d = demande( 'closed' );
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( 'J · le statut exact est restauré', 'closed' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+check( 'J · la métadonnée de statut précédent disparaît', '' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'J · LA TRANSITION DISPARAÎT', array() === TrashGuard::transition( $d['id'] ) );
+check( 'J · le téléchargement redevient possible', null !== D::locate( $d['params'], wpd_now() ) );
+
+// --- L · action groupée mixte ---
+neuf();
+$ok     = demande();
+$bloque = demande( 'processing' );
+
+wp_trash_post( $ok['id'] );
+wp_trash_post( $bloque['id'] );
+
+check( 'L · la demande valide part à la Corbeille', 'trash' === get_post( $ok['id'] )->post_status );
+check( 'L · sa transition est confirmée', TrashGuard::COMPLETED === ( TrashGuard::transition( $ok['id'] )['state'] ?? '' ) );
+check( 'L · la demande en processing reste private', SubmissionPostType::POST_STATUS === get_post( $bloque['id'] )->post_status );
+check( 'L · elle n’a aucune transition', array() === TrashGuard::transition( $bloque['id'] ) );
+check( 'L · aucun téléchargement pour l’une comme pour l’autre',
+	null === D::locate( $ok['params'], wpd_now() ) && null === D::locate( $bloque['params'], wpd_now() ) );
+
+// --- M · autre type de contenu ---
+$page = wp_insert_post( array( 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Page' ) );
+
+check( 'M · un autre type passe sans effet', false !== wp_trash_post( $page ) );
+check( 'M · aucune transition ne lui est posée', '' === get_post_meta( $page, TrashGuard::TRANSITION, true ) );
+
+// --- N · rétention sur une transition préparée ---
+neuf();
+$d = demande();
+saboter_corbeille();
+wp_trash_post( $d['id'] );
+wpd_clear_filter( 'pre_trash_post' );
+TrashGuard::register();
+
+update_post_meta( $d['id'], '_urbizen_last_contact_at_gmt', gmdate( 'Y-m-d H:i:s', wpd_now() - ( 400 * 86400 ) ) );
+\Urbizen\Platform\Privacy\Retention::purge( wpd_now() );
+
+check( 'N · LA RÉTENTION NE SUPPRIME PAS UN ÉTAT PRÉPARÉ', null !== get_post( $d['id'] ) );
+check( 'N · le document est conservé', 1 === fx_compte_fichiers() );
+check( 'N · la référence attribuée est conservée',
+	'attributed' === ( get_option( SubmissionRepository::RESERVATION_PREFIX . $d['ref'] )['state'] ?? '' ) );
+check( 'N · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+check( 'N · la mise à la Corbeille reste possible', false !== wp_trash_post( $d['id'] ) );
+
+// --- O · suppression définitive dans l'état préparé ---
+neuf();
+$d = demande();
+saboter_corbeille();
+wp_trash_post( $d['id'] );
+wpd_clear_filter( 'pre_trash_post' );
+TrashGuard::register();
+FileCleaner::register();
+
+$resultat = wp_delete_post( $d['id'], true );
+
+check( 'O · LA SUPPRESSION DÉFINITIVE EST BLOQUÉE', false === $resultat );
+check( 'O · le post est conservé', null !== get_post( $d['id'] ) );
+check( 'O · AUCUN FICHIER ORPHELIN', 1 === fx_compte_fichiers() && 1 === (int) get_post_meta( $d['id'], '_urbizen_files_count', true ) );
+check( 'O · le refus est journalisé', str_contains( journal(), 'transition de Corbeille non confirmée' ) );
+
+// Une fois la Corbeille confirmée, la suppression redevient possible.
+FileCleaner::reset();
+wp_trash_post( $d['id'] );
+FileCleaner::reset();
+
+check( 'O · après confirmation, la suppression aboutit', false !== wp_delete_post( $d['id'], true ) );
+check( 'O · le document est effacé', 0 === fx_compte_fichiers() );
+
+// ======================================================================
+// CONCURRENCE
+// ======================================================================
+neuf();
+$d = demande( 'converted' );
+
+// Deux préparations quasi simultanées : la seconde ne doit rien écraser.
+TrashGuard::guard_trash( null, get_post( $d['id'] ), 'private' );
+$memoire_a    = get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true );
+$transition_a = TrashGuard::transition( $d['id'] );
+
+TrashGuard::guard_trash( null, get_post( $d['id'] ), 'private' );
+
+check( 'concurrence · un seul statut précédent mémorisé', $memoire_a === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'concurrence · converted n’est pas inversé', 'converted' === get_post_meta( $d['id'], TrashGuard::PRE_TRASH, true ) );
+check( 'concurrence · une seule transition, non contradictoire', $transition_a === TrashGuard::transition( $d['id'] ) );
+check( 'concurrence · aucun téléchargement', null === D::locate( $d['params'], wpd_now() ) );
+
+// L'état final n'est jamais l'une des combinaisons interdites.
+$statut_wp  = get_post( $d['id'] )->post_status;
+$statut_app = get_post_meta( $d['id'], '_urbizen_status', true );
+$etat_tr    = (string) ( TrashGuard::transition( $d['id'] )['state'] ?? '' );
+
+check( 'concurrence · état final : private + prepared, ou trash + completed',
+	( SubmissionPostType::POST_STATUS === $statut_wp && TrashGuard::PREPARED === $etat_tr )
+	|| ( 'trash' === $statut_wp && TrashGuard::COMPLETED === $etat_tr ) );
+check( 'concurrence · jamais private + état téléchargeable',
+	! ( SubmissionPostType::POST_STATUS === $statut_wp && in_array( $statut_app, SubmissionPostType::downloadable_statuses(), true ) ) );
+check( 'concurrence · jamais trash + received', ! ( 'trash' === $statut_wp && 'received' === $statut_app ) );
+
+wp_trash_post( $d['id'] );
+wp_untrash_post( $d['id'] );
+
+check( 'concurrence · la restauration rend bien converted', 'converted' === get_post_meta( $d['id'], '_urbizen_status', true ) );
+
+
 verdict();

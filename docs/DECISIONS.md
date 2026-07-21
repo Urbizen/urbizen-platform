@@ -1179,3 +1179,48 @@ par nos hooks.
   ses données personnelles, et l'en exclure la rendrait immortelle.
 - Le vidage automatique emprunte `wp_delete_post()`, donc `pre_delete_post` :
   aucun second mécanisme de suppression physique n'est introduit.
+
+---
+
+## D-034 — Une mise à la Corbeille se rejoue
+
+**Date** : 21 juillet 2026 · **État** : actée · **Complète** [D-033]
+
+**Contexte.** L'invalidation applicative précède le changement de
+`post_status` : entre les deux, un autre greffon peut court-circuiter
+`wp_trash_post()`, ou l'écriture native échouer.
+
+L'audit du comportement antérieur montre que l'état n'était **pas bloqué** —
+le téléchargement restait refusé et une nouvelle tentative aboutissait. Mais
+rien ne permettait de **distinguer** une demande simplement *préparée* d'une
+demande réellement *mise à la Corbeille* : aucune trace, aucun hook postérieur.
+La rétention, la suppression définitive et la restauration raisonnaient donc
+sur une apparence.
+
+**Décision.** Un état durable de transition, `_urbizen_trash_transition`, à
+deux valeurs : `prepared` et `completed`. Contenu minimal — un état, le statut
+applicatif précédent, une date technique. Aucune donnée personnelle.
+
+`pre_trash_post` mémorise **une seule fois**, écrit la transition `prepared`,
+invalide, puis **relit chaque écriture**. `trashed_post` — seul hook exécuté
+*après* le changement de `post_status` — confirme en `completed`. Il ne touche
+ni aux fichiers, ni à la référence, et ne réactive aucun téléchargement.
+
+**Conséquences.**
+- Une nouvelle tentative est **idempotente** : elle réutilise le statut
+  mémorisé, ne crée pas de seconde transition, n'écrase rien, et laisse
+  WordPress retenter le passage natif.
+- Tant que la transition est `prepared`, l'intention de suppression reste
+  **fermée par défaut** : aucun téléchargement, aucune restauration
+  automatique, aucune normalisation vers un état téléchargeable, aucun fichier
+  supprimé, aucune référence libérée.
+- La rétention **ne purge pas** un état `prepared` resté en `private` :
+  l'ambiguïté ne se tranche pas toute seule. La suppression définitive y est
+  également bloquée — jamais de post supprimé laissant des fichiers.
+- Une restauration exige la transition **`completed`** : une simple préparation
+  ne vaut pas mise à la Corbeille.
+- `TrashGuard::reconcile()` répare sans rien détruire : elle confirme une
+  transition dont le `post_status` est bien passé à `trash`, et marque
+  `incoherent` une demande invalidée sans transition. Une transition seulement
+  préparée est laissée telle quelle, rejouable.
+- La restauration réussie supprime les deux métadonnées temporaires.
