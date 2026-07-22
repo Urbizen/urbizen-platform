@@ -269,7 +269,34 @@ preg_match( '/^ \* Version:\s*(.+)$/m', $principal, $mh );
 
 $version = $m[1] ?? '';
 
-check( 'la version du plugin est 0.9.0', '0.9.0' === $version );
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle comparait la version à un littéral, `0.9.0`, qu'il fallait rééditer à
+ * chaque incrément — un contrôle qu'on corrige mécaniquement finit par n'être
+ * plus lu. Elle est remplacée par une vérification de **concordance** : la
+ * version est celle qu'on veut si les quatre emplacements disent la même
+ * chose, et si sa forme est valide.
+ *
+ * C'est plus exigeant : l'ancienne formulation laissait passer un `block.json`
+ * resté en arrière, celle-ci le refuse.
+ */
+check( 'la version a une forme valide', 1 === preg_match( '/^\d+\.\d+\.\d+$/', $version ) );
+check( 'l’en-tête du greffon annonce la même version', trim( $mh[1] ?? '' ) === $version );
+
+$blocs_versions = array();
+
+foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
+	$json = json_decode(
+		(string) file_get_contents( URBIZEN_PLATFORM_DIR . 'blocks/' . $bloc . '/block.json' ),
+		true
+	);
+
+	$blocs_versions[ $bloc ] = (string) ( $json['version'] ?? '' );
+}
+
+check( 'LES QUATRE EMPLACEMENTS DE VERSION CONCORDENT',
+	array( $version, $version ) === array_values( $blocs_versions ) );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
