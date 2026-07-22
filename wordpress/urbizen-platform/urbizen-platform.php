@@ -3,7 +3,7 @@
  * Plugin Name:       Urbizen Platform
  * Plugin URI:        https://urbizen.fr
  * Description:       Logique métier Urbizen : formulaires d'urbanisme, composant cadastre, dossiers, transmission au service de génération documentaire. Indépendant du thème.
- * Version:           0.9.0
+ * Version:           0.10.0
  * Requires at least: 6.5
  * Requires PHP:      8.1
  * Author:            Urbizen
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-const URBIZEN_PLATFORM_VERSION     = '0.9.0';
+const URBIZEN_PLATFORM_VERSION     = '0.10.0';
 const URBIZEN_PLATFORM_MIN_PHP     = '8.1';
 const URBIZEN_PLATFORM_MIN_WP      = '6.5';
 const URBIZEN_PLATFORM_TEXT_DOMAIN = 'urbizen-platform';

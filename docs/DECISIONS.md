@@ -1638,3 +1638,65 @@ sur-titre monospace, titre, sous-titre, logo, rose des vents. Le rendu serveur
 ne produit aucun de ces éléments : les ajouter demanderait de modifier
 `ConceptionRenderer`, hors du périmètre d'un commit de style. La numérotation
 des étapes reste « 1 » et non « 01 », pour la même raison.
+
+## D-044 — Tables propres derrière WordPress, migrations en avant seulement
+
+**Contexte.** Le socle des comptes (phase E) exige des relations que
+`user_meta` ne sait pas porter : « cette personne est administratrice de
+l'agence A et simple lectrice chez B » est une relation *utilisateur ×
+organisation*, pas une paire clé-valeur. Jusqu'ici le greffon n'avait **jamais
+écrit une ligne de SQL** — zéro `$wpdb`, zéro `dbDelta` en cinquante classes.
+E1 franchit ce seuil.
+
+**Décision.** WordPress fournit **exclusivement** l'identité,
+l'authentification, les sessions, la récupération de mot de passe et les
+primitives CSRF. Le domaine Urbizen — organisations, adhésions, projets,
+autorisations, documents — vit dans des tables propres, derrière des
+interfaces.
+
+**Conséquences.**
+
+- **Le domaine ignore WordPress.** Aucun fichier de `src/Domain/` n'appelle une
+  fonction WordPress, ne référence `WP_User` ou `WP_Post`, ne touche `$wpdb`.
+  Un banc l'éprouve par analyse lexicale — commentaires et chaînes écartés,
+  faute de quoi il signalerait sa propre documentation — et une seconde couche
+  confronte les identifiants à la table des symboles d'un WordPress chargé.
+- **Une seule porte d'autorisation**, à refus par défaut. Aucune vue n'appelle
+  `current_user_can()` : c'est ainsi qu'une règle finit par exister en deux
+  exemplaires divergents. `administrator` n'est pas un court-circuit implicite.
+- **Les migrations sont en avant seulement.** Pas de méthode `annuler()` : une
+  migration qui supprime une colonne ne peut pas la restaurer, et lui donner
+  une méthode d'annulation aurait promis une réversibilité qui aurait fini par
+  être crue un jour de panne. Le retour arrière repose sur quatre niveaux —
+  rollback du code, migration compensatrice, procédure manuelle, restauration
+  de sauvegarde.
+- **Le DDL de MariaDB n'est pas transactionnel.** `CREATE TABLE` valide
+  implicitement ; une migration interrompue laisse un schéma partiel qu'aucun
+  `ROLLBACK` ne rattrape. D'où : `appliquer()` idempotente, `verifier()` fondée
+  sur le schéma réel et non sur le registre, une migration par requête, et
+  aucune inscription avant vérification positive.
+- **Le registre est l'unique source de vérité** de l'état du schéma. Aucune
+  option miroir : deux sources divergent toujours.
+- **Aucune migration ne part du trafic.** L'exécuteur n'est accroché à aucun
+  hook ; son seul point d'entrée est `wp urbizen schema migrate`. Faire dépendre
+  l'état d'un schéma des visites, c'est confier une migration au premier
+  visiteur venu, éventuellement plusieurs à la fois, éventuellement sur un
+  greffon à moitié copié.
+- **Le catalogue est vide en E1**, et c'est ce qui rend la garantie mesurable :
+  catalogue vide, retour immédiat, aucune requête. Prouvé par une doublure qui
+  lève à tout appel, et par le compteur `$wpdb->num_queries` sur un WordPress
+  réel.
+- **Deux barrières, jamais une.** Le verrou d'exécution coordonne ; la
+  contrainte `UNIQUE` du registre refuse le doublon même si le verrou tombait.
+
+**Règle de discipline, à faire tenir dans les PR suivantes.** *Aucune classe,
+table ou interface ne rejoint le socle sans un usage écrit dans la même PR.*
+Les entités `Organization`, `Membership` et `Project`, ainsi que toutes les
+interfaces de dépôt, ont été délibérément **retirées d'E1** : une interface
+écrite avant sa première implémentation est une conjecture. Elles naîtront en
+E3 et E4, avec leurs cas d'usage, leurs invariants, leur persistance et leurs
+bancs d'intégration.
+
+**Ce qui n'est pas décidé ici.** La durée de purge des brouillons, le nom
+définitif du rôle client (introduit en E2), et le modèle des documents
+(inchangé jusqu'en E5).
