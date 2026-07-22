@@ -54,6 +54,25 @@ foreach (
 		'src/Mail/WordPressMailTransport.php',
 		'src/Mail/MailScheduler.php',
 		'src/Admin/SubmissionsAdmin.php',
+		// Socle E1 : domaine, schéma, adaptateurs.
+		'src/Domain/Identity/ActeurCourant.php',
+		'src/Domain/Identity/CurrentUserProvider.php',
+		'src/Domain/Authorization/Decision.php',
+		'src/Domain/Authorization/ResourcePolicy.php',
+		'src/Domain/Authorization/RefusParDefaut.php',
+		'src/Domain/Authorization/PolicyRegistry.php',
+		'src/Domain/Authorization/Authorization.php',
+		'src/Domain/Support/Ulid.php',
+		'src/Schema/DatabaseGateway.php',
+		'src/Schema/Migration.php',
+		'src/Schema/MigrationCatalogue.php',
+		'src/Schema/ResultatMigration.php',
+		'src/Schema/MigrationLock.php',
+		'src/Schema/SchemaGuard.php',
+		'src/Schema/MigrationRunner.php',
+		'src/Adapter/WpCurrentUser.php',
+		'src/Adapter/WpdbGateway.php',
+		'src/Adapter/WpCliSchemaCommand.php',
 	) as $fichier
 ) {
 	require_once URBIZEN_PLATFORM_DIR . $fichier;

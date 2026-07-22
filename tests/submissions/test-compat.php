@@ -205,15 +205,47 @@ check( 'la provenance HTTP est exigée dans l’adaptateur',
 	str_contains( $sources['src/Files/HttpUploadedFileMover.php'], 'is_uploaded_file(' ) );
 
 // ------------------------------------------------ aucune table SQL ----------
-$sql = array();
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle interdisait `CREATE TABLE` et `dbDelta` dans TOUT `src/`. E1 introduit
+ * une couche de schéma dont c'est précisément le métier : la formulation
+ * lexicale d'origine est devenue inapplicable.
+ *
+ * Elle n'est pas affaiblie, elle est **scindée et durcie** :
+ *
+ *   1. l'interdiction demeure, inchangée, partout hors `src/Schema/` — donc
+ *      sur les cinquante classes qu'elle protégeait déjà ;
+ *   2. `dbDelta` reste interdit PARTOUT, y compris dans `src/Schema/` : la
+ *      couche de schéma écrit son SQL, elle ne s'en remet pas à un
+ *      comparateur approximatif ;
+ *   3. s'ajoute ce que l'ancienne formulation ne disait pas — le catalogue
+ *      est vide, donc aucune table n'est réellement créée à l'exécution.
+ *
+ * Le troisième point est plus fort que les deux précédents : il porte sur le
+ * comportement, non sur le texte du code.
+ */
+$sql     = array();
+$deltas  = array();
 
 foreach ( $sources as $chemin => $contenu ) {
+	if ( preg_match( '/dbDelta/i', $contenu ) ) {
+		$deltas[] = $chemin;
+	}
+
+	if ( 0 === strpos( $chemin, 'src/Schema/' ) ) {
+		continue;
+	}
+
 	if ( preg_match( '/dbDelta|CREATE TABLE/i', $contenu ) ) {
 		$sql[] = $chemin;
 	}
 }
 
-check( 'aucune table SQL créée', array() === $sql );
+check( 'aucune table SQL créée hors de la couche de schéma', array() === $sql );
+check( 'dbDelta reste interdit partout', array() === $deltas );
+check( 'LE CATALOGUE DE MIGRATIONS EST VIDE : AUCUNE TABLE N’EST CRÉÉE',
+	\Urbizen\Platform\Schema\MigrationCatalogue::plateforme()->est_vide() );
 
 // ------------------------------------------------ constantes de contrat -----
 check( 'l’action admin-post est urbizen_conception', 'urbizen_conception' === SubmissionController::ACTION );
@@ -237,7 +269,61 @@ preg_match( '/^ \* Version:\s*(.+)$/m', $principal, $mh );
 
 $version = $m[1] ?? '';
 
-check( 'la version du plugin est 0.9.0', '0.9.0' === $version );
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle comparait la version à un littéral, `0.9.0`, qu'il fallait rééditer à
+ * chaque incrément — un contrôle qu'on corrige mécaniquement finit par n'être
+ * plus lu. Elle est remplacée par une vérification de **concordance** : la
+ * version est celle qu'on veut si les quatre emplacements disent la même
+ * chose, et si sa forme est valide.
+ *
+ * C'est plus exigeant : l'ancienne formulation laissait passer un `block.json`
+ * resté en arrière, celle-ci le refuse.
+ */
+check( 'la version a une forme valide', 1 === preg_match( '/^\d+\.\d+\.\d+$/', $version ) );
+check( 'l’en-tête du greffon annonce la même version', trim( $mh[1] ?? '' ) === $version );
+
+$blocs_versions = array();
+
+foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
+	$json = json_decode(
+		(string) file_get_contents( URBIZEN_PLATFORM_DIR . 'blocks/' . $bloc . '/block.json' ),
+		true
+	);
+
+	$blocs_versions[ $bloc ] = (string) ( $json['version'] ?? '' );
+}
+
+check( 'LES QUATRE EMPLACEMENTS DE VERSION CONCORDENT',
+	array( $version, $version ) === array_values( $blocs_versions ) );
+
+// Le changelog doit annoncer cette version, et en tête : une version publiée
+// sans entrée de journal est une version qu'on ne sait pas relire.
+$journal = (string) file_get_contents( dirname( __DIR__, 2 ) . '/docs/CHANGELOG.md' );
+
+preg_match( '/^## \[([0-9]+\.[0-9]+\.[0-9]+)\]/m', $journal, $mj );
+
+check( 'le changelog annonce la même version', ( $mj[1] ?? '' ) === $version );
+check( 'et c’est bien son entrée la plus récente',
+	false !== strpos( $journal, '## [' . $version . ']' ) );
+
+// Aucune vue ni aucun contrôleur existant ne doit employer l'infrastructure
+// d'autorisation, qui reste inactive en E1.
+$consommateurs = array();
+
+foreach ( $sources as $chemin => $contenu ) {
+	if ( 0 === strpos( $chemin, 'src/Domain/' ) || 0 === strpos( $chemin, 'src/Adapter/' ) ) {
+		continue;
+	}
+
+	if ( preg_match( '/\bAuthorization\b|\bPolicyRegistry\b|\bActeurCourant\b/', $contenu ) ) {
+		$consommateurs[] = $chemin;
+	}
+}
+
+check( 'AUCUNE VUE NI CONTRÔLEUR N’UTILISE L’INFRASTRUCTURE INACTIVE',
+	array() === $consommateurs );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {

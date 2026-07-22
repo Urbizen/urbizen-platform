@@ -5,6 +5,63 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.10.0] — 22 juillet 2026
+
+Socle E1 : identité, autorisation, identifiants et infrastructure de schéma.
+
+> **Aucun effet visible, aucune table, aucune option.** Rien de ce code n'est
+> encore appelé par la plateforme. Le catalogue de migrations est vide, donc
+> l'exécuteur rend la main sans émettre une seule requête. Les formulaires DP,
+> PC et Conception, le téléchargement de documents, les soumissions existantes
+> et le CPT `urbizen_demande` sont inchangés.
+
+### Ajouté
+- `src/Domain/Identity/` : `ActeurCourant` (objet de valeur immuable) et le
+  port `CurrentUserProvider`. Un visiteur anonyme est un acteur explicite
+  d'identifiant zéro, jamais `null`.
+- `src/Domain/Authorization/` : façade `Authorization`, contrat
+  `ResourcePolicy`, `PolicyRegistry`, `Decision` et `RefusParDefaut`. **Refus
+  par défaut sans exception** ; `administrator` n'est pas un court-circuit
+  implicite.
+- `src/Domain/Support/Ulid.php` : identifiants opaques, triables et lisibles,
+  monotones dans un même processus.
+- `src/Schema/` : contrat de migration **en avant seulement** (sans
+  `annuler()`), catalogue littéral **vide**, exécuteur non branché sur le
+  trafic, **verrou à compare-et-échange** (reprise atomique d'un verrou expiré,
+  renouvellement par le seul propriétaire), sonde de capacités du moteur,
+  résultat structuré.
+- `src/Adapter/` : `WpCurrentUser`, `WpdbGateway`, `WpCliSchemaCommand`.
+- Commande `wp urbizen schema <status|migrate|verify>` — **seul point d'entrée
+  prévu** pour appliquer une migration. Enregistrée uniquement sous WP-CLI.
+- `tests/domaine/` : cinq bancs sans WordPress et
+  `tests/integration/test-schema-reel.php`, dont une épreuve à six processus
+  concurrents sur la reprise d'un verrou expiré.
+
+### Modifié
+- `src/Plugin.php` : enregistre les commandes de schéma, sous WP-CLI seulement.
+- `tests/submissions/test-compat.php` : l'assertion « aucune table SQL créée »
+  est **scindée et durcie**, non affaiblie — interdiction inchangée hors de
+  `src/Schema/`, `dbDelta` interdit partout, et contrôle nouveau que le
+  catalogue est vide donc qu'aucune table n'est créée à l'exécution.
+
+### Corrigé
+- **Verrou de migration** : la reprise d'un verrou expiré procédait par
+  lecture, suppression puis repose. La suppression étant inconditionnelle,
+  elle pouvait emporter un verrou tout neuf acquis entre-temps par un
+  troisième processus — deux processus se croyaient alors propriétaires.
+  Remplacé par un compare-et-échange fondé sur la valeur exacte, avec contrôle
+  du nombre de lignes touchées.
+- **Doublure de passerelle** : elle appliquait la condition de valeur quel que
+  soit le SQL reçu, et validait donc un code qui l'aurait perdue. Rendue
+  fidèle : la condition n'est appliquée que si l'instruction la porte.
+
+### Décisions
+- **D-044** — tables propres derrière WordPress ; DDL non transactionnel donc
+  migrations en avant seulement ; registre unique source de vérité ; exécution
+  explicite hors trafic.
+
+---
+
 ## [0.9.0] — 21 juillet 2026
 
 Formulaire de conception en six étapes, brouillon local et manifeste de dépôt.
