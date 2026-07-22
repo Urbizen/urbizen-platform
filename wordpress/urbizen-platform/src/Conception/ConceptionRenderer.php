@@ -105,6 +105,7 @@ final class ConceptionRenderer {
 		}
 
 		$html[] = self::sans_script();
+		$html[] = self::entete( $def, $etapes );
 		$html[] = self::progression( $etapes, $id );
 		$html[] = sprintf(
 			'<form class="%1$s__form" id="%2$s-form" method="post" enctype="multipart/form-data" action="%3$s" novalidate>',
@@ -150,6 +151,66 @@ final class ConceptionRenderer {
 			esc_html__(
 				'Ce formulaire nécessite JavaScript pour être envoyé. Les questions restent consultables ci-dessous, mais l’envoi ne fonctionnera pas tant que JavaScript est désactivé.',
 				'urbizen-platform'
+			)
+		);
+	}
+
+	/**
+	 * Cartouche d'en-tête, repris de la structure commune aux deux maquettes
+	 * `frontend/formulaires/dp-formulaire.html` et `pc-formulaire.html`.
+	 *
+	 * Les deux ouvrent sur le même bloc : un sur-titre en capitales espacées,
+	 * un titre, puis une phrase d'accroche annonçant le nombre de rubriques.
+	 * C'est cette structure qui est reprise, pas son contenu — les maquettes
+	 * annoncent un Cerfa, ce que la conception de plans n'est pas.
+	 *
+	 * **Ajout purement présentationnel.** Aucune étape, aucun champ, aucun nom
+	 * de champ, aucun prix, aucune donnée soumise ne dépend de ce bloc.
+	 *
+	 * Trois choix méritent d'être explicités :
+	 *
+	 * - le titre est un `h2`, pas un `h1` comme dans les maquettes. Celles-ci
+	 *   sont des pages entières ; ici le formulaire est inséré dans une page
+	 *   WordPress qui porte déjà son `h1`. Un second `h1` casserait le plan du
+	 *   document ;
+	 * - le nombre de rubriques est **compté**, jamais écrit en dur : il ne peut
+	 *   pas mentir si une étape est ajoutée ou retirée ;
+	 * - le logo et la rose des vents des maquettes ne sont pas repris. Ils y
+	 *   tiennent lieu d'en-tête de site ; dans une page WordPress, l'en-tête du
+	 *   thème les porte déjà. Le filet rayé de l'en-tête, lui, est conservé —
+	 *   il est en CSS, donc muet pour les technologies d'assistance.
+	 *
+	 * @param FormDefinition       $def    Définition serveur.
+	 * @param array<int, mixed>    $etapes Étapes déclarées.
+	 * @return string
+	 */
+	private static function entete( FormDefinition $def, array $etapes ): string {
+		$titre = $def->title();
+
+		if ( '' === $titre ) {
+			return '';
+		}
+
+		return sprintf(
+			'<header class="%1$s__entete">'
+				. '<p class="%1$s__surtitre">%2$s</p>'
+				. '<h2 class="%1$s__titre">%3$s</h2>'
+				. '<p class="%1$s__sous-titre">%4$s</p>'
+				. '</header>',
+			esc_attr( self::RACINE ),
+			esc_html__( 'Plans et pièces graphiques · Étude sur mesure', 'urbizen-platform' ),
+			esc_html( $titre ),
+			esc_html(
+				sprintf(
+					/* translators: %d : nombre de rubriques du formulaire. */
+					_n(
+						'Répondez à la rubrique ci-dessous. Urbizen vous adresse ensuite une proposition chiffrée, puis réalise vos plans et pièces graphiques.',
+						'Répondez aux %d rubriques ci-dessous. Urbizen vous adresse ensuite une proposition chiffrée, puis réalise vos plans et pièces graphiques.',
+						count( $etapes ),
+						'urbizen-platform'
+					),
+					count( $etapes )
+				)
 			)
 		);
 	}
@@ -257,26 +318,62 @@ final class ConceptionRenderer {
 	 * @return string
 	 */
 	private static function etape( FormDefinition $def, $etape, int $rang, string $id, bool $dernier ): string {
-		$eid     = self::etape_id( $etape );
-		$libelle = self::etape_libelle( $etape );
-		$champs  = $def->fields_for_step( $eid );
+		$eid    = self::etape_id( $etape );
+		$champs = $def->fields_for_step( $eid );
+		$total  = count( $def->steps() );
+
+		// Le titre long est celui de la définition. Le libellé court reste au
+		// rail : il y sert de repère, il ne remplace pas le vrai titre ici.
+		$intitule    = self::etape_titre( $etape );
+		$description = self::etape_description( $etape );
+		$id_desc     = $id . '-desc-' . $eid;
 
 		$html   = array();
 		$html[] = sprintf(
-			'<fieldset class="%1$s__etape" id="%2$s-etape-%3$s" data-step="%3$s" data-rang="%4$d"%5$s>',
+			'<fieldset class="%1$s__etape" id="%2$s-etape-%3$s" data-step="%3$s" data-rang="%4$d"%5$s%6$s>',
 			esc_attr( self::RACINE ),
 			esc_attr( $id ),
 			esc_attr( $eid ),
 			$rang,
-			$dernier ? ' data-derniere="1"' : ''
+			$dernier ? ' data-derniere="1"' : '',
+			'' === $description ? '' : sprintf( ' aria-describedby="%s"', esc_attr( $id_desc ) )
 		);
+
+		/*
+		 * Le rang est dans la légende, donc dans le nom accessible du groupe :
+		 * « Étape 1 sur 6, Votre projet ». Il n'est annoncé qu'une fois — le
+		 * rail porte `aria-current`, pas un second décompte parlé. Le total
+		 * est compté sur la définition, jamais écrit en dur.
+		 */
 		$html[] = sprintf(
-			'<legend class="%1$s__etape-titre" id="%2$s-titre-%3$s" tabindex="-1">%4$s</legend>',
+			'<legend class="%1$s__etape-titre" id="%2$s-titre-%3$s" tabindex="-1">'
+				// L'espace entre les deux `span` n'est pas décoratif : sans lui,
+				// le nom accessible du groupe est « Étape 1 sur 6Votre projet ».
+				. '<span class="%1$s__etape-rang">%4$s</span> '
+				. '<span class="%1$s__etape-intitule">%5$s</span>'
+				. '</legend>',
 			esc_attr( self::RACINE ),
 			esc_attr( $id ),
 			esc_attr( $eid ),
-			esc_html( sprintf( '%d. %s', $rang + 1, $libelle ) )
+			esc_html(
+				sprintf(
+					/* translators: 1 : rang de l'étape. 2 : nombre total d'étapes. */
+					__( 'Étape %1$d sur %2$d', 'urbizen-platform' ),
+					$rang + 1,
+					$total
+				)
+			),
+			esc_html( $intitule )
 		);
+
+		if ( '' !== $description ) {
+			$html[] = sprintf(
+				'<p class="%1$s__etape-description" id="%2$s">%3$s</p>',
+				esc_attr( self::RACINE ),
+				esc_attr( $id_desc ),
+				esc_html( $description )
+			);
+		}
 
 		if ( 'documents' === $eid ) {
 			$html[] = self::consignes_documents();
@@ -570,6 +667,34 @@ final class ConceptionRenderer {
 	 * @param mixed $etape Étape.
 	 * @return string
 	 */
+	/**
+	 * Titre long de l'étape, tel que déclaré dans la définition.
+	 *
+	 * `title` d'abord — c'est le vrai titre. `label` n'est qu'un repli : il est
+	 * fait pour le rail, où la place manque, et ne dit pas la même chose.
+	 * Aucun texte n'est écrit ici : le renderer ne fait que lire.
+	 *
+	 * @param array<string, mixed>|string $etape Étape déclarée.
+	 * @return string
+	 */
+	private static function etape_titre( $etape ): string {
+		if ( ! is_array( $etape ) ) {
+			return (string) $etape;
+		}
+
+		return (string) ( $etape['title'] ?? $etape['label'] ?? $etape['id'] ?? '' );
+	}
+
+	/**
+	 * Phrase d'explication de l'étape, si la définition en porte une.
+	 *
+	 * @param array<string, mixed>|string $etape Étape déclarée.
+	 * @return string
+	 */
+	private static function etape_description( $etape ): string {
+		return is_array( $etape ) ? trim( (string) ( $etape['description'] ?? '' ) ) : '';
+	}
+
 	private static function etape_libelle( $etape ): string {
 		if ( ! is_array( $etape ) ) {
 			return (string) $etape;

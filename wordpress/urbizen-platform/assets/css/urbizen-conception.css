@@ -20,11 +20,23 @@
  *   boutons           Space Grotesk 500 14px, 10px 20px, rayon 3px
  *                     retour = contour · suivant = encre · envoyer = vert
  *
- * Les tokens du thème (`--u-*`) sont la première valeur quand ils existent, la
- * valeur de repli étant celle de la maquette : le composant est juste avec ou
- * sans le thème, comme `urbizen-form.css` et `urbizen-cadastre.css`. Là où la
- * maquette et les tokens divergent — rayon 3px et non 4px, largeur 960px et
- * non 1120px — c'est la maquette qui l'emporte, elle est la référence.
+ * Les tokens du thème (`--u-*`) sont la première valeur, la valeur de repli
+ * étant celle de la maquette : le composant est juste avec ou sans le thème,
+ * comme `urbizen-form.css` et `urbizen-cadastre.css`.
+ *
+ * ATTENTION à ne pas se tromper sur ce que fait `var(--u-x, repli)` : c'est le
+ * TOKEN qui l'emporte, jamais le repli. Écrire cela et prétendre que « la
+ * maquette l'emporte » serait faux. Ici les deux disent la même chose, et c'est
+ * vérifié, pas supposé : les treize tokens consommés sont **identiques au
+ * caractère près** aux valeurs de la maquette (contrôle « 13 · le thème ne
+ * dérive pas de la maquette », qui compare `urbizen-tokens.css` à
+ * `dp-formulaire.html` et tombe à la première divergence).
+ *
+ * Les deux seuls tokens qui divergent réellement de la maquette ne sont pas
+ * consommés, précisément pour cette raison :
+ *
+ *   `--u-radius` vaut 4px, la maquette 3px  → on consomme `--u-radius-sm` (3px)
+ *   `--u-maxw`   vaut 1120px, la maquette 960px → largeur posée en local
  *
  * Tout est porté par `.urbizen-conception` : aucune règle ne vise un élément
  * global, ni l'en-tête, ni le pied de page, ni les formulaires antérieurs.
@@ -46,6 +58,27 @@
 	/* --- traits --- */
 	--uc-ligne: var(--u-line, #c9d3dd);
 	--uc-ligne-forte: var(--u-line-strong, #9fadbc);
+
+	/*
+	 * Six combinaisons de la maquette passent sous les seuils WCAG. Elles sont
+	 * mesurées, pas supposées : le contrôle donne exactement les mêmes ratios
+	 * sur `dp-formulaire.html` que sur ce composant. Plutôt que de les recopier
+	 * ou d'inventer des teintes, on choisit un AUTRE ton de la même charte.
+	 *
+	 *   petit texte vert   #128A5A → #0E6E48   4,25 → 5,41   (--u-brand-dk)
+	 *   étape à venir      #8791A6 → #55617A   2,72 → 6,03   (--u-ink-soft)
+	 *   pastille courante  fond    → #0E6E48   4,37 → 5,41   (--u-brand-dk)
+	 *   bordure de champ   #9FADBC → #8290A2   2,23 → 3,17   (assombri de 11 %)
+	 *
+	 * Seul le dernier ton n'existe pas dans la charte : `#9FADBC` ne peut pas
+	 * atteindre 3:1 sur `#FBFCFD`, et la bordure est le SEUL indice qui
+	 * identifie un champ sur une carte claire (WCAG 1.4.11).
+	 *
+	 * `#8290A2` est une ADAPTATION LOCALE D'ACCESSIBILITÉ, pas une couleur de
+	 * marque. Elle ne sert qu'aux bordures qui identifient une commande, elle
+	 * n'entre pas dans la charte, et rien d'autre ne doit s'en servir.
+	 */
+	--uc-ligne-lisible: #8290a2;
 
 	/* --- accent unique --- */
 	--uc-vert: var(--u-brand, #128a5a);
@@ -100,6 +133,50 @@
 	margin: 0;
 }
 
+/* --- cartouche d'en-tête --- */
+/*
+ * Reprise de `.dp-head` : filet rayé très pâle, sur-titre monospace en
+ * capitales espacées, titre en Space Grotesk, accroche en encre douce. Le bloc
+ * coiffe la coque et en porte le haut.
+ */
+.urbizen-conception__entete {
+	background:
+		repeating-linear-gradient(90deg, transparent 0 11px, rgba(84, 207, 153, 0.1) 11px 12px),
+		var(--uc-surface);
+	border: 1px solid var(--uc-ligne-forte);
+	border-bottom: 1px solid var(--uc-ligne);
+	border-radius: var(--uc-rayon) var(--uc-rayon) 0 0;
+	margin: 0 auto;
+	max-width: var(--uc-coque);
+	padding: clamp(20px, 4vw, 32px) clamp(20px, 4vw, 36px);
+}
+
+.urbizen-conception__surtitre {
+	color: var(--uc-vert-fonce);
+	font-family: var(--uc-mono);
+	font-size: 11px;
+	letter-spacing: 0.18em;
+	margin: 0 0 6px;
+	text-transform: uppercase;
+}
+
+.urbizen-conception__titre {
+	color: var(--uc-encre);
+	font-family: var(--uc-titre);
+	font-size: clamp(21px, 3.4vw, 30px);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+	line-height: 1.12;
+	margin: 0 0 6px;
+}
+
+.urbizen-conception__sous-titre {
+	color: var(--uc-encre-doux);
+	font-size: 14px;
+	margin: 0;
+	max-width: 46ch;
+}
+
 /*
  * La coque : le rail de progression et le formulaire sont deux frères que rien
  * n'enveloppe dans le HTML. Ils portent donc chacun une moitié du cadre, et se
@@ -115,7 +192,8 @@
 .urbizen-conception__progression {
 	background: linear-gradient(180deg, var(--uc-surface-2), var(--uc-surface) 120px);
 	border-bottom: 0;
-	border-radius: var(--uc-rayon) var(--uc-rayon) 0 0;
+	border-radius: 0;
+	border-top: 0;
 	margin: 0 auto;
 	max-width: var(--uc-coque);
 	padding: 14px 16px;
@@ -133,7 +211,7 @@
 
 .urbizen-conception__progression-item {
 	align-items: center;
-	color: var(--uc-encre-pale);
+	color: var(--uc-encre-doux);
 	display: flex;
 	flex-direction: column;
 	font-size: 11px;
@@ -170,8 +248,8 @@
 }
 
 .urbizen-conception__progression-item[aria-current="step"] .urbizen-conception__progression-rang {
-	background: var(--uc-vert);
-	border-color: var(--uc-vert);
+	background: var(--uc-vert-fonce);
+	border-color: var(--uc-vert-fonce);
 	box-shadow: 0 0 0 3px var(--uc-vert-pale);
 	color: #fff;
 }
@@ -180,6 +258,7 @@
 .urbizen-conception__form {
 	background: var(--uc-surface);
 	border-radius: 0 0 var(--uc-rayon) var(--uc-rayon);
+	border-top: 0;
 	margin: 0 auto;
 	max-width: var(--uc-coque);
 	padding: clamp(20px, 4vw, 34px) clamp(20px, 4vw, 38px);
@@ -197,6 +276,11 @@
 	display: none;
 }
 
+/*
+ * Hiérarchie d'étape reprise de `.dp-step-kicker` / `.dp-step-title` /
+ * `.dp-step-hint` : rang en monospace espacé, titre en Space Grotesk, phrase
+ * d'explication en encre douce. Le rail garde à côté ses libellés courts.
+ */
 .urbizen-conception__etape-titre {
 	color: var(--uc-encre);
 	display: block;
@@ -205,8 +289,30 @@
 	font-weight: 600;
 	letter-spacing: -0.01em;
 	line-height: 1.15;
-	margin: 0 0 22px;
+	margin: 0 0 4px;
 	padding: 0;
+}
+
+.urbizen-conception__etape-rang {
+	color: var(--uc-vert-fonce);
+	display: block;
+	font-family: var(--uc-mono);
+	font-size: 11px;
+	font-weight: 400;
+	letter-spacing: 0.14em;
+	margin-bottom: 4px;
+	text-transform: uppercase;
+}
+
+.urbizen-conception__etape-intitule {
+	display: block;
+}
+
+.urbizen-conception__etape-description {
+	color: var(--uc-encre-doux);
+	font-size: 13.5px;
+	margin: 0 0 22px;
+	max-width: 54ch;
 }
 
 /*
@@ -241,7 +347,7 @@
 /* Dans la maquette, l'astérisque de champ requis est vert, pas rouge : le
    rouge y est réservé aux erreurs de saisie. */
 .urbizen-conception__requis {
-	color: var(--uc-vert);
+	color: var(--uc-vert-fonce);
 	font-size: 12px;
 	font-weight: 400;
 }
@@ -273,7 +379,7 @@
 .urbizen-conception select,
 .urbizen-conception textarea {
 	background: var(--uc-surface);
-	border: 1px solid var(--uc-ligne-forte);
+	border: 1px solid var(--uc-ligne-lisible);
 	border-radius: var(--uc-rayon);
 	color: var(--uc-encre);
 	font-family: inherit;
@@ -325,7 +431,7 @@
 .urbizen-conception__choix {
 	align-items: center;
 	background: var(--uc-surface);
-	border: 1px solid var(--uc-ligne-forte);
+	border: 1px solid var(--uc-ligne-lisible);
 	border-radius: var(--uc-rayon);
 	display: flex;
 	font-size: 13.5px;
@@ -661,6 +767,12 @@
 		width: 100%;
 	}
 
+	.urbizen-conception__entete {
+		grid-column: 1 / -1;
+		margin: 0;
+		max-width: none;
+	}
+
 	/*
 	 * `margin: 0 auto` empêche l'étirement par défaut d'un élément de grille :
 	 * le rail se rétractait à sa largeur de contenu, laissant une fente entre
@@ -668,6 +780,7 @@
 	 */
 	.urbizen-conception__progression {
 		border-bottom: 1px solid var(--uc-ligne-forte);
+		border-radius: 0 0 0 var(--uc-rayon);
 		margin: 0;
 		border-radius: var(--uc-rayon) 0 0 var(--uc-rayon);
 		border-right: 1px solid var(--uc-ligne);
@@ -712,7 +825,7 @@
 
 	.urbizen-conception__form {
 		border-left: 0;
-		border-radius: 0 var(--uc-rayon) var(--uc-rayon) 0;
+		border-radius: 0 0 var(--uc-rayon) 0;
 		margin: 0;
 		max-width: none;
 	}
@@ -725,6 +838,7 @@
 	}
 
 	.urbizen-conception__etape-titre,
+	.urbizen-conception__etape-description,
 	.urbizen-conception__champ {
 		grid-column: 1 / -1;
 	}

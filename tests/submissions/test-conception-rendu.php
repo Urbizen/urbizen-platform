@@ -423,6 +423,234 @@ $orphelines = array_values( array_diff( array_unique( $employes[1] ), array_uniq
 check( '12 · aucune variable locale employée sans définition', array() === $orphelines );
 
 // ======================================================================
+// 13 · CARTOUCHE D’EN-TÊTE
+//
+// L'ajout est présentationnel : il ne doit RIEN changer à la structure. Les
+// contrôles de la section 3 (six étapes, quarante-cinq champs) tournent déjà
+// sur le même rendu — ceux-ci vérifient l'en-tête lui-même.
+// ======================================================================
+neuf();
+administrateur();
+$rendu = ConceptionRenderer::render( $def );
+
+check( '13 · le cartouche est rendu', 1 === substr_count( $rendu, 'urbizen-conception__entete' ) );
+check( '13 · il emploie l’élément header', str_contains( $rendu, '<header class="urbizen-conception__entete">' ) );
+check( '13 · un sur-titre', 1 === substr_count( $rendu, 'urbizen-conception__surtitre' ) );
+check( '13 · un titre', 1 === substr_count( $rendu, 'urbizen-conception__titre"' ) );
+check( '13 · un sous-titre', 1 === substr_count( $rendu, 'urbizen-conception__sous-titre' ) );
+
+// Aucun h1 : le formulaire s'insère dans une page WordPress qui porte le sien.
+check( '13 · AUCUN h1 dans le rendu', ! preg_match( '/<h1[\s>]/i', $rendu ) );
+check( '13 · le titre du cartouche est un h2',
+	str_contains( $rendu, '<h2 class="urbizen-conception__titre">' ) );
+
+// Le titre vient de la définition, il n'est pas écrit en dur dans le rendu.
+check( '13 · le titre vient de la définition', str_contains( $rendu, esc_html( $def->title() ) ) );
+check( '13 · et la définition le porte bien', 'Conception de plans sur mesure' === $def->title() );
+
+// Le nombre de rubriques est compté : il ne peut pas mentir.
+check( '13 · le nombre de rubriques annoncé est celui des étapes',
+	str_contains( $rendu, 'aux ' . count( $def->steps() ) . ' rubriques' ) );
+
+// Rien de décoratif n'est annoncé aux technologies d'assistance : le filet
+// rayé de la maquette est en CSS, et ni logo ni rose des vents ne sont repris.
+$entete = substr( $rendu, (int) strpos( $rendu, '__entete' ), 600 );
+
+check( '13 · aucune image dans le cartouche', ! str_contains( $entete, '<img' ) );
+check( '13 · aucun SVG dans le cartouche', ! str_contains( $entete, '<svg' ) );
+check( '13 · aucun aria-hidden nécessaire', ! str_contains( $entete, 'aria-hidden' ) );
+
+// Le cartouche est hors du formulaire : il n'ajoute aucune donnée soumise.
+check( '13 · le cartouche précède le formulaire',
+	strpos( $rendu, '__entete' ) < strpos( $rendu, '__form' ) );
+check( '13 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '13 · toujours six étapes', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+check( '13 · aucun champ ajouté par le cartouche',
+	substr_count( $rendu, '<input' ) === substr_count( $rendu, '<input' ) && ! str_contains( $entete, '<input' ) );
+
+// ======================================================================
+// 15 · HIÉRARCHIE D’ÉTAPE
+//
+// Le rail garde les libellés courts ; le contenu de l'étape porte le vrai
+// titre et sa phrase d'explication. Les trois textes viennent de la
+// définition — le renderer n'en écrit aucun.
+// ======================================================================
+$etapes_def = $def->steps();
+
+check( '15 · six rangs annoncés', 6 === substr_count( $rendu, 'urbizen-conception__etape-rang' ) );
+check( '15 · six intitulés', 6 === substr_count( $rendu, 'urbizen-conception__etape-intitule' ) );
+check( '15 · six descriptions', 6 === substr_count( $rendu, 'urbizen-conception__etape-description' ) );
+check( '15 · six légendes subsistent', 6 === substr_count( $rendu, 'urbizen-conception__etape-titre' ) );
+check( '15 · six fieldset subsistent', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+
+// Le total est compté, pas écrit en dur : six « sur 6 », et jamais « sur 7 ».
+check( '15 · le total vient de la définition',
+	6 === substr_count( $rendu, 'sur ' . count( $etapes_def ) . '<' ) );
+
+$sans_titre = array();
+$sans_desc  = array();
+$rang       = 0;
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	++$rang;
+
+	$titre = (string) ( $etape['title'] ?? '' );
+	$desc  = (string) ( $etape['description'] ?? '' );
+
+	if ( '' !== $titre && ! str_contains( $rendu, '__etape-intitule">' . esc_html( $titre ) . '<' ) ) {
+		$sans_titre[] = $etape['id'];
+	}
+
+	if ( '' !== $desc && ! str_contains( $rendu, esc_html( $desc ) ) ) {
+		$sans_desc[] = $etape['id'];
+	}
+
+	check( "15 · l’étape $rang annonce son rang", str_contains( $rendu, "Étape $rang sur 6" ) );
+}
+
+check( '15 · tous les titres d’étapes viennent de la définition', array() === $sans_titre );
+check( '15 · toutes les descriptions viennent de la définition', array() === $sans_desc );
+
+// Aucun de ces textes n'est écrit dans le renderer : il ne fait que lire.
+$source_renderer = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Conception/ConceptionRenderer.php'
+);
+
+/*
+ * Les commentaires sont retirés avant comparaison : un texte cité dans une
+ * explication n'est pas un texte recopié. On exige ensuite la chaîne ENTIÈRE
+ * entre guillemets, jamais un fragment — sans quoi le libellé « Pièces »
+ * ferait tomber le contrôle à cause du bloc « Pièces d’urbanisme », qui n'a
+ * rien à voir.
+ */
+$sans_commentaires = (string) preg_replace(
+	array( '#/\*.*?\*/#s', '#//[^\n]*#' ),
+	'',
+	$source_renderer
+);
+
+preg_match_all( "/'((?:[^'\\\\]|\\\\.)*)'/", $sans_commentaires, $litteraux );
+
+$emis     = array_map( static fn( $t ) => stripslashes( $t ), $litteraux[1] );
+$recopies = array();
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	foreach ( array( 'title', 'description', 'label' ) as $cle ) {
+		$texte = (string) ( $etape[ $cle ] ?? '' );
+
+		if ( '' !== $texte && in_array( $texte, $emis, true ) ) {
+			$recopies[] = $etape['id'] . '.' . $cle;
+		}
+	}
+}
+
+check( '15 · AUCUN TEXTE D’ÉTAPE N’EST RECOPIÉ DANS LE RENDERER', array() === $recopies );
+
+// Le libellé court reste au rail, et n'y remplace pas le titre long.
+check( '15 · le rail garde les libellés courts',
+	str_contains( $rendu, '__progression-label">Programme<' )
+	&& str_contains( $rendu, '__progression-label">Contact<' ) );
+check( '15 · le fieldset porte le titre long, pas le libellé court',
+	str_contains( $rendu, '__etape-intitule">Votre projet<' )
+	&& str_contains( $rendu, '__etape-intitule">Vos coordonnées<' ) );
+
+// Lien sémantique entre le groupe et sa description.
+check( '15 · six fieldset décrits par leur paragraphe',
+	6 === substr_count( $rendu, 'aria-describedby="urbizen-conception-1-desc-' ) );
+
+$sans_ancre = array();
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	$ancre = 'urbizen-conception-1-desc-' . $etape['id'];
+
+	if ( ! str_contains( $rendu, 'id="' . $ancre . '"' ) ) {
+		$sans_ancre[] = $etape['id'];
+	}
+}
+
+check( '15 · chaque description porte son identifiant', array() === $sans_ancre );
+
+// Le rang n'est annoncé qu'une fois : il est dans la légende, pas en plus
+// dans le rail, et l'ancien préfixe « 1. » a disparu.
+check( '15 · plus de préfixe numéroté dans la légende', ! str_contains( $rendu, '>1. Programme<' ) );
+check( '15 · le rang est dans la légende', str_contains( $rendu, '__etape-rang">Étape 1 sur 6<' ) );
+
+// Sans l'espace entre les deux `span`, le nom accessible du groupe devient
+// « Étape 1 sur 6Votre projet ». Le contrôle vise ce caractère précis.
+check( '15 · le nom accessible du groupe est séparé',
+	str_contains( $rendu, '</span> <span class="urbizen-conception__etape-intitule">' ) );
+
+// Rien d'autre n'a bougé.
+check( '15 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '15 · toujours seize conditions', 16 === substr_count( $rendu, 'data-visible-if="' ) );
+check( '15 · toujours aucun h1', ! preg_match( '/<h1[\s>]/i', $rendu ) );
+
+// ======================================================================
+// 14 · LE THÈME NE DÉRIVE PAS DE LA MAQUETTE
+//
+// `var(--u-x, repli)` fait gagner le TOKEN, jamais le repli. Le composant ne
+// reste donc fidèle à la maquette que tant que les deux coïncident. Ce contrôle
+// compare directement `urbizen-tokens.css` à `dp-formulaire.html` : si le thème
+// dérive un jour, il tombe ici, pas sous les yeux de la propriétaire.
+// ======================================================================
+$tokens_css = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-child/assets/css/urbizen-tokens.css'
+);
+
+/**
+ * Relève la valeur d'une variable CSS dans une feuille.
+ *
+ * @param string $source Feuille.
+ * @param string $nom    Nom de la variable.
+ * @return string
+ */
+function valeur_css( string $source, string $nom ): string {
+	return preg_match( '/' . preg_quote( $nom, '/' ) . '\s*:\s*([^;]+);/', $source, $m )
+		? strtolower( trim( $m[1] ) )
+		: '';
+}
+
+// Correspondance token du thème → variable de la maquette.
+$paires = array(
+	'--u-paper'       => '--paper',
+	'--u-grid'        => '--grid',
+	'--u-surface'     => '--surface',
+	'--u-ink'         => '--ink',
+	'--u-ink-soft'    => '--ink-soft',
+	'--u-ink-faint'   => '--ink-faint',
+	'--u-line'        => '--line',
+	'--u-line-strong' => '--line-strong',
+	'--u-brand'       => '--cadastre',
+	'--u-brand-dk'    => '--cadastre-dk',
+	'--u-brand-sf'    => '--cadastre-sf',
+	'--u-error'       => '--error',
+	'--u-radius-sm'   => '--radius',
+);
+
+foreach ( $paires as $token => $var_maquette ) {
+	$a = valeur_css( $tokens_css, $token );
+	$b = valeur_css( $maquette, $var_maquette );
+
+	check( "14 · $token vaut la valeur de la maquette", '' !== $a && $a === $b );
+}
+
+// Les deux tokens qui divergent réellement ne doivent JAMAIS être consommés.
+foreach ( array( '--u-radius', '--u-maxw' ) as $divergent ) {
+	check(
+		"14 · $divergent n’est pas consommé, il diverge de la maquette",
+		! str_contains( $css, 'var(' . $divergent . ',' )
+	);
+}
+
+// Les deux maquettes restent interchangeables : une seule référence.
+$maquette_pc = (string) file_get_contents( dirname( __DIR__, 2 ) . '/frontend/formulaires/pc-formulaire.html' );
+
+preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette, $sd );
+preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette_pc, $sp );
+
+check( '14 · DP et PC portent le même CSS', ( $sd[1] ?? 'a' ) === ( $sp[1] ?? 'b' ) );
+
+// ======================================================================
 // 11 · ÉCHAPPEMENT
 // ======================================================================
 check( '11 · aucun script dans le rendu', ! str_contains( $rendu, '<script' ) );
