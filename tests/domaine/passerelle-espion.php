@@ -56,6 +56,10 @@ final class PasserelleMuette implements DatabaseGateway {
 		$this->interdit( 'lignes' );
 	}
 
+	public function lignes_affectees( string $sql, array $parametres = array() ): int {
+		$this->interdit( 'lignes_affectees' );
+	}
+
 	public function table_existe( string $nom ): bool {
 		$this->interdit( 'table_existe' );
 	}
@@ -149,6 +153,12 @@ final class PasserelleMemoire implements DatabaseGateway {
 			return $this->capacites['utf8mb4'] ? 'utf8mb4' : null;
 		}
 
+		if ( false !== strpos( $sql, 'option_value' ) && false !== strpos( $sql, 'option_name' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			return $this->options[ $nom ] ?? null;
+		}
+
 		return null;
 	}
 
@@ -164,6 +174,93 @@ final class PasserelleMemoire implements DatabaseGateway {
 
 	public function derniere_erreur(): string {
 		return '';
+	}
+
+	/**
+	 * Table d'options simulée : nom → valeur brute.
+	 *
+	 * @var array<string, string>
+	 */
+	public array $options = array();
+
+	/**
+	 * Exécute une instruction en rendant le nombre de lignes touchées.
+	 *
+	 * Les quatre formes employées par le verrou sont reproduites **avec leur
+	 * sémantique exacte** : l'insertion échoue si la clé existe, la mise à jour
+	 * et la suppression ne touchent une ligne que si la valeur attendue est
+	 * encore là. C'est cette fidélité qui donne son sens au banc — une doublure
+	 * permissive laisserait passer précisément le défaut qu'on éprouve.
+	 *
+	 * @param string             $sql        Instruction.
+	 * @param array<int, scalar> $parametres Paramètres.
+	 * @return int
+	 */
+	public function lignes_affectees( string $sql, array $parametres = array() ): int {
+		$this->instructions[] = $sql;
+
+		if ( 0 === strpos( $sql, 'INSERT INTO' ) && false !== strpos( $sql, 'option_name' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			if ( array_key_exists( $nom, $this->options ) ) {
+				return -1; // Violation de clé unique.
+			}
+
+			$this->options[ $nom ] = (string) ( $parametres[1] ?? '' );
+
+			return 1;
+		}
+
+		if ( 0 === strpos( $sql, 'UPDATE' ) && false !== strpos( $sql, 'option_name' ) ) {
+			$nouvelle = (string) ( $parametres[0] ?? '' );
+			$nom      = (string) ( $parametres[1] ?? '' );
+			$attendue = (string) ( $parametres[2] ?? '' );
+
+			if ( ! array_key_exists( $nom, $this->options ) ) {
+				return 0;
+			}
+
+			// La condition sur l'ancienne valeur n'est appliquée QUE si le SQL
+			// la porte réellement. Une doublure qui l'imposerait de toute façon
+			// validerait un code qui l'a perdue — c'est ainsi qu'un défaut
+			// survit à sa propre suite de tests.
+			if ( $this->porte_condition_de_valeur( $sql ) && $this->options[ $nom ] !== $attendue ) {
+				return 0;
+			}
+
+			$this->options[ $nom ] = $nouvelle;
+
+			return 1;
+		}
+
+		if ( 0 === strpos( $sql, 'DELETE FROM' ) && false !== strpos( $sql, 'option_name' ) ) {
+			$nom      = (string) ( $parametres[0] ?? '' );
+			$attendue = (string) ( $parametres[1] ?? '' );
+
+			if ( ! array_key_exists( $nom, $this->options ) ) {
+				return 0;
+			}
+
+			if ( $this->porte_condition_de_valeur( $sql ) && $this->options[ $nom ] !== $attendue ) {
+				return 0;
+			}
+
+			unset( $this->options[ $nom ] );
+
+			return 1;
+		}
+
+		return $this->executer( $sql, $parametres ) ? 1 : -1;
+	}
+
+	/**
+	 * L'instruction porte-t-elle réellement la condition sur l'ancienne valeur ?
+	 *
+	 * @param string $sql Instruction.
+	 * @return bool
+	 */
+	private function porte_condition_de_valeur( string $sql ): bool {
+		return 1 === preg_match( '/option_value\s*=\s*%s/', $sql );
 	}
 }
 

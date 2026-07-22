@@ -12,9 +12,10 @@ declare( strict_types = 1 );
 
 require dirname( __DIR__ ) . '/amorce-reelle.php';
 
+use Urbizen\Platform\Adapter\WpdbGateway;
 use Urbizen\Platform\Schema\MigrationLock;
 
-$verrou = MigrationLock::acquerir();
+$verrou = MigrationLock::acquerir( new WpdbGateway() );
 
 if ( null === $verrou ) {
 	echo 'refuse';

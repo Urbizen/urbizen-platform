@@ -82,6 +82,20 @@ final class WpdbGateway implements DatabaseGateway {
 	}
 
 	/**
+	 * @param string             $sql        Instruction.
+	 * @param array<int, scalar> $parametres Paramètres.
+	 * @return int
+	 */
+	public function lignes_affectees( string $sql, array $parametres = array() ): int {
+		$retour = $this->wpdb->query( $this->preparer( $sql, $parametres ) ); // phpcs:ignore WordPress.DB
+
+		// `query()` rend `false` sur erreur et un entier sinon — y compris `0`,
+		// qui signifie « aucune ligne ne correspondait ». Pour un
+		// compare-et-échange, cette distinction est tout l'enjeu.
+		return false === $retour ? -1 : (int) $retour;
+	}
+
+	/**
 	 * @param string $nom Nom complet.
 	 * @return bool
 	 */

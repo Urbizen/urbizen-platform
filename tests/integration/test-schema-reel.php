@@ -254,10 +254,16 @@ check( '5 · LA SONDE NE LAISSE AUCUNE TABLE', array() === ( is_array( $restes )
 // ======================================================================
 delete_option( MigrationLock::OPTION );
 
-$verrou = MigrationLock::acquerir();
+$verrou = MigrationLock::acquerir( new WpdbGateway() );
 
 check( '6 · le verrou s’acquiert', null !== $verrou );
-check( '6 · il est visible en base', is_array( get_option( MigrationLock::OPTION, null ) ) );
+$brut_verrou = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", MigrationLock::OPTION ) ); // phpcs:ignore
+$decode      = json_decode( (string) $brut_verrou, true );
+
+check( '6 · il est visible en base, en JSON prévisible', is_array( $decode ) );
+check( '6 · la valeur stockée porte notre propriétaire',
+	( $decode['proprietaire'] ?? '' ) === $verrou->proprietaire() );
+check( '6 · elle porte une échéance future', (int) ( $decode['expire_le'] ?? 0 ) > time() );
 
 // Un second processus réel tente d'acquérir pendant que nous tenons le verrou.
 $script = __DIR__ . '/procs/acquerir-verrou.php';
@@ -281,6 +287,111 @@ exec( sprintf( '%s %s 2>&1', escapeshellarg( PHP_BINARY ), escapeshellarg( $scri
 check( '6 · une fois libéré, un autre processus acquiert', 'acquis' === trim( implode( '', $sortie ) ) );
 
 delete_option( MigrationLock::OPTION );
+
+// ======================================================================
+// 6 bis · REPRISE D'UN VERROU EXPIRÉ, SOUS CONCURRENCE RÉELLE
+//
+// Le parent pose un verrou DÉJÀ ÉCHU, puis lance six fils qui attendent le
+// même instant avant de tenter la reprise. C'est la fenêtre exacte que
+// l'ancienne implémentation laissait ouverte — lire, supprimer, reposer.
+//
+// Exigence : exactement un fils obtient le verrou.
+// ======================================================================
+delete_option( MigrationLock::OPTION );
+
+$passerelle_verrou = new WpdbGateway();
+
+// Un verrou expiré, écrit tel quel : propriétaire valide, échéance dépassée.
+$fantome = wp_json_encode(
+	array(
+		'proprietaire' => \Urbizen\Platform\Domain\Support\Ulid::generer(),
+		'cree_le'      => time() - 10000,
+		'expire_le'    => time() - 5000,
+	)
+);
+
+$wpdb->query( // phpcs:ignore
+	$wpdb->prepare(
+		"INSERT INTO {$wpdb->options} ( option_name, option_value, autoload ) VALUES ( %s, %s, 'no' )",
+		MigrationLock::OPTION,
+		$fantome
+	)
+);
+wp_cache_delete( MigrationLock::OPTION, 'options' );
+wp_cache_delete( 'alloptions', 'options' );
+
+check( '6 bis · un verrou expiré est en place',
+	$fantome === $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", MigrationLock::OPTION ) ) ); // phpcs:ignore
+
+$fils      = 6;
+$dossier   = sys_get_temp_dir() . '/urbizen-verrou-' . getmypid();
+@mkdir( $dossier, 0700, true );
+
+// Départ commun, assez loin pour que tous aient fini d'amorcer WordPress.
+$depart  = microtime( true ) + 6.0;
+$script  = __DIR__ . '/procs/reprendre-verrou-expire.php';
+$attente = array();
+
+for ( $i = 0; $i < $fils; $i++ ) {
+	$fichier      = $dossier . '/fils-' . $i . '.txt';
+	$attente[]    = $fichier;
+
+	// En arrière-plan : les fils doivent courir ensemble, pas l'un après
+	// l'autre.
+	exec(
+		sprintf(
+			'%s %s %s %s > /dev/null 2>&1 &',
+			escapeshellarg( PHP_BINARY ),
+			escapeshellarg( $script ),
+			escapeshellarg( $fichier ),
+			escapeshellarg( (string) $depart )
+		)
+	);
+}
+
+// On laisse le temps aux fils d'amorcer, de courir, puis d'écrire.
+$limite = microtime( true ) + 40.0;
+
+do {
+	usleep( 250000 );
+	$ecrits = 0;
+
+	foreach ( $attente as $fichier ) {
+		if ( is_file( $fichier ) && '' !== trim( (string) @file_get_contents( $fichier ) ) ) {
+			++$ecrits;
+		}
+	}
+} while ( $ecrits < $fils && microtime( true ) < $limite );
+
+$acquis     = 0;
+$refuses    = 0;
+$possesseurs = array();
+
+foreach ( $attente as $fichier ) {
+	$ligne = trim( (string) @file_get_contents( $fichier ) );
+
+	if ( 0 === strpos( $ligne, 'acquis:' ) ) {
+		++$acquis;
+		$possesseurs[] = substr( $ligne, 7 );
+	} elseif ( 'refuse' === $ligne ) {
+		++$refuses;
+	}
+
+	@unlink( $fichier );
+}
+
+@rmdir( $dossier );
+
+check( sprintf( '6 bis · les %d fils ont tous répondu', $fils ), $fils === ( $acquis + $refuses ) );
+check( '6 bis · EXACTEMENT UN FILS OBTIENT LE VERROU EXPIRÉ', 1 === $acquis );
+check( '6 bis · tous les autres sont refusés', $fils - 1 === $refuses );
+check( '6 bis · un seul propriétaire distinct', 1 === count( array_unique( $possesseurs ) ) );
+
+delete_option( MigrationLock::OPTION );
+$wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->options} WHERE option_name = %s", MigrationLock::OPTION ) ); // phpcs:ignore
+
+check( '6 bis · aucun verrou résiduel',
+	null === $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", MigrationLock::OPTION ) ) ); // phpcs:ignore
 
 // ======================================================================
 // 7 · FRONTIÈRE, CONFRONTÉE AUX SYMBOLES RÉELS DE WORDPRESS

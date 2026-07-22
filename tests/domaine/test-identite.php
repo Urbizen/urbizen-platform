@@ -59,6 +59,52 @@ $menteur = new ActeurCourant( 0, array( 'administrator' ), true );
 check( '4 · ANONYME AVEC ADRESSE VÉRIFIÉE → REFUSÉ', false === $menteur->courriel_verifie() );
 
 // ======================================================================
+// 4 bis · LE DRAPEAU DE VÉRIFICATION EST RESTRICTIF PAR DÉFAUT
+//
+// E2 n'existe pas : aucun mécanisme n'écrit encore la vérification. Le drapeau
+// doit donc valoir `false` pour tout le monde, y compris l'administrateur
+// historique — exister dans `wp_users` ne prouve pas qu'une adresse a été
+// confirmée.
+// ======================================================================
+check( '4 bis · DÉFAUT DU CONSTRUCTEUR : NON VÉRIFIÉ',
+	false === ( new ActeurCourant( 99 ) )->courriel_verifie() );
+check( '4 bis · un administrateur n’est pas vérifié d’office',
+	false === ( new ActeurCourant( 1, array( 'administrator' ) ) )->courriel_verifie() );
+check( '4 bis · l’anonyme non plus', false === ActeurCourant::anonyme()->courriel_verifie() );
+
+// L'adaptateur ne doit lire qu'une valeur strictement égale à « 1 ».
+$adaptateur = file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Adapter/WpCurrentUser.php'
+);
+
+check( '4 bis · l’adaptateur compare strictement à « 1 »',
+	false !== strpos( $adaptateur, "'1' === (string) $valeur" ) );
+check( '4 bis · IL N’ÉCRIT AUCUNE MÉTADONNÉE',
+	false === strpos( $adaptateur, 'update_user_meta' )
+	&& false === strpos( $adaptateur, 'add_user_meta' ) );
+
+// Aucune politique d'E1 ne doit accorder un droit sur ce drapeau.
+$politiques = glob(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Domain/Authorization/*.php'
+);
+
+$usages = array();
+
+foreach ( (array) $politiques as $fichier ) {
+	$code = (string) preg_replace(
+		array( '#/\*.*?\*/#s', '#//[^\n]*#' ),
+		'',
+		(string) file_get_contents( $fichier )
+	);
+
+	if ( false !== strpos( $code, 'courriel_verifie' ) ) {
+		$usages[] = basename( $fichier );
+	}
+}
+
+check( '4 bis · AUCUNE POLITIQUE E1 N’ACCORDE UN DROIT SUR CE DRAPEAU', array() === $usages );
+
+// ======================================================================
 // 5 · IDENTITÉ
 // ======================================================================
 $a = new ActeurCourant( 42 );

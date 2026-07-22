@@ -55,6 +55,20 @@ interface DatabaseGateway {
 	public function lignes( string $sql, array $parametres = array() ): array;
 
 	/**
+	 * Exécute une instruction et rend le **nombre exact de lignes touchées**.
+	 *
+	 * C'est la primitive du compare-et-échange : un `UPDATE ... WHERE
+	 * ancienne_valeur = %s` qui rend `1` prouve que ce processus — et lui seul —
+	 * a remplacé la valeur qu'il avait lue. Un booléen ne le dirait pas : une
+	 * mise à jour qui ne touche aucune ligne « réussit » elle aussi.
+	 *
+	 * @param string             $sql        Instruction.
+	 * @param array<int, scalar> $parametres Paramètres.
+	 * @return int Lignes touchées, ou `-1` en cas d'erreur.
+	 */
+	public function lignes_affectees( string $sql, array $parametres = array() ): int;
+
+	/**
 	 * Cette table existe-t-elle ?
 	 *
 	 * @param string $nom Nom complet, préfixe compris.

@@ -297,6 +297,33 @@ foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
 
 check( 'LES QUATRE EMPLACEMENTS DE VERSION CONCORDENT',
 	array( $version, $version ) === array_values( $blocs_versions ) );
+
+// Le changelog doit annoncer cette version, et en tête : une version publiée
+// sans entrée de journal est une version qu'on ne sait pas relire.
+$journal = (string) file_get_contents( dirname( __DIR__, 2 ) . '/docs/CHANGELOG.md' );
+
+preg_match( '/^## \[([0-9]+\.[0-9]+\.[0-9]+)\]/m', $journal, $mj );
+
+check( 'le changelog annonce la même version', ( $mj[1] ?? '' ) === $version );
+check( 'et c’est bien son entrée la plus récente',
+	false !== strpos( $journal, '## [' . $version . ']' ) );
+
+// Aucune vue ni aucun contrôleur existant ne doit employer l'infrastructure
+// d'autorisation, qui reste inactive en E1.
+$consommateurs = array();
+
+foreach ( $sources as $chemin => $contenu ) {
+	if ( 0 === strpos( $chemin, 'src/Domain/' ) || 0 === strpos( $chemin, 'src/Adapter/' ) ) {
+		continue;
+	}
+
+	if ( preg_match( '/\bAuthorization\b|\bPolicyRegistry\b|\bActeurCourant\b/', $contenu ) ) {
+		$consommateurs[] = $chemin;
+	}
+}
+
+check( 'AUCUNE VUE NI CONTRÔLEUR N’UTILISE L’INFRASTRUCTURE INACTIVE',
+	array() === $consommateurs );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {

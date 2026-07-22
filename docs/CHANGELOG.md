@@ -27,13 +27,15 @@ Socle E1 : identité, autorisation, identifiants et infrastructure de schéma.
   monotones dans un même processus.
 - `src/Schema/` : contrat de migration **en avant seulement** (sans
   `annuler()`), catalogue littéral **vide**, exécuteur non branché sur le
-  trafic, verrou à propriétaire et échéance, sonde de capacités du moteur,
+  trafic, **verrou à compare-et-échange** (reprise atomique d'un verrou expiré,
+  renouvellement par le seul propriétaire), sonde de capacités du moteur,
   résultat structuré.
 - `src/Adapter/` : `WpCurrentUser`, `WpdbGateway`, `WpCliSchemaCommand`.
 - Commande `wp urbizen schema <status|migrate|verify>` — **seul point d'entrée
   prévu** pour appliquer une migration. Enregistrée uniquement sous WP-CLI.
-- `tests/domaine/` : cinq bancs sans WordPress (150 contrôles) et
-  `tests/integration/test-schema-reel.php` (45 contrôles).
+- `tests/domaine/` : cinq bancs sans WordPress et
+  `tests/integration/test-schema-reel.php`, dont une épreuve à six processus
+  concurrents sur la reprise d'un verrou expiré.
 
 ### Modifié
 - `src/Plugin.php` : enregistre les commandes de schéma, sous WP-CLI seulement.
@@ -41,6 +43,17 @@ Socle E1 : identité, autorisation, identifiants et infrastructure de schéma.
   est **scindée et durcie**, non affaiblie — interdiction inchangée hors de
   `src/Schema/`, `dbDelta` interdit partout, et contrôle nouveau que le
   catalogue est vide donc qu'aucune table n'est créée à l'exécution.
+
+### Corrigé
+- **Verrou de migration** : la reprise d'un verrou expiré procédait par
+  lecture, suppression puis repose. La suppression étant inconditionnelle,
+  elle pouvait emporter un verrou tout neuf acquis entre-temps par un
+  troisième processus — deux processus se croyaient alors propriétaires.
+  Remplacé par un compare-et-échange fondé sur la valeur exacte, avec contrôle
+  du nombre de lignes touchées.
+- **Doublure de passerelle** : elle appliquait la condition de valeur quel que
+  soit le SQL reçu, et validait donc un code qui l'aurait perdue. Rendue
+  fidèle : la condition n'est appliquée que si l'instruction la porte.
 
 ### Décisions
 - **D-044** — tables propres derrière WordPress ; DDL non transactionnel donc

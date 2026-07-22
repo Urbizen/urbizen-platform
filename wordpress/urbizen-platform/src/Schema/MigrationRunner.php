@@ -67,14 +67,14 @@ final class MigrationRunner {
 			return ResultatMigration::rien();
 		}
 
-		$verrou = MigrationLock::acquerir( $maintenant );
+		$verrou = MigrationLock::acquerir( $this->db, $maintenant );
 
 		if ( null === $verrou ) {
 			return ResultatMigration::echec( '', 'verrou_indisponible' );
 		}
 
 		try {
-			return $this->appliquer_series( $maintenant );
+			return $this->appliquer_series( $verrou, $maintenant );
 		} catch ( Throwable $e ) {
 			return ResultatMigration::echec( '', 'exception : ' . $e->getMessage() );
 		} finally {
@@ -147,10 +147,11 @@ final class MigrationRunner {
 	/**
 	 * Applique la série, verrou déjà tenu.
 	 *
-	 * @param int|null $maintenant Horloge.
+	 * @param MigrationLock $verrou     Verrou détenu.
+	 * @param int|null      $maintenant Horloge.
 	 * @return ResultatMigration
 	 */
-	private function appliquer_series( ?int $maintenant ): ResultatMigration {
+	private function appliquer_series( MigrationLock $verrou, ?int $maintenant ): ResultatMigration {
 		if ( ! $this->assurer_registre() ) {
 			return ResultatMigration::echec( '', 'registre_indisponible' );
 		}
@@ -164,6 +165,20 @@ final class MigrationRunner {
 
 			if ( in_array( $id, $deja, true ) ) {
 				continue;
+			}
+
+			/*
+			 * Avant chaque migration, on prolonge si l'échéance approche — et
+			 * l'on s'arrête si la propriété est perdue.
+			 *
+			 * Sans cela, une série longue verrait son verrou expirer en cours
+			 * de route, un second processus le reprendrait légitimement, et
+			 * deux `appliquer()` tourneraient de concert. La contrainte
+			 * `UNIQUE` du registre n'y changerait rien : elle intervient
+			 * APRÈS l'application, quand le mal est fait.
+			 */
+			if ( ! $verrou->renouveler_si_besoin( $maintenant ) ) {
+				return ResultatMigration::echec( $id, 'verrou_perdu', $appliquees, $deja );
 			}
 
 			$absente = $garde->premiere_absente( $migration->prerequis() );

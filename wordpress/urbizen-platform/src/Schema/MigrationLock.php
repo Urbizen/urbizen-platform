@@ -2,26 +2,45 @@
 /**
  * Verrou d'exécution des migrations.
  *
- * Ce n'est pas un booléen. Un booléen ne dit pas **qui** détient le verrou, ni
- * **depuis quand** — donc il ne permet ni de refuser une libération étrangère,
- * ni de reprendre après un processus mort. La valeur porte trois champs :
- * propriétaire tiré au hasard, date de création, date d'expiration.
+ * ## Le défaut que ce fichier corrige
  *
- * Cinq règles en découlent :
+ * Une première version reprenait un verrou expiré en trois temps : lire,
+ * supprimer, reposer. `add_option()` étant atomique, il paraissait suffire à
+ * départager deux repreneurs. **Il ne suffisait pas**, et pas pour la raison
+ * qu'on croyait :
  *
- * - **acquisition atomique** — `add_option()` échoue si la clé existe déjà,
- *   c'est la primitive employée pour les références et les notifications ;
- * - **durée bornée** — aucun verrou n'est éternel, aucun appelant n'attend
- *   indéfiniment ;
- * - **reprise d'un verrou expiré**, mais jamais d'un verrou vivant ;
- * - **libération par le seul propriétaire** — un processus ne supprime pas le
- *   verrou d'un autre, même expiré, même s'il croit bien faire ;
- * - **libération dans un `finally`**, à la charge de l'appelant.
+ *   P1 lit un verrou expiré.
+ *   P2 lit le même verrou expiré.
+ *   P1 supprime.
+ *   P3 — processus neuf, pas un repreneur — acquiert légitimement.
+ *   P2 supprime  ← il détruit le verrou tout neuf de P3.
+ *   P2 acquiert.
+ *   → P2 et P3 se croient tous deux propriétaires.
  *
- * Course résiduelle assumée : entre la constatation d'expiration et la reprise,
- * deux processus peuvent se croiser. La seconde barrière est la contrainte
- * `UNIQUE` du registre, qui refusera d'enregistrer deux fois la même migration.
- * On ne compte jamais sur une seule défense.
+ * La suppression était **inconditionnelle** : elle emportait ce qui se
+ * trouvait là, y compris un verrou vivant posé entre-temps.
+ *
+ * ## Ce qui le remplace
+ *
+ * Un **compare-et-échange** : on ne remplace la valeur que si elle est encore,
+ * octet pour octet, celle qu'on a lue, et l'on exige que la base rende
+ * exactement une ligne touchée. Deux repreneurs simultanés lisent la même
+ * valeur ; le premier à écrire la change, le second ne trouve plus sa
+ * condition et repart les mains vides.
+ *
+ * Les trois opérations qui touchent un verrou existant — reprise,
+ * renouvellement, libération — passent toutes par cette condition. Aucune ne
+ * peut atteindre le verrou d'un autre.
+ *
+ * La valeur est du JSON, et non un tableau PHP sérialisé : le contenu stocké
+ * est alors parfaitement prévisible, donc comparable dans un `WHERE`.
+ *
+ * ## Ce que la contrainte `UNIQUE` du registre ne fait pas
+ *
+ * Elle empêche d'**inscrire** deux fois la même migration. Elle intervient
+ * après `appliquer()`. Elle ne peut donc pas empêcher deux processus de
+ * l'exécuter en même temps — seul le verrou le peut. La présenter comme une
+ * seconde barrière contre l'exécution concurrente était une erreur.
  *
  * @package Urbizen\Platform\Schema
  */
@@ -31,7 +50,7 @@ namespace Urbizen\Platform\Schema;
 use Urbizen\Platform\Domain\Support\Ulid;
 
 /**
- * Verrou de migration.
+ * Verrou de migration, à compare-et-échange.
  */
 final class MigrationLock {
 
@@ -49,11 +68,29 @@ final class MigrationLock {
 	public const TTL = 900;
 
 	/**
-	 * Propriétaire de ce verrou.
-	 *
+	 * Seuil de renouvellement : en deçà, le propriétaire prolonge.
+	 */
+	public const SEUIL_RENOUVELLEMENT = 300;
+
+	/**
+	 * @var DatabaseGateway
+	 */
+	private DatabaseGateway $db;
+
+	/**
 	 * @var string
 	 */
 	private string $proprietaire;
+
+	/**
+	 * Valeur exacte actuellement en base, telle qu'on l'y a écrite.
+	 *
+	 * C'est la clé du compare-et-échange : sans elle, on ne pourrait pas
+	 * exiger « remplace uniquement si c'est encore ma valeur ».
+	 *
+	 * @var string
+	 */
+	private string $valeur_courante;
 
 	/**
 	 * @var int
@@ -61,43 +98,83 @@ final class MigrationLock {
 	private int $expire_le;
 
 	/**
-	 * @param string $proprietaire Jeton du propriétaire.
-	 * @param int    $expire_le    Échéance.
+	 * Ce verrou a-t-il été perdu ou rendu ?
+	 *
+	 * @var bool
 	 */
-	private function __construct( string $proprietaire, int $expire_le ) {
-		$this->proprietaire = $proprietaire;
-		$this->expire_le    = $expire_le;
+	private bool $actif = true;
+
+	/**
+	 * @param DatabaseGateway $db              Passerelle.
+	 * @param string          $proprietaire    Jeton du propriétaire.
+	 * @param string          $valeur_courante Valeur en base.
+	 * @param int             $expire_le       Échéance.
+	 */
+	private function __construct(
+		DatabaseGateway $db,
+		string $proprietaire,
+		string $valeur_courante,
+		int $expire_le
+	) {
+		$this->db              = $db;
+		$this->proprietaire    = $proprietaire;
+		$this->valeur_courante = $valeur_courante;
+		$this->expire_le       = $expire_le;
 	}
 
 	/**
 	 * Tente d'acquérir.
 	 *
-	 * @param int|null $maintenant Horloge injectable.
-	 * @return self|null `null` si le verrou est tenu par un vivant.
+	 * Deux chemins, tous deux atomiques :
+	 *
+	 * - **verrou absent** — `INSERT` sur une colonne à index unique : deux
+	 *   processus simultanés, un seul passe, l'autre reçoit une erreur ;
+	 * - **verrou expiré** — `UPDATE ... WHERE option_value = <valeur lue>` :
+	 *   deux repreneurs simultanés, un seul touche une ligne.
+	 *
+	 * Un verrou vivant n'est jamais touché.
+	 *
+	 * @param DatabaseGateway $db         Passerelle.
+	 * @param int|null        $maintenant Horloge injectable.
+	 * @return self|null
 	 */
-	public static function acquerir( ?int $maintenant = null ): ?self {
+	public static function acquerir( DatabaseGateway $db, ?int $maintenant = null ): ?self {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 
 		$proprietaire = Ulid::generer();
 		$expire_le    = $maintenant + self::TTL;
+		$valeur       = self::encoder( $proprietaire, $maintenant, $expire_le );
 
-		$valeur = array(
-			'proprietaire' => $proprietaire,
-			'cree_le'      => $maintenant,
-			'expire_le'    => $expire_le,
+		// Chemin 1 : personne ne tient le verrou.
+		$pose = $db->lignes_affectees(
+			sprintf(
+				'INSERT INTO `%s` ( option_name, option_value, autoload ) VALUES ( %%s, %%s, %%s )',
+				self::table( $db )
+			),
+			array( self::OPTION, $valeur, 'no' )
 		);
 
-		// Chemin normal : personne ne tient le verrou.
-		if ( self::poser( $valeur ) ) {
-			return new self( $proprietaire, $expire_le );
+		if ( 1 === $pose ) {
+			self::vider_cache();
+
+			return new self( $db, $proprietaire, $valeur, $expire_le );
 		}
 
-		$existant = self::lire();
+		// Chemin 2 : quelqu'un tient, ou tenait.
+		$brut = self::lire_brut( $db );
+
+		if ( null === $brut ) {
+			// L'option existe mais on n'a pas pu la lire : on refuse plutôt
+			// que de présumer le champ libre.
+			self::journaliser( 'verrou de migration illisible, acquisition refusée' );
+
+			return null;
+		}
+
+		$existant = self::decoder( $brut );
 
 		if ( null === $existant ) {
-			// L'option existe mais son contenu est illisible : on ne présume
-			// pas qu'elle est libre, on refuse et on laisse un humain voir.
-			self::journaliser( 'verrou de migration illisible, acquisition refusée' );
+			self::journaliser( 'verrou de migration malformé, acquisition refusée' );
 
 			return null;
 		}
@@ -113,51 +190,129 @@ final class MigrationLock {
 			return null;
 		}
 
-		// Verrou expiré : on le retire puis on repose atomiquement. La
-		// suppression seule ne suffirait pas — c'est `add_option()` qui
-		// tranche entre deux repreneurs simultanés.
-		self::journaliser(
+		// Reprise par compare-et-échange. La condition porte sur la valeur
+		// **exacte** qu'on vient de lire : si elle a changé entre-temps — parce
+		// qu'un autre a repris, ou parce qu'un processus neuf a acquis — la
+		// mise à jour ne touche aucune ligne et nous repartons sans rien.
+		$repris = $db->lignes_affectees(
 			sprintf(
-				'verrou de migration expiré depuis %d s, reprise',
-				$maintenant - $existant['expire_le']
-			)
+				'UPDATE `%s` SET option_value = %%s WHERE option_name = %%s AND option_value = %%s',
+				self::table( $db )
+			),
+			array( $valeur, self::OPTION, $brut )
 		);
 
-		self::retirer();
+		if ( 1 !== $repris ) {
+			self::journaliser( 'reprise du verrou perdue au profit d’un autre processus' );
 
-		if ( self::poser( $valeur ) ) {
-			return new self( $proprietaire, $expire_le );
+			return null;
 		}
 
-		return null;
+		self::vider_cache();
+		self::journaliser(
+			sprintf( 'verrou de migration expiré depuis %d s, repris', $maintenant - $existant['expire_le'] )
+		);
+
+		return new self( $db, $proprietaire, $valeur, $expire_le );
 	}
 
 	/**
-	 * Libère, **si et seulement si** ce processus est le propriétaire.
+	 * Prolonge, si et seulement si nous détenons encore le verrou.
 	 *
-	 * @return bool Vrai si la libération a eu lieu.
+	 * Même primitive que la reprise : la condition porte sur notre propre
+	 * valeur. Si un autre processus nous a repris — parce que nous avons
+	 * dépassé l'échéance —, la mise à jour ne touche rien et nous l'apprenons.
+	 *
+	 * @param int|null $maintenant Horloge injectable.
+	 * @return bool Faux si le verrou est perdu ; l'appelant DOIT alors s'arrêter.
+	 */
+	public function renouveler( ?int $maintenant = null ): bool {
+		if ( ! $this->actif ) {
+			return false;
+		}
+
+		$maintenant = null === $maintenant ? time() : $maintenant;
+		$expire_le  = $maintenant + self::TTL;
+		$nouvelle   = self::encoder( $this->proprietaire, $maintenant, $expire_le );
+
+		$touchees = $this->db->lignes_affectees(
+			sprintf(
+				'UPDATE `%s` SET option_value = %%s WHERE option_name = %%s AND option_value = %%s',
+				self::table( $this->db )
+			),
+			array( $nouvelle, self::OPTION, $this->valeur_courante )
+		);
+
+		if ( 1 !== $touchees ) {
+			// Nous ne détenons plus rien. On se marque inactif pour qu'une
+			// libération ultérieure ne puisse pas emporter le verrou d'autrui.
+			$this->actif = false;
+
+			self::journaliser( 'renouvellement du verrou refusé : propriété perdue' );
+
+			return false;
+		}
+
+		self::vider_cache();
+
+		$this->valeur_courante = $nouvelle;
+		$this->expire_le       = $expire_le;
+
+		return true;
+	}
+
+	/**
+	 * Prolonge si l'échéance approche.
+	 *
+	 * @param int|null $maintenant Horloge injectable.
+	 * @return bool Faux uniquement si un renouvellement nécessaire a échoué.
+	 */
+	public function renouveler_si_besoin( ?int $maintenant = null ): bool {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+
+		if ( ( $this->expire_le - $maintenant ) > self::SEUIL_RENOUVELLEMENT ) {
+			return true;
+		}
+
+		return $this->renouveler( $maintenant );
+	}
+
+	/**
+	 * Libère, **si et seulement si** la valeur en base est encore la nôtre.
+	 *
+	 * La condition n'est pas seulement le nom de l'option : c'est la valeur
+	 * complète. Une instance dont le verrou a expiré et été repris ne peut donc
+	 * pas supprimer celui de son successeur.
+	 *
+	 * @return bool
 	 */
 	public function liberer(): bool {
-		$existant = self::lire();
-
-		if ( null === $existant ) {
+		if ( ! $this->actif ) {
 			return false;
 		}
 
-		if ( ! hash_equals( $existant['proprietaire'], $this->proprietaire ) ) {
-			// Notre verrou a expiré et un autre l'a repris : le supprimer
-			// interromprait son travail.
-			self::journaliser( 'libération refusée : le verrou appartient à un autre processus' );
+		$supprimees = $this->db->lignes_affectees(
+			sprintf(
+				'DELETE FROM `%s` WHERE option_name = %%s AND option_value = %%s',
+				self::table( $this->db )
+			),
+			array( self::OPTION, $this->valeur_courante )
+		);
+
+		$this->actif = false;
+
+		self::vider_cache();
+
+		if ( 1 !== $supprimees ) {
+			self::journaliser( 'libération sans effet : le verrou ne nous appartenait plus' );
 
 			return false;
 		}
 
-		return self::retirer();
+		return true;
 	}
 
 	/**
-	 * Jeton du propriétaire.
-	 *
 	 * @return string
 	 */
 	public function proprietaire(): string {
@@ -172,79 +327,109 @@ final class MigrationLock {
 	}
 
 	/**
-	 * Ce verrou est-il encore valable ?
-	 *
 	 * @param int|null $maintenant Horloge injectable.
 	 * @return bool
 	 */
 	public function est_vivant( ?int $maintenant = null ): bool {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 
-		return $this->expire_le > $maintenant;
+		return $this->actif && $this->expire_le > $maintenant;
 	}
 
 	/**
-	 * Pose atomiquement.
+	 * Table des options de l'installation.
 	 *
-	 * @param array<string, mixed> $valeur Valeur.
-	 * @return bool
+	 * @param DatabaseGateway $db Passerelle.
+	 * @return string
 	 */
-	private static function poser( array $valeur ): bool {
-		if ( ! function_exists( 'add_option' ) ) {
-			return false;
-		}
-
-		// `autoload = no` : ce verrou n'a rien à faire dans le cache d'options
-		// chargé à chaque requête.
-		return (bool) add_option( self::OPTION, $valeur, '', 'no' );
+	private static function table( DatabaseGateway $db ): string {
+		return $db->prefixe() . 'options';
 	}
 
 	/**
-	 * Lit le verrou existant, ou `null` s'il est absent ou malformé.
+	 * Encode la valeur du verrou.
 	 *
-	 * @return array{proprietaire: string, cree_le: int, expire_le: int}|null
+	 * JSON, et non un tableau sérialisé : le contenu stocké doit être
+	 * prévisible au caractère près pour servir de condition dans un `WHERE`.
+	 *
+	 * @param string $proprietaire Jeton.
+	 * @param int    $cree_le      Création.
+	 * @param int    $expire_le    Échéance.
+	 * @return string
 	 */
-	private static function lire(): ?array {
-		if ( ! function_exists( 'get_option' ) ) {
-			return null;
-		}
-
-		$brut = get_option( self::OPTION, null );
-
-		if ( ! is_array( $brut ) ) {
-			return null;
-		}
-
-		foreach ( array( 'proprietaire', 'cree_le', 'expire_le' ) as $cle ) {
-			if ( ! isset( $brut[ $cle ] ) ) {
-				return null;
-			}
-		}
-
-		$proprietaire = (string) $brut['proprietaire'];
-
-		if ( ! Ulid::est_valide( $proprietaire ) ) {
-			return null;
-		}
-
-		return array(
-			'proprietaire' => $proprietaire,
-			'cree_le'      => (int) $brut['cree_le'],
-			'expire_le'    => (int) $brut['expire_le'],
+	private static function encoder( string $proprietaire, int $cree_le, int $expire_le ): string {
+		return (string) json_encode(
+			array(
+				'proprietaire' => $proprietaire,
+				'cree_le'      => $cree_le,
+				'expire_le'    => $expire_le,
+			)
 		);
 	}
 
 	/**
-	 * Retire l'option.
+	 * Décode, ou `null` si la valeur est inexploitable.
 	 *
-	 * @return bool
+	 * @param string $brut Valeur brute.
+	 * @return array{proprietaire: string, cree_le: int, expire_le: int}|null
 	 */
-	private static function retirer(): bool {
-		if ( ! function_exists( 'delete_option' ) ) {
-			return false;
+	private static function decoder( string $brut ): ?array {
+		$decode = json_decode( $brut, true );
+
+		if ( ! is_array( $decode ) ) {
+			return null;
 		}
 
-		return (bool) delete_option( self::OPTION );
+		foreach ( array( 'proprietaire', 'cree_le', 'expire_le' ) as $cle ) {
+			if ( ! isset( $decode[ $cle ] ) ) {
+				return null;
+			}
+		}
+
+		if ( ! Ulid::est_valide( (string) $decode['proprietaire'] ) ) {
+			return null;
+		}
+
+		return array(
+			'proprietaire' => (string) $decode['proprietaire'],
+			'cree_le'      => (int) $decode['cree_le'],
+			'expire_le'    => (int) $decode['expire_le'],
+		);
+	}
+
+	/**
+	 * Lit la valeur brute, sans cache.
+	 *
+	 * On interroge la base directement plutôt que `get_option()` : un cache
+	 * d'objets rendrait une valeur périmée, et un compare-et-échange fondé sur
+	 * une lecture périmée ne compare rien.
+	 *
+	 * @param DatabaseGateway $db Passerelle.
+	 * @return string|null
+	 */
+	private static function lire_brut( DatabaseGateway $db ): ?string {
+		return $db->valeur(
+			sprintf( 'SELECT option_value FROM `%s` WHERE option_name = %%s', self::table( $db ) ),
+			array( self::OPTION )
+		);
+	}
+
+	/**
+	 * Invalide le cache d'options de WordPress.
+	 *
+	 * Nous écrivons en SQL direct : sans cette purge, `get_option()` continuerait
+	 * de rendre l'ancienne valeur dans la même requête.
+	 *
+	 * @return void
+	 */
+	private static function vider_cache(): void {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( self::OPTION, 'options' );
+		}
+
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( 'alloptions', 'options' );
+		}
 	}
 
 	/**
