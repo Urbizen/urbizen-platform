@@ -70,10 +70,31 @@ if ( array() !== $refs ) {
 	echo '    référence : ' . implode( ' | ', $refs ) . "\n";
 }
 
-// Aucune ressource du prototype ne doit avoir été introduite.
+// PR C introduit les ressources du formulaire de conception. Ce qui doit être
+// garanti n'est plus leur absence, mais qu'elles ne soient **jamais chargées**
+// pour qui n'a pas le droit de voir le formulaire.
 $assets = glob( URBIZEN_PLATFORM_DIR . 'assets/{css,js}/*conception*', GLOB_BRACE );
 
-check( 'aucune feuille de style ni script « conception »', array() === $assets );
+check( 'les ressources du formulaire existent', 2 === count( (array) $assets ) );
+
+$GLOBALS['wpd_logged_in'] = false;
+$GLOBALS['wpd_can']       = false;
+$GLOBALS['wpd_styles']    = array();
+$GLOBALS['wpd_scripts']   = array();
+
+$rendu_anonyme = \Urbizen\Platform\Conception\ConceptionRenderer::render(
+	\Urbizen\Platform\Forms\FormRegistry::get( 'conception' )
+);
+
+check( 'un visiteur anonyme n’obtient aucun rendu', '' === $rendu_anonyme );
+check( 'ni feuille de style', array() === $GLOBALS['wpd_styles'] );
+check( 'ni script', array() === $GLOBALS['wpd_scripts'] );
+check( 'ni schéma exposé', array() === ( $GLOBALS['wpd_inline'] ?? array() ) );
+
+// Le prototype de la page d'accueil, lui, ne doit toujours rien apporter.
+$proto = glob( URBIZEN_PLATFORM_DIR . 'assets/{css,js}/*prototype*', GLOB_BRACE );
+
+check( 'aucune ressource de prototype', array() === (array) $proto );
 
 $theme = $racine . '/wordpress/urbizen-child';
 
@@ -216,7 +237,7 @@ preg_match( '/^ \* Version:\s*(.+)$/m', $principal, $mh );
 
 $version = $m[1] ?? '';
 
-check( 'la version du plugin est 0.8.0', '0.8.0' === $version );
+check( 'la version du plugin est 0.9.0', '0.9.0' === $version );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {

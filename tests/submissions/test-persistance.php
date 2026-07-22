@@ -301,4 +301,105 @@ check( 'K · la transaction n’est pas committed', 'committed' !== ( Submission
 check( 'K · aucune référence attribuée',
 	'attributed' !== ( get_option( SubmissionRepository::RESERVATION_PREFIX . $ref )['state'] ?? '' ) );
 
+// ======================================================================
+// L · ÉCHAPPEMENT AVANT ÉCRITURE WORDPRESS
+// ======================================================================
+// WordPress applique `wp_unslash()` à toute valeur de métadonnée : il suppose
+// recevoir des données déjà échappées. Lui confier une valeur brute revient à
+// lui demander d'en retirer des antislashes qui n'en sont pas — et
+// `wp_json_encode()` en place devant chaque `/`.
+neuf();
+$id = un_post();
+
+$valeurs = array(
+	'chaîne simple'        => 'bonjour',
+	'slash'                => 'a/b/c',
+	'antislash'            => 'a\\b\\c',
+	'apostrophe'           => "l'aphérèse d'Anaïs",
+	'guillemet'            => 'il a dit "bonjour"',
+	'URL complète'         => 'https://urbizen.fr/wp-admin/admin-post.php?a=1&b=2',
+	'chemin Unix'          => '/home/u328261530/private/urbizen-conception/.staging/abc',
+	'chemin Windows'       => 'C:\\Users\\Camille\\Documents\\plan.pdf',
+	'Unicode'              => 'Émile Ünïcode 日本語 — «guillemets»',
+	'chaîne vide'          => '',
+	'JSON avec chemin'     => (string) wp_json_encode( array( 'staging' => '/private/urbizen-conception/.staging/xyz', 'state' => 'committed' ) ),
+	'JSON imbriqué'        => (string) wp_json_encode( array( 'a' => array( 'b' => array( 'c' => "d/e'f\\g" ) ) ) ),
+	'JSON avec apostrophe' => (string) wp_json_encode( array( 'nom' => "l'Anaïs", 'url' => 'https://x.test/a/b' ) ),
+);
+
+foreach ( $valeurs as $quoi => $valeur ) {
+	$cle = '_essai_' . md5( $quoi );
+
+	check( "L · [$quoi] persist_meta réussit", true === SubmissionRepository::persist_meta( $id, $cle, $valeur ) );
+	check( "L · [$quoi] la relecture est identique, octet pour octet", $valeur === get_post_meta( $id, $cle, true ) );
+
+	// Deuxième écriture : ni échec, ni double échappement.
+	check( "L · [$quoi] la seconde écriture reste idempotente", true === SubmissionRepository::persist_meta( $id, $cle, $valeur ) );
+	check( "L · [$quoi] aucune double échappement", $valeur === get_post_meta( $id, $cle, true ) );
+}
+
+// Types non chaînes.
+check( 'L · entier', SubmissionRepository::persist_meta( $id, '_n2', 42 ) && '42' === (string) get_post_meta( $id, '_n2', true ) );
+check( 'L · booléen', SubmissionRepository::persist_meta( $id, '_b2', true ) );
+check( 'L · tableau avec slash',
+	SubmissionRepository::persist_meta( $id, '_t2', array( 'chemin' => '/a/b', 'quote' => "l'x" ) ) );
+check( 'L · le tableau est relu à l’identique',
+	array( 'chemin' => '/a/b', 'quote' => "l'x" ) == get_post_meta( $id, '_t2', true ) );
+
+// La valeur logique reste **non échappée** dans le code applicatif : ce sont
+// les objets métier qui comptent, pas leur forme de transport.
+$transaction = (string) wp_json_encode( array( 'staging' => '/private/x/.staging/y', 'state' => 'committed' ) );
+SubmissionRepository::persist_meta( $id, '_urbizen_transaction', $transaction );
+$relu = json_decode( (string) get_post_meta( $id, '_urbizen_transaction', true ), true );
+
+check( 'L · la transaction relue est décodable', is_array( $relu ) );
+check( 'L · le chemin de staging est intact', '/private/x/.staging/y' === ( $relu['staging'] ?? '' ) );
+check( 'L · aucun antislash parasite', ! str_contains( (string) get_post_meta( $id, '_urbizen_transaction', true ), '\\\\' ) );
+
+// Un échec réel d'écriture reste un échec.
+$GLOBALS['wpd_meta_fail'] = '_urbizen_transaction';
+
+check( 'L · un échec réel reste détecté',
+	false === SubmissionRepository::persist_meta( $id, '_urbizen_transaction', (string) wp_json_encode( array( 'state' => 'autre' ) ) ) );
+
+$GLOBALS['wpd_meta_fail'] = '';
+
+// ======================================================================
+// M · LA CORRECTION EST CENTRALISÉE
+// ======================================================================
+$source = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Submissions/SubmissionRepository.php' );
+$code   = implode(
+	'',
+	array_map(
+		static fn( $tok ) => is_array( $tok ) && in_array( $tok[0], array( T_COMMENT, T_DOC_COMMENT ), true ) ? ' ' : ( is_array( $tok ) ? $tok[1] : $tok ),
+		token_get_all( $source )
+	)
+);
+
+check( 'M · un seul appel à wp_slash', 1 === substr_count( $code, 'wp_slash(' ) );
+check( 'M · aucun addslashes', ! str_contains( $code, 'addslashes(' ) );
+check( 'M · la comparaison porte sur la valeur logique',
+	str_contains( $code, 'return self::meta_equivaut( get_post_meta( $id, $cle, true ), $valeur );' ) );
+check( 'M · un seul point d’écriture des métadonnées', 1 === substr_count( $code, 'update_post_meta(' ) );
+
+// Aucun appelant n'échappe déjà de son côté.
+$appelants = array( 'src/Submissions/SubmissionRepository.php', 'src/Submissions/TrashGuard.php', 'src/Mail/MailQueue.php' );
+$fautifs   = array();
+
+foreach ( $appelants as $fichier ) {
+	$c = (string) file_get_contents( URBIZEN_PLATFORM_DIR . $fichier );
+
+	if ( 1 === preg_match( '/persist_meta\(\s*\$?\w+\s*,\s*[^,]+,\s*wp_slash\(/', $c ) ) {
+		$fautifs[] = $fichier;
+	}
+}
+
+check( 'M · aucun appelant n’échappe déjà', array() === $fautifs );
+
+// Toutes les métadonnées concernées passent par la primitive.
+foreach ( array( '_urbizen_transaction', '_urbizen_files', '_urbizen_source_path', '_urbizen_payload' ) as $cle ) {
+	check( "M · $cle est couverte par persist_meta", str_contains( $code, "'" . $cle . "'" ) );
+}
+
+
 verdict();

@@ -1,0 +1,671 @@
+<?php
+/**
+ * Banc d'essai du rendu du formulaire de conception.
+ *
+ * Deux garanties, dans cet ordre.
+ *
+ * **Personne ne voit ce formulaire.** Un visiteur anonyme n'obtient ni balise,
+ * ni schéma, ni nonce, ni jeton, ni ressource. Le garde est serveur : le
+ * masquer en CSS reviendrait à le servir quand même.
+ *
+ * **Ce qui est rendu vient de la définition serveur.** Six étapes, quarante-cinq
+ * champs, dans l'ordre exact, avec leurs libellés, leurs obligations et leurs
+ * conditions — rien de recopié.
+ *
+ * Toutes les données sont fictives.
+ */
+
+require __DIR__ . '/bootstrap.php';
+
+use Urbizen\Platform\Conception\ConceptionAssets;
+use Urbizen\Platform\Conception\ConceptionAvailability;
+use Urbizen\Platform\Conception\ConceptionRenderer;
+use Urbizen\Platform\Conception\ConceptionSchema;
+use Urbizen\Platform\Forms\FormRegistry;
+use Urbizen\Platform\Http\SubmissionController;
+
+/**
+ * Repart d'un état propre, visiteur anonyme.
+ */
+function neuf(): void {
+	wpd_reset();
+	ConceptionRenderer::reset();
+	ConceptionAssets::register();
+	$GLOBALS['wpd_logged_in'] = false;
+	$GLOBALS['wpd_can']       = false;
+}
+
+/**
+ * Devient administrateur authentifié.
+ */
+function administrateur(): void {
+	$GLOBALS['wpd_logged_in'] = true;
+	$GLOBALS['wpd_can']       = true;
+}
+
+$def = FormRegistry::get( 'conception' );
+
+// ======================================================================
+// 1 · GARDE DE PUBLICATION
+// ======================================================================
+neuf();
+
+check( '1 · le formulaire n’est pas public par défaut', false === ConceptionAvailability::is_public() );
+check( '1 · un anonyme ne peut pas prévisualiser', false === ConceptionAvailability::can_preview() );
+check( '1 · ni faire rendre', false === ConceptionAvailability::can_render() );
+check( '1 · motif technique', 'formulaire_non_public' === ConceptionAvailability::blocker() );
+
+$rendu = ConceptionRenderer::render( $def );
+
+check( '1 · rendu anonyme vide', '' === $rendu );
+check( '1 · aucun nonce émis', ! str_contains( $rendu, SubmissionController::NONCE_FIELD ) );
+check( '1 · aucun jeton émis', ! str_contains( $rendu, SubmissionController::TOKEN_FIELD ) );
+check( '1 · aucune ressource mise en file', array() === $GLOBALS['wpd_styles'] && array() === $GLOBALS['wpd_scripts'] );
+check( '1 · aucun schéma exposé', array() === $GLOBALS['wpd_inline'] );
+
+// --- un utilisateur connecté sans capacité n'obtient rien non plus ---
+neuf();
+$GLOBALS['wpd_logged_in'] = true;
+
+check( '1 · connecté sans manage_options : aucun rendu', '' === ConceptionRenderer::render( $def ) );
+check( '1 · aucune ressource', array() === $GLOBALS['wpd_styles'] );
+
+// --- une capacité sans session ne suffit pas ---
+neuf();
+$GLOBALS['wpd_can'] = true;
+
+check( '1 · capacité sans session : aucun rendu', '' === ConceptionRenderer::render( $def ) );
+
+// --- aucun paramètre d'URL n'ouvre le formulaire ---
+neuf();
+$_GET['urbizen_conception']  = '1';
+$_GET['preview']             = 'true';
+$_REQUEST['conception']      = 'ouvert';
+
+check( '1 · UN PARAMÈTRE D’URL N’OUVRE RIEN', '' === ConceptionRenderer::render( $def ) );
+
+$_GET     = array();
+$_REQUEST = array();
+
+// --- le filtre serveur, lui, ouvre ---
+neuf();
+add_filter( 'urbizen_conception_public_enabled', static fn() => true );
+
+check( '1 · le filtre serveur ouvre le formulaire', true === ConceptionAvailability::is_public() );
+check( '1 · et le rendu a lieu, même anonyme', '' !== ConceptionRenderer::render( $def ) );
+
+wpd_clear_filter( 'urbizen_conception_public_enabled' );
+
+// --- une valeur non stricte ne suffit pas ---
+neuf();
+add_filter( 'urbizen_conception_public_enabled', static fn() => '1' );
+
+check( '1 · une valeur non booléenne n’ouvre pas', false === ConceptionAvailability::is_public() );
+
+wpd_clear_filter( 'urbizen_conception_public_enabled' );
+
+// ======================================================================
+// 2 · APERÇU ADMINISTRATEUR
+// ======================================================================
+neuf();
+administrateur();
+$rendu = ConceptionRenderer::render( $def );
+
+check( '2 · l’administrateur obtient le formulaire', '' !== $rendu );
+check( '2 · il est signalé comme aperçu', str_contains( $rendu, 'urbizen-conception__apercu' ) );
+check( '2 · la feuille de style est chargée', in_array( ConceptionAssets::HANDLE_CSS, $GLOBALS['wpd_styles'], true ) );
+check( '2 · le script est chargé', in_array( ConceptionAssets::HANDLE_JS, $GLOBALS['wpd_scripts'], true ) );
+check( '2 · le schéma est transmis', isset( $GLOBALS['wpd_inline'][ ConceptionAssets::HANDLE_JS ] ) );
+
+// ======================================================================
+// 3 · STRUCTURE : SIX ÉTAPES, QUARANTE-CINQ CHAMPS
+// ======================================================================
+$etapes = $def->steps();
+
+check( '3 · six étapes', 6 === count( $etapes ) );
+check( '3 · six fieldset d’étape', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+check( '3 · six légendes', 6 === substr_count( $rendu, 'urbizen-conception__etape-titre' ) );
+check( '3 · six entrées de progression', 6 === substr_count( $rendu, 'urbizen-conception__progression-item' ) );
+
+$total = 0;
+$rang  = 0;
+$ordre = true;
+$position = -1;
+
+foreach ( $etapes as $etape ) {
+	$eid    = is_array( $etape ) ? (string) $etape['id'] : (string) $etape;
+	$champs = $def->fields_for_step( $eid );
+	$total += count( $champs );
+
+	$ici = strpos( $rendu, 'data-step="' . $eid . '" data-rang="' . $rang . '"' );
+
+	if ( false === $ici || $ici < $position ) {
+		$ordre = false;
+	}
+
+	$position = (int) $ici;
+	++$rang;
+}
+
+check( '3 · quarante-cinq champs déclarés', 45 === $total );
+check( '3 · les étapes sont dans l’ordre exact', $ordre );
+check( '3 · chaque champ a son bloc', 45 === substr_count( $rendu, 'data-field="' ) );
+
+// Chaque champ de la définition est présent, nommément.
+$manquants = array();
+
+foreach ( $def->fields() as $champ ) {
+	if ( ! str_contains( $rendu, 'data-field="' . $champ['name'] . '"' ) ) {
+		$manquants[] = $champ['name'];
+	}
+}
+
+check( '3 · aucun champ manquant', array() === $manquants );
+
+// ======================================================================
+// 4 · LIBELLÉS, OBLIGATIONS, CONDITIONS
+// ======================================================================
+$sans_label   = array();
+$sans_requis  = array();
+$sans_cond    = array();
+
+foreach ( $def->fields() as $champ ) {
+	if ( isset( $champ['label'] ) && ! str_contains( $rendu, esc_html( (string) $champ['label'] ) ) ) {
+		$sans_label[] = $champ['name'];
+	}
+
+	if ( ! empty( $champ['required'] ) ) {
+		$bloc = substr( $rendu, (int) strpos( $rendu, 'data-field="' . $champ['name'] . '"' ), 1200 );
+
+		if ( ! str_contains( $bloc, 'urbizen-conception__requis' ) ) {
+			$sans_requis[] = $champ['name'];
+		}
+	}
+
+	if ( isset( $champ['visible_if']['field'] )
+		&& ! str_contains( $rendu, 'data-visible-if="' . $champ['visible_if']['field'] . '"' ) ) {
+		$sans_cond[] = $champ['name'];
+	}
+}
+
+check( '4 · tous les libellés sont rendus', array() === $sans_label );
+check( '4 · les six champs obligatoires sont marqués', array() === $sans_requis );
+check( '4 · l’obligation est écrite, pas seulement colorée', str_contains( $rendu, '(obligatoire)' ) );
+check( '4 · les seize conditions sont portées par le HTML', array() === $sans_cond );
+check( '4 · seize champs conditionnels', 16 === substr_count( $rendu, 'data-visible-if="' ) );
+
+// ======================================================================
+// 5 · ACCESSIBILITÉ
+// ======================================================================
+check( '5 · un seul formulaire', 1 === substr_count( $rendu, '<form ' ) );
+check( '5 · un seul bouton submit', 1 === substr_count( $rendu, 'type="submit"' ) );
+// Quatre boutons simples : Précédent, Suivant, suppression du brouillon, et
+// le bouton d'envoi n'en fait pas partie — c'est le seul `submit`.
+check( '5 · Précédent et Suivant sont des boutons simples',
+	str_contains( $rendu, 'data-action="precedent"' ) && str_contains( $rendu, 'data-action="suivant"' ) );
+check( '5 · aucun autre submit que l’envoi', 1 === substr_count( $rendu, 'type="submit"' ) );
+check( '5 · les actions secondaires sont des boutons simples',
+	3 === substr_count( $rendu, 'type="button"' ) );
+check( '5 · zone aria-live pour les annonces', str_contains( $rendu, 'aria-live="polite"' ) );
+check( '5 · résumé d’erreurs en alerte', str_contains( $rendu, 'role="alert"' ) && str_contains( $rendu, 'aria-live="assertive"' ) );
+check( '5 · l’étape active porte aria-current', 1 === substr_count( $rendu, 'aria-current="step"' ) );
+check( '5 · les légendes sont focalisables', str_contains( $rendu, '__etape-titre" id=' ) && str_contains( $rendu, 'tabindex="-1"' ) );
+check( '5 · chaque contrôle simple a un label lié', substr_count( $rendu, '<label class="urbizen-conception__label" for="' ) > 0 );
+check( '5 · les groupes de choix ont une légende', substr_count( $rendu, 'urbizen-conception__groupe' ) > 0 );
+check( '5 · aucun placeholder tenant lieu de libellé', ! str_contains( $rendu, 'placeholder=' ) );
+check( '5 · chaque contrôle décrit son message d’erreur', substr_count( $rendu, 'aria-describedby="' ) > 0 );
+check( '5 · le pot de miel est hors du parcours clavier',
+	str_contains( $rendu, 'tabindex="-1" autocomplete="off"' ) && str_contains( $rendu, 'aria-hidden="true"' ) );
+
+// ======================================================================
+// 6 · SANS JAVASCRIPT
+// ======================================================================
+// Sans JavaScript, aucun bouton ne doit laisser croire que l'envoi marchera.
+check( '6 · la navigation est masquée par le serveur', str_contains( $rendu, '__navigation" hidden>' ) );
+check( '6 · un message noscript explicite', str_contains( $rendu, '<noscript>' ) && str_contains( $rendu, 'nécessite JavaScript' ) );
+check( '6 · les six étapes sont dans le document', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+check( '6 · aucune étape masquée côté serveur', ! str_contains( $rendu, '__etape" id="urbizen-conception-1-etape-pieces" data-step="pieces" data-rang="1" hidden' ) );
+
+// ======================================================================
+// 7 · CHAMPS TECHNIQUES
+// ======================================================================
+check( '7 · l’action est celle du contrôleur existant', str_contains( $rendu, 'value="' . SubmissionController::ACTION . '"' ) );
+check( '7 · un nonce est posé', str_contains( $rendu, 'name="' . SubmissionController::NONCE_FIELD . '"' ) );
+check( '7 · un jeton anti-spam est posé', str_contains( $rendu, 'name="' . SubmissionController::TOKEN_FIELD . '"' ) );
+check( '7 · un pot de miel est posé', str_contains( $rendu, 'name="' . SubmissionController::HONEYPOT_FIELD . '"' ) );
+check( '7 · une URL de retour du même site', str_contains( $rendu, 'name="' . SubmissionController::RETURN_FIELD . '"' ) );
+check( '7 · le formulaire est multipart', str_contains( $rendu, 'enctype="multipart/form-data"' ) );
+check( '7 · il pointe vers admin-post.php', str_contains( $rendu, 'admin-post.php' ) );
+check( '7 · aucune donnée dans l’URL d’action', ! str_contains( $rendu, 'admin-post.php?' ) );
+
+// ======================================================================
+// 8 · DOCUMENTS
+// ======================================================================
+foreach ( \Urbizen\Platform\Files\UploadPolicy::BLOCKS as $bloc ) {
+	check( "8 · le bloc « $bloc » est rendu", str_contains( $rendu, 'data-bloc="' . $bloc . '"' ) );
+}
+
+check( '8 · cinq champs de dépôt', 5 === substr_count( $rendu, 'type="file"' ) );
+check( '8 · dépôt multiple', 5 === substr_count( $rendu, 'multiple accept=' ) );
+check( '8 · les extensions viennent de la politique', str_contains( $rendu, '.pdf,.jpg,.jpeg,.png,.webp' ) );
+check( '8 · les limites sont affichées', str_contains( $rendu, '10 documents au maximum par rubrique, 20 au total' ) );
+
+// ======================================================================
+// 9 · SCHÉMA EXPOSÉ
+// ======================================================================
+$inline = implode( "\n", $GLOBALS['wpd_inline'][ ConceptionAssets::HANDLE_JS ] ?? array() );
+$schema = ConceptionSchema::build( $def );
+
+check( '9 · le schéma porte une version', '1' === $schema['version'] );
+check( '9 · six étapes', 6 === count( $schema['steps'] ) );
+check( '9 · quarante-cinq champs', 45 === array_sum( array_map( static fn( $e ) => count( $e['fields'] ), $schema['steps'] ) ) );
+check( '9 · les tarifs viennent de Pricing', 449 === $schema['pricing']['base'] );
+check( '9 · l’option interne n’est pas exposée', ! isset( $schema['pricing']['options']['modifs_sup'] ) );
+check( '9 · les six options commerciales le sont', 6 === count( $schema['pricing']['options'] ) );
+check( '9 · le pack et ses remplacements', 'pack_ftc' === $schema['pricing']['pack'] && 3 === count( $schema['pricing']['packReplaces'] ) );
+check( '9 · les prestations sur devis', 3 === count( $schema['pricing']['surDevis'] ) );
+check( '9 · la remise permis est une information', 200 === $schema['pricing']['remisePermis'] );
+check( '9 · les limites de dépôt', 20 === $schema['uploads']['maxTotal'] && 10 === $schema['uploads']['maxPerBlock'] );
+
+// Rien de technique ne fuit dans le schéma.
+$json = (string) wp_json_encode( $schema );
+
+foreach ( array( 'nonce', 'token', 'signature', 'salt', 'path', '_urbizen_', 'admin_email' ) as $interdit ) {
+	check( "9 · le schéma ne contient pas « $interdit »", ! str_contains( strtolower( $json ), $interdit ) );
+}
+
+check( '9 · le schéma est bien celui transmis au navigateur', str_contains( $inline, '"version":"1"' ) );
+
+// ======================================================================
+// 10 · ISOLATION DES STYLES
+// ======================================================================
+$css = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'assets/css/urbizen-conception.css' );
+
+$regles = array_filter(
+	array_map( 'trim', explode( '}', $css ) ),
+	static fn( $r ) => str_contains( $r, '{' ) && ! str_starts_with( ltrim( $r ), '@' ) && ! str_starts_with( ltrim( $r ), '/*' )
+);
+
+$hors_racine = array();
+
+foreach ( $regles as $regle ) {
+	$selecteur = trim( explode( '{', $regle )[0] );
+	$selecteur = trim( (string) preg_replace( '#/\*.*?\*/#s', '', $selecteur ) );
+
+	if ( '' === $selecteur ) {
+		continue;
+	}
+
+	foreach ( explode( ',', $selecteur ) as $part ) {
+		$part = trim( $part );
+
+		if ( '' !== $part && ! str_contains( $part, '.urbizen-conception' ) ) {
+			$hors_racine[] = $part;
+		}
+	}
+}
+
+check( '10 · toutes les règles sont sous la classe racine', array() === $hors_racine );
+check( '10 · une adaptation mobile est prévue', str_contains( $css, '@media' ) );
+check( '10 · la navigation masquée le reste vraiment',
+	str_contains( $css, '.urbizen-conception__navigation[hidden]' ) );
+check( '10 · aucune règle sur body, header ou footer',
+	! preg_match( '/(^|[\s,])(body|header|footer|html)\s*\{/m', $css ) );
+
+// ======================================================================
+// 12 · CONFORMITÉ À LA RÉFÉRENCE VISUELLE
+//
+// La référence obligatoire est `frontend/formulaires/dp-formulaire.html`.
+// Ces contrôles interdisent le retour à une apparence générique, sans figer
+// des valeurs fragiles : on vérifie que la feuille CONSOMME la charte du thème
+// et que sa hiérarchie de boutons est bien celle de la maquette, jamais qu'un
+// espacement vaut tel nombre de pixels.
+//
+// L'ancien contrôle « la palette Urbizen est employée », qui exigeait #0b1f3a,
+// #7bdcb5 et #f6f8fb, est retiré — et non affaibli : ces trois teintes étaient
+// celles du gabarit Hostinger, pas celles de la maquette de référence, qui
+// impose #14233B, #128A5A et #EAEEF2. Le contrôle ci-dessous est strictement
+// plus exigeant : il vérifie sept tokens au lieu de trois littéraux.
+// ======================================================================
+$maquette = (string) file_get_contents( dirname( __DIR__, 2 ) . '/frontend/formulaires/dp-formulaire.html' );
+
+check( '12 · la maquette de référence est bien présente dans le dépôt', '' !== $maquette );
+
+// Chaque token de charte consommé par la feuille, avec la valeur de repli que
+// la maquette impose. Le repli garantit un rendu juste même sans le thème.
+$tokens = array(
+	'--u-ink'         => '#14233b',
+	'--u-paper'       => '#eaeef2',
+	'--u-surface'     => '#fbfcfd',
+	'--u-line-strong' => '#9fadbc',
+	'--u-brand'       => '#128a5a',
+	'--u-font-title'  => 'space grotesk',
+	'--u-font-body'   => 'ibm plex sans',
+	'--u-font-mono'   => 'ibm plex mono',
+);
+
+$bas = strtolower( $css );
+
+foreach ( $tokens as $token => $repli ) {
+	check(
+		"12 · la feuille consomme « $token » avec le repli de la maquette",
+		str_contains( $bas, 'var(' . $token . ',' ) && str_contains( $bas, $repli )
+	);
+
+	// La valeur de la maquette doit aussi exister dans la maquette elle-même :
+	// si quelqu'un invente une teinte, la comparaison tombe.
+	check(
+		"12 · « $repli » vient bien de la maquette de référence",
+		str_contains( strtolower( $maquette ), $repli )
+	);
+}
+
+// La feuille ne déclare jamais la charte : elle appartient au thème (D-002).
+check( '12 · aucune déclaration de token global', 1 !== preg_match( '/(^|})\s*:root\s*\{/', $css ) );
+
+// Hiérarchie des boutons, reprise de la maquette : retour en contour, suivant
+// en encre, envoi en vert. Trois styles distincts, jamais un gris système.
+check( '12 · le bouton d’envoi porte l’accent vert',
+	1 === preg_match( '/--envoyer\s*\{[^}]*background:\s*var\(--uc-vert\)/', $css ) );
+check( '12 · le bouton suivant porte l’encre',
+	1 === preg_match( '/--suivant\s*\{[^}]*background:\s*var\(--uc-encre\)/', $css ) );
+check( '12 · le bouton précédent est un contour',
+	1 === preg_match( '/--precedent\s*\{[^}]*border-color:\s*var\(--uc-ligne-forte\)/', $css ) );
+
+// Signature visuelle de la maquette : papier quadrillé et rail de légende.
+check( '12 · le fond quadrillé de la maquette est repris', str_contains( $css, '26px 26px' ) );
+check( '12 · le rail de légende est en place',
+	str_contains( $css, 'grid-template-columns: 232px' ) );
+
+// Aucune apparence native laissée au navigateur sur le dépôt de pièces.
+check( '12 · le bouton natif du champ fichier est redessiné',
+	str_contains( $css, '::file-selector-button' ) );
+
+// --- la charte du thème est réellement déclarée en dépendance ---
+neuf();
+administrateur();
+ConceptionRenderer::render( $def );
+
+$deps = $GLOBALS['wpd_styles_deps'][ ConceptionAssets::HANDLE_CSS ] ?? array();
+
+check( '12 · les polices du thème sont déclarées en dépendance', in_array( 'urbizen-fonts', $deps, true ) );
+check( '12 · les tokens du thème aussi', in_array( 'urbizen-tokens', $deps, true ) );
+check( '12 · les tokens dépendent des polices',
+	array( 'urbizen-fonts' ) === ( $GLOBALS['wpd_styles_deps']['urbizen-tokens'] ?? null ) );
+check( '12 · les polices ne dépendent de rien',
+	array() === ( $GLOBALS['wpd_styles_deps']['urbizen-fonts'] ?? null ) );
+check( '12 · le greffon ne sert pas sa propre copie de la charte',
+	! file_exists( URBIZEN_PLATFORM_DIR . 'assets/css/urbizen-tokens.css' ) );
+
+// Une charte déjà posée par le thème n'est jamais réenregistrée : c'est la
+// version du thème qui sert.
+// Le thème pose sa feuille AVANT que le greffon n'enregistre la sienne :
+// c'est l'ordre réel, le thème s'accrochant plus tôt que le rendu du bloc.
+wpd_reset();
+ConceptionRenderer::reset();
+wp_register_style( 'urbizen-fonts', 'https://exemple.test/pose-par-le-theme.css' );
+ConceptionAssets::register();
+administrateur();
+ConceptionRenderer::render( $def );
+
+check( '12 · un handle déjà enregistré par le thème est respecté',
+	'https://exemple.test/pose-par-le-theme.css' === ( $GLOBALS['wpd_styles_reg']['urbizen-fonts'] ?? '' ) );
+check( '12 · et reste tout de même une dépendance',
+	in_array( 'urbizen-fonts', $GLOBALS['wpd_styles_deps'][ ConceptionAssets::HANDLE_CSS ] ?? array(), true ) );
+
+// Toute variable locale employée doit être définie : une faute de frappe
+// ferait silencieusement retomber le rendu sur le style du navigateur.
+preg_match_all( '/var\(\s*(--uc-[a-z0-9-]+)/', $css, $employes );
+preg_match_all( '/^\s*(--uc-[a-z0-9-]+)\s*:/m', $css, $definis );
+
+$orphelines = array_values( array_diff( array_unique( $employes[1] ), array_unique( $definis[1] ) ) );
+
+check( '12 · aucune variable locale employée sans définition', array() === $orphelines );
+
+// ======================================================================
+// 13 · CARTOUCHE D’EN-TÊTE
+//
+// L'ajout est présentationnel : il ne doit RIEN changer à la structure. Les
+// contrôles de la section 3 (six étapes, quarante-cinq champs) tournent déjà
+// sur le même rendu — ceux-ci vérifient l'en-tête lui-même.
+// ======================================================================
+neuf();
+administrateur();
+$rendu = ConceptionRenderer::render( $def );
+
+check( '13 · le cartouche est rendu', 1 === substr_count( $rendu, 'urbizen-conception__entete' ) );
+check( '13 · il emploie l’élément header', str_contains( $rendu, '<header class="urbizen-conception__entete">' ) );
+check( '13 · un sur-titre', 1 === substr_count( $rendu, 'urbizen-conception__surtitre' ) );
+check( '13 · un titre', 1 === substr_count( $rendu, 'urbizen-conception__titre"' ) );
+check( '13 · un sous-titre', 1 === substr_count( $rendu, 'urbizen-conception__sous-titre' ) );
+
+// Aucun h1 : le formulaire s'insère dans une page WordPress qui porte le sien.
+check( '13 · AUCUN h1 dans le rendu', ! preg_match( '/<h1[\s>]/i', $rendu ) );
+check( '13 · le titre du cartouche est un h2',
+	str_contains( $rendu, '<h2 class="urbizen-conception__titre">' ) );
+
+// Le titre vient de la définition, il n'est pas écrit en dur dans le rendu.
+check( '13 · le titre vient de la définition', str_contains( $rendu, esc_html( $def->title() ) ) );
+check( '13 · et la définition le porte bien', 'Conception de plans sur mesure' === $def->title() );
+
+// Le nombre de rubriques est compté : il ne peut pas mentir.
+check( '13 · le nombre de rubriques annoncé est celui des étapes',
+	str_contains( $rendu, 'aux ' . count( $def->steps() ) . ' rubriques' ) );
+
+// Rien de décoratif n'est annoncé aux technologies d'assistance : le filet
+// rayé de la maquette est en CSS, et ni logo ni rose des vents ne sont repris.
+$entete = substr( $rendu, (int) strpos( $rendu, '__entete' ), 600 );
+
+check( '13 · aucune image dans le cartouche', ! str_contains( $entete, '<img' ) );
+check( '13 · aucun SVG dans le cartouche', ! str_contains( $entete, '<svg' ) );
+check( '13 · aucun aria-hidden nécessaire', ! str_contains( $entete, 'aria-hidden' ) );
+
+// Le cartouche est hors du formulaire : il n'ajoute aucune donnée soumise.
+check( '13 · le cartouche précède le formulaire',
+	strpos( $rendu, '__entete' ) < strpos( $rendu, '__form' ) );
+check( '13 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '13 · toujours six étapes', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+check( '13 · aucun champ ajouté par le cartouche',
+	substr_count( $rendu, '<input' ) === substr_count( $rendu, '<input' ) && ! str_contains( $entete, '<input' ) );
+
+// ======================================================================
+// 15 · HIÉRARCHIE D’ÉTAPE
+//
+// Le rail garde les libellés courts ; le contenu de l'étape porte le vrai
+// titre et sa phrase d'explication. Les trois textes viennent de la
+// définition — le renderer n'en écrit aucun.
+// ======================================================================
+$etapes_def = $def->steps();
+
+check( '15 · six rangs annoncés', 6 === substr_count( $rendu, 'urbizen-conception__etape-rang' ) );
+check( '15 · six intitulés', 6 === substr_count( $rendu, 'urbizen-conception__etape-intitule' ) );
+check( '15 · six descriptions', 6 === substr_count( $rendu, 'urbizen-conception__etape-description' ) );
+check( '15 · six légendes subsistent', 6 === substr_count( $rendu, 'urbizen-conception__etape-titre' ) );
+check( '15 · six fieldset subsistent', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
+
+// Le total est compté, pas écrit en dur : six « sur 6 », et jamais « sur 7 ».
+check( '15 · le total vient de la définition',
+	6 === substr_count( $rendu, 'sur ' . count( $etapes_def ) . '<' ) );
+
+$sans_titre = array();
+$sans_desc  = array();
+$rang       = 0;
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	++$rang;
+
+	$titre = (string) ( $etape['title'] ?? '' );
+	$desc  = (string) ( $etape['description'] ?? '' );
+
+	if ( '' !== $titre && ! str_contains( $rendu, '__etape-intitule">' . esc_html( $titre ) . '<' ) ) {
+		$sans_titre[] = $etape['id'];
+	}
+
+	if ( '' !== $desc && ! str_contains( $rendu, esc_html( $desc ) ) ) {
+		$sans_desc[] = $etape['id'];
+	}
+
+	check( "15 · l’étape $rang annonce son rang", str_contains( $rendu, "Étape $rang sur 6" ) );
+}
+
+check( '15 · tous les titres d’étapes viennent de la définition', array() === $sans_titre );
+check( '15 · toutes les descriptions viennent de la définition', array() === $sans_desc );
+
+// Aucun de ces textes n'est écrit dans le renderer : il ne fait que lire.
+$source_renderer = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Conception/ConceptionRenderer.php'
+);
+
+/*
+ * Les commentaires sont retirés avant comparaison : un texte cité dans une
+ * explication n'est pas un texte recopié. On exige ensuite la chaîne ENTIÈRE
+ * entre guillemets, jamais un fragment — sans quoi le libellé « Pièces »
+ * ferait tomber le contrôle à cause du bloc « Pièces d’urbanisme », qui n'a
+ * rien à voir.
+ */
+$sans_commentaires = (string) preg_replace(
+	array( '#/\*.*?\*/#s', '#//[^\n]*#' ),
+	'',
+	$source_renderer
+);
+
+preg_match_all( "/'((?:[^'\\\\]|\\\\.)*)'/", $sans_commentaires, $litteraux );
+
+$emis     = array_map( static fn( $t ) => stripslashes( $t ), $litteraux[1] );
+$recopies = array();
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	foreach ( array( 'title', 'description', 'label' ) as $cle ) {
+		$texte = (string) ( $etape[ $cle ] ?? '' );
+
+		if ( '' !== $texte && in_array( $texte, $emis, true ) ) {
+			$recopies[] = $etape['id'] . '.' . $cle;
+		}
+	}
+}
+
+check( '15 · AUCUN TEXTE D’ÉTAPE N’EST RECOPIÉ DANS LE RENDERER', array() === $recopies );
+
+// Le libellé court reste au rail, et n'y remplace pas le titre long.
+check( '15 · le rail garde les libellés courts',
+	str_contains( $rendu, '__progression-label">Programme<' )
+	&& str_contains( $rendu, '__progression-label">Contact<' ) );
+check( '15 · le fieldset porte le titre long, pas le libellé court',
+	str_contains( $rendu, '__etape-intitule">Votre projet<' )
+	&& str_contains( $rendu, '__etape-intitule">Vos coordonnées<' ) );
+
+// Lien sémantique entre le groupe et sa description.
+check( '15 · six fieldset décrits par leur paragraphe',
+	6 === substr_count( $rendu, 'aria-describedby="urbizen-conception-1-desc-' ) );
+
+$sans_ancre = array();
+
+foreach ( array_values( $etapes_def ) as $etape ) {
+	$ancre = 'urbizen-conception-1-desc-' . $etape['id'];
+
+	if ( ! str_contains( $rendu, 'id="' . $ancre . '"' ) ) {
+		$sans_ancre[] = $etape['id'];
+	}
+}
+
+check( '15 · chaque description porte son identifiant', array() === $sans_ancre );
+
+// Le rang n'est annoncé qu'une fois : il est dans la légende, pas en plus
+// dans le rail, et l'ancien préfixe « 1. » a disparu.
+check( '15 · plus de préfixe numéroté dans la légende', ! str_contains( $rendu, '>1. Programme<' ) );
+check( '15 · le rang est dans la légende', str_contains( $rendu, '__etape-rang">Étape 1 sur 6<' ) );
+
+// Sans l'espace entre les deux `span`, le nom accessible du groupe devient
+// « Étape 1 sur 6Votre projet ». Le contrôle vise ce caractère précis.
+check( '15 · le nom accessible du groupe est séparé',
+	str_contains( $rendu, '</span> <span class="urbizen-conception__etape-intitule">' ) );
+
+// Rien d'autre n'a bougé.
+check( '15 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '15 · toujours seize conditions', 16 === substr_count( $rendu, 'data-visible-if="' ) );
+check( '15 · toujours aucun h1', ! preg_match( '/<h1[\s>]/i', $rendu ) );
+
+// ======================================================================
+// 14 · LE THÈME NE DÉRIVE PAS DE LA MAQUETTE
+//
+// `var(--u-x, repli)` fait gagner le TOKEN, jamais le repli. Le composant ne
+// reste donc fidèle à la maquette que tant que les deux coïncident. Ce contrôle
+// compare directement `urbizen-tokens.css` à `dp-formulaire.html` : si le thème
+// dérive un jour, il tombe ici, pas sous les yeux de la propriétaire.
+// ======================================================================
+$tokens_css = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-child/assets/css/urbizen-tokens.css'
+);
+
+/**
+ * Relève la valeur d'une variable CSS dans une feuille.
+ *
+ * @param string $source Feuille.
+ * @param string $nom    Nom de la variable.
+ * @return string
+ */
+function valeur_css( string $source, string $nom ): string {
+	return preg_match( '/' . preg_quote( $nom, '/' ) . '\s*:\s*([^;]+);/', $source, $m )
+		? strtolower( trim( $m[1] ) )
+		: '';
+}
+
+// Correspondance token du thème → variable de la maquette.
+$paires = array(
+	'--u-paper'       => '--paper',
+	'--u-grid'        => '--grid',
+	'--u-surface'     => '--surface',
+	'--u-ink'         => '--ink',
+	'--u-ink-soft'    => '--ink-soft',
+	'--u-ink-faint'   => '--ink-faint',
+	'--u-line'        => '--line',
+	'--u-line-strong' => '--line-strong',
+	'--u-brand'       => '--cadastre',
+	'--u-brand-dk'    => '--cadastre-dk',
+	'--u-brand-sf'    => '--cadastre-sf',
+	'--u-error'       => '--error',
+	'--u-radius-sm'   => '--radius',
+);
+
+foreach ( $paires as $token => $var_maquette ) {
+	$a = valeur_css( $tokens_css, $token );
+	$b = valeur_css( $maquette, $var_maquette );
+
+	check( "14 · $token vaut la valeur de la maquette", '' !== $a && $a === $b );
+}
+
+// Les deux tokens qui divergent réellement ne doivent JAMAIS être consommés.
+foreach ( array( '--u-radius', '--u-maxw' ) as $divergent ) {
+	check(
+		"14 · $divergent n’est pas consommé, il diverge de la maquette",
+		! str_contains( $css, 'var(' . $divergent . ',' )
+	);
+}
+
+// Les deux maquettes restent interchangeables : une seule référence.
+$maquette_pc = (string) file_get_contents( dirname( __DIR__, 2 ) . '/frontend/formulaires/pc-formulaire.html' );
+
+preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette, $sd );
+preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette_pc, $sp );
+
+check( '14 · DP et PC portent le même CSS', ( $sd[1] ?? 'a' ) === ( $sp[1] ?? 'b' ) );
+
+// ======================================================================
+// 11 · ÉCHAPPEMENT
+// ======================================================================
+check( '11 · aucun script dans le rendu', ! str_contains( $rendu, '<script' ) );
+check( '11 · aucun gestionnaire d’événement en ligne', 1 !== preg_match( '/<[a-z]+[^>]*\son[a-z]+\s*=/i', $rendu ) );
+check( '11 · le HTML est équilibré',
+	substr_count( $rendu, '<fieldset' ) === substr_count( $rendu, '</fieldset>' )
+	&& substr_count( $rendu, '<form ' ) === substr_count( $rendu, '</form>' ) );
+
+// Deux instances sur la même page portent des identifiants distincts.
+neuf();
+administrateur();
+$a = ConceptionRenderer::render( $def );
+$b = ConceptionRenderer::render( $def );
+
+check( '11 · deux instances ont des identifiants distincts',
+	str_contains( $a, 'id="urbizen-conception-1"' ) && str_contains( $b, 'id="urbizen-conception-2"' ) );
+
+verdict();

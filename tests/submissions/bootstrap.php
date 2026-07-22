@@ -30,6 +30,10 @@ foreach (
 		'src/Forms/Pricing.php',
 		'src/Forms/Validator.php',
 		'src/Forms/Renderer.php',
+		'src/Conception/ConceptionAvailability.php',
+		'src/Conception/ConceptionSchema.php',
+		'src/Conception/ConceptionAssets.php',
+		'src/Conception/ConceptionRenderer.php',
 		'src/Security/AntiSpam.php',
 		'src/Security/RateLimiter.php',
 		'src/Submissions/SubmissionPostType.php',
@@ -52,6 +56,7 @@ foreach (
 		'src/Files/HttpUploadedFileMover.php',
 		'src/Files/UploadPolicy.php',
 		'src/Files/UploadNormalizer.php',
+		'src/Files/UploadManifest.php',
 		'src/Files/Storage.php',
 		'src/Files/SignedLink.php',
 		'src/Files/FileCleaner.php',
@@ -181,11 +186,83 @@ function serveur( array $extra = array() ): array {
  * @return \Urbizen\Platform\Http\SubmissionResult
  */
 function traiter( array $post, array $files = array(), array $server = array() ): \Urbizen\Platform\Http\SubmissionResult {
+	// Un navigateur qui joint des documents déclare toujours un manifeste. Les
+	// bancs qui éprouvent autre chose en obtiennent donc un, cohérent, sans
+	// avoir à le construire. Un banc peut évidemment le remplacer — c'est même
+	// tout l'objet de `test-manifeste.php`.
+	if ( array() !== $files && ! array_key_exists( \Urbizen\Platform\Files\UploadManifest::FIELD, $post ) ) {
+		$post[ \Urbizen\Platform\Files\UploadManifest::FIELD ] = fx_manifeste( $files );
+	}
+
 	return \Urbizen\Platform\Http\SubmissionController::process(
 		$post,
 		$files,
 		array() === $server ? serveur() : $server,
 		wpd_now()
+	);
+}
+
+/**
+ * Construit le manifeste qu'un navigateur honnête produirait.
+ *
+ * Il est calculé depuis `$_FILES` **avant** toute normalisation, comme le
+ * ferait le navigateur depuis ses objets `File` : c'est bien une déclaration,
+ * pas un reflet de ce que le serveur a reçu.
+ *
+ * @param array<string, mixed> $files Superglobale `$_FILES`.
+ * @return string JSON canonique.
+ */
+function fx_manifeste( array $files ): string {
+	$blocs = array();
+	$total = 0;
+	$n     = 0;
+
+	foreach ( $files as $bloc => $entree ) {
+		if ( ! is_array( $entree ) || ! isset( $entree['size'] ) ) {
+			continue;
+		}
+
+		$tailles = is_array( $entree['size'] ) ? array_values( $entree['size'] ) : array( $entree['size'] );
+		$erreurs = is_array( $entree['error'] ?? null ) ? array_values( $entree['error'] ) : array( $entree['error'] ?? UPLOAD_ERR_OK );
+		$chemins = is_array( $entree['tmp_name'] ?? null ) ? array_values( $entree['tmp_name'] ) : array( $entree['tmp_name'] ?? '' );
+
+		$somme  = 0;
+		$compte = 0;
+
+		foreach ( $tailles as $i => $taille ) {
+			// Un champ de dépôt laissé vide ne figure dans aucune collection
+			// de navigateur : il n'entre donc pas au manifeste.
+			if ( UPLOAD_ERR_NO_FILE === (int) ( $erreurs[ $i ] ?? UPLOAD_ERR_OK ) ) {
+				continue;
+			}
+
+			// Le navigateur déclare `File.size` ; le serveur compare avec ce
+			// qu'il a réellement reçu. La fixture mesure donc le fichier.
+			$chemin = (string) ( $chemins[ $i ] ?? '' );
+			$reelle = '' !== $chemin && is_file( $chemin ) ? (int) filesize( $chemin ) : (int) $taille;
+
+			$somme += $reelle;
+			++$compte;
+		}
+
+		if ( 0 === $compte ) {
+			continue;
+		}
+
+		$blocs[ (string) $bloc ] = array( 'count' => $compte, 'size' => $somme );
+		$total                  += $somme;
+		$n                      += $compte;
+	}
+
+	ksort( $blocs );
+
+	return (string) wp_json_encode(
+		array(
+			'version'     => \Urbizen\Platform\Files\UploadManifest::VERSION,
+			'total_count' => $n,
+			'total_size'  => $total,
+			'blocks'      => $blocs,
+		)
 	);
 }
 

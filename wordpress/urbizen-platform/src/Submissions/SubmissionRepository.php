@@ -332,9 +332,36 @@ final class SubmissionRepository {
 	 * @return bool
 	 */
 	public static function persist_meta( int $id, string $cle, $valeur ): bool {
-		update_post_meta( $id, $cle, $valeur );
+		update_post_meta( $id, $cle, self::echapper( $valeur ) );
 
 		return self::meta_equivaut( get_post_meta( $id, $cle, true ), $valeur );
+	}
+
+	/**
+	 * Échappe une valeur comme l'API des métadonnées l'attend.
+	 *
+	 * WordPress applique `wp_unslash()` à toute valeur de métadonnée : il
+	 * suppose recevoir des données échappées, comme celles d'une superglobale.
+	 * Lui passer une valeur brute revient donc à lui demander d'en retirer des
+	 * antislashes qui n'en sont pas.
+	 *
+	 * Le cas décisif : `wp_json_encode()` échappe `/` en `\/`. Le JSON d'une
+	 * transaction contenant un chemin de staging perdait ses antislashes à
+	 * l'écriture, la relecture différait, et `finalize()` abandonnait — donc
+	 * **toute soumission comportant des documents échouait sur un vrai
+	 * WordPress**. Une soumission sans document passait, le chemin de staging
+	 * étant vide : c'est ce qui a rendu le défaut invisible si longtemps
+	 * (D-041).
+	 *
+	 * @param mixed $valeur Valeur voulue.
+	 * @return mixed Valeur échappée.
+	 */
+	private static function echapper( $valeur ) {
+		if ( is_string( $valeur ) || is_array( $valeur ) ) {
+			return wp_slash( $valeur );
+		}
+
+		return $valeur;
 	}
 
 	/**

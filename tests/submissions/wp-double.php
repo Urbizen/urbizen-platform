@@ -46,6 +46,13 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_cron_single'] = array();
 	$GLOBALS['wpd_cron_args']   = array();
 	$GLOBALS['wpd_mail_retour'] = true;
+	$GLOBALS['wpd_styles']      = array();
+	$GLOBALS['wpd_scripts']     = array();
+	$GLOBALS['wpd_styles_reg']  = array();
+	$GLOBALS['wpd_styles_deps'] = array();
+	$GLOBALS['wpd_scripts_reg'] = array();
+	$GLOBALS['wpd_inline']      = array();
+	$GLOBALS['wpd_logged_in']   = false;
 	$GLOBALS['wpd_redirect_leve'] = false;
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
@@ -614,7 +621,12 @@ function update_post_meta( $id, $cle, $valeur, $prev = '' ) {
 		return false;
 	}
 
-	$id      = (int) $id;
+	$id = (int) $id;
+
+	// Le cœur applique `wp_unslash()` à toute valeur de métadonnée : il suppose
+	// recevoir des données échappées. Ne pas le reproduire ferait passer pour
+	// correcte une écriture qui, en production, perd ses antislashes.
+	$valeur  = wp_unslash( $valeur );
 	$present = array_key_exists( $cle, $GLOBALS['wpd_meta'][ $id ] ?? array() );
 
 	// Couche de stockage qui **annonce** un succès sans rien écrire. Un code
@@ -717,14 +729,55 @@ function wpd_meta_query_match( int $id, array $query ): bool {
 }
 
 // -------------------------------------------------------------------- JSON --
+/**
+ * Encodage JSON, **fidèle** au cœur.
+ *
+ * `wp_json_encode()` n'ajoute aucun drapeau : elle échappe donc `/` en `\/`,
+ * et laisse l'Unicode sous forme `\uXXXX`. Ajouter `JSON_UNESCAPED_SLASHES`,
+ * comme le faisait cette doublure, supprimait précisément les antislashes dont
+ * la disparition constituait le défaut — et le rendait invisible.
+ */
 function wp_json_encode( $donnees, $options = 0, $depth = 512 ) {
-	return json_encode( $donnees, $options | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, $depth );
+	return json_encode( $donnees, $options, $depth );
 }
 
 // ---------------------------------------------------------------- adresses --
 function home_url( $chemin = '' ) { return 'https://exemple.test' . $chemin; }
 function wp_parse_url( $url, $composant = -1 ) { return parse_url( $url, $composant ); }
-function wp_unslash( $valeur ) { return $valeur; }
+/**
+ * Retire les antislashes, **comme le cœur**.
+ *
+ * L'ancienne doublure rendait la valeur telle quelle. C'est cette infidélité
+ * qui a masqué, jusqu'au banc WordPress réel, le fait que l'API des
+ * métadonnées applique `wp_unslash()` à tout ce qu'on lui confie — et mange
+ * donc les antislashes que `wp_json_encode()` place devant chaque `/`.
+ */
+function wp_unslash( $valeur ) {
+	return wpd_stripslashes_profond( $valeur );
+}
+
+/**
+ * Ajoute les antislashes, comme `wp_slash()`.
+ */
+function wp_slash( $valeur ) {
+	if ( is_array( $valeur ) ) {
+		return array_map( 'wp_slash', $valeur );
+	}
+
+	if ( ! is_string( $valeur ) ) {
+		return $valeur;
+	}
+
+	return addslashes( $valeur );
+}
+
+function wpd_stripslashes_profond( $valeur ) {
+	if ( is_array( $valeur ) ) {
+		return array_map( 'wpd_stripslashes_profond', $valeur );
+	}
+
+	return is_string( $valeur ) ? stripslashes( $valeur ) : $valeur;
+}
 function wp_get_referer() { return '' !== $GLOBALS['wpd_referer'] ? $GLOBALS['wpd_referer'] : false; }
 
 function add_query_arg( $args, $url = '' ) {
@@ -944,6 +997,101 @@ function esc_url( $url, $protocols = null, $context = 'display' ) {
 
 function wp_nonce_url( $url, $action = -1 ) {
 	return add_query_arg( '_wpnonce', wp_create_nonce( $action ), $url );
+}
+
+// ------------------------------------------------------------- ressources ---
+/**
+ * Doublure du chargement de ressources.
+ *
+ * Elle ne charge rien : elle **compte**. Un banc doit pouvoir prouver qu'aucun
+ * script ni feuille de style n'est mis en file pour un visiteur anonyme.
+ */
+function wp_register_style( $handle, $src = '', $deps = array(), $ver = false ) {
+	// WordPress ignore un réenregistrement : le premier enregistrement gagne.
+	// La doublure doit se comporter pareil, sans quoi un banc croirait pouvoir
+	// écraser une feuille déjà posée par le thème.
+	if ( isset( $GLOBALS['wpd_styles_reg'][ $handle ] ) ) {
+		return false;
+	}
+
+	$GLOBALS['wpd_styles_reg'][ $handle ]  = $src;
+	$GLOBALS['wpd_styles_deps'][ $handle ] = (array) $deps;
+	return true;
+}
+
+/**
+ * Racine du thème enfant réel.
+ *
+ * La doublure pointe vers le thème versionné du dépôt, et non vers un dossier
+ * inventé : un banc qui vérifie que la charte du thème est bien déclarée doit
+ * tomber si les fichiers disparaissent.
+ */
+function get_stylesheet_directory() {
+	return dirname( __DIR__, 2 ) . '/wordpress/urbizen-child';
+}
+
+function get_stylesheet_directory_uri() {
+	return 'https://exemple.test/wp-content/themes/urbizen-child';
+}
+
+function wp_register_script( $handle, $src = '', $deps = array(), $ver = false, $footer = false ) {
+	$GLOBALS['wpd_scripts_reg'][ $handle ] = $src;
+	return true;
+}
+
+function wp_enqueue_style( $handle ) {
+	$GLOBALS['wpd_styles'][] = $handle;
+}
+
+function wp_enqueue_script( $handle ) {
+	$GLOBALS['wpd_scripts'][] = $handle;
+}
+
+function wp_style_is( $handle, $liste = 'enqueued' ) {
+	return 'registered' === $liste
+		? isset( $GLOBALS['wpd_styles_reg'][ $handle ] )
+		: in_array( $handle, $GLOBALS['wpd_styles'], true );
+}
+
+function wp_script_is( $handle, $liste = 'enqueued' ) {
+	return 'registered' === $liste
+		? isset( $GLOBALS['wpd_scripts_reg'][ $handle ] )
+		: in_array( $handle, $GLOBALS['wpd_scripts'], true );
+}
+
+function wp_add_inline_script( $handle, $donnees, $position = 'after' ) {
+	$GLOBALS['wpd_inline'][ $handle ][] = (string) $donnees;
+	return true;
+}
+
+function wp_nonce_field( $action = -1, $nom = '_wpnonce', $referer = true, $echo = true ) {
+	$html = sprintf(
+		'<input type="hidden" name="%s" value="%s">',
+		esc_attr( (string) $nom ),
+		esc_attr( wp_create_nonce( $action ) )
+	);
+
+	if ( $echo ) {
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+	}
+
+	return $html;
+}
+
+function get_permalink( $post = 0 ) {
+	return $GLOBALS['wpd_permalink'] ?? 'https://urbizen.test/apercu/';
+}
+
+function is_user_logged_in() {
+	return (bool) ( $GLOBALS['wpd_logged_in'] ?? false );
+}
+
+function esc_attr__( $texte, $domaine = 'default' ) {
+	return esc_attr( $texte );
+}
+
+function plugin_dir_url( $fichier ) {
+	return 'https://urbizen.test/wp-content/plugins/urbizen-platform/';
 }
 
 // ---------------------------------------------------------------- $wpdb -----

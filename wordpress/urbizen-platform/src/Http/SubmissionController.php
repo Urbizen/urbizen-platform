@@ -22,6 +22,7 @@
 namespace Urbizen\Platform\Http;
 
 use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Files\UploadManifest;
 use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
@@ -260,14 +261,50 @@ final class SubmissionController {
 			return $renoncer( $normalisation['code'] );
 		}
 
+		// --- 10 bis · manifeste : détecter une réception partielle ---
+		// `max_file_uploads` plafonne à 20 : au-delà, PHP livre une partie des
+		// fichiers sans le signaler. Le serveur ne peut pas connaître un
+		// fichier qui ne lui est jamais parvenu ; seule la déclaration
+		// préalable du navigateur permet de constater l'écart (D-032).
+		//
+		// Le contrôle vient **après** la normalisation — les tailles comparées
+		// sont mesurées sur les fichiers réellement reçus — et **avant** tout
+		// dépôt : un refus ne laisse ni staging, ni référence, ni notification.
+		// Il vient aussi après les barrières de `UploadPolicy`, pour que le
+		// motif rendu reste le plus précis possible ; il ne les remplace pas.
+		$verifier_manifeste = static function () use ( $post, $normalisation, $renoncer ) {
+			$manifeste = UploadManifest::verify(
+				$post[ UploadManifest::FIELD ] ?? null,
+				$normalisation['files']
+			);
+
+			return $manifeste['ok'] ? null : $renoncer( $manifeste['code'] );
+		};
+
 		$lot     = array();
 		$staging = null;
+
+		if ( array() === $normalisation['files'] ) {
+			// Aucun fichier reçu : c'est précisément le cas où un manifeste
+			// annonçant des documents doit être refusé.
+			$refus = $verifier_manifeste();
+
+			if ( null !== $refus ) {
+				return $refus;
+			}
+		}
 
 		if ( array() !== $normalisation['files'] ) {
 			$politique = UploadPolicy::validate( $normalisation['files'] );
 
 			if ( ! $politique['ok'] ) {
 				return $renoncer( $politique['code'] );
+			}
+
+			$refus = $verifier_manifeste();
+
+			if ( null !== $refus ) {
+				return $refus;
 			}
 
 			// --- 11 · dépôt dans un staging privé ---

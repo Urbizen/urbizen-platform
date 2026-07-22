@@ -46,6 +46,17 @@ final class SubmissionResult {
 	public const UPLOAD_INVALID_EXTENSION   = 'upload_invalid_extension';
 	public const UPLOAD_INVALID_MIME        = 'upload_invalid_mime';
 	public const UPLOAD_COUNT_EXCEEDED      = 'upload_count_exceeded';
+
+	/**
+	 * Le navigateur a déclaré plus — ou autre chose — que ce qui est arrivé.
+	 *
+	 * La cause la plus probable est une troncature silencieuse par
+	 * `max_file_uploads`. Le code reste **générique** : il ne dit pas au client
+	 * quel fichier manque, ni pourquoi.
+	 */
+	public const UPLOAD_INCOMPLETE          = 'upload_incomplete';
+	public const UPLOAD_MANIFEST_INVALID    = 'upload_manifest_invalid';
+	public const UPLOAD_MANIFEST_MISSING    = 'upload_manifest_missing';
 	public const UPLOAD_TOTAL_SIZE_EXCEEDED = 'upload_total_size_exceeded';
 	public const STORAGE_UNAVAILABLE        = 'storage_unavailable';
 	public const STORAGE_FAILED             = 'storage_failed';

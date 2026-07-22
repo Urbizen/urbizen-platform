@@ -1538,3 +1538,103 @@ inter-processus, libération automatique après terminaison forcée.
 - Le plancher de durée du bail demeure, comme précaution secondaire. Il ne se
   lève que sous `URBIZEN_TESTING`, constante définie hors du dépôt — le mode CLI
   seul ne suffit pas, les tâches planifiées s'y exécutant aussi.
+
+---
+
+## D-042 — `max_file_uploads` : le manifeste clôt D-032
+
+**Date** : 21 juillet 2026 · **État** : actée · **Clôt** [D-032]
+
+**Contexte.** `max_file_uploads` vaut 20 en production. Au-delà, PHP livre une
+partie des fichiers **sans le signaler**. Le serveur ne peut pas connaître un
+fichier qui ne lui est jamais parvenu : rien ne distingue « l'utilisateur en a
+joint 19 » de « il en a joint 20 et l'un s'est perdu ».
+
+**Décision.** Le navigateur déclare ce qu'il envoie ; le serveur compare avec
+ce qu'il reçoit. Cette comparaison clôt D-032, sans toucher à Hostinger.
+
+**Preuves, sur un vrai WordPress 7.0.2, par requêtes multipart écrites octet
+par octet et envoyées sur une socket :**
+
+- manifeste 20, corps contenant 19 parties → **`upload_incomplete`** ;
+- dernière partie coupée en plein contenu → **`upload_partial`** ;
+- **témoin** manifeste 20, corps contenant 20 parties → succès complet :
+  demande finalisée, référence `attributed`, notification `pending`, un
+  événement mail, vingt documents stockés, aucun courriel externe.
+
+Le témoin est indispensable : sans lui, les deux refus auraient pu venir d'une
+cause parasite. Ils l'ont d'ailleurs fait une fois — `token_too_fast` — et
+c'est le témoin qui l'a révélé.
+
+**Ce que le manifeste est, et n'est pas.**
+
+- Il est **contrôlé mais non fiable par nature** : un client peut y écrire
+  n'importe quoi. Sa forme est validée strictement — clés exactes, entiers
+  canoniques, cohérence du total avec la somme des blocs, blocs connus — mais
+  son contenu reste une affirmation.
+- Il exprime **ce que le navigateur affirme avoir sélectionné**, avant
+  transport.
+- Il sert uniquement à **détecter une différence** entre cette affirmation et
+  ce que PHP a réellement reçu.
+- Il **ne valide aucun fichier** et **ne remplace jamais `UploadPolicy`** :
+  extension réelle, type réel, provenance HTTP, tailles et nombres continuent
+  de s'appliquer intégralement. Un manifeste parfaitement exact ne fait passer
+  ni un SVG, ni un onzième document dans un bloc.
+
+**Les tailles comparées sont mesurées**, par `filesize()` sur le fichier
+temporaire — jamais `declared_size`, qui n'est qu'une prétention de la requête.
+Une mesure impossible — fichier absent, effacé, illisible, chemin vide,
+répertoire — refuse la soumission plutôt que de convertir `false` en zéro.
+
+**Conséquences.**
+- `max_file_uploads` reste à **20**. Aucune modification Hostinger n'a été
+  nécessaire, ni demandée.
+- Le formulaire limite le client à vingt documents ; le manifeste détecte les
+  réceptions partielles ; le refus est transactionnel — ni demande finalisée,
+  ni référence attribuée, ni notification, ni document, ni staging.
+- Aucun faux succès n'est possible : sans comparaison certaine, on refuse.
+
+## D-043 — La maquette de référence, pas la production, fait foi visuellement
+
+**Contexte.** La propriétaire a jugé le formulaire de conception « ancien et
+générique », et a désigné les formulaires DP et PC comme référence visuelle
+obligatoire.
+
+Deux objets portent ce nom, et ils ne se ressemblent pas :
+
+1. les **pages publiques** `/declaration-prealable/` et `/permis-de-construire/`,
+   qui servent aujourd'hui des formulaires Fluent Forms — Poppins, Open Sans,
+   rayon 7px, bouton `#002D6B` ;
+2. les **maquettes versionnées** `frontend/formulaires/dp-formulaire.html` et
+   `pc-formulaire.html` — papier quadrillé, cartouche, rail de légende, Space
+   Grotesk, IBM Plex, vert `#128A5A`, rayon 3px.
+
+La référence retenue est la **seconde**. Les pages publiques sont destinées à
+être refaites : s'aligner dessus reviendrait à copier ce qui doit disparaître.
+
+**Conséquences.**
+
+- Les deux maquettes portent un CSS **strictement identique** — comparaison
+  ligne à ligne, zéro différence. Il n'y a donc qu'une référence, pas deux, et
+  aucun arbitrage à rendre entre elles.
+- Là où la maquette et `urbizen-tokens.css` divergent, c'est la maquette qui
+  l'emporte : rayon **3px** et non 4px, coque **960px** et non 1120px.
+- La palette annoncée en consigne (`#0B1F3A`, `#7BDCB5`, `#F6F8FB`) est celle du
+  gabarit Hostinger, pas celle de la maquette. Elle n'est pas retenue :
+  l'encre est `#14233B`, l'accent `#128A5A`, le papier `#EAEEF2`.
+- `urbizen-conception.css` ne déclare aucun token global : elle **consomme**
+  `var(--u-*)` avec le repli de la maquette, comme `urbizen-form.css` et
+  `urbizen-cadastre.css`. Le rendu global reste au thème (D-002).
+- Le thème enfant ne met sa charte en file que sous le gabarit de l'accueil.
+  `ConceptionAssets` déclare donc `urbizen-fonts` et `urbizen-tokens` en
+  dépendance de sa propre feuille — sans jamais en embarquer de copie, et sans
+  réenregistrer un handle que le thème aurait déjà posé.
+- L'alignement est **entièrement en CSS**. Aucun champ, aucune étape, aucune
+  règle tarifaire, aucun calcul serveur, aucun brouillon, aucun manifeste,
+  aucune limite de dépôt n'est touché.
+
+**Ce qui n'est pas repris.** La maquette ouvre sur un cartouche d'en-tête —
+sur-titre monospace, titre, sous-titre, logo, rose des vents. Le rendu serveur
+ne produit aucun de ces éléments : les ajouter demanderait de modifier
+`ConceptionRenderer`, hors du périmètre d'un commit de style. La numérotation
+des étapes reste « 1 » et non « 01 », pour la même raison.
