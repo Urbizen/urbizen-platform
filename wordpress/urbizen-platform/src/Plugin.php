@@ -13,6 +13,7 @@ use Urbizen\Platform\Blocks\FormBlock;
 use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
+use Urbizen\Platform\Adapter\WpCliSchemaCommand;
 use Urbizen\Platform\Conception\ConceptionAssets;
 use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Privacy\Retention;
@@ -120,6 +121,19 @@ final class Plugin {
 		if ( is_admin() ) {
 			SubmissionsAdmin::register();
 		}
+
+		/*
+		 * Commandes de schéma : **uniquement sous WP-CLI**.
+		 *
+		 * Aucune migration ne doit pouvoir partir d'une requête web, fût-elle
+		 * une visite de l'administration. `register()` sort immédiatement si
+		 * `WP_CLI` n'est pas défini, donc rien n'est enregistré ici en dehors
+		 * de la ligne de commande.
+		 *
+		 * En E1 le catalogue est vide : même invoquées, ces commandes rendent
+		 * la main sans émettre une seule requête.
+		 */
+		WpCliSchemaCommand::register();
 
 		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : cadastre, formulaires, réception et documents privés actifs.' );
 	}

@@ -32,6 +32,10 @@ foreach (
 		'src/Forms/Renderer.php',
 		'src/Conception/ConceptionAvailability.php',
 		'src/Conception/ConceptionSchema.php',
+		// Socle E1 : nécessaire au contrôle « le catalogue est vide ».
+		'src/Schema/DatabaseGateway.php',
+		'src/Schema/Migration.php',
+		'src/Schema/MigrationCatalogue.php',
 		'src/Conception/ConceptionAssets.php',
 		'src/Conception/ConceptionRenderer.php',
 		'src/Security/AntiSpam.php',

@@ -205,15 +205,47 @@ check( 'la provenance HTTP est exigée dans l’adaptateur',
 	str_contains( $sources['src/Files/HttpUploadedFileMover.php'], 'is_uploaded_file(' ) );
 
 // ------------------------------------------------ aucune table SQL ----------
-$sql = array();
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle interdisait `CREATE TABLE` et `dbDelta` dans TOUT `src/`. E1 introduit
+ * une couche de schéma dont c'est précisément le métier : la formulation
+ * lexicale d'origine est devenue inapplicable.
+ *
+ * Elle n'est pas affaiblie, elle est **scindée et durcie** :
+ *
+ *   1. l'interdiction demeure, inchangée, partout hors `src/Schema/` — donc
+ *      sur les cinquante classes qu'elle protégeait déjà ;
+ *   2. `dbDelta` reste interdit PARTOUT, y compris dans `src/Schema/` : la
+ *      couche de schéma écrit son SQL, elle ne s'en remet pas à un
+ *      comparateur approximatif ;
+ *   3. s'ajoute ce que l'ancienne formulation ne disait pas — le catalogue
+ *      est vide, donc aucune table n'est réellement créée à l'exécution.
+ *
+ * Le troisième point est plus fort que les deux précédents : il porte sur le
+ * comportement, non sur le texte du code.
+ */
+$sql     = array();
+$deltas  = array();
 
 foreach ( $sources as $chemin => $contenu ) {
+	if ( preg_match( '/dbDelta/i', $contenu ) ) {
+		$deltas[] = $chemin;
+	}
+
+	if ( 0 === strpos( $chemin, 'src/Schema/' ) ) {
+		continue;
+	}
+
 	if ( preg_match( '/dbDelta|CREATE TABLE/i', $contenu ) ) {
 		$sql[] = $chemin;
 	}
 }
 
-check( 'aucune table SQL créée', array() === $sql );
+check( 'aucune table SQL créée hors de la couche de schéma', array() === $sql );
+check( 'dbDelta reste interdit partout', array() === $deltas );
+check( 'LE CATALOGUE DE MIGRATIONS EST VIDE : AUCUNE TABLE N’EST CRÉÉE',
+	\Urbizen\Platform\Schema\MigrationCatalogue::plateforme()->est_vide() );
 
 // ------------------------------------------------ constantes de contrat -----
 check( 'l’action admin-post est urbizen_conception', 'urbizen_conception' === SubmissionController::ACTION );
