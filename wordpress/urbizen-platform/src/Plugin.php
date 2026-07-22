@@ -13,7 +13,9 @@ use Urbizen\Platform\Blocks\FormBlock;
 use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
+use Urbizen\Platform\Adapter\WpCliAccountsCommand;
 use Urbizen\Platform\Adapter\WpCliSchemaCommand;
+use Urbizen\Platform\Adapter\WpComptes;
 use Urbizen\Platform\Conception\ConceptionAssets;
 use Urbizen\Platform\Mail\MailScheduler;
 use Urbizen\Platform\Privacy\Retention;
@@ -134,6 +136,15 @@ final class Plugin {
 		 * la main sans émettre une seule requête.
 		 */
 		WpCliSchemaCommand::register();
+		WpCliAccountsCommand::register();
+
+		/*
+		 * Surveillance des profils : invalide une vérification lorsqu'une
+		 * adresse change hors du flux Urbizen. Ce crochet n'écrit rien tant
+		 * qu'aucune adresse ne bouge, et ne valide jamais — il ne sait que
+		 * retirer.
+		 */
+		WpComptes::register();
 
 		Logger::debug( 'Amorçage Urbizen Platform ' . URBIZEN_PLATFORM_VERSION . ' : cadastre, formulaires, réception et documents privés actifs.' );
 	}
