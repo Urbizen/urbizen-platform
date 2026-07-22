@@ -14,6 +14,46 @@
 declare( strict_types = 1 );
 
 use Urbizen\Platform\Account\ComptesGateway;
+
+/**
+ * Journal d'événements partagé par les deux doublures.
+ *
+ * Il rend l'ORDRE des opérations observable — et c'est la seule façon de
+ * prouver qu'aucune lecture ne précède l'acquisition du verrou. Un
+ * entrelacement ne le prouverait pas : le code correct ne lisant rien avant le
+ * verrou, rien ne peut y devenir périmé, et la course n'a pas lieu.
+ */
+final class JournalEvenements {
+
+	/**
+	 * @var array<int, string>
+	 */
+	public static array $evenements = array();
+
+	public static function reset(): void {
+		self::$evenements = array();
+	}
+
+	public static function noter( string $evenement ): void {
+		self::$evenements[] = $evenement;
+	}
+
+	/**
+	 * Rang du premier événement correspondant, ou -1.
+	 *
+	 * @param string $motif Motif recherché.
+	 * @return int
+	 */
+	public static function premier( string $motif ): int {
+		foreach ( self::$evenements as $rang => $evenement ) {
+			if ( false !== strpos( $evenement, $motif ) ) {
+				return $rang;
+			}
+		}
+
+		return -1;
+	}
+}
 use Urbizen\Platform\Domain\Account\AdresseCourriel;
 use Urbizen\Platform\Domain\Account\Compte;
 use Urbizen\Platform\Schema\DatabaseGateway;
@@ -61,6 +101,7 @@ final class PasserelleOptions implements DatabaseGateway {
 		$this->instructions[] = $sql;
 
 		if ( 0 === strpos( $sql, 'INSERT INTO' ) ) {
+			JournalEvenements::noter( 'verrou:pose' );
 			$nom = (string) ( $parametres[0] ?? '' );
 
 			// L'index unique de `option_name` : une seule insertion passe.
@@ -189,6 +230,17 @@ final class ComptesDouble implements ComptesGateway {
 	 */
 	public bool $promotion_echoue = false;
 
+	/**
+	 * Piège : rappel exécuté APRÈS la lecture d'une clé donnée, une seule fois.
+	 *
+	 * Il sert à reproduire un entrelacement réel dans un seul processus : sans
+	 * lui, toute lecture suit l'écriture concurrente, et une mutation qui
+	 * supprimerait la relecture sous verrou passerait inaperçue.
+	 *
+	 * @var array{cle: string, rappel: callable}|null
+	 */
+	public ?array $piege = null;
+
 	public function canoniser( string $brute ): string {
 		$valeur = (string) preg_replace( '/[\x00-\x1F\x7F]/', '', $brute );
 
@@ -261,9 +313,19 @@ final class ComptesDouble implements ComptesGateway {
 	public function lire_meta( int $id, string $cle ): ?string {
 		// Une clé absente rend `null` ; une clé vide rend la chaîne vide. La
 		// distinction est ce qui permet de détecter un état partiel.
-		return array_key_exists( $cle, $this->metas[ $id ] ?? array() )
+		JournalEvenements::noter( 'lecture:' . $cle );
+
+		$valeur = array_key_exists( $cle, $this->metas[ $id ] ?? array() )
 			? (string) $this->metas[ $id ][ $cle ]
 			: null;
+
+		if ( null !== $this->piege && $this->piege['cle'] === $cle ) {
+			$rappel      = $this->piege['rappel'];
+			$this->piege = null; // Une seule fois.
+			$rappel( $this, $id );
+		}
+
+		return $valeur;
 	}
 
 	public function ecrire_meta( int $id, string $cle, string $valeur ): bool {

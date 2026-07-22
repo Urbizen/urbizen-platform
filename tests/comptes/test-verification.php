@@ -120,6 +120,36 @@ check( '4 · le compte n’est pas vérifié par l’ancien jeton',
 check( '4 · le nouveau jeton, lui, fonctionne',
 	'' === $s5->consommer( $id5, $nouveau->jeton(), $t + 140 ) );
 
+// ----------------------------------------------------------------------
+// AUCUNE LECTURE AVANT LE VERROU.
+//
+// C'est la forme démontrable de l'exigence « ne jamais utiliser pour la
+// mutation un état lu avant l'acquisition ». Un entrelacement ne la prouverait
+// pas : le code correct ne lisant rien avant le verrou, rien ne peut y devenir
+// périmé, et la course n'a pas lieu. On observe donc l'ORDRE des opérations.
+// ----------------------------------------------------------------------
+list( $c5b, $db5b, $s5b, $id5b ) = monter( 'ordre@exemple.fr' );
+$r5b = $s5b->preparer( $id5b, $t );
+
+JournalEvenements::reset();
+$s5b->consommer( $id5b, $r5b->jeton(), $t + 10 );
+
+$rang_verrou  = JournalEvenements::premier( 'verrou:pose' );
+$rang_lecture = JournalEvenements::premier( 'lecture:' );
+
+check( '4 · le verrou a bien été posé', $rang_verrou >= 0 );
+check( '4 · des lectures ont bien eu lieu', $rang_lecture >= 0 );
+check( '4 · AUCUNE LECTURE AVANT L’ACQUISITION DU VERROU', $rang_verrou < $rang_lecture );
+
+// Même exigence à la préparation.
+list( $c5c, $db5c, $s5c, $id5c ) = monter( 'ordre2@exemple.fr' );
+
+JournalEvenements::reset();
+$s5c->preparer( $id5c, $t );
+
+check( '4 · à la préparation aussi, le verrou précède toute lecture',
+	JournalEvenements::premier( 'verrou:pose' ) < JournalEvenements::premier( 'lecture:' ) );
+
 // La génération s'incrémente : un ancien condensat n'est pas recalculable.
 check( '4 · la génération a augmenté',
 	(int) $c5->lire_meta( $id5, J::META_GENERATION ) >= 2 );
@@ -154,6 +184,32 @@ $r7 = $s7->preparer( $id7, $t );
 check( '5 · une écriture partielle refuse la préparation', false === $r7->est_prepare() );
 check( '5 · le motif est explicite', 'ecriture_incomplete' === $r7->motif() );
 check( '5 · AUCUN ÉTAT PARTIEL NE SUBSISTE', null === $c7->lire_meta( $id7, J::META_CONDENSAT ) );
+
+// ----------------------------------------------------------------------
+// UN ÉTAT PARTIEL N'EST JAMAIS PARTIELLEMENT VALIDE.
+//
+// Quatre métadonnées portent un jeton. Si l'une manque, la consommation doit
+// être refusée — jamais complétée par une valeur par défaut, ce qui
+// reviendrait à accepter un jeton qu'on ne sait plus interpréter.
+// ----------------------------------------------------------------------
+foreach ( array( J::META_CIBLE, J::META_EXPIRE, J::META_GENERATION, J::META_CONDENSAT ) as $manquante ) {
+	list( $cp, $dbp, $sp, $idp ) = monter( 'partiel@exemple.fr' );
+	$rp = $sp->preparer( $idp, $t );
+
+	// On retire une seule des quatre.
+	$cp->supprimer_meta( $idp, $manquante );
+
+	$motif = $sp->consommer( $idp, $rp->jeton(), $t + 10 );
+
+	check(
+		sprintf( '5 · SANS « %s », LA CONSOMMATION EST REFUSÉE', $manquante ),
+		'jeton_absent' === $motif || 'jeton_invalide' === $motif
+	);
+	check(
+		sprintf( '5 · et le compte reste non vérifié (%s)', $manquante ),
+		null === $cp->lire_meta( $idp, VerificationService::META_VERIFIE )
+	);
+}
 
 // ======================================================================
 // 6 · VERROU OCCUPÉ

@@ -5,6 +5,43 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.11.0] — 23 juillet 2026
+
+Socle E2.1 : comptes particuliers, rôle client et vérification du courriel.
+
+> **Aucun écran, aucun courriel, aucune page.** E2.1 est un socle technique :
+> pas d'interface HTTP, pas de shortcode, aucun envoi. Le rôle
+> `urbizen_client` n'est créé que par une commande explicite. Rien ne change
+> pour un visiteur, et les formulaires DP, PC, Conception ainsi que le cadastre
+> sont inchangés.
+
+### Ajouté
+- `src/Domain/Account/` : `Compte` (ressource), `AdresseCourriel` (valide, ne
+  normalise pas), `DemandeVerification`, `ActionVerifiee`.
+- `src/Domain/Authorization/` : `PolitiqueCompte`, `PolitiqueVerification`,
+  `PolitiqueActionVerifiee`. **Aucune ne consulte de rôle.**
+- `src/Account/` : `ComptesGateway` (port), `RoleClient`, `VerrouCompte`
+  (compare-et-échange), `LimiteEnvois`, `JetonVerification` (condensat lié au
+  compte, à la cible et à la génération), `ResultatEmission`,
+  `VerificationService`, `InscriptionService`, `AutorisationComptes`.
+- `src/Adapter/` : `WpComptes` (avec garde de promotion), `WpCliAccountsCommand`.
+- Commandes `wp urbizen accounts <status|install|verify>` — **seul point
+  d'entrée installant le rôle**.
+- `tests/comptes/` : sept bancs sans WordPress ;
+  `tests/integration/test-comptes-reel.php` avec deux courses multiprocessus.
+
+### Modifié
+- `src/Plugin.php` : enregistre les commandes de comptes et la surveillance des
+  profils.
+- `tests/domaine/test-identite.php` et `tests/submissions/test-compat.php` :
+  deux assertions **resserrées**, non affaiblies — voir le commit dédié.
+
+### Décisions
+- **D-045** — comptes WordPress sans table propre ; vérification restrictive
+  par défaut ; jeton lié à sa cible ; installation du rôle hors trafic.
+
+---
+
 ## [0.10.0] — 22 juillet 2026
 
 Socle E1 : identité, autorisation, identifiants et infrastructure de schéma.

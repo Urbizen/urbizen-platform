@@ -1700,3 +1700,54 @@ bancs d'intégration.
 **Ce qui n'est pas décidé ici.** La durée de purge des brouillons, le nom
 définitif du rôle client (introduit en E2), et le modèle des documents
 (inchangé jusqu'en E5).
+
+## D-045 — Comptes WordPress, sans table propre
+
+**Contexte.** La phase E exige un socle de comptes particuliers. D-044 a posé
+la règle : aucune table sans démonstration qu'un `user_meta` ne suffit pas.
+
+**Décision.** E2 n'a besoin que d'identité, mot de passe, session, état de
+vérification et jeton en cours. Les quatre premiers appartiennent à WordPress ;
+les deux derniers sont **mono-valués par utilisateur**, sans jointure ni tri.
+`user_meta` suffit, et la démonstration du contraire n'existe pas. **Aucune
+table n'est créée.** Les tables viendront en E3, quand apparaîtront des
+relations *utilisateur × organisation* que `user_meta` ne sait pas porter.
+
+**Conséquences.**
+
+- **`Compte` n'est pas `ActeurCourant`.** Le premier est la ressource visée,
+  le second le sujet qui agit. `Authorization::peut( 'compte.modifier', $compte )`
+  demande si l'acteur courant peut modifier ce compte-là. `Compte` ne porte donc
+  pas de rôles : ils appartiennent à celui qui agit.
+- **Le domaine valide, l'adaptateur normalise.** Reproduire `sanitize_email()`
+  dans `AdresseCourriel` l'obligerait à suivre WordPress sans jamais pouvoir le
+  vérifier ; deux normalisations divergentes valent moins qu'une seule.
+- **Absence vaut « non vérifié ».** `_urbizen_courriel_verifie` ne connaît
+  qu'une valeur, la chaîne `'1'`. Tout le reste — absente, vide, `true`, `'oui'` —
+  signifie non vérifié. L'administratrice historique est donc non vérifiée :
+  exister dans `wp_users` ne prouve pas qu'une adresse a été confirmée.
+- **Le jeton est lié à ce qu'il confirme.** Le condensat couvre identifiant,
+  cible et génération. Sans la cible, un lien émis pour une adresse en attente
+  pourrait en confirmer une autre — il suffirait de demander un changement, de
+  recevoir le lien, puis d'en demander un second avant de cliquer.
+- **Le verrou est temporaire, jamais une marque de consommation.** Une marque
+  permanente rendrait un jeton légitime inutilisable après un simple échec de
+  promotion. Le condensat n'est effacé qu'après une vérification **relue** — la
+  seule preuve d'écriture, leçon déjà payée sur les métadonnées de demande.
+- **Rien ne décide sur un état lu avant le verrou.** Le contrôle préalable est
+  un préfiltre : il évite un verrou inutile, il n'autorise rien. Cette propriété
+  se prouve par l'ORDRE des opérations, non par un entrelacement — le code
+  correct ne lisant rien avant le verrou, rien ne peut y devenir périmé.
+- **Le rôle n'est jamais installé par le trafic.** Une visite ne doit provoquer
+  aucune écriture d'installation, même principe que l'exécuteur de migrations.
+  `wp urbizen accounts install` est le chemin réel d'un déploiement, un `rsync`
+  ne déclenchant pas le crochet d'activation.
+- **Une seule capacité, `read`.** Elle sert la navigation, jamais une décision.
+  Aucune politique ne lit de rôle, et un contrôle lexical l'exige de chacune.
+- **Un échec ne détruit rien.** Un compte créé dont l'émission échoue demeure,
+  non vérifié et récupérable : le supprimer effacerait un mot de passe déjà
+  choisi par quelqu'un.
+
+**Ce qui n'est pas décidé ici.** Les écrans, les courriels et le changement
+d'adresse public appartiennent à E2.2 ; la suppression et l'anonymisation des
+comptes à la phase RGPD ; l'authentification à deux facteurs à la phase H.
