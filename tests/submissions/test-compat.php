@@ -308,12 +308,33 @@ check( 'le changelog annonce la même version', ( $mj[1] ?? '' ) === $version );
 check( 'et c’est bien son entrée la plus récente',
 	false !== strpos( $journal, '## [' . $version . ']' ) );
 
-// Aucune vue ni aucun contrôleur existant ne doit employer l'infrastructure
-// d'autorisation, qui reste inactive en E1.
-$consommateurs = array();
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle interdisait l'infrastructure d'autorisation PARTOUT hors `Domain/` et
+ * `Adapter/`. E2 ajoute `Account/AutorisationComptes.php`, dont le seul rôle
+ * est justement d'assembler le registre — un endroit unique, sans quoi deux
+ * assemblages divergents finiraient par ne pas décider pareil.
+ *
+ * L'assertion n'est pas affaiblie : son intention était que les VUES et les
+ * CONTRÔLEURS ne s'en emparent pas. Elle vise désormais ces répertoires
+ * nommément, ce qui est plus précis que « tout sauf deux exceptions » — et ne
+ * se relâchera pas à chaque nouveau répertoire de service.
+ */
+$vues_et_controleurs = array( 'src/Http/', 'src/Blocks/', 'src/Conception/', 'src/Admin/', 'src/Forms/' );
+$consommateurs       = array();
 
 foreach ( $sources as $chemin => $contenu ) {
-	if ( 0 === strpos( $chemin, 'src/Domain/' ) || 0 === strpos( $chemin, 'src/Adapter/' ) ) {
+	$vise = false;
+
+	foreach ( $vues_et_controleurs as $prefixe ) {
+		if ( 0 === strpos( $chemin, $prefixe ) ) {
+			$vise = true;
+			break;
+		}
+	}
+
+	if ( ! $vise ) {
 		continue;
 	}
 
@@ -324,6 +345,8 @@ foreach ( $sources as $chemin => $contenu ) {
 
 check( 'AUCUNE VUE NI CONTRÔLEUR N’UTILISE L’INFRASTRUCTURE INACTIVE',
 	array() === $consommateurs );
+check( 'les répertoires de vues et contrôleurs ont bien été parcourus',
+	count( $vues_et_controleurs ) === 5 );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {
