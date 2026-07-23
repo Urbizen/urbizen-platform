@@ -31,6 +31,7 @@ bancs=(
 	test-jeton.php
 	test-emission.php
 	test-verification.php
+	test-idempotence.php
 	test-inscription.php
 )
 

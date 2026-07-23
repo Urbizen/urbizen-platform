@@ -155,7 +155,7 @@ final class VerificationService {
 			}
 
 			// (3-4) Quota et délai.
-			$etat  = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+			$etat  = LimiteEnvois::etat_depuis_source( $this->lire_source_quota( $compte ) );
 			$motif = LimiteEnvois::motif_de_refus( $etat, $maintenant );
 
 			if ( '' !== $motif ) {
@@ -253,12 +253,18 @@ final class VerificationService {
 				return false;
 			}
 
-			if ( ! $this->consommer_quota( $compte, $maintenant ) ) {
+			// (2-4) Source, puis miroir. La source reconnaît l'identifiant si
+			// c'est un rejeu et n'ajoute alors aucun créneau.
+			if ( ! $this->consommer_quota( $compte, $maintenant, $emission_id ) ) {
 				return false;
 			}
 
-			// L'émission est close ; le jeton, lui, reste actif jusqu'à sa
-			// consommation ou son échéance.
+			// (5) L'émission n'est effacée QUE si source et miroir ont été
+			// écrits. C'est elle qui permet le rejeu : la supprimer sur un
+			// miroir en échec fermerait la seule porte de reprise.
+			//
+			// (6) Le jeton, lui, reste actif jusqu'à sa consommation ou son
+			// échéance.
 			return $this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 		} finally {
 			$verrou->liberer();
@@ -441,7 +447,10 @@ final class VerificationService {
 				&& (int) $generation === (int) $attente['generation']
 				&& hash_equals( (string) $attente['cible'], $cible )
 			) {
-				$this->consommer_quota( $compte, $maintenant );
+				// L'identifiant de CETTE émission est transmis : si l'appelant
+				// confirme ensuite la même, la source la reconnaîtra et le
+				// créneau ne sera pas décompté deux fois.
+				$this->consommer_quota( $compte, $maintenant, (string) $attente['id'] );
 			}
 
 			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
@@ -468,17 +477,83 @@ final class VerificationService {
 	 * @param int $maintenant Horloge.
 	 * @return bool
 	 */
-	private function consommer_quota( int $compte, int $maintenant ): bool {
-		$etat = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+	private function consommer_quota( int $compte, int $maintenant, string $emission_id ): bool {
+		$source = $this->lire_source_quota( $compte );
 
-		// Un quota illisible est réécrit proprement plutôt que conservé : on
-		// repart d'un envoi connu, jamais d'un état qu'on ne sait pas lire.
-		$base = empty( $etat['corrompue'] ) ? $etat['horodatages'] : array();
+		// Une source illisible ferme : on n'écrit pas par-dessus un état qu'on
+		// ne sait pas lire, et l'on ne repart pas d'un tableau vide — ce serait
+		// offrir une fenêtre entière à qui aurait corrompu la valeur.
+		if ( ! empty( $source['corrompue'] ) ) {
+			Logger::error( sprintf( 'confirmation refusee : quota_illisible (compte %d)', $compte ) );
 
+			return false;
+		}
+
+		$entrees = $source['entrees'];
+
+		// (2) L'identifiant y figure déjà : c'est un rejeu. On n'ajoute pas un
+		// second créneau, mais on poursuit — le miroir et l'effacement de
+		// l'émission restent peut-être à faire.
+		if ( ! LimiteEnvois::contient_emission( $entrees, $emission_id ) ) {
+			$entrees = LimiteEnvois::ajouter_emission( $entrees, $maintenant, $emission_id );
+		}
+
+		// (3) La source d'abord, toujours. Le miroir ne s'écrit jamais seul :
+		// il ne doit pas pouvoir devancer ce dont il n'est que la trace.
+		if ( ! $this->comptes->ecrire_meta( $compte, LimiteEnvois::META_SOURCE, LimiteEnvois::encoder_source( $entrees ) ) ) {
+			return false;
+		}
+
+		// (4) Le miroir est réécrit EN ENTIER depuis la source. Il n'est pas
+		// rattrapé par incréments : la première écriture qui aboutit le remet
+		// exactement à jour, quel que soit le nombre d'échecs précédents.
 		return $this->comptes->ecrire_meta(
 			$compte,
 			LimiteEnvois::META,
-			LimiteEnvois::encoder( LimiteEnvois::confirmer( $base, $maintenant ) )
+			LimiteEnvois::encoder( LimiteEnvois::horodatages_de( $entrees ) )
+		);
+	}
+
+	/**
+	 * Lit la source du quota, amorcée depuis le miroir si elle est absente.
+	 *
+	 * **Absente n'est pas corrompue.** Absente veut dire « jamais migrée » :
+	 * on amorce depuis le miroir hérité, chaque horodatage devenant `{a, e:''}`.
+	 * Corrompue veut dire « état incompris » : elle se propage, et l'appelant
+	 * refuse.
+	 *
+	 * L'amorçage reste **en mémoire** : une lecture n'écrit pas. La source
+	 * amorcée sera persistée par la première confirmation qui aboutit, avec le
+	 * créneau qu'elle ajoute.
+	 *
+	 * Le miroir n'est lu **que** dans ce cas d'amorçage, jamais en recours sur
+	 * une source corrompue : ce serait transformer un état incompris en
+	 * autorisation.
+	 *
+	 * @param int $compte Identifiant.
+	 * @return array{entrees: array<int, array{a: int, e: string}>, corrompue: bool, absente: bool}
+	 */
+	private function lire_source_quota( int $compte ): array {
+		$source = LimiteEnvois::decoder_source(
+			$this->comptes->lire_meta( $compte, LimiteEnvois::META_SOURCE )
+		);
+
+		if ( empty( $source['absente'] ) ) {
+			return $source;
+		}
+
+		$miroir = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+
+		// Un miroir hérité illisible n'autorise pas davantage : on le traite
+		// comme plein, dans le sens restrictif.
+		if ( ! empty( $miroir['corrompue'] ) ) {
+			return array( 'entrees' => array(), 'corrompue' => true, 'absente' => false );
+		}
+
+		return array(
+			'entrees'   => LimiteEnvois::amorcer_depuis_miroir( $miroir['horodatages'] ),
+			'corrompue' => false,
+			'absente'   => false,
 		);
 	}
 
