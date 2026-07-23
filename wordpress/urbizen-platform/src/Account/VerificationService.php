@@ -213,6 +213,130 @@ final class VerificationService {
 	}
 
 	/**
+	 * Enregistre une demande de changement d'adresse et prépare son émission.
+	 *
+	 * **Tout se fait sous UNE seule acquisition du verrou.** Écrire la cible
+	 * puis appeler `preparer()` — qui reverrouillerait — ouvrirait une fenêtre
+	 * entre les deux : une demande concurrente y remplacerait la cible, et le
+	 * jeton confirmerait alors une adresse que personne n'a demandée. C'est la
+	 * raison d'être de `preparer_sous_verrou()`.
+	 *
+	 * **L'adresse du compte ne bouge pas ici.** Seule `consommer()` promeut
+	 * l'adresse en attente, et `WpComptes` protège cette promotion de sa garde.
+	 * L'ancienne adresse reste donc celle du compte jusqu'à ce que le
+	 * destinataire de la nouvelle ait suivi son lien.
+	 *
+	 * **Si la préparation échoue, la cible est restaurée.** Laisser une adresse
+	 * en attente sans jeton ferait viser cette adresse jamais confirmée par le
+	 * renvoi suivant. Le tout aboutit, ou rien ne bouge.
+	 *
+	 * @param int      $compte         Identifiant.
+	 * @param string   $nouvelle_brute Adresse demandée, telle que saisie.
+	 * @param int|null $maintenant     Horloge injectable.
+	 * @return array{motif: string, ancienne: string, emission: ResultatEmission|null}
+	 */
+	public function demander_changement_adresse( int $compte, string $nouvelle_brute, ?int $maintenant = null ): array {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+		$verrou     = VerrouCompte::acquerir( $this->db, $compte, $maintenant );
+
+		if ( null === $verrou ) {
+			return self::changement_refuse( 'verrou_indisponible' );
+		}
+
+		try {
+			// Relecture SOUS verrou : tout ce qui suit décide sur cet état-là.
+			$objet = $this->comptes->trouver_par_id( $compte );
+
+			if ( null === $objet ) {
+				return self::changement_refuse( 'compte_absent' );
+			}
+
+			$ancienne = $objet->adresse()->valeur();
+
+			// Ce qu'il faudra remettre si la préparation échoue : la valeur
+			// exacte d'avant, ou son absence.
+			$precedente = $this->comptes->lire_meta( $compte, self::META_EN_ATTENTE );
+
+			$canonique = $this->comptes->canoniser( $nouvelle_brute );
+			$adresse   = AdresseCourriel::ou_null( $canonique );
+
+			if ( null === $adresse ) {
+				return self::changement_refuse( 'adresse_invalide', $ancienne );
+			}
+
+			if ( hash_equals( $ancienne, $adresse->valeur() ) ) {
+				return self::changement_refuse( 'adresse_inchangee', $ancienne );
+			}
+
+			// Le compte lui-même est écarté du contrôle : sa propre adresse ne
+			// doit pas se rendre indisponible à lui-même.
+			if ( ! $this->comptes->adresse_disponible( $adresse->valeur(), $compte ) ) {
+				// Le motif part au journal, jamais à l'utilisateur : dire
+				// « cette adresse est prise » offrirait un annuaire.
+				return self::changement_refuse( 'adresse_indisponible', $ancienne );
+			}
+
+			if ( ! $this->comptes->ecrire_meta( $compte, self::META_EN_ATTENTE, $adresse->valeur() ) ) {
+				return self::changement_refuse( 'ecriture_incomplete', $ancienne );
+			}
+
+			// Le verrou est TOUJOURS détenu : la cible qu'on vient d'écrire est
+			// celle que cette préparation lira.
+			$emission = $this->preparer_sous_verrou( $compte, $maintenant );
+
+			if ( ! $emission->est_prepare() ) {
+				$this->restaurer_en_attente( $compte, $precedente );
+
+				return self::changement_refuse( $emission->motif(), $ancienne );
+			}
+
+			Logger::info( sprintf( 'changement d adresse demande (compte %d)', $compte ) );
+
+			return array(
+				'motif'    => '',
+				'ancienne' => $ancienne,
+				'emission' => $emission,
+			);
+		} catch ( Throwable $e ) {
+			return self::changement_refuse( 'exception' );
+		} finally {
+			// Libéré AVANT tout rendu et tout envoi : un verrou de 60 secondes
+			// ne survivrait pas à un envoi SMTP.
+			$verrou->liberer();
+		}
+	}
+
+	/**
+	 * Remet l'adresse en attente dans l'état où elle était.
+	 *
+	 * @param int         $compte     Identifiant.
+	 * @param string|null $precedente Valeur d'avant, ou null si absente.
+	 * @return void
+	 */
+	private function restaurer_en_attente( int $compte, ?string $precedente ): void {
+		if ( null === $precedente || '' === $precedente ) {
+			$this->comptes->supprimer_meta( $compte, self::META_EN_ATTENTE );
+
+			return;
+		}
+
+		$this->comptes->ecrire_meta( $compte, self::META_EN_ATTENTE, $precedente );
+	}
+
+	/**
+	 * @param string $motif    Motif technique.
+	 * @param string $ancienne Adresse actuelle, si connue.
+	 * @return array{motif: string, ancienne: string, emission: ResultatEmission|null}
+	 */
+	private static function changement_refuse( string $motif, string $ancienne = '' ): array {
+		return array(
+			'motif'    => $motif,
+			'ancienne' => $ancienne,
+			'emission' => null,
+		);
+	}
+
+	/**
 	 * Confirme qu'une émission a réellement eu lieu, et consomme le quota.
 	 *
 	 * L'identifiant présenté doit être celui de l'émission encore en attente :

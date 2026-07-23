@@ -32,6 +32,7 @@ bancs=(
 	test-emission.php
 	test-verification.php
 	test-idempotence.php
+	test-changement-adresse.php
 	test-inscription.php
 )
 
