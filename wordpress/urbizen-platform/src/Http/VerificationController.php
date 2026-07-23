@@ -45,11 +45,6 @@ final class VerificationController {
 	public const BUCKET = 'verification';
 
 	/**
-	 * Compartiment du GET : plafond large, l'affichage n'a aucun effet.
-	 */
-	public const BUCKET_GET = 'verification_vue';
-
-	/**
 	 * Accroche l'action, en GET comme en POST.
 	 *
 	 * Une seule action, deux méthodes : c'est `handle()` qui les distingue.
@@ -100,22 +95,28 @@ final class VerificationController {
 			self::rediriger( 'invalide' );
 		}
 
-		// Plafond large : afficher ne coûte rien au système, mais un
-		// préchargeur emballé ne doit pas pouvoir marteler la page.
-		RateLimiter::reserve( self::BUCKET_GET, $_SERVER );
-
 		/*
-		 * On lit la cible pour l'afficher. C'est une LECTURE : le condensat
-		 * n'est ni comparé, ni effacé, et l'émission n'est pas close. Une
-		 * cible absente n'est pas une erreur affichable — la page se rend
-		 * quand même, et c'est le POST qui tranchera.
+		 * LE LIEN EST AUTHENTIFIÉ AVANT QUE QUOI QUE CE SOIT NE S'AFFICHE.
+		 *
+		 * Se contenter de la forme du jeton, puis lire la cible avec
+		 * l'identifiant fourni, suffisait à obtenir l'adresse de tout compte
+		 * ayant une vérification en cours : il n'y avait qu'à essayer des
+		 * identifiants numériques avec 64 caractères hexadécimaux quelconques.
+		 * C'est l'annuaire que tout le reste du parcours refuse de fournir.
+		 *
+		 * `inspecter()` ne consomme rien : aucune écriture, aucun verrou
+		 * écrivant, aucune clôture, aucun quota. Le GET reste sans effet.
 		 */
-		$comptes = new WpComptes();
-		$cible   = (string) $comptes->lire_meta( $lu['compte'], \Urbizen\Platform\Account\JetonVerification::META_CIBLE );
+		$service    = new VerificationService( new WpComptes(), new WpdbGateway() );
+		$inspection = $service->inspecter( $lu['compte'], $lu['jeton'] );
+
+		if ( '' !== $inspection['motif'] ) {
+			self::rediriger( self::code_public( $inspection['motif'] ) );
+		}
 
 		$urbizen_compte = $lu['compte'];
 		$urbizen_jeton  = $lu['jeton'];
-		$urbizen_cible  = $cible;
+		$urbizen_cible  = $inspection['cible'];
 
 		require URBIZEN_PLATFORM_DIR . 'templates/comptes/verification.php';
 
@@ -186,7 +187,23 @@ final class VerificationController {
 			return 'expire';
 		}
 
-		if ( 'verrou_indisponible' === $motif || 'exception' === $motif ) {
+		/*
+		 * Les échecs de PERSISTANCE ne sont pas des liens invalides. Dire
+		 * « invalide » à quelqu'un dont le lien est bon mais dont l'écriture a
+		 * échoué l'enverrait en redemander un, alors que le sien fonctionne
+		 * encore : il faut lui dire de réessayer.
+		 */
+		$indisponibles = array(
+			'verrou_indisponible',
+			'exception',
+			'quota_non_clos',
+			'promotion_echouee',
+			'ecriture_verifie_echouee',
+			'verification_non_relue',
+			'adresse_occupee',
+		);
+
+		if ( in_array( $motif, $indisponibles, true ) ) {
 			return 'indisponible';
 		}
 

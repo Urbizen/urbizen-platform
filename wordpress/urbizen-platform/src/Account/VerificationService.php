@@ -213,6 +213,68 @@ final class VerificationService {
 	}
 
 	/**
+	 * Authentifie un lien SANS RIEN CONSOMMER, ni rien écrire.
+	 *
+	 * Le GET de la page de vérification doit prouver que le lien est le bon
+	 * AVANT d'afficher l'adresse qu'il confirme. Sans cette preuve, il suffirait
+	 * d'essayer des identifiants numériques avec un jeton bien formé pour se
+	 * faire afficher l'adresse de tout compte ayant une vérification en cours —
+	 * exactement l'annuaire que le reste du parcours refuse de fournir.
+	 *
+	 * **Aucune écriture, aucun verrou écrivant, aucune clôture, aucun quota.**
+	 * La méthode lit et compare, rien de plus. Elle ne prend pas non plus
+	 * `VerrouCompte` : le verrou sert à sérialiser des ÉCRITURES, et une lecture
+	 * qui le prendrait bloquerait une émission légitime pour rien.
+	 *
+	 * Les motifs rendus sont ceux de `consommer()`, de sorte que compte absent
+	 * et jeton invalide restent indiscernables du dehors.
+	 *
+	 * @param int      $compte     Identifiant présenté.
+	 * @param string   $jeton      Jeton présenté.
+	 * @param int|null $maintenant Horloge injectable.
+	 * @return array{motif: string, cible: string}
+	 */
+	public function inspecter( int $compte, string $jeton, ?int $maintenant = null ): array {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+
+		if ( $compte <= 0 || ! JetonVerification::forme_valide( $jeton ) ) {
+			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+		}
+
+		$objet = $this->comptes->trouver_par_id( $compte );
+
+		if ( null === $objet ) {
+			// MÊME motif qu'un jeton invalide : distinguer révélerait quels
+			// identifiants correspondent à un compte.
+			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+		}
+
+		$condensat  = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CONDENSAT );
+		$expire     = $this->comptes->lire_meta( $compte, JetonVerification::META_EXPIRE );
+		$cible      = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CIBLE );
+		$generation = $this->comptes->lire_meta( $compte, JetonVerification::META_GENERATION );
+
+		if ( '' === $condensat || null === $expire || '' === $cible || null === $generation ) {
+			return array( 'motif' => 'jeton_absent', 'cible' => '' );
+		}
+
+		if ( ! JetonVerification::correspond( $condensat, $compte, $cible, (int) $generation, $jeton ) ) {
+			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+		}
+
+		if ( ! ctype_digit( (string) $expire ) || (int) $expire <= $maintenant ) {
+			return array( 'motif' => 'jeton_expire', 'cible' => '' );
+		}
+
+		if ( ! hash_equals( $objet->cible_de_verification()->valeur(), $cible ) ) {
+			return array( 'motif' => 'cible_obsolete', 'cible' => '' );
+		}
+
+		// La cible n'est rendue QU'ICI, une fois le condensat prouvé.
+		return array( 'motif' => '', 'cible' => $cible );
+	}
+
+	/**
 	 * Enregistre une demande de changement d'adresse et prépare son émission.
 	 *
 	 * **Tout se fait sous UNE seule acquisition du verrou.** Écrire la cible
@@ -528,6 +590,37 @@ final class VerificationService {
 				return 'cible_obsolete';
 			}
 
+			/*
+			 * (6 bis) LE QUOTA D'ABORD, avant toute mutation irréversible.
+			 *
+			 * Le destinataire vient de suivre le lien : c'est la preuve d'envoi
+			 * la plus forte qui soit, et le créneau doit être décompté. Le faire
+			 * APRÈS la promotion et le marquage — comme auparavant — laissait un
+			 * chemin où le compte se vérifiait, le jeton disparaissait, et le
+			 * décompte se perdait si la source ou le miroir échouait. D-046 exige
+			 * un quota exact : on refuse plutôt que de perdre un créneau.
+			 *
+			 * Rien n'est encore altéré ici. Un échec rend `indisponible` et
+			 * laisse le jeton, l'émission, l'adresse et l'état non vérifié
+			 * exactement où ils étaient : le clic est rejouable.
+			 */
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
+			);
+
+			$emission_du_jeton = null !== $attente
+				&& empty( $attente['corrompue'] )
+				&& (int) $generation === (int) $attente['generation']
+				&& hash_equals( (string) $attente['cible'], $cible );
+
+			if ( $emission_du_jeton
+				&& ! $this->consommer_quota( $compte, $maintenant, (string) $attente['id'] ) ) {
+				// Un rejeu du même clic reconnaîtra l'identifiant dans la
+				// source, réparera le miroir sans second créneau, et ira
+				// jusqu'au bout.
+				return 'quota_non_clos';
+			}
+
 			// (7) Changement d'adresse : est-elle encore libre ?
 			if ( $objet->a_un_changement_en_cours() ) {
 				if ( ! $this->comptes->adresse_disponible( $cible, $compte ) ) {
@@ -553,30 +646,9 @@ final class VerificationService {
 
 			$this->comptes->ecrire_meta( $compte, self::META_VERIFIE_LE, gmdate( 'Y-m-d H:i:s', $maintenant ) );
 
-			/*
-			 * (9) Une émission de ce jeton était-elle encore en attente ?
-			 *
-			 * Alors le courriel est bel et bien parti — le destinataire vient
-			 * d'en suivre le lien. C'est la preuve d'envoi la plus forte qui
-			 * soit, et le créneau doit être décompté ici : sans cela, cliquer
-			 * plus vite que l'appelant ne confirme rendrait le créneau gratuit,
-			 * et l'opération répétée viderait le quota de sa fonction.
-			 */
-			$attente = EmissionEnAttente::decoder(
-				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
-			);
-
-			if ( null !== $attente
-				&& empty( $attente['corrompue'] )
-				&& (int) $generation === (int) $attente['generation']
-				&& hash_equals( (string) $attente['cible'], $cible )
-			) {
-				// L'identifiant de CETTE émission est transmis : si l'appelant
-				// confirme ensuite la même, la source la reconnaîtra et le
-				// créneau ne sera pas décompté deux fois.
-				$this->consommer_quota( $compte, $maintenant, (string) $attente['id'] );
-			}
-
+			// (9) Le créneau est déjà décompté (6 bis). L'émission peut être
+			// close : une confirmation tardive de l'émetteur reconnaîtra son
+			// identifiant dans la source et n'ajoutera aucun second créneau.
 			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 
 			// (10) Le condensat n'est effacé qu'ici, après preuve.

@@ -275,4 +275,118 @@ for ( $n = 0; $n < 3; $n++ ) {
 check( '10 · source et miroir restent égaux après chaque opération réussie', $egales );
 check( '10 · trois créneaux consommés', 3 === count( source_de( $ca, $ia )['entrees'] ) );
 
+// ======================================================================
+// 11 · INSPECTION — lecture seule, et aucune fuite d'adresse
+// ======================================================================
+list( $cb, $db, $sb, $ib ) = monter_idem();
+
+$rb = $sb->preparer( $ib, $t );
+
+// Un faux jeton BIEN FORMÉ, sur un VRAI identifiant.
+$faux = str_repeat( 'ab', 32 );
+
+$insp = $sb->inspecter( $ib, $faux, $t + 1 );
+check( '11 · FAUX JETON BIEN FORMÉ : refusé', 'jeton_invalide' === $insp['motif'] );
+check( '11 · ET AUCUNE ADRESSE N\'EST RENDUE', '' === $insp['cible'] );
+
+// Compte absent : MÊME issue qu'un jeton invalide.
+check( '11 · compte absent : même motif public',
+	'jeton_invalide' === $sb->inspecter( 999999, $faux, $t + 1 )['motif'] );
+check( '11 · et aucune adresse', '' === $sb->inspecter( 999999, $faux, $t + 1 )['cible'] );
+
+check( '11 · identifiant nul refusé', 'jeton_invalide' === $sb->inspecter( 0, $faux, $t )['motif'] );
+check( '11 · jeton de forme invalide refusé',
+	'jeton_invalide' === $sb->inspecter( $ib, 'court', $t )['motif'] );
+
+// Le vrai jeton, lui, rend la bonne cible.
+$ok = $sb->inspecter( $ib, $rb->jeton(), $t + 1 );
+check( '11 · JETON VALIDE : accepté', '' === $ok['motif'] );
+check( '11 · et il rend LA BONNE CIBLE', 'claire@exemple.fr' === $ok['cible'] );
+
+// Expiré.
+check( '11 · jeton expiré rend « expire »',
+	'jeton_expire' === $sb->inspecter( $ib, $rb->jeton(), $t + 90000 )['motif'] );
+
+// ======================================================================
+// 12 · L'INSPECTION N'ÉCRIT ABSOLUMENT RIEN
+// ======================================================================
+list( $cc, $dc, $sc, $ic ) = monter_idem();
+
+$rc    = $sc->preparer( $ic, $t );
+$avant = $cc->metas[ $ic ];
+
+$sc->inspecter( $ic, $rc->jeton(), $t + 1 );
+$sc->inspecter( $ic, $faux, $t + 1 );
+$sc->inspecter( 999999, $faux, $t + 1 );
+
+check( '12 · TOUTES LES MÉTADONNÉES SONT IDENTIQUES avant et après',
+	$avant === $cc->metas[ $ic ] );
+check( '12 · l\'émission en attente est intacte',
+	null !== $cc->lire_meta( $ic, EmissionEnAttente::META ) );
+check( '12 · le quota n\'a pas bougé',
+	null === $cc->lire_meta( $ic, LimiteEnvois::META_SOURCE ) );
+check( '12 · le compte n\'est pas vérifié',
+	null === $cc->lire_meta( $ic, VerificationService::META_VERIFIE ) );
+check( '12 · le jeton reste consommable après inspection',
+	'' === $sc->consommer( $ic, $rc->jeton(), $t + 2 ) );
+
+// ======================================================================
+// 13 · LE QUOTA EST CLOS AVANT TOUTE MUTATION IRRÉVERSIBLE
+// ======================================================================
+list( $cd, $dd, $sd, $id ) = monter_idem();
+
+$rd = $sd->preparer( $id, $t );
+
+// Le destinataire clique AVANT que l'émetteur n'ait confirmé.
+check( '13 · consommation réussie', '' === $sd->consommer( $id, $rd->jeton(), $t + 1 ) );
+check( '13 · EXACTEMENT UN CRÉNEAU', 1 === count( source_de( $cd, $id )['entrees'] ) );
+check( '13 · sous l\'identifiant de l\'émission',
+	$rd->emission_id() === source_de( $cd, $id )['entrees'][0]['e'] );
+
+// Une confirmation TARDIVE de l'émetteur n'ajoute rien.
+$sd->confirmer_emission( $id, $rd->emission_id(), $t + 2 );
+check( '13 · une confirmation tardive N\'AJOUTE PAS de second créneau',
+	1 === count( source_de( $cd, $id )['entrees'] ) );
+
+// ── Échec d'écriture de la SOURCE : rien n'est vérifié ────────────────
+list( $ce, $de, $se, $ie ) = monter_idem();
+
+$re                     = $se->preparer( $ie, $t );
+$ce->ecritures_refusees = array( LimiteEnvois::META_SOURCE );
+
+check( '13 · SOURCE EN ÉCHEC : la consommation est refusée',
+	'quota_non_clos' === $se->consommer( $ie, $re->jeton(), $t + 1 ) );
+check( '13 · LE COMPTE N\'EST PAS VÉRIFIÉ',
+	null === $ce->lire_meta( $ie, VerificationService::META_VERIFIE ) );
+check( '13 · LE JETON EST CONSERVÉ',
+	null !== $ce->lire_meta( $ie, Urbizen\Platform\Account\JetonVerification::META_CONDENSAT ) );
+check( '13 · L\'ÉMISSION EST CONSERVÉE',
+	null !== $ce->lire_meta( $ie, EmissionEnAttente::META ) );
+
+// ── Source écrite, MIROIR en échec : un créneau, puis rejeu ───────────
+list( $cf, $df, $sf, $if ) = monter_idem();
+
+$rf                     = $sf->preparer( $if, $t );
+$cf->ecritures_refusees = array( LimiteEnvois::META );
+
+check( '13 · MIROIR EN ÉCHEC : la consommation est refusée',
+	'quota_non_clos' === $sf->consommer( $if, $rf->jeton(), $t + 1 ) );
+check( '13 · mais la source porte UN créneau', 1 === count( source_de( $cf, $if )['entrees'] ) );
+check( '13 · le compte n\'est toujours pas vérifié',
+	null === $cf->lire_meta( $if, VerificationService::META_VERIFIE ) );
+
+// Le rejeu du MÊME clic répare et va jusqu'au bout.
+$cf->ecritures_refusees = array();
+
+check( '13 · LE REJEU DU MÊME CLIC ABOUTIT', '' === $sf->consommer( $if, $rf->jeton(), $t + 2 ) );
+check( '13 · AUCUN SECOND CRÉNEAU', 1 === count( source_de( $cf, $if )['entrees'] ) );
+check( '13 · source et miroir sont désormais identiques',
+	LimiteEnvois::horodatages_de( source_de( $cf, $if )['entrees'] ) === miroir_de( $cf, $if ) );
+check( '13 · le compte est vérifié',
+	'1' === $cf->lire_meta( $if, VerificationService::META_VERIFIE ) );
+check( '13 · le jeton est supprimé',
+	null === $cf->lire_meta( $if, Urbizen\Platform\Account\JetonVerification::META_CONDENSAT ) );
+check( '13 · l\'émission est supprimée',
+	null === $cf->lire_meta( $if, EmissionEnAttente::META ) );
+
 verdict();

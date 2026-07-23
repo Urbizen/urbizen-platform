@@ -99,8 +99,27 @@ check( '2 · il n\'efface aucune métadonnée',
 		return false === strpos( $bloc, 'supprimer_meta' ) && false === strpos( $bloc, 'ecrire_meta' );
 	} )() );
 
-check( '2 · il ne lit la cible que pour l\'afficher',
-	false !== strpos( $source, 'META_CIBLE' ) );
+check( '2 · il AUTHENTIFIE le lien avant d\'afficher quoi que ce soit',
+	false !== strpos( $source, '->inspecter(' ) );
+check( '2 · et n\'affiche la cible que si l\'inspection a réussi',
+	( static function () use ( $source ): bool {
+		$pos_inspect = strpos( $source, '->inspecter(' );
+		$pos_cible   = strpos( $source, '$urbizen_cible' );
+
+		return false !== $pos_inspect && false !== $pos_cible && $pos_inspect < $pos_cible;
+	} )() );
+check( '2 · il ne lit plus META_CIBLE lui-même',
+	false === strpos( $source, 'META_CIBLE' ) );
+
+// ─── Le GET ne réserve plus rien ────────────────────────────────────────
+check( '2 · BUCKET_GET a disparu', false === strpos( $source, 'BUCKET_GET' ) );
+check( '2 · LE GET NE RÉSERVE AUCUN CRÉNEAU',
+	( static function () use ( $source ): bool {
+		$debut = (int) strpos( $source, 'private static function afficher(' );
+		$fin   = (int) strpos( $source, 'private static function consommer(' );
+
+		return false === strpos( substr( $source, $debut, $fin - $debut ), 'RateLimiter::' );
+	} )() );
 
 // ======================================================================
 // 3 · LE GABARIT — jeton en champ caché, aucune ressource externe
@@ -169,6 +188,16 @@ check( '6 · expiré', 'expire' === $traduire->invoke( null, 'jeton_expire' ) );
 check( '6 · verrou indisponible → indisponible',
 	'indisponible' === $traduire->invoke( null, 'verrou_indisponible' ) );
 check( '6 · exception → indisponible', 'indisponible' === $traduire->invoke( null, 'exception' ) );
+
+/*
+ * Un échec de PERSISTANCE n'est pas un lien invalide. Dire « invalide » à
+ * quelqu'un dont le lien fonctionne encore l'enverrait en redemander un pour
+ * rien : il faut lui dire de réessayer.
+ */
+foreach ( array( 'quota_non_clos', 'promotion_echouee', 'ecriture_verifie_echouee', 'verification_non_relue', 'adresse_occupee' ) as $persistance ) {
+	check( sprintf( '6 · %s → INDISPONIBLE, jamais « invalide »', $persistance ),
+		'indisponible' === $traduire->invoke( null, $persistance ) );
+}
 
 check( '6 · JETON INVALIDE ET DÉJÀ UTILISÉ RENDENT LE MÊME CODE',
 	$traduire->invoke( null, 'jeton_invalide' ) === $traduire->invoke( null, 'jeton_absent' ) );
