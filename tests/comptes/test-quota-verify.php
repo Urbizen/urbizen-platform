@@ -25,9 +25,13 @@ $GLOBALS['banc_db'] = new PasserelleOptions();
  * Passerelle qui exécute un rappel À L'ACQUISITION D'UN VERROU.
  *
  * Elle enveloppe une vraie `PasserelleOptions` — `final`, donc non héritable —
- * et déclenche le rappel au moment précis où un verrou de compte est posé,
- * c'est-à-dire APRÈS le constat initial et AVANT la relecture sous verrou.
- * C'est la fenêtre exacte qu'un processus concurrent occuperait.
+ * et déclenche le rappel JUSTE AVANT que la réparation n'acquière son verrou.
+ *
+ * L'interleaving simulé : l'autre processus termine son alignement et libère
+ * son verrou (le rappel), PUIS la réparation acquiert le sien (l'INSERT
+ * délégué). Déclencher le rappel après l'INSERT simulerait au contraire une
+ * écriture concurrente qui violerait le verrou déjà tenu — ce qui n'est pas le
+ * scénario.
  */
 final class PasserelleAlignante implements Urbizen\Platform\Schema\DatabaseGateway {
 
@@ -35,6 +39,8 @@ final class PasserelleAlignante implements Urbizen\Platform\Schema\DatabaseGatew
 
 	/** @var callable */
 	private $a_l_acquisition;
+
+	private bool $declenche = false;
 
 	public function __construct( callable $a_l_acquisition ) {
 		$this->inner           = new PasserelleOptions();
@@ -58,18 +64,33 @@ final class PasserelleAlignante implements Urbizen\Platform\Schema\DatabaseGatew
 	}
 
 	public function lignes_affectees( string $sql, array $parametres = array() ): int {
-		$pose = $this->inner->lignes_affectees( $sql, $parametres );
-
-		// Un verrou de compte vient d'être posé : on aligne le miroir, comme le
-		// ferait une confirmation concurrente qui aurait gagné la course.
-		if ( 1 === $pose
-			&& false !== strpos( $sql, 'INSERT' )
+		// AVANT de poser le verrou de la réparation : l'autre processus vient de
+		// finir et de libérer le sien. Une seule fois.
+		if ( false !== strpos( $sql, 'INSERT' )
 			&& isset( $parametres[0] )
-			&& 0 === strpos( (string) $parametres[0], Urbizen\Platform\Account\VerrouCompte::PREFIXE ) ) {
+			&& 0 === strpos( (string) $parametres[0], Urbizen\Platform\Account\VerrouCompte::PREFIXE )
+			&& ! $this->declenche ) {
+			$this->declenche = true;
 			( $this->a_l_acquisition )();
 		}
 
-		return $pose;
+		return $this->inner->lignes_affectees( $sql, $parametres );
+	}
+
+	/**
+	 * Le verrou d'un compte est-il posé dans la passerelle interne ?
+	 *
+	 * Seule observation exposée : de quoi vérifier qu'aucun verrou ne survit,
+	 * sans donner accès au reste de l'état interne.
+	 *
+	 * @param int $compte Identifiant.
+	 * @return bool
+	 */
+	public function verrou_survit( int $compte ): bool {
+		return array_key_exists(
+			Urbizen\Platform\Account\VerrouCompte::option_pour( $compte ),
+			$this->inner->options
+		);
 	}
 
 	public function table_existe( string $nom ): bool {
@@ -241,6 +262,23 @@ function compte_avec( string $source, string $miroir ): int {
 	return $id;
 }
 
+/**
+ * Le verrou d'un compte survit-il dans la passerelle INJECTÉE ?
+ *
+ * `VerrouCompte` écrit dans la `DatabaseGateway` qu'on lui donne, pas dans
+ * `WpDouble::$options`. Inspecter ce dernier réussirait même si le verrou
+ * survivait : c'est le mauvais magasin.
+ *
+ * @param int $compte Identifiant.
+ * @return bool
+ */
+function verrou_survit_banc_db( int $compte ): bool {
+	return array_key_exists(
+		Urbizen\Platform\Account\VerrouCompte::option_pour( $compte ),
+		$GLOBALS['banc_db']->options
+	);
+}
+
 $source_ok = LimiteEnvois::encoder_source(
 	array( array( 'a' => $t, 'e' => 'aaa' ), array( 'a' => $t + 10, 'e' => 'bbb' ) )
 );
@@ -341,8 +379,10 @@ CliDouble::reset();
 WpDouble::reset();
 $id7 = compte_avec( $source_ok, LimiteEnvois::encoder( array( $t ) ) );
 
-// Le verrou est déjà posé : `add_option()` refusera de le reprendre.
-Urbizen\Platform\Account\VerrouCompte::acquerir( $GLOBALS['banc_db'], $id7 );
+// Le verrou est déjà posé : `add_option()` refusera de le reprendre. On garde
+// l'objet pour le libérer ensuite, faute de quoi il polluerait la passerelle
+// partagée des scénarios suivants.
+$verrou5 = Urbizen\Platform\Account\VerrouCompte::acquerir( $GLOBALS['banc_db'], $id7 );
 
 $avant7 = CliDouble::$metas[ $id7 ];
 $err    = lancer( true );
@@ -350,6 +390,12 @@ $err    = lancer( true );
 check( '5 · VERROU INDISPONIBLE : code de sortie non nul', true === $err );
 check( '5 · signalé', false !== strpos( implode( ' ', CliDouble::$warnings ), 'verrou indisponible' ) );
 check( '5 · AUCUNE ÉCRITURE', $avant7 === CliDouble::$metas[ $id7 ] );
+check( '5 · le verrou volontaire est bien présent avant libération',
+	true === verrou_survit_banc_db( $id7 ) );
+
+// Libéré : il ne doit pas peser sur la suite.
+$verrou5->liberer();
+check( '5 · et il disparaît une fois libéré', false === verrou_survit_banc_db( $id7 ) );
 
 // ======================================================================
 // 6 · LA SOURCE N'EST JAMAIS ÉCRITE, quel que soit le scénario
@@ -388,15 +434,8 @@ CliDouble::$ecritures_refusees = array( LimiteEnvois::META );
 
 lancer( true );
 
-$verrous = 0;
-
-foreach ( WpDouble::$options as $cle => $valeur ) {
-	if ( 0 === strpos( (string) $cle, Urbizen\Platform\Account\VerrouCompte::PREFIXE ) ) {
-		$verrous++;
-	}
-}
-
-check( '7 · AUCUN VERROU NE SURVIT à une sortie en erreur', 0 === $verrous );
+check( '7 · AUCUN VERROU NE SURVIT à une sortie en erreur — dans la passerelle INJECTÉE',
+	false === verrou_survit_banc_db( $id8 ) );
 
 // ======================================================================
 // 8 · CONCURRENCE RÉELLE — le miroir s'aligne À L'ACQUISITION DU VERROU
@@ -442,6 +481,7 @@ check( '8 · AUCUNE ÉCRITURE N\'EST MÊME TENTÉE — la relecture pré-écritu
 check( '8 · le miroir posé par la course tient',
 	$miroir_ok === CliDouble::$metas[ $id9 ][ LimiteEnvois::META ] );
 check( '8 · la source est intacte', $source_ok === CliDouble::$metas[ $id9 ][ LimiteEnvois::META_SOURCE ] );
+check( '8 · le verrou de la réparation a été libéré', false === $db_conc->verrou_survit( $id9 ) );
 
 // ======================================================================
 // 9 · ÉCRITURE « RÉUSSIE » MAIS RELECTURE DIVERGENTE
@@ -513,14 +553,13 @@ check( '10 · AUCUNE réparation n\'est annoncée',
 check( '10 · la source reste intacte', $source_vide === CliDouble::$metas[ $id13 ][ LimiteEnvois::META_SOURCE ] );
 
 // ── Le verrou est libéré dans TOUS ces cas ────────────────────────────
-$verrous_survivants = 0;
-
-foreach ( WpDouble::$options as $cle => $valeur ) {
-	if ( 0 === strpos( (string) $cle, Urbizen\Platform\Account\VerrouCompte::PREFIXE ) ) {
-		$verrous_survivants++;
-	}
-}
-
-check( '10 · aucun verrou ne survit à la réparation d\'un miroir corrompu', 0 === $verrous_survivants );
+// Les trois comptes sont passés par `lancer()`, donc par la passerelle
+// injectée `$GLOBALS['banc_db']` — c'est là qu'un verrou survivrait.
+check( '10 · aucun verrou ne survit (compte source vide + miroir corrompu, lecture seule)',
+	false === verrou_survit_banc_db( $id11 ) );
+check( '10 · aucun verrou ne survit (réparation d\'un miroir corrompu)',
+	false === verrou_survit_banc_db( $id12 ) );
+check( '10 · aucun verrou ne survit (écriture non retenue)',
+	false === verrou_survit_banc_db( $id13 ) );
 
 verdict();
