@@ -1782,3 +1782,176 @@ relations *utilisateur × organisation* que `user_meta` ne sait pas porter.
 **Ce qui n'est pas décidé ici.** Les écrans, les courriels et le changement
 d'adresse public appartiennent à E2.2 ; la suppression et l'anonymisation des
 comptes à la phase RGPD ; l'authentification à deux facteurs à la phase H.
+
+## D-046 — Le parcours public des comptes n'ouvre que quatre portes
+
+**Contexte.** E2.1 a posé un socle complet mais entièrement fermé : aucun écran,
+aucune route, aucun courriel. Le code existe, il est éprouvé, et rien ne
+l'appelle en production. E2.2 ouvre ce socle au public, et c'est le moment où
+les erreurs cessent d'être théoriques.
+
+**Décision.** E2.2 livre **quatre parcours, et rien d'autre** : inscription d'un
+particulier, émission et renvoi du courriel de vérification, consommation du
+lien, changement d'adresse. L'authentification, la session, la reconnaissance
+par adresse et la réinitialisation du mot de passe restent à **WordPress** :
+E2.2 n'écrit aucun mécanisme de session, aucun cookie, aucun jeton
+d'authentification.
+
+**Conséquences.**
+
+- **Une vérification réussie ne connecte pas.** Donner une session à quiconque
+  suit un lien reçu par courriel ferait de l'accès à une boîte un accès au
+  compte. Le lien confirme une adresse ; il n'ouvre rien.
+- **La réponse d'inscription ne dépend pas de l'existence de l'adresse.**
+  Accepter de dire « cette adresse est déjà prise » offrirait un annuaire de la
+  clientèle à qui prendrait la peine de sonder. Inscription et renvoi public
+  rendent le même code 303, la même page et le même message, que l'adresse soit
+  libre, prise non vérifiée, prise vérifiée, ou que le quota soit épuisé.
+- **Le renvoi public passe par l'action d'inscription.** `InscriptionService`
+  sait déjà relancer un compte non vérifié et refuser un compte vérifié ; une
+  seconde action ferait une seconde règle à tenir en cohérence. Le renvoi
+  demandé depuis une session ouverte, lui, est une action distincte soumise à
+  une politique.
+- **Le lien ne consomme rien en GET.** La page affiche l'adresse concernée et un
+  bouton, sans toucher au jeton ; la consommation part en POST. Un lien qui
+  vérifierait en GET serait consommé par le premier antivirus de messagerie ou
+  préchargeur qui le suit, et le client recevrait un lien mort sans avoir rien
+  fait.
+- **L'ancienne adresse reste celle du compte jusqu'à la consommation.** Le
+  changement écrit `_urbizen_courriel_en_attente` puis émet un jeton vers la
+  **nouvelle** adresse ; la promotion n'a lieu qu'à la consommation, et
+  `WpComptes` la protège de sa garde. L'ancienne adresse est prévenue du
+  changement demandé, **sans lien ni jeton** — c'est le seul avertissement dont
+  dispose quelqu'un dont la boîte a été compromise.
+- **Un seul chemin de code émet, et il ne connaît pas `wp_mail()`.**
+  `EnvoiVerification` reçoit un `MailTransport` par construction et appelle le
+  contrat existant sans le modifier. Le contrôle lexical de
+  `tests/submissions/test-compat.php` reste **inchangé au caractère près** ;
+  E2.2 lui ajoute un contrôle **additif** exigeant que `MailTransport::send()`
+  ne soit appelé, dans le domaine des comptes, que depuis `EnvoiVerification`.
+- **Une exception du transport est un échec, sans distinction.** `ok = false` et
+  une exception mènent au même appel, `annuler_emission()`, immédiatement. La
+  laisser remonter laisserait l'émission en vol jusqu'à son expiration : le
+  compte resterait fermé cinq minutes après un envoi qui n'a jamais eu lieu, et
+  le quota serait juste mais le client bloqué sans raison.
+- **Après `ok = true`, l'annulation est interdite, sans exception.** Le message a
+  été accepté par le transport et le lien est peut-être déjà dans une boîte ;
+  annuler détruirait le jeton d'un lien vivant. Un échec de
+  `confirmer_emission()` est **journalisé**, l'émission en attente reste posée,
+  et elle sera rejouée ou expirera. Le seul risque est un créneau non décompté ;
+  le risque inverse serait un client bloqué avec un lien mort.
+- **Le verrou n'est pas tenu pendant l'envoi.** Tenir un verrou de 60 secondes
+  pendant un envoi SMTP le ferait expirer en cours de route. C'est précisément
+  la raison d'être de l'émission en attente.
+- **`admin-post.php`, pas de route REST.** Une route REST imposerait `fetch()`,
+  donc JavaScript, sur un parcours qui doit rester accessible. Chaque action
+  répond par une **redirection 303** vers une page de résultat générique, dont
+  l'URL ne porte ni adresse, ni jeton, ni motif technique. `admin_post_nopriv_*`
+  n'est déclaré que pour les trois actions réellement anonymes : un visiteur
+  déconnecté ne doit pas même atteindre le code des deux actions de session.
+- **La politique n'intervient pas sur les actes anonymes.** Une politique répond
+  à la question « cet acteur peut-il agir sur cette ressource ». À l'inscription
+  il n'y a ni acteur ni ressource ; au renvoi public l'appelant n'a rien prouvé ;
+  à la consommation, l'autorisation **est** la validation du condensat par
+  `VerificationService::consommer()`. Y superposer `AutorisationComptes`
+  donnerait l'illusion d'un contrôle supplémentaire là où le vrai contrôle est
+  déjà cryptographique.
+- **Le nonce anonyme n'est pas une protection et ne sera pas présenté comme
+  telle.** WordPress calcule les nonces à partir de l'identifiant de
+  l'utilisateur, qui vaut **zéro pour tout visiteur déconnecté** : c'est une
+  valeur partagée, obtenue en chargeant la page publique, et rejouable. La
+  protection des actions anonymes repose sur un empilement dont aucun étage ne
+  suffit seul — contrôle de méthode, nonce, jeton anti-robot du socle de
+  formulaires, limitation par origine réseau, réponse uniforme, `LimiteEnvois`
+  par compte. Sur les deux actions de session, le nonce redevient une protection
+  CSRF liée à l'utilisateur, et il **s'ajoute** à la politique métier.
+- **La clé d'idempotence vit dans le même enregistrement que l'effet.**
+  `_urbizen_verif_envois` ne portait que des horodatages : si l'écriture du
+  quota réussissait et que l'effacement de l'émission échouait, une seconde
+  confirmation décomptait un second créneau. `_urbizen_verif_emissions` devient
+  la **source de vérité**, seule lue pour décider, et porte `{a, e}` —
+  horodatage et identifiant d'émission. Un marqueur séparé n'aurait fait que
+  déplacer la fenêtre.
+- **Le miroir n'est jamais lu pour décider, et jamais un recours.**
+  `_urbizen_verif_envois` reste écrit au format 0.11.0, réécrit **en entier**
+  depuis la source à chaque confirmation qui aboutit. Lire le miroir pour
+  « sauver » une source corrompue transformerait un état incompris en
+  autorisation, c'est-à-dire exactement l'inversion contre laquelle tout le
+  reste est bâti.
+- **Absente ≠ corrompue.** Source absente : amorçage depuis le miroir, chaque
+  horodatage devenant `{a: t, e: ""}`. Source corrompue : `quota_illisible`,
+  refus, aucune émission jusqu'à intervention. Un identifiant vide ne peut
+  jamais correspondre, donc les créneaux hérités **bornent sans autoriser** —
+  c'est la direction sûre.
+- **Au-delà de `MAX`, l'état est corrompu, et un quota corrompu est traité comme
+  plein.** On ne tronque pas silencieusement : tronquer choisirait quelles
+  émissions oublier, ce qui est exactement la décision qu'on n'a pas les moyens
+  de prendre.
+- **L'émission en attente n'est effacée que si source et miroir ont été
+  écrits.** C'est elle qui permet le rejeu ; le rejeu reconnaît l'identifiant,
+  saute l'ajout, réécrit le miroir et efface l'émission, **sans second
+  créneau**.
+- **Bornes réelles.** Sous 0.12.0 le quota est exact en toutes circonstances. Le
+  miroir peut être en retard d'un nombre quelconque de confirmations — de 0 à
+  `MAX` entrées — sans effet sur aucune décision ; son seul effet est un retour
+  arrière en 0.11.0, où le code hérité sous-compterait jusqu'à `MAX` créneaux.
+  À la montée 0.11.0 → 0.12.0, une confirmation restée en suspens sera rejouée
+  sans que son identifiant soit reconnu et ajoutera **un créneau de trop**, une
+  seule fois par compte, dans le sens restrictif.
+- **Aucune purge de quota.** Purger détruit un mécanisme de sécurité et le
+  besoin ne le justifie pas. `wp urbizen accounts quota-verify` est en **lecture
+  seule** par défaut et rend un code de sortie non nul en cas de divergence ;
+  `--repair-mirror` réécrit le **miroir seul** depuis la source, ne touche
+  jamais la source, ne supprime aucun créneau et ne peut donc jamais élargir un
+  droit.
+- **Aucun `sleep()`, aucun délai artificiel.** Une attente fixe ne masque pas le
+  canal : le temps d'un envoi réel varie de plusieurs ordres de grandeur, et une
+  constante choisie au hasard est soit trop courte pour couvrir la variance,
+  soit assez longue pour devenir une arme — chaque requête de sondage
+  immobiliserait un processus PHP, transformant la protection en amplificateur
+  de saturation.
+- **Le canal temporel résiduel est réel et demeure exploitable.** Une
+  inscription sur adresse libre crée un utilisateur et remet un message au
+  transport ; sur adresse déjà vérifiée, elle sort presque aussitôt. L'écart est
+  mesurable, et **une origine distribuée le rend praticable** en échappant à la
+  limitation par origine. E2.2 **réduit** ce canal, elle ne le ferme pas. Le
+  fermer supposerait une mise en file uniforme et un envoi hors requête, à
+  démontrer et à éprouver ; son absence est un risque **assumé et consigné**,
+  non un point réglé. Les bancs n'éprouvent donc que ce qui est vrai et stable :
+  corps et statuts **identiques à l'octet près**.
+- **La page portant le jeton ne fuit pas par ses en-têtes.**
+  `nocache_headers()`, `Cache-Control: private, no-store, max-age=0`,
+  `Referrer-Policy: no-referrer` — sans quoi le jeton partirait dans le `Referer`
+  de la première ressource externe — `X-Robots-Tag: noindex, nofollow` doublé
+  d'un `<meta name="robots">`, aucun contenu tiers ni police distante, aucune
+  journalisation applicative du jeton, et après le POST une redirection 303 vers
+  une URL **nettoyée**.
+- **Le jeton reste néanmoins dans les journaux d'accès, et ce n'est pas
+  masqué.** Le parcours devant fonctionner sans JavaScript, le lien porte le
+  jeton dans sa chaîne de requête ; un fragment `#` ne serait pas lisible par un
+  formulaire sans script. Le risque se formule exactement : quiconque peut lire
+  les journaux d'accès, dans les 24 heures de validité et **avant** que le
+  destinataire n'ait cliqué, peut consommer le jeton à sa place. Ce qui le
+  borne : la validité de 24 heures, l'usage unique, l'invalidation à la
+  consommation, et le fait qu'une vérification ne donne aucune session. Le
+  supprimer demanderait du JavaScript ou un code court saisi à la main — deux
+  options qui restent un arbitrage ouvert.
+- **La consommation distingue quatre issues seulement** : succès, lien expiré,
+  lien invalide ou déjà utilisé, indisponible. La fusion des deux derniers n'est
+  pas une coquetterie : les séparer révélerait qu'un compte donné existe et n'a
+  pas de jeton en cours.
+- **Une assertion historique est resserrée, non affaiblie.** Celle d'E2.1 qui
+  exige qu'aucune vue ni contrôleur n'utilise l'infrastructure d'autorisation
+  sera réécrite pour **nommer les deux seuls contrôleurs** autorisés à le faire,
+  inventoriée et justifiée dans un commit dédié, puis réprouvée par mutation —
+  même procédure qu'en E2.1.
+- **Dix-neuf mutations obligatoires**, dont chacune doit faire tomber un
+  contrôle **nommé**, et aucun fichier muté ne doit subsister.
+- **Les pages WordPress portant les shortcodes sont un geste d'exploitant.**
+  Aucune page n'est créée ni publiée par le code.
+
+**Ce qui n'est pas décidé ici.** L'espace client et son tableau de bord ; le
+rattachement des demandes existantes à un compte ; la suppression et
+l'anonymisation RGPD ; les organisations et l'espace professionnel ;
+l'authentification à deux facteurs ; la réinitialisation du mot de passe,
+laissée à WordPress ; toute table propre, qui reste soumise à D-044.
