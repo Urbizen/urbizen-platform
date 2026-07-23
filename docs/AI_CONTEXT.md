@@ -184,6 +184,10 @@ Trois conséquences à retenir :
    requêtes partent du navigateur du visiteur vers l'IGN. L'adresse saisie et la
    parcelle confirmée restent dans l'onglet (`sessionStorage`, clé préfixée
    `urbizen:`), effaçables par `UrbizenCadastre.clearStored()`.
+   *Ceci vaut tant que D-047 n'est pas mise en œuvre : son lot 1 fait récupérer la
+   géométrie par le serveur, à partir du seul identifiant de parcelle, et son lot 3
+   ajoute Panoramax à la liste des services externes. Ce constat devra alors être
+   réécrit.*
 2. **Toute panne se voit** : délai maximal de 8 s par requête, puis message
    explicite — recherche indisponible, aucune adresse trouvée, carte
    momentanément indisponible, lecture de parcelle impossible.
@@ -214,7 +218,9 @@ parcel         communeCode, prefix, section, number, id, surfaceM2
 Cinq points à ne pas oublier :
 
 1. **Pas de géométrie.** Exclue du contrat 1.0, faute d'usage en aval. Elle
-   reste en interne pour le tracé sur la carte.
+   reste en interne pour le tracé sur la carte. D-047 ne rouvre pas ce contrat :
+   la géométrie sera refaite côté serveur depuis l'identifiant, jamais transmise
+   par le navigateur.
 2. **Deux codes commune distincts** : `address.cityCode` vient du géocodeur,
    `parcel.communeCode` de la parcelle. Jamais fusionnés, jamais substitués.
    Une divergence est signalée, pas corrigée.
@@ -308,3 +314,11 @@ scripts/                 à créer
   redirection 301, jamais sans.
 - Les 4 entrées Fluent Forms sont des données personnelles réelles : à exporter
   chiffrées, hors dépôt, avant toute désactivation.
+- Aucune pièce graphique (DP1–DP8, PCMI1–PCMI8) n'est produite à ce jour, et
+  l'extension n'appelle jamais `backend/dp-service/` : `src/Backend/` est vide.
+- La nomenclature DP6/DP7/DP8 de `frontend/formulaires/dp-formulaire.html` est
+  décalée d'un rang par rapport à `backend/dp-service/documents.py`, qui fait foi ;
+  `_image_to_pdf()` détruit par ailleurs l'EXIF utile (orientation et données GPS),
+  et le HEIC n'est pas pris en charge.
+- D-047 documente l'architecture cible de la préparation assistée des pièces ;
+  aucun de ses lots n'est implémenté à ce jour.

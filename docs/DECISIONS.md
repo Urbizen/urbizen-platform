@@ -1955,3 +1955,219 @@ rattachement des demandes existantes à un compte ; la suppression et
 l'anonymisation RGPD ; les organisations et l'espace professionnel ;
 l'authentification à deux facteurs ; la réinitialisation du mot de passe,
 laissée à WordPress ; toute table propre, qui reste soumise à D-044.
+
+## D-047 — Préparation assistée et vérifiable des pièces d'urbanisme
+
+**Contexte.** Le dépôt sait recueillir une demande et constituer un PDF :
+`backend/dp-service/` produit notice, bordereau et assemblage, et convertit les
+photographies en pages. Il ne remplit aucun Cerfa — les mappings de `cerfa.py` sont
+tous en `TODO_` — et l'extension ne l'appelle jamais : `src/Backend/` est vide. Le
+composant cadastre obtient déjà de l'IGN l'adresse, la parcelle et sa géométrie, mais
+**depuis le navigateur du visiteur**, et la géométrie est explicitement exclue du
+contrat 1.0 (D-009). Aucune pièce graphique n'est produite. La question n'est donc pas
+d'améliorer une automatisation existante, mais de décider ce que l'on automatise, ce
+que l'on assiste, et ce que l'on refuse d'automatiser.
+
+**Décision.** Les pièces se répartissent en **trois niveaux**, et rien ne passe de l'un
+à l'autre sans une nouvelle décision.
+
+**Niveau 1 — automatisation forte.** Une fois les entrées nécessaires **obtenues et
+validées**, la génération est **déterministe** et ne demande **aucun dessin manuel** :
+deux exécutions sur les mêmes entrées rendent la même pièce. Cela ne signifie pas
+« sans intervention humaine » : la confirmation de la référence cadastrale est un acte
+de la personne, et c'est lui qui ouvre le niveau 1.
+
+| Pièce | Entrées |
+|---|---|
+| Recherche et confirmation de la référence cadastrale | adresse saisie, **confirmation par la personne** |
+| Géométrie de la parcelle, **récupérée par le serveur** | identifiant de parcelle |
+| DP1/PCMI1 — plan de situation | géométrie serveur, fond cartographique |
+| Préremplissage des Cerfa | champs du formulaire, références cadastrales |
+| Bordereau des pièces | inventaire des pièces réellement jointes |
+| Mise en page, légendes et classement des photographies | fichiers fournis par le client |
+
+**Niveau 2 — automatisation assistée, validation humaine obligatoire.** Le système
+propose, une personne d'Urbizen relit, corrige et valide. **Aucune de ces pièces ne
+part sans cette validation**, et la validation est un acte tracé — identité et date —
+non une case cochée par défaut.
+
+| Pièce | Produite à partir de |
+|---|---|
+| DP2/PCMI2 — plan de masse | implantation saisie : emprise, dimensions, orientation, distances aux limites, accès, stationnement, arbres, réseaux |
+| DP3/PCMI3 — coupe du terrain et de la construction | implantation et altimétrie |
+| DP4/PCMI5 — façades et toiture | modèles et données du projet |
+| DP5, DP6/PCMI6 — représentation et insertion | modèles, photographies, données du projet |
+| DP7/DP8, PCMI7/PCMI8 — planches photographiques | photographies fournies, repérage sur plan |
+| Notice descriptive (PCMI4) | formulaire, préremplie puis relue |
+
+**Niveau 3 — ce qui n'est pas automatisé, et ne le sera pas ici.** Ces limites ne sont
+pas des réserves de prudence : ce sont des règles opposables, chacune devant être tenue
+par un contrôle nommé.
+
+- **Le cadastre n'est jamais présenté comme une délimitation juridique de propriété.**
+  Le parcellaire est une donnée **fiscale**, **millésimée** et périodiquement
+  actualisée, dont la contenance est indicative. Toute pièce et toute interface qui
+  l'affichent portent cette mention. Seul un géomètre-expert borne une limite.
+- **Aucune promesse de plans architecturaux entièrement automatiques.** Ni dans le
+  produit, ni dans la documentation, ni dans un support commercial.
+- **Les plans définitifs sont contrôlés, réalisés ou validés et fournis par Urbizen.**
+  Une pièce de niveau 2 non validée est un brouillon interne, jamais un livrable.
+- **Aucune transmission automatique à l'administration.** Le dépôt sur le guichet
+  dématérialisé reste un acte humain, vérifié et signé. Le système ne détient aucun
+  identifiant de téléprocédure.
+- **Le serveur récupère lui-même les données officielles.** Une géométrie envoyée par
+  le navigateur n'est jamais acceptée, pour une pièce ni pour un calcul. C'est
+  l'application de D-013 à la donnée géographique : ce qui vient du navigateur est une
+  **intention**, jamais une source.
+- **La provenance est conservée avec la donnée.** Source, date de récupération,
+  références et version du référentiel sont conservées **intégralement dans les
+  métadonnées du dossier**. Sur la pièce elle-même, seules sont reproduites **la date,
+  la source et les attributions nécessaires** : une planche surchargée de références
+  techniques devient illisible. Une pièce dont la provenance n'est pas retrouvable
+  n'est pas auditable.
+- **Les cas limites sont traités explicitement, jamais par un repli silencieux :**
+  adresse ambiguë — la personne tranche, le système ne choisit pas ; projet sur
+  plusieurs parcelles — plusieurs identifiants, jamais une fusion inventée ;
+  indisponibilité d'une API — la pièce n'est pas produite et le motif est affiché,
+  plutôt qu'une pièce fausse ou une géométrie périmée.
+
+---
+
+**Planches photographiques — DP7/DP8 et PCMI7/PCMI8.**
+
+C'est une **préparation assistée**, jamais une garantie automatique de conformité
+administrative. Le système propose des points de vue et des images candidates ; il ne
+certifie rien.
+
+- **La source principale reste une photographie récente fournie par le client.** Tout le
+  reste est un préremplissage. **Le remplacement par une photographie téléversée par le
+  client est possible à tout moment**, sur chaque planche, sans condition.
+- **Deux points de prise de vue sont proposés automatiquement** : environnement proche
+  et paysage lointain, chacun avec son orientation et ses consignes de prise de vue.
+- **Une image est refusée, ou soumise à remplacement**, lorsqu'elle est trop ancienne,
+  ne montre pas clairement le terrain, est obstruée, est prise depuis un angle
+  inadéquat, ou ne correspond plus à l'état actuel du terrain.
+
+**Deux actes de validation distincts, et le second est bloquant.**
+
+| Acte | Qui | Objet |
+|---|---|---|
+| Confirmation | le client | la photographie correspond bien à son terrain et à son **état actuel** |
+| Validation | Urbizen | **aptitude administrative** et cadrage de la pièce |
+
+L'assemblage définitif du dossier **reste bloqué tant que la validation Urbizen
+manque**. La confirmation du client ne s'y substitue jamais : elle porte sur ce que le
+client est seul à savoir, l'état réel du terrain ; la validation Urbizen porte sur ce
+qu'il n'a pas à connaître, la recevabilité de la pièce.
+
+**Google Street View — ce qui est garanti, et ce qui ne peut pas l'être.**
+
+Street View est une **aide visuelle ponctuelle** et rien d'autre. Un contrôle lexical
+seul serait une fausse garantie : il ne reconnaîtra jamais une capture d'écran Street
+View téléversée comme un fichier ordinaire. La décision ne garantit donc que ce qui est
+**techniquement démontrable** :
+
+- **aucun appel ni endpoint Google Street View dans le code** ;
+- **aucune récupération, conservation ou fourniture d'image Google par Urbizen** ;
+- **liste fermée des sources internes autorisées à l'assemblage** — une image dont la
+  source n'est pas dans cette liste n'entre pas dans un document ;
+- **provenance obligatoire pour toute image proposée par le système** ;
+- **attestation de droits et contrôle humain pour tout fichier téléversé** — c'est la
+  seule barrière qui puisse répondre d'une capture d'écran, et elle est humaine.
+
+Le contrôle lexical **complète** ce dispositif ; il n'en est pas le fondement et ne
+doit jamais être présenté comme suffisant.
+
+**Panoramax — un seul point d'entrée dans le premier périmètre.**
+
+Panoramax peut proposer une image de remplacement ou de préremplissage là où la
+couverture existe. Dans le premier périmètre, **`panoramax.ign.fr` est la seule instance
+automatisée autorisée**, sous **Licence Ouverte 2.0**. Les autres instances et les
+licences CC-BY-SA restent **hors périmètre** jusqu'à une analyse distincte : une
+obligation de partage à l'identique ne s'introduit pas par accident dans un dossier
+client.
+
+**Toute image Panoramax porte sa fiche de provenance**, conservée et affichée :
+identifiant, instance source, auteur, licence, URL, date de prise de vue, date de
+récupération.
+
+**Report du point et de l'angle — trois métadonnées distinctes, à ne pas confondre.**
+
+| Métadonnée | Ce qu'elle donne | Ce qu'elle ne donne pas |
+|---|---|---|
+| `Orientation` | la rotation ou le retournement à appliquer aux **pixels** | **aucune** information sur la direction de visée |
+| `GPSLatitude`, `GPSLongitude` | le **point** de prise de vue | la direction |
+| `GPSImgDirection` | la **direction** de visée, lorsqu'elle existe | rien si absente, et sa fiabilité est variable |
+
+Confondre `Orientation` avec l'angle de prise de vue produirait des flèches fausses sur
+les plans. **Quand `GPSImgDirection` est absente ou insuffisamment fiable, la direction
+est saisie ou confirmée à la main sur la carte** — la flèche n'est jamais devinée.
+
+**Toutes ces métadonnées sont des entrées non fiables.** Elles proviennent d'un fichier
+fourni : types, plages et coordonnées sont validés, et une confirmation humaine
+intervient avant tout report sur une pièce.
+
+Le point et l'angle sont reportés **sur le plan de situation dès le lot 3** ; le report
+**sur le plan de masse arrive avec le lot 4**, qui le produit.
+
+**Prérequis du lot photographique, consignés et non traités ici :**
+
+1. Corriger la nomenclature du formulaire DP — DP6 insertion, DP7 environnement proche,
+   DP8 paysage lointain.
+2. Extraire les informations EXIF utiles depuis l'original **avant toute conversion**.
+3. Appliquer l'orientation EXIF (rotation des pixels) avant génération.
+4. Obtenir le **consentement** avant d'exploiter ou de conserver la géolocalisation.
+5. Ne conserver que les données nécessaires au dossier, **pas l'intégralité des
+   métadonnées EXIF**.
+6. Prendre en charge le HEIC, ou prévoir une conversion guidée côté client.
+7. Mettre en place le dispositif Street View ci-dessus : absence d'appel et d'endpoint,
+   liste fermée des sources à l'assemblage, provenance obligatoire, attestation de
+   droits et contrôle humain au téléversement — le contrôle lexical en complément.
+
+---
+
+**Conséquences.**
+
+- **Seul l'identifiant traverse le formulaire ; la géométrie est refaite côté serveur.**
+  Le navigateur transmet ce qu'il transmet déjà — identifiant de parcelle, code INSEE,
+  section, numéro — et le serveur réinterroge l'IGN. **Le contrat 1.0 de D-009 n'est pas
+  rouvert** et la géométrie n'y entre pas.
+- **Le composant cadastre cesse d'être le seul appelant de l'IGN.** Aujourd'hui aucune
+  donnée ne parvient à un serveur Urbizen depuis ce composant ; demain l'identifiant y
+  parvient, et c'est notre serveur qui interroge l'IGN. On déplace un appel du visiteur
+  vers nous, ce qui nous rend responsables du cache, de la rétention et du quota. La
+  politique de confidentialité et AI_CONTEXT devront le refléter **au moment de la
+  livraison**, pas avant.
+- **Panoramax devient un service externe supplémentaire**, avec ses quotas, sa couverture
+  inégale et ses obligations d'attribution. Il rejoindra le tableau des services externes
+  d'AI_CONTEXT quand il sera réellement appelé.
+- **Les données officielles sont mises en cache, et le cache est daté.** Un cache expiré
+  ne produit pas une pièce périmée : il déclenche une nouvelle récupération, ou un refus.
+- **Une pièce de niveau 2 non validée n'est jamais livrable.** L'état de validation vit
+  avec la pièce, porte l'identité du valideur et la date, et son absence bloque
+  l'assemblage du dossier final.
+- **Le préremplissage Cerfa est déterministe mais aujourd'hui inopérant.** Les mappings
+  de `cerfa.py` sont tous en `TODO_`.
+- **La conversion d'image actuelle détruit l'EXIF utile.** `_image_to_pdf()` convertit en
+  RGB puis réenregistre en JPEG : orientation et données GPS disparaissent. Le lot 3 ne
+  peut pas s'appuyer dessus en l'état.
+- **Aucune table n'est créée par cette décision.** D-044 s'applique.
+
+**Ordre de réalisation et dépendances techniques — deux choses différentes.** L'ordre
+1 → 5 est un ordre **choisi** ; il n'est pas la carte des dépendances. Plusieurs lots
+peuvent avancer en parallèle dès que leurs dépendances propres sont tenues.
+
+| Lot | Contenu | Dépendance technique réelle |
+|---|---|---|
+| 1 | DP1/PCMI1 — plan de situation, géométrie serveur | pont HTTP authentifié |
+| 2 | Cerfa préremplis, bordereau, notice | mappings `cerfa.py` et données validées — **pas le lot 1** |
+| 3 | Planches photographiques DP7/DP8, PCMI7/PCMI8 | lot 1 pour le report sur le plan de situation, plus ses sept prérequis — **pas le lot 2** |
+| 4 | Éditeur simple d'implantation, puis DP2/PCMI2 | lot 1 |
+| 5 | Coupe, façades, insertion — DP3/PCMI3, DP4/PCMI5, DP5, DP6/PCMI6 | lot 4 |
+
+**Ce qui n'est pas décidé ici.** Le choix des référentiels altimétriques et des fonds
+cartographiques imprimables ; le format d'échange de l'implantation ; la technologie de
+rendu des pièces graphiques ; le modèle de stockage des versions de pièces ; le seuil
+d'ancienneté au-delà duquel une photographie est refusée ; l'ouverture à d'autres
+instances Panoramax et aux licences CC-BY-SA ; la tarification des lots ; le dépôt sur
+le guichet dématérialisé, qui reste hors du système.
