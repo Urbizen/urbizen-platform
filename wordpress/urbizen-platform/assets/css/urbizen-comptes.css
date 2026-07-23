@@ -1,0 +1,81 @@
+/*
+ * Styles des parcours de comptes.
+ *
+ * Chargés LOCALEMENT. Aucune police distante, aucun import externe : ces pages
+ * portent un jeton dans leur URL, et toute requête sortante l'emporterait dans
+ * son en-tête `Referer`.
+ */
+
+.urbizen-comptes-page {
+	margin: 0;
+	padding: 2rem 1rem;
+	background: #F7F8F6;
+	color: #14233B;
+	font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+	line-height: 1.55;
+}
+
+.urbizen-comptes-carte {
+	max-width: 34rem;
+	margin: 0 auto;
+	padding: 1.75rem;
+	background: #FFF;
+	border: 1px solid #C9D3DD;
+	border-radius: 6px;
+}
+
+.urbizen-comptes-carte h1 {
+	margin: 0 0 1rem;
+	font-size: 1.35rem;
+	color: #14233B;
+}
+
+.urbizen-comptes-carte p {
+	margin: 0 0 1rem;
+}
+
+.urbizen-comptes label {
+	display: inline-block;
+	margin-bottom: 0.25rem;
+	font-weight: 500;
+}
+
+.urbizen-comptes input[type="email"],
+.urbizen-comptes input[type="password"] {
+	width: 100%;
+	max-width: 100%;
+	padding: 0.55rem 0.65rem;
+	border: 1px solid #C9D3DD;
+	border-radius: 4px;
+	font: inherit;
+	box-sizing: border-box;
+}
+
+.urbizen-comptes button,
+.urbizen-comptes-carte button {
+	padding: 0.55rem 1.1rem;
+	border: 0;
+	border-radius: 4px;
+	background: #128A5A;
+	color: #FFF;
+	font: inherit;
+	cursor: pointer;
+}
+
+.urbizen-comptes button:hover,
+.urbizen-comptes-carte button:hover {
+	background: #0E6E48;
+}
+
+.urbizen-comptes button:focus-visible,
+.urbizen-comptes-carte button:focus-visible,
+.urbizen-comptes input:focus-visible {
+	outline: 2px solid #14233B;
+	outline-offset: 2px;
+}
+
+@media (max-width: 30rem) {
+	.urbizen-comptes-carte {
+		padding: 1.1rem;
+	}
+}
