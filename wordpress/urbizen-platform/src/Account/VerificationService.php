@@ -100,6 +100,31 @@ final class VerificationService {
 		}
 
 		try {
+			return $this->preparer_sous_verrou( $compte, $maintenant );
+		} finally {
+			$verrou->liberer();
+		}
+	}
+
+	/**
+	 * Prépare une émission, le verrou du compte étant **déjà détenu**.
+	 *
+	 * Extraite de `preparer()` pour qu'un appelant qui tient déjà le verrou
+	 * puisse préparer sans le relâcher. C'est ce qui rend
+	 * `demander_changement_adresse()` atomique : enregistrer la cible puis
+	 * préparer l'émission en deux acquisitions successives ouvrirait une
+	 * fenêtre où une demande concurrente remplacerait la cible entre les deux,
+	 * et le jeton confirmerait alors une adresse que personne n'a demandée.
+	 *
+	 * N'acquiert ni ne libère aucun verrou : c'est la responsabilité de
+	 * l'appelant, et elle n'est pas partageable.
+	 *
+	 * @param int $compte     Identifiant.
+	 * @param int $maintenant Horloge.
+	 * @return ResultatEmission
+	 */
+	private function preparer_sous_verrou( int $compte, int $maintenant ): ResultatEmission {
+		try {
 			// Relecture SOUS verrou : le compte a pu changer entre-temps.
 			$objet = $this->comptes->trouver_par_id( $compte );
 
@@ -184,8 +209,6 @@ final class VerificationService {
 			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 
 			return ResultatEmission::refuse( 'exception' );
-		} finally {
-			$verrou->liberer();
 		}
 	}
 
