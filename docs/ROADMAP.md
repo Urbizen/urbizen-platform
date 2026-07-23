@@ -3,7 +3,7 @@
 > Alignée sur l'architecture réelle et l'avancement constaté en production.
 > La référence d'ensemble reste [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md).
 
-Dernière mise à jour : 19 juillet 2026.
+Dernière mise à jour : 23 juillet 2026.
 
 ---
 
@@ -81,6 +81,50 @@ Légende : `[x]` terminé et vérifié · `[~]` écrit, non validé en condition
 - [x] Documentation du lancement local du service Python — *fait le 19/07/2026*
 - [ ] Tests automatiques du service : `tests/` est vide à ce jour
 
+### Préparation assistée des pièces — D-047
+
+> L'ordre des lots est un ordre de réalisation, non une chaîne de dépendances :
+> les lots 2 et 3 sont indépendants l'un de l'autre. Chaque lot porte sa
+> dépendance réelle.
+
+- [ ] **Lot 1 — DP1/PCMI1** *(dépend du pont HTTP authentifié ci-dessus)* :
+      récupération **serveur** de la géométrie depuis l'identifiant de parcelle,
+      cache daté, plan de situation
+- [ ] **Lot 2 — Cerfa, bordereau, notice** *(dépend des mappings `cerfa.py` et de
+      données validées, pas du lot 1)*
+- [ ] **Lot 3 — Planches photographiques** DP7/DP8 et PCMI7/PCMI8 *(dépend du lot 1
+      pour le report sur le plan de situation et de ses sept prérequis, pas du
+      lot 2)* : deux points de vue proposés (proche et lointain) avec orientation
+      et consignes, recherche Panoramax sur `panoramax.ign.fr` uniquement, fiche de
+      provenance, confirmation client puis validation Urbizen
+- [ ] **Lot 4 — Éditeur simple d'implantation**, puis DP2/PCMI2 *(dépend du lot 1)* ;
+      report du point et de l'angle des prises de vue sur le plan de masse
+- [ ] **Lot 5 — Coupe, façades, insertion** : DP3/PCMI3, DP4/PCMI5, DP5, DP6/PCMI6
+      *(dépend du lot 4)*
+
+Prérequis du lot 3, à traiter avant lui :
+
+- [ ] Corriger la nomenclature du formulaire DP : DP6 insertion, DP7 environnement
+      proche, DP8 paysage lointain
+- [ ] Extraire l'EXIF utile depuis l'original **avant** toute conversion
+- [ ] Appliquer l'orientation EXIF (rotation des pixels) avant génération
+- [ ] Recueillir le consentement avant d'exploiter ou conserver la géolocalisation
+- [ ] Ne conserver que les métadonnées nécessaires au dossier, pas tout l'EXIF
+- [ ] Prendre en charge le HEIC, ou prévoir une conversion guidée côté client
+- [ ] Dispositif Street View : aucun appel ni endpoint Google, liste fermée des
+      sources autorisées à l'assemblage, provenance obligatoire, attestation de
+      droits et contrôle humain au téléversement ; contrôle lexical en complément
+- [ ] Direction de visée : `GPSImgDirection` quand elle existe et qu'elle est
+      fiable, sinon saisie ou confirmation manuelle de la flèche sur la carte
+
+Transverse à tous les lots :
+
+- [ ] Mention « le cadastre n'est pas une délimitation juridique » portée par toute
+      interface et toute pièce affichant le parcellaire
+- [ ] Provenance complète dans les métadonnées du dossier ; sur la pièce, date,
+      source et attributions nécessaires seulement
+- [ ] Validation Urbizen tracée — valideur et date — bloquant l'assemblage définitif
+
 ---
 
 ## Étape 6 — Refonte des pages dans l'univers Urbizen
@@ -139,6 +183,9 @@ conservant les URL existantes.
 | `POST /api/dp` non authentifié, CORS `*` | existant | 5 |
 | ~~`requirements.txt` et `.env.example` absents~~ | existant | **soldé le 19/07/2026** |
 | Aucun test du service Python (`tests/cadastre/` existe désormais) | existant | 5 |
+| Nomenclature DP6/DP7/DP8 du formulaire DP décalée d'un rang | constaté le 23/07/2026 | 5 (lot 3) |
+| `_image_to_pdf()` détruit l'EXIF utile : orientation et données GPS perdues | constaté le 23/07/2026 | 5 (lot 3) |
+| HEIC refusé par `UploadPolicy` (format iPhone par défaut) | constaté le 23/07/2026 | 5 (lot 3) |
 | CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
 | Slug CGV `refund_returns` | héritage WooCommerce | 6 |
 | 393 Mo de médias non optimisés | existant | 6 |
