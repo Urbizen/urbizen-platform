@@ -87,12 +87,68 @@ check( '2 · avec un motif technique', 'creation_echouee' === $r4['motif'] );
 // ======================================================================
 list( $c5, $db5, $s5 ) = inscription();
 
-check( '3 · onze caractères : refusé',
-	'mot_de_passe_trop_court' === $s5->inscrire( 'x@exemple.fr', str_repeat( 'a', 11 ), $t )['motif'] );
+/*
+ * Le motif s'appelle désormais `inscription_incomplete` : le mot de passe
+ * n'est plus contrôlé d'entrée, mais seulement une fois établi que l'adresse
+ * est libre et qu'on créerait donc un compte. L'assertion qui compte — AUCUN
+ * COMPTE CRÉÉ — est inchangée.
+ */
+check( '3 · onze caractères sur adresse libre : refusé',
+	'inscription_incomplete' === $s5->inscrire( 'x@exemple.fr', str_repeat( 'a', 11 ), $t )['motif'] );
 check( '3 · douze caractères : accepté',
 	true === $s5->inscrire( 'y@exemple.fr', str_repeat( 'a', 12 ), $t )['cree'] );
 check( '3 · AUCUN COMPTE CRÉÉ SUR MOT DE PASSE TROP COURT',
 	null === $c5->trouver_par_adresse( 'x@exemple.fr' ) );
+check( '3 · mot de passe VIDE sur adresse libre : aucune création',
+	'inscription_incomplete' === $s5->inscrire( 'z@exemple.fr', '', $t )['motif']
+	&& null === $c5->trouver_par_adresse( 'z@exemple.fr' ) );
+
+// ======================================================================
+// 3 bis · LE RENVOI PUBLIC EMPRUNTE CETTE MÊME ACTION
+// ======================================================================
+list( $c5b, $db5b, $s5b ) = inscription();
+
+// Une inscription complète, d'abord.
+$premiere = $s5b->inscrire( 'renvoi@exemple.fr', $mdp, $t );
+check( '3 bis · compte créé', true === $premiere['cree'] );
+
+$compte_id = $premiere['compte'];
+
+// La première émission est close : tant qu'elle est en vol, aucune seconde
+// préparation n'est possible — c'est la règle « une seule émission à la fois »
+// d'E2.1, et le renvoi n'y échappe pas.
+$en_vol = $s5b->inscrire( 'renvoi@exemple.fr', '', $t + 10 );
+check( '3 bis · un renvoi pendant qu\'une émission est en vol est refusé',
+	null !== $en_vol['emission'] && 'emission_en_attente' === $en_vol['emission']->motif() );
+
+$v5b = new Urbizen\Platform\Account\VerificationService( $c5b, $db5b );
+$v5b->confirmer_emission( $compte_id, $premiere['emission']->emission_id(), $t + 1 );
+
+// Puis un RENVOI : même appel, SANS mot de passe.
+$renvoi = $s5b->inscrire( 'renvoi@exemple.fr', '', $t + 400 );
+
+check( '3 bis · RENVOI SANS MOT DE PASSE : accepté',
+	'adresse_prise_non_verifiee' === $renvoi['motif'] );
+check( '3 bis · aucun compte n\'est créé au renvoi', false === $renvoi['cree'] );
+check( '3 bis · c\'est bien le compte existant qui est visé',
+	$compte_id === $renvoi['compte'] );
+check( '3 bis · une nouvelle émission est préparée',
+	null !== $renvoi['emission'] && $renvoi['emission']->est_prepare() );
+check( '3 bis · et elle vise l\'adresse DÉJÀ ENREGISTRÉE',
+	'renvoi@exemple.fr' === $renvoi['emission']->cible() );
+
+// Un compte vérifié ne reçoit jamais de relance, avec ou sans mot de passe.
+$c5b->metas[ $compte_id ][ Urbizen\Platform\Account\VerificationService::META_VERIFIE ] = '1';
+
+$sur_verifie = $s5b->inscrire( 'renvoi@exemple.fr', '', $t + 400 );
+check( '3 bis · COMPTE VÉRIFIÉ : aucun envoi',
+	'adresse_prise_verifiee' === $sur_verifie['motif'] && null === $sur_verifie['emission'] );
+
+$avec_mdp = $s5b->inscrire( 'renvoi@exemple.fr', $mdp, $t + 500 );
+check( '3 bis · ni avec un mot de passe valide',
+	'adresse_prise_verifiee' === $avec_mdp['motif'] && null === $avec_mdp['emission'] );
+check( '3 bis · et aucun compte n\'a été créé en double',
+	1 === count( $c5b->utilisateurs ) );
 
 // ======================================================================
 // 4 · ADRESSE INVALIDE

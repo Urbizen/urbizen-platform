@@ -82,10 +82,6 @@ final class InscriptionService {
 	public function inscrire( string $adresse_brute, string $mot_de_passe, ?int $maintenant = null ): array {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 
-		if ( strlen( $mot_de_passe ) < self::MDP_MINIMUM ) {
-			return $this->echec( 'mot_de_passe_trop_court' );
-		}
-
 		$canonique = $this->comptes->canoniser( $adresse_brute );
 		$adresse   = AdresseCourriel::ou_null( $canonique );
 
@@ -106,6 +102,12 @@ final class InscriptionService {
 			// Adresse déjà employée. On ne le dit pas, et l'on ne relance un
 			// lien que pour un compte encore non vérifié — jamais de courriel
 			// répété vers un compte vérifié, quel que soit le nombre d'essais.
+			//
+			// Le mot de passe n'est PAS exigé ici : c'est ce qui permet au
+			// renvoi public d'emprunter cette même action, sans seconde règle
+			// à tenir en cohérence. Aucun compte n'est modifié sur ce chemin,
+			// et le lien part toujours à l'adresse déjà enregistrée : savoir
+			// l'écrire ne donne donc aucun pouvoir sur le compte.
 			if ( $existant->est_verifie() ) {
 				return $this->echec( 'adresse_prise_verifiee' );
 			}
@@ -118,6 +120,14 @@ final class InscriptionService {
 				'motif'    => 'adresse_prise_non_verifiee',
 				'emission' => $emission,
 			);
+		}
+
+		// L'adresse est libre : il faut alors une inscription complète. Le mot
+		// de passe n'est contrôlé qu'ICI, une fois établi qu'on créerait un
+		// compte. Le contrôler d'entrée — ce que faisait la version
+		// précédente — rendait tout renvoi impossible sans mot de passe.
+		if ( strlen( $mot_de_passe ) < self::MDP_MINIMUM ) {
+			return $this->echec( 'inscription_incomplete' );
 		}
 
 		$id = $this->creer_avec_identifiant_unique( $adresse->valeur(), $mot_de_passe );
