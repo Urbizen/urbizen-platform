@@ -50,6 +50,15 @@ final class CliDouble {
 	/** @var array<int, string> */
 	public static array $ecritures_refusees = array();
 
+	/**
+	 * Clés dont l'écriture REND VRAI sans rien retenir.
+	 *
+	 * C'est le cas le plus traître : la commande croit avoir réparé.
+	 *
+	 * @var array<int, string>
+	 */
+	public static array $ecritures_menteuses = array();
+
 	public static bool $verrou_indisponible = false;
 
 	public static function reset(): void {
@@ -59,6 +68,7 @@ final class CliDouble {
 		self::$erreurs             = array();
 		self::$metas               = array();
 		self::$ecritures_refusees  = array();
+		self::$ecritures_menteuses = array();
 		self::$verrou_indisponible = false;
 	}
 }
@@ -108,6 +118,11 @@ function update_user_meta( int $id, string $cle, $valeur ) {
 		return false;
 	}
 
+	// Annonce un succès sans rien retenir.
+	if ( in_array( $cle, CliDouble::$ecritures_menteuses, true ) ) {
+		return true;
+	}
+
 	CliDouble::$metas[ $id ][ $cle ] = (string) $valeur;
 
 	return true;
@@ -124,11 +139,9 @@ use Urbizen\Platform\Adapter\WpCliAccountsCommand;
  * @return bool
  */
 function lancer( bool $reparer ): bool {
-	// La passerelle du verrou est substituée : `WpdbGateway` exige un `$wpdb`
-	// réel, que le banc n'a pas et n'a pas à simuler.
-	WpCliAccountsCommand::substituer_passerelle( $GLOBALS['banc_db'] );
-
-	$cmd = new WpCliAccountsCommand();
+	// La passerelle est INJECTÉE : `WpdbGateway` exige un `$wpdb` réel, que le
+	// banc n'a pas. Aucune couture statique n'existe côté production.
+	$cmd = new WpCliAccountsCommand( $GLOBALS['banc_db'] );
 
 	try {
 		$cmd->quota_verify( array(), $reparer ? array( 'repair-mirror' => true ) : array() );
@@ -147,7 +160,12 @@ function lancer( bool $reparer ): bool {
  * @return int
  */
 function compte_avec( string $source, string $miroir ): int {
-	$id = 100 + count( CliDouble::$metas );
+	// Un compteur qui NE SE RÉINITIALISE PAS : les verrous vivent dans la
+	// passerelle partagée, et deux comptes de même identifiant partageraient un
+	// verrou entre deux scénarios.
+	static $suivant = 100;
+
+	$id = $suivant++;
 
 	CliDouble::$metas[ $id ] = array(
 		LimiteEnvois::META_SOURCE => $source,
@@ -218,7 +236,7 @@ $err = lancer( true );
 
 check( '3 · ÉCRITURE REFUSÉE : code de sortie non nul', true === $err );
 check( '3 · elle est signalée comme telle',
-	false !== strpos( implode( ' ', CliDouble::$warnings ), 'écriture du miroir refusée' ) );
+	false !== strpos( implode( ' ', CliDouble::$warnings ), 'écriture refusée' ) );
 check( '3 · AUCUNE réparation n\'est annoncée',
 	false !== strpos( implode( ' ', CliDouble::$log ), 'RELUS : 0' ) );
 check( '3 · une réparation échouée est comptée',
@@ -313,5 +331,47 @@ foreach ( WpDouble::$options as $cle => $valeur ) {
 }
 
 check( '7 · AUCUN VERROU NE SURVIT à une sortie en erreur', 0 === $verrous );
+
+// ======================================================================
+// 8 · LE MIROIR DEVENU CONFORME AVANT L'ÉCRITURE
+// ======================================================================
+CliDouble::reset();
+WpDouble::reset();
+$id9 = compte_avec( $source_ok, LimiteEnvois::encoder( array( $t ) ) );
+
+/*
+ * On simule un autre processus qui aligne le miroir entre le constat et
+ * l'acquisition du verrou : l'écriture est refusée, mais l'état EST correct.
+ * Annoncer un échec ici serait une fausse alerte.
+ */
+CliDouble::$metas[ $id9 ][ LimiteEnvois::META ] = $miroir_ok;
+CliDouble::$ecritures_refusees                  = array( LimiteEnvois::META );
+
+$err = lancer( true );
+
+check( '8 · miroir déjà conforme sous verrou : AUCUNE FAUSSE ERREUR', false === $err );
+check( '8 · aucune réparation en échec n\'est comptée',
+	false !== strpos( implode( ' ', CliDouble::$log ), 'échouées : 0' ) );
+check( '8 · le miroir est inchangé', $miroir_ok === CliDouble::$metas[ $id9 ][ LimiteEnvois::META ] );
+
+// ======================================================================
+// 9 · ÉCRITURE « RÉUSSIE » MAIS RELECTURE DIVERGENTE
+// ======================================================================
+CliDouble::reset();
+WpDouble::reset();
+$id10 = compte_avec( $source_ok, LimiteEnvois::encoder( array( $t ) ) );
+
+// L'écriture rend vrai, mais n'est pas retenue : seul le relu fait foi.
+CliDouble::$ecritures_menteuses = array( LimiteEnvois::META );
+
+$err = lancer( true );
+
+check( '9 · ÉCRITURE NON RETENUE : code de sortie non nul', true === $err );
+check( '9 · signalée comme relecture divergente',
+	false !== strpos( implode( ' ', CliDouble::$warnings ), 'relecture divergente' ) );
+check( '9 · aucune réparation annoncée',
+	false !== strpos( implode( ' ', CliDouble::$log ), 'RELUS : 0' ) );
+check( '9 · LA SOURCE EST INTACTE',
+	$source_ok === CliDouble::$metas[ $id10 ][ LimiteEnvois::META_SOURCE ] );
 
 verdict();

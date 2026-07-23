@@ -1,12 +1,16 @@
 <?php
 /**
- * Commande WP-CLI : `wp urbizen accounts <status|install|verify>`.
+ * Commande WP-CLI : `wp urbizen accounts <status|install|verify|quota-verify>`.
  *
  * **Seul point d'entrée qui installe le rôle.** Aucune visite, publique ou
  * d'administration, ne doit provoquer une écriture d'installation : l'état
  * d'une installation ne dépend pas du trafic. Le crochet d'activation reste
  * offert pour une installation neuve, mais un `rsync` ne le déclenche pas —
  * d'où cette commande, qui est le chemin réel d'un déploiement.
+ *
+ * `quota-verify` compare la source du quota à son miroir. Elle est en LECTURE
+ * SEULE par défaut ; `--repair-mirror` réécrit le miroir seul, et jamais la
+ * source. Elle ne peut donc pas élargir un droit.
  *
  * Elle ne rend **jamais** de jeton brut, ni d'adresse.
  *
@@ -27,6 +31,32 @@ defined( 'ABSPATH' ) || exit;
  * Adaptation WP-CLI de l'installation des comptes.
  */
 final class WpCliAccountsCommand {
+
+	/**
+	 * Passerelle de base, pour le verrou de réparation.
+	 *
+	 * Injectée par construction plutôt que substituée par une méthode statique :
+	 * une couture « réservée aux bancs » laisserait un état global mutable dans
+	 * le code de production, que n'importe quel appelant pourrait déplacer.
+	 * WP-CLI construit la commande sans argument, et obtient `WpdbGateway`.
+	 *
+	 * @var DatabaseGateway|null
+	 */
+	private ?DatabaseGateway $db;
+
+	/**
+	 * @param DatabaseGateway|null $db Passerelle ; `null` pour celle de WordPress.
+	 */
+	public function __construct( ?DatabaseGateway $db = null ) {
+		$this->db = $db;
+	}
+
+	/**
+	 * @return DatabaseGateway
+	 */
+	private function passerelle(): DatabaseGateway {
+		return $this->db ?? new WpdbGateway();
+	}
 
 	/**
 	 * Enregistre la commande, uniquement sous WP-CLI.
@@ -161,9 +191,9 @@ final class WpCliAccountsCommand {
 			$source      = LimiteEnvois::decoder_source( '' === $brut_source ? null : (string) $brut_source );
 
 			if ( ! empty( $source['corrompue'] ) ) {
-				// On NE RÉPARE PAS une source illisible : on ne saurait pas
-				// quoi écrire, et écrire quand même reviendrait à choisir
-				// quels créneaux oublier.
+				// On NE RÉPARE PAS une source illisible : on ne saurait pas quoi
+				// écrire, et écrire quand même reviendrait à choisir quels
+				// créneaux oublier.
 				$corrompus++;
 
 				WP_CLI::warning( sprintf( 'compte %d : source illisible, aucune réparation possible', $compte ) );
@@ -172,18 +202,12 @@ final class WpCliAccountsCommand {
 			}
 
 			if ( ! empty( $source['absente'] ) ) {
-				// Absente n'est pas corrompue : le compte n'a simplement
-				// jamais été migré. Ce n'est pas une divergence.
+				// Absente n'est pas corrompue : le compte n'a simplement jamais
+				// été migré. Ce n'est pas une divergence.
 				continue;
 			}
 
-			$attendu = LimiteEnvois::horodatages_de( $source['entrees'] );
-			$brut_m  = get_user_meta( $compte, LimiteEnvois::META, true );
-			$miroir  = LimiteEnvois::decoder( '' === $brut_m ? null : (string) $brut_m );
-
-			$reel = ! empty( $miroir['corrompue'] ) ? null : $miroir['horodatages'];
-
-			if ( $attendu === $reel ) {
+			if ( LimiteEnvois::horodatages_de( $source['entrees'] ) === self::miroir_de( $compte ) ) {
 				continue;
 			}
 
@@ -195,7 +219,7 @@ final class WpCliAccountsCommand {
 				continue;
 			}
 
-			if ( self::reparer_miroir( $compte ) ) {
+			if ( $this->reparer_miroir( $compte ) ) {
 				$repares++;
 
 				continue;
@@ -234,8 +258,8 @@ final class WpCliAccountsCommand {
 	private static function comptes_a_examiner(): array {
 		$ids = get_users(
 			array(
-				'fields'       => 'ID',
-				'meta_query'   => array(
+				'fields'     => 'ID',
+				'meta_query' => array(
 					'relation' => 'OR',
 					array( 'key' => LimiteEnvois::META_SOURCE, 'compare' => 'EXISTS' ),
 					array( 'key' => LimiteEnvois::META, 'compare' => 'EXISTS' ),
@@ -249,25 +273,23 @@ final class WpCliAccountsCommand {
 	/**
 	 * Réécrit le miroir d'un compte, SOUS VERROU, et le PROUVE.
 	 *
-	 * Écrire sans relire n'est pas une réparation : c'est une intention. Le
-	 * retour de l'écriture est contrôlé, puis le miroir est RELU et comparé à
-	 * ce qu'il devait devenir. Sans cette relecture, la commande annoncerait
-	 * des réparations qui n'ont pas eu lieu — et l'on s'y fierait pour valider
-	 * un retour arrière.
+	 * Écrire sans relire n'est pas une réparation : c'est une intention. Seule
+	 * la valeur relue fait foi — une écriture annoncée réussie mais non retenue
+	 * est un échec, et une écriture annoncée en échec sur un état déjà correct
+	 * n'en est pas un.
 	 *
 	 * Le verrou est indispensable : sans lui, on écrirait un miroir dérivé
-	 * d'une source lue AVANT qu'une émission concurrente ne la fasse avancer,
-	 * et l'on remettrait le compte en arrière. Source et miroir sont donc
-	 * relus APRÈS acquisition.
+	 * d'une source lue AVANT qu'une émission concurrente ne la fasse avancer.
+	 * Source ET miroir sont donc relus APRÈS acquisition.
 	 *
 	 * La source n'est jamais écrite, et une source absente ou illisible ne
 	 * donne lieu à AUCUNE écriture : on ne saurait pas quoi écrire.
 	 *
 	 * @param int $compte Identifiant.
-	 * @return bool Vrai seulement si la réparation est prouvée.
+	 * @return bool Vrai seulement si l'alignement est prouvé.
 	 */
-	private static function reparer_miroir( int $compte ): bool {
-		$verrou = VerrouCompte::acquerir( self::passerelle(), $compte );
+	private function reparer_miroir( int $compte ): bool {
+		$verrou = VerrouCompte::acquerir( $this->passerelle(), $compte );
 
 		if ( null === $verrou ) {
 			WP_CLI::warning( sprintf( 'compte %d : verrou indisponible, aucune réparation', $compte ) );
@@ -288,23 +310,34 @@ final class WpCliAccountsCommand {
 
 			$attendu = LimiteEnvois::horodatages_de( $source['entrees'] );
 
+			/*
+			 * Le miroir est RELU avant qu'on décide d'écrire. Un autre processus
+			 * a pu l'aligner entre le constat et l'acquisition : `update_user_meta()`
+			 * rendrait alors `false` — non parce qu'elle a échoué, mais parce que
+			 * la valeur est déjà la bonne — et l'on annoncerait un échec sur un
+			 * état correct.
+			 */
+			if ( self::miroir_de( $compte ) === $attendu ) {
+				return true;
+			}
+
 			// LE MIROIR SEUL.
-			if ( false === update_user_meta( $compte, LimiteEnvois::META, LimiteEnvois::encoder( $attendu ) ) ) {
-				WP_CLI::warning( sprintf( 'compte %d : écriture du miroir refusée', $compte ) );
+			$ecrit = update_user_meta( $compte, LimiteEnvois::META, LimiteEnvois::encoder( $attendu ) );
 
-				return false;
+			// On relit MÊME si l'écriture s'est dite en échec.
+			if ( self::miroir_de( $compte ) === $attendu ) {
+				return true;
 			}
 
-			// La preuve : on relit.
-            $relu = get_user_meta( $compte, LimiteEnvois::META, true );
+			WP_CLI::warning(
+				sprintf(
+					'compte %d : miroir non aligné après écriture (%s)',
+					$compte,
+					false === $ecrit ? 'écriture refusée' : 'relecture divergente'
+				)
+			);
 
-			if ( LimiteEnvois::decoder( '' === $relu ? null : (string) $relu )['horodatages'] !== $attendu ) {
-				WP_CLI::warning( sprintf( 'compte %d : miroir relu divergent', $compte ) );
-
-				return false;
-			}
-
-			return true;
+			return false;
 		} finally {
 			// Libéré AVANT tout `WP_CLI::error()`, qui termine le processus et
 			// laisserait sinon le verrou posé jusqu'à son expiration.
@@ -312,31 +345,17 @@ final class WpCliAccountsCommand {
 		}
 	}
 
-	/**
-	 * Passerelle de base, pour le verrou.
-	 *
-	 * Isolée en une méthode plutôt qu'appelée sur place : `WpdbGateway` exige un
-	 * `$wpdb` réel, et les bancs sans WordPress doivent pouvoir substituer une
-	 * doublure sans qu'un état mutable ne traîne en production.
-	 *
-	 * @var DatabaseGateway|null
-	 */
-	private static ?DatabaseGateway $passerelle = null;
+
 
 	/**
-	 * Substitue la passerelle. **Réservé aux bancs.**
+	 * Horodatages actuellement portés par le miroir d'un compte.
 	 *
-	 * @param DatabaseGateway|null $passerelle Passerelle, ou null pour rétablir.
-	 * @return void
+	 * @param int $compte Identifiant.
+	 * @return array<int, int>
 	 */
-	public static function substituer_passerelle( ?DatabaseGateway $passerelle ): void {
-		self::$passerelle = $passerelle;
-	}
+	private static function miroir_de( int $compte ): array {
+		$brut = get_user_meta( $compte, LimiteEnvois::META, true );
 
-	/**
-	 * @return DatabaseGateway
-	 */
-	private static function passerelle(): DatabaseGateway {
-		return self::$passerelle ?? new WpdbGateway();
+		return LimiteEnvois::decoder( '' === $brut ? null : (string) $brut )['horodatages'];
 	}
 }

@@ -389,4 +389,60 @@ check( '13 · le jeton est supprimé',
 check( '13 · l\'émission est supprimée',
 	null === $cf->lire_meta( $if, EmissionEnAttente::META ) );
 
+// ======================================================================
+// 14 · UNE PANNE PENDANT L'INSPECTION REND « exception », JAMAIS UN 500
+// ======================================================================
+list( $cg, $dg, $sg, $ig ) = monter_idem();
+
+$rg = $sg->preparer( $ig, $t );
+
+$avant_g = $cg->metas[ $ig ];
+
+// Panne pendant la recherche du compte.
+$cg->lever_trouver = true;
+
+$insp_g = $sg->inspecter( $ig, $rg->jeton(), $t + 1 );
+
+check( '14 · panne à la recherche : motif « exception »', 'exception' === $insp_g['motif'] );
+check( '14 · cible vide', '' === $insp_g['cible'] );
+check( '14 · AUCUNE ÉCRITURE malgré la panne', $avant_g === $cg->metas[ $ig ] );
+
+$cg->lever_trouver = false;
+
+// Panne pendant une lecture de métadonnée.
+$ch = new ComptesDouble();
+$dh = new PasserelleOptions();
+$sh = new VerificationService( $ch, $dh );
+$ih = $ch->creer( 'urb_y', 'claire@exemple.fr', 'motdepasse-long' );
+$rh = $sh->preparer( $ih, $t );
+
+$avant_h            = $ch->metas[ $ih ];
+$ch->lever_lecture  = Urbizen\Platform\Account\JetonVerification::META_CONDENSAT;
+
+$insp_h = $sh->inspecter( $ih, $rh->jeton(), $t + 1 );
+
+check( '14 · panne à la lecture d\'une métadonnée : motif « exception »',
+	'exception' === $insp_h['motif'] );
+check( '14 · cible vide', '' === $insp_h['cible'] );
+check( '14 · AUCUNE ÉCRITURE', $avant_h === $ch->metas[ $ih ] );
+
+$ch->lever_lecture = '';
+
+// Le journal ne porte AUCUNE donnée sensible depuis ce chemin.
+\Urbizen\Platform\Support\Logger::reset();
+$ci = new ComptesDouble();
+$di = new PasserelleOptions();
+$si = new VerificationService( $ci, $di );
+$ii = $ci->creer( 'urb_z', 'secrete@exemple.fr', 'motdepasse-long' );
+$ri = $si->preparer( $ii, $t );
+$ci->lever_trouver = true;
+$si->inspecter( $ii, $ri->jeton(), $t + 1 );
+
+$j = \Urbizen\Platform\Support\Logger::tout();
+check( '14 · aucune adresse au journal', false === strpos( $j, 'secrete@exemple.fr' ) );
+check( '14 · aucun jeton au journal', 1 !== preg_match( '/[0-9a-f]{64}/', $j ) );
+check( '14 · aucun identifiant de compte au journal',
+	1 !== preg_match( '/compte\s*' . $ii . '/', $j ) );
+check( '14 · le chemin d\'inspection n\'écrit rien au journal', '' === trim( $j ) );
+
 verdict();

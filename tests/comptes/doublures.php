@@ -241,6 +241,20 @@ final class ComptesDouble implements ComptesGateway {
 	 */
 	public ?array $piege = null;
 
+	/**
+	 * `trouver_par_id()` doit-il lever ?
+	 *
+	 * @var bool
+	 */
+	public bool $lever_trouver = false;
+
+	/**
+	 * Clé dont la LECTURE doit lever.
+	 *
+	 * @var string
+	 */
+	public string $lever_lecture = '';
+
 	public function canoniser( string $brute ): string {
 		$valeur = (string) preg_replace( '/[\x00-\x1F\x7F]/', '', $brute );
 
@@ -248,6 +262,10 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function trouver_par_id( int $id ): ?Compte {
+		if ( $this->lever_trouver ) {
+			throw new RuntimeException( 'base indisponible : trouver_par_id' );
+		}
+
 		if ( ! isset( $this->utilisateurs[ $id ] ) ) {
 			return null;
 		}
@@ -311,6 +329,10 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function lire_meta( int $id, string $cle ): ?string {
+		if ( '' !== $this->lever_lecture && $this->lever_lecture === $cle ) {
+			throw new RuntimeException( 'base indisponible : lire_meta' );
+		}
+
 		// Une clé absente rend `null` ; une clé vide rend la chaîne vide. La
 		// distinction est ce qui permet de détecter un état partiel.
 		JournalEvenements::noter( 'lecture:' . $cle );

@@ -237,41 +237,54 @@ final class VerificationService {
 	public function inspecter( int $compte, string $jeton, ?int $maintenant = null ): array {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 
-		if ( $compte <= 0 || ! JetonVerification::forme_valide( $jeton ) ) {
-			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+		/*
+		 * TOUTE lecture est encadrée. Une panne de la base pendant l'inspection
+		 * n'a pas à devenir un 500 : c'est un service momentanément
+		 * indisponible, et le parcours a déjà une issue publique pour cela.
+		 *
+		 * Rien n'est journalisé depuis ce chemin — ni jeton, ni adresse, ni
+		 * identifiant. Une trace prise ici porterait précisément ce que la
+		 * méthode existe pour ne pas divulguer.
+		 */
+		try {
+			if ( $compte <= 0 || ! JetonVerification::forme_valide( $jeton ) ) {
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			$objet = $this->comptes->trouver_par_id( $compte );
+
+			if ( null === $objet ) {
+				// MÊME motif qu'un jeton invalide : distinguer révélerait quels
+				// identifiants correspondent à un compte.
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			$condensat  = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CONDENSAT );
+			$expire     = $this->comptes->lire_meta( $compte, JetonVerification::META_EXPIRE );
+			$cible      = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CIBLE );
+			$generation = $this->comptes->lire_meta( $compte, JetonVerification::META_GENERATION );
+
+			if ( '' === $condensat || null === $expire || '' === $cible || null === $generation ) {
+				return array( 'motif' => 'jeton_absent', 'cible' => '' );
+			}
+
+			if ( ! JetonVerification::correspond( $condensat, $compte, $cible, (int) $generation, $jeton ) ) {
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			if ( ! ctype_digit( (string) $expire ) || (int) $expire <= $maintenant ) {
+				return array( 'motif' => 'jeton_expire', 'cible' => '' );
+			}
+
+			if ( ! hash_equals( $objet->cible_de_verification()->valeur(), $cible ) ) {
+				return array( 'motif' => 'cible_obsolete', 'cible' => '' );
+			}
+
+			// La cible n'est rendue QU'ICI, une fois le condensat prouvé.
+			return array( 'motif' => '', 'cible' => $cible );
+		} catch ( Throwable $e ) {
+			return array( 'motif' => 'exception', 'cible' => '' );
 		}
-
-		$objet = $this->comptes->trouver_par_id( $compte );
-
-		if ( null === $objet ) {
-			// MÊME motif qu'un jeton invalide : distinguer révélerait quels
-			// identifiants correspondent à un compte.
-			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
-		}
-
-		$condensat  = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CONDENSAT );
-		$expire     = $this->comptes->lire_meta( $compte, JetonVerification::META_EXPIRE );
-		$cible      = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CIBLE );
-		$generation = $this->comptes->lire_meta( $compte, JetonVerification::META_GENERATION );
-
-		if ( '' === $condensat || null === $expire || '' === $cible || null === $generation ) {
-			return array( 'motif' => 'jeton_absent', 'cible' => '' );
-		}
-
-		if ( ! JetonVerification::correspond( $condensat, $compte, $cible, (int) $generation, $jeton ) ) {
-			return array( 'motif' => 'jeton_invalide', 'cible' => '' );
-		}
-
-		if ( ! ctype_digit( (string) $expire ) || (int) $expire <= $maintenant ) {
-			return array( 'motif' => 'jeton_expire', 'cible' => '' );
-		}
-
-		if ( ! hash_equals( $objet->cible_de_verification()->valeur(), $cible ) ) {
-			return array( 'motif' => 'cible_obsolete', 'cible' => '' );
-		}
-
-		// La cible n'est rendue QU'ICI, une fois le condensat prouvé.
-		return array( 'motif' => '', 'cible' => $cible );
 	}
 
 	/**
