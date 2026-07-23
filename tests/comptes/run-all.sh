@@ -34,6 +34,7 @@ bancs=(
 	test-idempotence.php
 	test-changement-adresse.php
 	test-courriel-verification.php
+	test-envoi.php
 	test-inscription.php
 )
 
@@ -44,13 +45,25 @@ for banc in "${bancs[@]}"; do
 		continue
 	fi
 
-	if sortie=$( "$PHP_BIN" "$banc" 2>&1 ); then
-		printf '\033[32m✓ %s\033[0m\n' "$banc"
-	else
+	if ! sortie=$( "$PHP_BIN" "$banc" 2>&1 ); then
 		printf '\033[31m✗ %s\033[0m\n' "$banc"
 		printf '%s\n' "$sortie" | tail -20
 		echecs=$(( echecs + 1 ))
+		continue
 	fi
+
+	# Un code de sortie nul ne suffit PAS. La garde `defined( 'ABSPATH' ) || exit;`
+	# que portent les fichiers d'extension termine le processus sans rien dire,
+	# code 0 : un banc muet passerait alors pour un banc vert. On exige donc le
+	# verdict, pas seulement l'absence d'erreur.
+	if ! printf '%s' "$sortie" | grep -q 'TOUS LES CONTROLES PASSENT'; then
+		printf '\033[31m✗ %s : aucun verdict rendu (banc muet ?)\033[0m\n' "$banc"
+		printf '%s\n' "$sortie" | tail -20
+		echecs=$(( echecs + 1 ))
+		continue
+	fi
+
+	printf '\033[32m✓ %s\033[0m\n' "$banc"
 done
 
 echo

@@ -13,6 +13,17 @@ declare( strict_types = 1 );
 define( 'URBIZEN_SRC', dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/' );
 define( 'URBIZEN_TEST_SECRET', 'secret-de-banc-e2' );
 
+/*
+ * Les fichiers de `src/Mail/` portent la garde `defined( 'ABSPATH' ) || exit;`
+ * — celle qui empêche d'appeler un fichier d'extension directement par son URL.
+ * Hors WordPress, elle termine le processus SANS RIEN DIRE, code de sortie 0 :
+ * un banc muet passerait alors pour un banc vert.
+ *
+ * La doublure de `tests/submissions/` définit `ABSPATH` pour cette raison ; on
+ * fait ici la même chose, et pour la même raison.
+ */
+defined( 'ABSPATH' ) || define( 'ABSPATH', __DIR__ . '/' );
+
 $urbizen_fichiers = array(
 	'Domain/Identity/ActeurCourant.php',
 	'Domain/Identity/CurrentUserProvider.php',
@@ -42,6 +53,8 @@ $urbizen_fichiers = array(
 	'Account/AutorisationComptes.php',
 	'Account/LienVerification.php',
 	'Account/CourrielVerification.php',
+	'Mail/MailTransport.php',
+	'Account/EnvoiVerification.php',
 );
 
 foreach ( $urbizen_fichiers as $urbizen_fichier ) {
