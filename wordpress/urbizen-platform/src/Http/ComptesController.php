@@ -203,12 +203,23 @@ final class ComptesController {
 			// réponse reste celle de tous les autres cas.
 			Logger::error( 'inscription : exception interne' );
 		} finally {
-			// Imbriqué : un échec de `consume_token()` ne doit pas empêcher la
-			// confirmation du créneau, sans quoi le coût ne serait pas perçu.
+			/*
+			 * Imbriqué : un échec de `consume_token()` ne doit pas empêcher la
+			 * confirmation du créneau, sans quoi le coût ne serait pas perçu.
+			 *
+			 * Et l'ensemble est absorbé : une panne de stockage pendant la
+			 * finalisation ne doit pas remonter à la place de la redirection.
+			 * La confirmation a été TENTÉE avant que l'exception ne soit
+			 * attrapée — l'ordre des blocs le garantit.
+			 */
 			try {
-				AntiSpam::consume_token( $jeton_robot );
-			} finally {
-				RateLimiter::confirm( $creneau );
+				try {
+					AntiSpam::consume_token( $jeton_robot );
+				} finally {
+					RateLimiter::confirm( $creneau );
+				}
+			} catch ( \Throwable $e ) {
+				Logger::error( 'inscription : finalisation incomplete' );
 			}
 		}
 

@@ -240,8 +240,9 @@ check( '6 · et JAMAIS APPELÉ après la frontière',
 check( '6 · RateLimiter::release n\'est jamais appelé',
 	false === strpos( $source, 'RateLimiter::release' ) );
 
-check( '6 · la confirmation est imbriquée dans un second finally',
-	1 === preg_match( '/finally\s*\{\s*\/\/[^\n]*\n\s*\/\/[^\n]*\n\s*try\s*\{\s*AntiSpam::consume_token/', $source ) );
+// L'imbrication du `finally` de finalisation n'est PAS éprouvée par une
+// expression régulière : le cas 12 la fait échouer pour de vrai et observe
+// l'état du créneau.
 
 // Le limiteur refuse : le jeton est libéré, rien n'est consommé.
 preparer_requete();
@@ -322,5 +323,78 @@ check( '10 · le renvoi connecté exige verification.demander',
 	false !== strpos( $bloc_session, "'verification.demander'" ) );
 check( '10 · les deux exigent une session',
 	2 === substr_count( $bloc_session, 'is_user_logged_in()' ) );
+
+// ======================================================================
+// 11 · PANNE DU LIMITEUR AVANT LA FRONTIÈRE — exécutée, pas déduite
+// ======================================================================
+$jeton_11 = preparer_requete();
+
+// `add_option()` lève, mais UNIQUEMENT pour les créneaux du limiteur : la
+// réservation du jeton anti-robot, elle, a bien eu lieu.
+WpDouble::$lever_add_option = RateLimiter::OPTION_PREFIX;
+
+$s = sortie( array( CC::class, 'handle_inscription' ) );
+
+WpDouble::$lever_add_option = null;
+
+check( '11 · EXCEPTION DU LIMITEUR : la réponse reste une redirection',
+	null !== $s && 'redirect' === $s->genre );
+check( '11 · en 303', null !== $s && 303 === $s->statut );
+check( '11 · avec le code uniforme',
+	null !== $s && false !== strpos( $s->url, 'code=verifiez' ) );
+check( '11 · AUCUN CRÉNEAU ne subsiste', 0 === creneaux_reserves() );
+check( '11 · LE JETON A ÉTÉ RENDU UTILISABLE — release_token a bien agi',
+	! AntiSpam::is_used( $jeton_11 ) );
+check( '11 · et il est effectivement réservable à nouveau',
+	true === AntiSpam::reserve_token( $jeton_11 ) );
+check( '11 · aucun détail de l\'exception ne franchit la frontière publique',
+	null !== $s && false === stripos( $s->url, 'stockage' )
+	&& false === stripos( $s->url, 'exception' ) );
+
+// ======================================================================
+// 12 · PANNE DE consume_token() APRÈS LA FRONTIÈRE
+// ======================================================================
+$jeton_12 = preparer_requete();
+
+/*
+ * On laisse la requête franchir la frontière, puis `update_option()` lève —
+ * uniquement pour les jetons anti-robot. `RateLimiter::confirm()` passe par
+ * `update_option()` sur SON préfixe, qui reste intact : c'est ce qui permet
+ * d'observer que la confirmation a bien eu lieu malgré l'échec.
+ */
+WpDouble::$lever_update_option = AntiSpam::OPTION_PREFIX;
+
+$s = sortie( array( CC::class, 'handle_inscription' ) );
+
+WpDouble::$lever_update_option = null;
+
+check( '12 · L\'EXCEPTION EST ABSORBÉE : la redirection a bien lieu',
+	null !== $s && 'redirect' === $s->genre );
+check( '12 · en 303', null !== $s && 303 === $s->statut );
+check( '12 · avec le code uniforme, comme toutes les autres issues',
+	null !== $s && false !== strpos( $s->url, 'code=verifiez' ) );
+check( '12 · aucun détail de l\'exception dans la réponse',
+	null !== $s && false === stripos( $s->url, 'stockage' ) );
+
+$creneaux_12 = array();
+
+foreach ( WpDouble::$options as $cle => $valeur ) {
+	if ( 0 === strpos( (string) $cle, RateLimiter::OPTION_PREFIX ) && is_array( $valeur ) ) {
+		$creneaux_12[] = $valeur;
+	}
+}
+
+check( '12 · un créneau existe bel et bien', 1 === count( $creneaux_12 ) );
+check( '12 · RateLimiter::confirm S\'EST EXÉCUTÉ malgré l\'échec de consume_token',
+	isset( $creneaux_12[0]['state'] ) && 'confirmed' === $creneaux_12[0]['state'] );
+check( '12 · LE CRÉNEAU N\'EST PAS RESTÉ « reserved »',
+	isset( $creneaux_12[0]['state'] ) && 'reserved' !== $creneaux_12[0]['state'] );
+check( '12 · AUCUNE LIBÉRATION APRÈS LA FRONTIÈRE — le créneau n\'a pas disparu',
+	1 === count( $creneaux_12 ) );
+
+// La panne ne remonte pas non plus quand le métier a réussi avant elle.
+check( '12 · la finalisation incomplète est journalisée sans détail',
+	false !== strpos( \Urbizen\Platform\Support\Logger::tout(), 'finalisation incomplete' )
+	&& false === strpos( \Urbizen\Platform\Support\Logger::tout(), 'stockage indisponible' ) );
 
 verdict();

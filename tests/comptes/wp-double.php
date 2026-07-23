@@ -81,7 +81,23 @@ final class WpDouble {
 	 */
 	public static array $nonces_valides = array();
 
+	/**
+	 * Préfixe d'option pour lequel `add_option()` doit LEVER.
+	 *
+	 * Une panne de stockage ne se simule pas par une valeur de retour : elle
+	 * lève. Ciblée par préfixe, elle permet d'éprouver l'échec d'un seul
+	 * mécanisme sans casser les autres.
+	 */
+	public static ?string $lever_add_option = null;
+
+	/**
+	 * Préfixe d'option pour lequel `update_option()` doit LEVER.
+	 */
+	public static ?string $lever_update_option = null;
+
 	public static function reset(): void {
+		self::$lever_add_option    = null;
+		self::$lever_update_option = null;
 		self::$actions        = array();
 		self::$shortcodes     = array();
 		self::$options        = array();
@@ -127,6 +143,10 @@ function get_option( string $cle, $defaut = false ) {
 }
 
 function add_option( string $cle, $valeur, string $deprecie = '', $autoload = 'yes' ): bool {
+	if ( null !== WpDouble::$lever_add_option && 0 === strpos( $cle, WpDouble::$lever_add_option ) ) {
+		throw new RuntimeException( 'stockage indisponible : ' . $cle );
+	}
+
 	if ( array_key_exists( $cle, WpDouble::$options ) ) {
 		return false;
 	}
@@ -137,6 +157,10 @@ function add_option( string $cle, $valeur, string $deprecie = '', $autoload = 'y
 }
 
 function update_option( string $cle, $valeur, $autoload = null ): bool {
+	if ( null !== WpDouble::$lever_update_option && 0 === strpos( $cle, WpDouble::$lever_update_option ) ) {
+		throw new RuntimeException( 'stockage indisponible : ' . $cle );
+	}
+
 	WpDouble::$options[ $cle ] = $valeur;
 
 	return true;
