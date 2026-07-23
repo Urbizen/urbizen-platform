@@ -83,12 +83,25 @@ check( '4 bis · IL N’ÉCRIT AUCUNE MÉTADONNÉE',
 	false === strpos( $adaptateur, 'update_user_meta' )
 	&& false === strpos( $adaptateur, 'add_user_meta' ) );
 
-// Aucune politique d'E1 ne doit accorder un droit sur ce drapeau.
+/*
+ * ASSERTION HISTORIQUE MODIFIÉE — inventoriée.
+ *
+ * Elle exigeait qu'AUCUNE politique ne consulte le drapeau de vérification.
+ * C'était juste en E1, où rien ne l'écrivait. E2 introduit
+ * `PolitiqueActionVerifiee`, dont c'est précisément et uniquement la règle.
+ *
+ * L'assertion n'est pas affaiblie mais RESSERRÉE : une seule politique a le
+ * droit de lire ce drapeau, elle est nommée, et toutes les autres doivent s'en
+ * abstenir. L'ancienne formulation deviendrait trivialement vraie le jour où
+ * l'on renommerait le drapeau ; celle-ci nomme l'exception, donc elle tombe si
+ * une seconde politique s'en empare.
+ */
 $politiques = glob(
 	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Domain/Authorization/*.php'
 );
 
-$usages = array();
+$autorisee = 'PolitiqueActionVerifiee.php';
+$usages    = array();
 
 foreach ( (array) $politiques as $fichier ) {
 	$code = (string) preg_replace(
@@ -97,12 +110,15 @@ foreach ( (array) $politiques as $fichier ) {
 		(string) file_get_contents( $fichier )
 	);
 
-	if ( false !== strpos( $code, 'courriel_verifie' ) ) {
+	if ( false !== strpos( $code, 'courriel_verifie' ) && basename( $fichier ) !== $autorisee ) {
 		$usages[] = basename( $fichier );
 	}
 }
 
-check( '4 bis · AUCUNE POLITIQUE E1 N’ACCORDE UN DROIT SUR CE DRAPEAU', array() === $usages );
+check( '4 bis · des politiques ont bien été parcourues', count( (array) $politiques ) >= 5 );
+check( '4 bis · UNE SEULE POLITIQUE CONSULTE CE DRAPEAU, ET ELLE EST NOMMÉE', array() === $usages );
+check( '4 bis · et cette politique existe bien',
+	is_readable( dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Domain/Authorization/' . $autorisee ) );
 
 // ======================================================================
 // 5 · IDENTITÉ

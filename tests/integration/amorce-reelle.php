@@ -73,6 +73,26 @@ foreach (
 		'src/Adapter/WpCurrentUser.php',
 		'src/Adapter/WpdbGateway.php',
 		'src/Adapter/WpCliSchemaCommand.php',
+		// Socle E2.1 : comptes.
+		'src/Domain/Account/AdresseCourriel.php',
+		'src/Domain/Account/Compte.php',
+		'src/Domain/Account/DemandeVerification.php',
+		'src/Domain/Account/ActionVerifiee.php',
+		'src/Domain/Authorization/PolitiqueCompte.php',
+		'src/Domain/Authorization/PolitiqueVerification.php',
+		'src/Domain/Authorization/PolitiqueActionVerifiee.php',
+		'src/Account/ComptesGateway.php',
+		'src/Account/RoleClient.php',
+		'src/Account/VerrouCompte.php',
+		'src/Account/LimiteEnvois.php',
+		'src/Account/JetonVerification.php',
+		'src/Account/EmissionEnAttente.php',
+		'src/Account/ResultatEmission.php',
+		'src/Account/VerificationService.php',
+		'src/Account/InscriptionService.php',
+		'src/Account/AutorisationComptes.php',
+		'src/Adapter/WpComptes.php',
+		'src/Adapter/WpCliAccountsCommand.php',
 	) as $fichier
 ) {
 	require_once URBIZEN_PLATFORM_DIR . $fichier;

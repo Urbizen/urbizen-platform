@@ -5,6 +5,69 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.11.0] — 23 juillet 2026
+
+Socle E2.1 : comptes particuliers, rôle client et vérification du courriel.
+
+> **Aucun écran, aucun courriel, aucune page.** E2.1 est un socle technique :
+> pas d'interface HTTP, pas de shortcode, aucun envoi. Le rôle
+> `urbizen_client` n'est créé que par une commande explicite. Rien ne change
+> pour un visiteur, et les formulaires DP, PC, Conception ainsi que le cadastre
+> sont inchangés.
+
+### Ajouté
+- `src/Domain/Account/` : `Compte` (ressource), `AdresseCourriel` (valide, ne
+  normalise pas), `DemandeVerification`, `ActionVerifiee`.
+- `src/Domain/Authorization/` : `PolitiqueCompte`, `PolitiqueVerification`,
+  `PolitiqueActionVerifiee`. **Aucune ne consulte de rôle.**
+- `src/Account/` : `ComptesGateway` (port), `RoleClient`, `VerrouCompte`
+  (compare-et-échange), `LimiteEnvois`, `JetonVerification` (condensat lié au
+  compte, à la cible et à la génération), `EmissionEnAttente`,
+  `ResultatEmission`, `VerificationService`, `InscriptionService`,
+  `AutorisationComptes`.
+- `src/Adapter/` : `WpComptes` (avec garde de promotion), `WpCliAccountsCommand`.
+- Commandes `wp urbizen accounts <status|install|verify>` — **seul point
+  d'entrée installant le rôle**.
+- `tests/comptes/` : huit bancs sans WordPress ;
+  `tests/integration/test-comptes-reel.php` avec trois courses multiprocessus.
+
+### Métadonnées utilisateur employées
+
+Toutes portent le préfixe `_urbizen_`, donc **privées** au sens WordPress :
+elles ne ressortent ni par l'API REST des utilisateurs, ni par `get_users()`.
+
+| Clé | Contenu | Expiration | Sensibilité | Nettoyage |
+|---|---|---|---|---|
+| `_urbizen_courriel_verifie` | la chaîne `'1'`, et elle seule | aucune | nulle | changement d'adresse hors flux |
+| `_urbizen_courriel_verifie_le` | date GMT `Y-m-d H:i:s` | aucune | nulle | idem |
+| `_urbizen_courriel_en_attente` | adresse visée par un changement | aucune | **donnée personnelle** | consommation du jeton, ou changement hors flux |
+| `_urbizen_verif_condensat` | HMAC-SHA256, jamais le jeton | 24 h | condensat, non réversible | consommation, annulation, émission expirée, changement hors flux |
+| `_urbizen_verif_expire` | horodatage entier | 24 h | nulle | idem |
+| `_urbizen_verif_cible` | adresse que le jeton confirme | 24 h | **donnée personnelle** | idem |
+| `_urbizen_verif_generation` | entier croissant | aucune | nulle | **jamais** — la remettre à zéro rendrait un ancien condensat calculable |
+| `_urbizen_verif_envois` | liste JSON de 0 à 3 horodatages | fenêtre glissante de 24 h | nulle | purge à chaque lecture |
+| `_urbizen_verif_emission_en_attente` | `{id, generation, cible, cree_le, expire_le, statut}` | **5 minutes** | **donnée personnelle** (porte la cible) — jamais le jeton ni son condensat | confirmation, annulation, préparation suivante si expirée, changement hors flux |
+
+`_urbizen_verif_emission_en_attente` interdit une seconde préparation tant
+qu'elle est posée et non expirée. Une valeur illisible est traitée comme
+présente **et** expirée : personne ne peut plus la clore, donc la préparation
+suivante la nettoie — avec le jeton qu'elle portait — plutôt que de condamner le
+compte. Deux jetons vivants restent impossibles.
+
+### Modifié
+- `src/Plugin.php` : enregistre les commandes de comptes et la surveillance des
+  profils.
+- `tests/domaine/test-identite.php` et `tests/submissions/test-compat.php` :
+  deux assertions **resserrées**, non affaiblies — voir le commit dédié.
+
+### Décisions
+- **D-045** — comptes WordPress sans table propre ; vérification restrictive
+  par défaut ; jeton lié à sa cible ; installation du rôle hors trafic ; une
+  seule émission en vol à la fois ; rôle réconcilié en place ; garde
+  `profile_update` comptée par utilisateur.
+
+---
+
 ## [0.10.0] — 22 juillet 2026
 
 Socle E1 : identité, autorisation, identifiants et infrastructure de schéma.
