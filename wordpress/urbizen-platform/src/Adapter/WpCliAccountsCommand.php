@@ -207,7 +207,7 @@ final class WpCliAccountsCommand {
 				continue;
 			}
 
-			if ( LimiteEnvois::horodatages_de( $source['entrees'] ) === self::miroir_de( $compte ) ) {
+			if ( self::miroir_aligne_sur( $compte, LimiteEnvois::horodatages_de( $source['entrees'] ) ) ) {
 				continue;
 			}
 
@@ -317,15 +317,21 @@ final class WpCliAccountsCommand {
 			 * la valeur est déjà la bonne — et l'on annoncerait un échec sur un
 			 * état correct.
 			 */
-			if ( self::miroir_de( $compte ) === $attendu ) {
+			if ( self::miroir_aligne_sur( $compte, $attendu ) ) {
 				return true;
 			}
 
 			// LE MIROIR SEUL.
 			$ecrit = update_user_meta( $compte, LimiteEnvois::META, LimiteEnvois::encoder( $attendu ) );
 
-			// On relit MÊME si l'écriture s'est dite en échec.
-			if ( self::miroir_de( $compte ) === $attendu ) {
+			/*
+			 * On relit MÊME si l'écriture s'est dite en échec. Et l'on exige un
+			 * miroir NON CORROMPU : une écriture qui laisserait `nawak` en place
+			 * décoderait `horodatages=[]`, indistinguable d'un miroir vide
+			 * légitime si l'on ne regardait que les horodatages. Le marqueur
+			 * `corrompue` est donc consulté, jamais jeté.
+			 */
+			if ( self::miroir_aligne_sur( $compte, $attendu ) ) {
 				return true;
 			}
 
@@ -348,14 +354,23 @@ final class WpCliAccountsCommand {
 
 
 	/**
-	 * Horodatages actuellement portés par le miroir d'un compte.
+	 * Le miroir d'un compte est-il aligné sur des horodatages attendus ?
 	 *
-	 * @param int $compte Identifiant.
-	 * @return array<int, int>
+	 * Alignement veut dire DEUX choses, et la seconde était perdue : le miroir
+	 * n'est pas corrompu, ET ses horodatages correspondent exactement. Un
+	 * miroir illisible décode `horodatages=[]` avec `corrompue=true` ; ne
+	 * regarder que les horodatages le rendrait indistinguable d'un miroir vide
+	 * légitime, et une source valide mais vide le déclarerait « conforme ». Le
+	 * marqueur `corrompue` est donc consulté, jamais jeté.
+	 *
+	 * @param int             $compte  Identifiant.
+	 * @param array<int, int> $attendu Horodatages dérivés de la source.
+	 * @return bool
 	 */
-	private static function miroir_de( int $compte ): array {
-		$brut = get_user_meta( $compte, LimiteEnvois::META, true );
+	private static function miroir_aligne_sur( int $compte, array $attendu ): bool {
+		$brut    = get_user_meta( $compte, LimiteEnvois::META, true );
+		$decode  = LimiteEnvois::decoder( '' === $brut ? null : (string) $brut );
 
-		return LimiteEnvois::decoder( '' === $brut ? null : (string) $brut )['horodatages'];
+		return empty( $decode['corrompue'] ) && $decode['horodatages'] === $attendu;
 	}
 }
