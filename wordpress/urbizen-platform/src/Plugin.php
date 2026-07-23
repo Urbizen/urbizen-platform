@@ -11,6 +11,7 @@ use Urbizen\Platform\Admin\SubmissionsAdmin;
 use Urbizen\Platform\Blocks\CadastreBlock;
 use Urbizen\Platform\Blocks\FormBlock;
 use Urbizen\Platform\Files\FileCleaner;
+use Urbizen\Platform\Http\ComptesController;
 use Urbizen\Platform\Http\FileDownloadController;
 use Urbizen\Platform\Http\SubmissionController;
 use Urbizen\Platform\Adapter\WpCliAccountsCommand;
@@ -114,6 +115,7 @@ final class Plugin {
 		SubmissionPostType::register();
 		SubmissionController::register();
 		FileDownloadController::register();
+		ComptesController::register();
 		FileCleaner::register();
 		TrashGuard::register();
 		Retention::register();
