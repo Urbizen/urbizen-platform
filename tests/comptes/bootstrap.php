@@ -40,6 +40,8 @@ $urbizen_fichiers = array(
 	'Account/InscriptionService.php',
 	'Account/RoleClient.php',
 	'Account/AutorisationComptes.php',
+	'Account/LienVerification.php',
+	'Account/CourrielVerification.php',
 );
 
 foreach ( $urbizen_fichiers as $urbizen_fichier ) {
