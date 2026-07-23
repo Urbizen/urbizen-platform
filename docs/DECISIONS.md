@@ -1734,10 +1734,41 @@ relations *utilisateur × organisation* que `user_meta` ne sait pas porter.
   permanente rendrait un jeton légitime inutilisable après un simple échec de
   promotion. Le condensat n'est effacé qu'après une vérification **relue** — la
   seule preuve d'écriture, leçon déjà payée sur les métadonnées de demande.
-- **Rien ne décide sur un état lu avant le verrou.** Le contrôle préalable est
-  un préfiltre : il évite un verrou inutile, il n'autorise rien. Cette propriété
-  se prouve par l'ORDRE des opérations, non par un entrelacement — le code
-  correct ne lisant rien avant le verrou, rien ne peut y devenir périmé.
+- **Aucune lecture de stockage ne précède le verrou.** Le contrôle préalable de
+  `consommer()` est une validation d'**arguments** — identifiant positif, jeton
+  de forme plausible — qui n'interroge ni la base ni les métadonnées. Il
+  n'autorise rien et n'écarte que des valeurs qui ne peuvent pas être un jeton,
+  quel que soit l'état du stockage. La propriété se prouve donc par l'ORDRE des
+  opérations, non par un entrelacement : le code correct ne lisant rien avant le
+  verrou, rien ne peut y devenir périmé, et la course n'a pas lieu.
+- **Une seule émission peut être en vol à la fois.** Confirmer après l'envoi ne
+  suffisait pas : entre la préparation de P1 et son départ, rien ne disait que
+  P1 existait, et P2 pouvait préparer un second jeton qui invalidait le premier
+  avant même qu'il parte. Deux courriels arrivaient alors, dont l'un portait un
+  lien déjà mort, sans que le destinataire puisse distinguer lequel.
+  `_urbizen_verif_emission_en_attente` est l'état manquant ; `confirmer` et
+  `annuler` exigent l'identifiant rendu à la préparation, de sorte qu'un appelant
+  lent ne puisse pas clore l'émission d'un autre.
+- **Annuler détruit le jeton ; le conserver n'aurait aucun sens.** Le jeton brut
+  n'est pas stocké : il n'existait que dans la réponse rendue à l'appelant. Un
+  jeton « conservé » serait un condensat que plus personne ne peut satisfaire,
+  occupant la place du suivant. Le quota, lui, reste intact : on peut repréparer
+  aussitôt.
+- **Consommer un jeton décompte le créneau si son émission est encore ouverte.**
+  Suivre le lien est la preuve d'envoi la plus forte qui soit. Sans ce décompte,
+  cliquer plus vite que l'appelant ne confirme rendrait le créneau gratuit, et
+  l'opération répétée viderait le quota de sa fonction.
+- **Le rôle est réconcilié en place, jamais retiré puis reposé.** Contrairement
+  à ce qu'on pourrait croire, `remove_role()` ne vide pas le `wp_capabilities`
+  des utilisateurs : le rôle recréé leur revient. Le danger est la **fenêtre** —
+  entre le retrait et la repose, aucun objet de rôle ne répond, `read` est
+  refusée à tout client dont une requête passe là, et une mort du processus
+  laisse l'installation sans rôle. La correction se fait donc capacité par
+  capacité, et le rôle figure dans chaque écriture de l'option.
+- **La garde `profile_update` est comptée, par utilisateur.** Globale, elle
+  ferait taire l'invalidation d'un compte pendant qu'on en promeut un autre dans
+  la même requête. Simple booléen, elle ne survivrait pas à l'imbrication : la
+  promotion interne, en se retirant, désarmerait celle qui l'englobe.
 - **Le rôle n'est jamais installé par le trafic.** Une visite ne doit provoquer
   aucune écriture d'installation, même principe que l'exécuteur de migrations.
   `wp urbizen accounts install` est le chemin réel d'un déploiement, un `rsync`
