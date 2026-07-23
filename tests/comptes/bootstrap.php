@@ -34,6 +34,7 @@ $urbizen_fichiers = array(
 	'Account/VerrouCompte.php',
 	'Account/LimiteEnvois.php',
 	'Account/JetonVerification.php',
+	'Account/EmissionEnAttente.php',
 	'Account/ResultatEmission.php',
 	'Account/VerificationService.php',
 	'Account/InscriptionService.php',

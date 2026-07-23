@@ -121,6 +121,14 @@ check( '5 · AUCUN COMPTE N’EST CRÉÉ', array() === $c7->utilisateurs );
 list( $c8, $db8, $s8 ) = inscription();
 $premier = $s8->inscrire( 'occupee@exemple.fr', $mdp, $t );
 
+// Ce que fera E2.2 dès le courriel parti : clore l'émission. Sans cette étape,
+// le compte reste fermé aux préparations pendant cinq minutes — c'est justement
+// la protection qu'on vient d'ajouter, et l'éprouver ici serait la contourner.
+$v8 = new VerificationService( $c8, $db8 );
+
+check( '6 · l’émission initiale est close par l’appelant',
+	$v8->confirmer_emission( $premier['compte'], $premier['emission']->emission_id(), $t ) );
+
 // Compte non vérifié : un renvoi est tenté.
 $second = $s8->inscrire( 'occupee@exemple.fr', $mdp, $t + 120 );
 
@@ -128,6 +136,16 @@ check( '6 · aucun second compte n’est créé', false === $second['cree'] );
 check( '6 · le compte visé est le premier', $premier['compte'] === $second['compte'] );
 check( '6 · UN RENVOI EST TENTÉ POUR UN COMPTE NON VÉRIFIÉ',
 	null !== $second['emission'] && $second['emission']->est_prepare() );
+
+// Et tant que ce renvoi n'est pas clos, un troisième essai ne repart pas.
+$aussitot = $s8->inscrire( 'occupee@exemple.fr', $mdp, $t + 121 );
+
+check( '6 · UN TROISIÈME ESSAI IMMÉDIAT N’ÉMET RIEN',
+	null !== $aussitot['emission']
+	&& false === $aussitot['emission']->est_prepare()
+	&& 'emission_en_attente' === $aussitot['emission']->motif() );
+
+$v8->confirmer_emission( $second['compte'], $second['emission']->emission_id(), $t + 120 );
 
 // Compte vérifié : aucun courriel, jamais.
 $c8->ecrire_meta( $premier['compte'], VerificationService::META_VERIFIE, '1' );

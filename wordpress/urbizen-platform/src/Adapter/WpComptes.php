@@ -16,6 +16,15 @@
  * adresse. La garde est donc explicite, limitée à la requête courante, et
  * retirée dans un `finally` — y compris si `wp_update_user` lève.
  *
+ * Elle est **indexée par utilisateur et comptée**, jamais globale. Un booléen
+ * global armerait la garde pour tout le monde : une promotion sur le compte A
+ * ferait taire l'invalidation d'un changement subi par le compte B dans la même
+ * requête — exactement le cas qu'un crochet accroché à `profile_update` peut
+ * provoquer. Et un simple booléen par utilisateur ne survivrait pas à
+ * l'imbrication : la promotion interne, en se retirant, désarmerait celle qui
+ * l'englobe. D'où un compteur, décrémenté dans le `finally`, et l'entrée retirée
+ * seulement lorsqu'il revient à zéro.
+ *
  * @package Urbizen\Platform\Adapter
  */
 
@@ -23,6 +32,7 @@ namespace Urbizen\Platform\Adapter;
 
 use Throwable;
 use Urbizen\Platform\Account\ComptesGateway;
+use Urbizen\Platform\Account\EmissionEnAttente;
 use Urbizen\Platform\Account\JetonVerification;
 use Urbizen\Platform\Account\RoleClient;
 use Urbizen\Platform\Account\VerificationService;
@@ -38,9 +48,9 @@ defined( 'ABSPATH' ) || exit;
 final class WpComptes implements ComptesGateway {
 
 	/**
-	 * Comptes dont une promotion Urbizen est en cours, dans cette requête.
+	 * Promotions Urbizen en cours dans cette requête : identifiant → profondeur.
 	 *
-	 * @var array<int, bool>
+	 * @var array<int, int>
 	 */
 	private static array $promotions = array();
 
@@ -69,8 +79,9 @@ final class WpComptes implements ComptesGateway {
 			return;
 		}
 
-		// Notre propre promotion : ne rien faire.
-		if ( isset( self::$promotions[ $id ] ) ) {
+		// Notre propre promotion, sur CE compte : ne rien faire. Une promotion
+		// en cours sur un autre compte ne doit rien désarmer ici.
+		if ( ( self::$promotions[ $id ] ?? 0 ) > 0 ) {
 			return;
 		}
 
@@ -97,6 +108,10 @@ final class WpComptes implements ComptesGateway {
 		delete_user_meta( $id, JetonVerification::META_EXPIRE );
 		delete_user_meta( $id, JetonVerification::META_CIBLE );
 		delete_user_meta( $id, VerificationService::META_EN_ATTENTE );
+
+		// L'émission en attente vise une adresse qui n'a plus cours : la laisser
+		// bloquerait cinq minutes une préparation devenue légitime.
+		delete_user_meta( $id, EmissionEnAttente::META );
 
 		Logger::info( sprintf( 'verification invalidee : adresse modifiee hors flux (compte %d)', $id ) );
 	}
@@ -243,7 +258,7 @@ final class WpComptes implements ComptesGateway {
 			return false;
 		}
 
-		self::$promotions[ $id ] = true;
+		self::$promotions[ $id ] = ( self::$promotions[ $id ] ?? 0 ) + 1;
 
 		try {
 			$retour = wp_update_user( array( 'ID' => $id, 'user_email' => $canonique ) );
@@ -261,10 +276,17 @@ final class WpComptes implements ComptesGateway {
 		} catch ( Throwable $e ) {
 			return false;
 		} finally {
-			// La garde est retirée dans tous les cas, exception comprise :
-			// la laisser posée désarmerait la surveillance pour le reste de
-			// la requête.
-			unset( self::$promotions[ $id ] );
+			// La garde est décrémentée dans tous les cas, exception comprise :
+			// la laisser posée désarmerait la surveillance pour le reste de la
+			// requête. L'entrée ne disparaît qu'au retour à zéro, sinon une
+			// promotion imbriquée désarmerait celle qui l'englobe.
+			$restant = ( self::$promotions[ $id ] ?? 0 ) - 1;
+
+			if ( $restant > 0 ) {
+				self::$promotions[ $id ] = $restant;
+			} else {
+				unset( self::$promotions[ $id ] );
+			}
 		}
 	}
 
@@ -285,7 +307,20 @@ final class WpComptes implements ComptesGateway {
 	 * @return bool
 	 */
 	public static function promotion_en_cours( int $id ): bool {
-		return isset( self::$promotions[ $id ] );
+		return ( self::$promotions[ $id ] ?? 0 ) > 0;
+	}
+
+	/**
+	 * Profondeur de promotion pour ce compte.
+	 *
+	 * Réservé aux bancs, qui doivent pouvoir prouver que l'imbrication est
+	 * comptée et non écrasée.
+	 *
+	 * @param int $id Identifiant.
+	 * @return int
+	 */
+	public static function profondeur_promotion( int $id ): int {
+		return (int) ( self::$promotions[ $id ] ?? 0 );
 	}
 
 	/**

@@ -86,6 +86,7 @@ foreach (
 		'src/Account/VerrouCompte.php',
 		'src/Account/LimiteEnvois.php',
 		'src/Account/JetonVerification.php',
+		'src/Account/EmissionEnAttente.php',
 		'src/Account/ResultatEmission.php',
 		'src/Account/VerificationService.php',
 		'src/Account/InscriptionService.php',

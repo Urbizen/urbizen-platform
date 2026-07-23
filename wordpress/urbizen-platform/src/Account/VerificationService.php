@@ -2,18 +2,25 @@
 /**
  * Émission et consommation des jetons de vérification.
  *
- * Deux invariants portent la sûreté de ce service.
+ * Trois invariants portent la sûreté de ce service.
  *
- * **Tout ce qui décide passe sous verrou.** Le contrôle effectué avant
- * l'acquisition n'est qu'un préfiltre : il évite d'acquérir un verrou pour
- * rien, il n'autorise rien. L'état sur lequel repose la mutation finale est
- * **relu après** le verrou, jamais avant — sans quoi deux processus agiraient
- * sur une photographie périmée.
+ * **Aucune lecture de stockage ne précède le verrou.** `consommer()` commence
+ * par un contrôle d'arguments — identifiant positif, jeton de forme plausible —
+ * qui n'interroge ni la base ni les métadonnées : c'est une validation de
+ * paramètres, pas une lecture d'état. Tout ce qui décide est lu **après**
+ * l'acquisition. C'est vérifié par l'ordre des opérations, pas par une course :
+ * le code correct ne lisant rien avant le verrou, rien ne peut y devenir
+ * périmé.
  *
- * **Rien de définitif n'est écrit sur le chemin de l'échec.** Le condensat
- * n'est supprimé qu'après une vérification relue et confirmée ; le quota n'est
- * consommé que lorsque l'appelant confirme son envoi. Un échec laisse donc un
- * jeton légitime encore utilisable, ce qui est le comportement voulu.
+ * **Une seule émission peut être en vol à la fois.** La confirmation après
+ * envoi ne suffisait pas : entre la préparation de P1 et son envoi, rien ne
+ * disait que P1 existait, et P2 pouvait préparer un second jeton qui invalidait
+ * le premier avant même son départ. `EmissionEnAttente` est cet état manquant ;
+ * tant qu'il est posé et non expiré, aucune autre préparation ne passe.
+ *
+ * **Rien de définitif n'est écrit sur le chemin de l'échec.** Le condensat n'est
+ * supprimé qu'après une vérification relue et confirmée ; le quota n'est
+ * consommé qu'à la confirmation d'un envoi réel.
  *
  * @package Urbizen\Platform\Account
  */
@@ -23,6 +30,7 @@ namespace Urbizen\Platform\Account;
 use Throwable;
 use Urbizen\Platform\Domain\Account\AdresseCourriel;
 use Urbizen\Platform\Domain\Account\Compte;
+use Urbizen\Platform\Domain\Support\Ulid;
 use Urbizen\Platform\Schema\DatabaseGateway;
 use Urbizen\Platform\Support\Logger;
 
@@ -62,6 +70,23 @@ final class VerificationService {
 	/**
 	 * Prépare un jeton, sans consommer le quota.
 	 *
+	 * Sous verrou, dans cet ordre :
+	 *
+	 *   1. relire et nettoyer une émission en attente expirée — avec le jeton
+	 *      qu'elle portait ;
+	 *   2. refuser si une émission non expirée existe déjà ;
+	 *   3. purger les horodatages sortis de la fenêtre ;
+	 *   4. contrôler quota et délai minimal ;
+	 *   5. engendrer le jeton et sa génération ;
+	 *   6. écrire condensat, échéance, cible, génération ;
+	 *   7. écrire l'émission en attente — **en dernier**.
+	 *
+	 * L'ordre 6-puis-7 n'est pas indifférent. Si le processus meurt entre les
+	 * deux, on laisse un jeton sans émission : la préparation suivante n'est pas
+	 * bloquée, et elle écrase ce jeton en incrémentant la génération. L'ordre
+	 * inverse laisserait une émission sans jeton, qui bloquerait le compte
+	 * jusqu'à son expiration pour rien.
+	 *
 	 * @param int      $compte     Identifiant.
 	 * @param int|null $maintenant Horloge injectable.
 	 * @return ResultatEmission
@@ -82,6 +107,29 @@ final class VerificationService {
 				return ResultatEmission::refuse( 'compte_absent' );
 			}
 
+			// (1-2) Une émission est-elle déjà en vol ?
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
+			);
+
+			if ( null !== $attente ) {
+				if ( ! EmissionEnAttente::est_expiree( $attente, $maintenant ) ) {
+					Logger::info( sprintf( 'emission refusee : emission_en_attente (compte %d)', $compte ) );
+
+					return ResultatEmission::refuse( 'emission_en_attente' );
+				}
+
+				// Expirée : le processus qui l'avait ouverte n'a ni confirmé ni
+				// annulé. Son jeton part avec elle — sinon un lien préparé, non
+				// envoyé et jamais clos resterait consommable un jour entier.
+				$this->effacer_jeton( $compte );
+
+				if ( ! $this->comptes->supprimer_meta( $compte, EmissionEnAttente::META ) ) {
+					return ResultatEmission::refuse( 'nettoyage_impossible' );
+				}
+			}
+
+			// (3-4) Quota et délai.
 			$etat  = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
 			$motif = LimiteEnvois::motif_de_refus( $etat, $maintenant );
 
@@ -91,12 +139,13 @@ final class VerificationService {
 				return ResultatEmission::refuse( $motif );
 			}
 
+			// (5) Jeton.
 			$cible      = $objet->cible_de_verification()->valeur();
 			$generation = $this->generation_suivante( $compte );
 			$jeton      = JetonVerification::engendrer();
 			$expire_le  = $maintenant + JetonVerification::TTL;
 
-			// L'écriture est groupée : une seule valeur manquante rendra le
+			// (6) L'écriture est groupée : une seule valeur manquante rendra le
 			// jeton invalide à la consommation, jamais partiellement valide.
 			$ecrit = $this->comptes->ecrire_meta(
 				$compte,
@@ -115,9 +164,24 @@ final class VerificationService {
 				return ResultatEmission::refuse( 'ecriture_incomplete' );
 			}
 
-			return ResultatEmission::prepare( $jeton, $cible, $expire_le );
+			// (7) L'émission en attente ferme le compte aux autres préparations.
+			$emission_id = Ulid::generer();
+
+			if ( ! $this->comptes->ecrire_meta(
+				$compte,
+				EmissionEnAttente::META,
+				EmissionEnAttente::encoder( $emission_id, $generation, $cible, $maintenant )
+			) ) {
+				$this->effacer_jeton( $compte );
+				$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
+
+				return ResultatEmission::refuse( 'ecriture_incomplete' );
+			}
+
+			return ResultatEmission::prepare( $jeton, $cible, $expire_le, $emission_id, $generation );
 		} catch ( Throwable $e ) {
 			$this->effacer_jeton( $compte );
+			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 
 			return ResultatEmission::refuse( 'exception' );
 		} finally {
@@ -128,11 +192,24 @@ final class VerificationService {
 	/**
 	 * Confirme qu'une émission a réellement eu lieu, et consomme le quota.
 	 *
-	 * @param int      $compte     Identifiant.
-	 * @param int|null $maintenant Horloge injectable.
+	 * L'identifiant présenté doit être celui de l'émission encore en attente :
+	 * un appelant lent ne doit pas pouvoir clore une émission plus récente que
+	 * la sienne. Génération et cible sont recontrôlées contre le jeton stocké —
+	 * si le jeton a été remplacé, l'émission que l'on croit confirmer n'existe
+	 * plus.
+	 *
+	 * **Le quota est écrit avant l'effacement de l'émission.** L'ordre inverse
+	 * serait plus élégant mais penche du mauvais côté : si l'effacement passait
+	 * et l'écriture du quota échouait, un envoi réel ne serait pas décompté. Ici,
+	 * une suppression manquée coûte au pire un créneau de trop — jamais un
+	 * créneau de moins.
+	 *
+	 * @param int      $compte      Identifiant.
+	 * @param string   $emission_id Identifiant d'émission.
+	 * @param int|null $maintenant  Horloge injectable.
 	 * @return bool
 	 */
-	public function confirmer_emission( int $compte, ?int $maintenant = null ): bool {
+	public function confirmer_emission( int $compte, string $emission_id, ?int $maintenant = null ): bool {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 		$verrou     = VerrouCompte::acquerir( $this->db, $compte, $maintenant );
 
@@ -141,35 +218,100 @@ final class VerificationService {
 		}
 
 		try {
-			$etat = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
-
-			// Un quota illisible est réécrit proprement plutôt que conservé :
-			// on repart d'un envoi connu, jamais d'un état qu'on ne sait pas lire.
-			$base = empty( $etat['corrompue'] ) ? $etat['horodatages'] : array();
-
-			return $this->comptes->ecrire_meta(
-				$compte,
-				LimiteEnvois::META,
-				LimiteEnvois::encoder( LimiteEnvois::confirmer( $base, $maintenant ) )
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
 			);
+
+			if ( null === $attente || ! EmissionEnAttente::correspond( $attente, $emission_id ) ) {
+				return false;
+			}
+
+			if ( ! $this->emission_porte_le_jeton( $compte, $attente ) ) {
+				return false;
+			}
+
+			if ( ! $this->consommer_quota( $compte, $maintenant ) ) {
+				return false;
+			}
+
+			// L'émission est close ; le jeton, lui, reste actif jusqu'à sa
+			// consommation ou son échéance.
+			return $this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 		} finally {
 			$verrou->liberer();
 		}
 	}
 
 	/**
-	 * Annule une émission : le quota reste intact, le jeton reste valide.
+	 * Annule une émission : le quota reste intact, le jeton est détruit.
 	 *
-	 * Rien à écrire — c'est précisément le point. La méthode existe pour que
-	 * l'appelant exprime son intention, et pour que les bancs l'éprouvent.
+	 * Détruire le jeton peut surprendre — mais le conserver ne servirait à rien.
+	 * Le jeton brut n'est pas stocké : il n'existait que dans la réponse rendue à
+	 * l'appelant, et disparaît avec la requête. Un jeton « conservé » serait donc
+	 * un condensat que plus personne ne peut satisfaire, occupant la place du
+	 * suivant. L'appelant doit repréparer, et il le peut immédiatement puisque le
+	 * quota n'a pas bougé.
 	 *
-	 * @param int $compte Identifiant.
+	 * @param int      $compte      Identifiant.
+	 * @param string   $emission_id Identifiant d'émission.
+	 * @param int|null $maintenant  Horloge injectable.
 	 * @return bool
 	 */
-	public function annuler_emission( int $compte ): bool {
-		Logger::info( sprintf( 'emission annulee (compte %d)', $compte ) );
+	public function annuler_emission( int $compte, string $emission_id, ?int $maintenant = null ): bool {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+		$verrou     = VerrouCompte::acquerir( $this->db, $compte, $maintenant );
 
-		return true;
+		if ( null === $verrou ) {
+			return false;
+		}
+
+		try {
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
+			);
+
+			if ( null === $attente || ! EmissionEnAttente::correspond( $attente, $emission_id ) ) {
+				return false;
+			}
+
+			// Le jeton n'est effacé que s'il est bien celui de CETTE émission :
+			// une génération plus récente appartient à quelqu'un d'autre.
+			if ( $this->emission_porte_le_jeton( $compte, $attente ) ) {
+				$this->effacer_jeton( $compte );
+			}
+
+			if ( ! $this->comptes->supprimer_meta( $compte, EmissionEnAttente::META ) ) {
+				return false;
+			}
+
+			Logger::info( sprintf( 'emission annulee : quota intact (compte %d)', $compte ) );
+
+			return true;
+		} finally {
+			$verrou->liberer();
+		}
+	}
+
+	/**
+	 * Le jeton actuellement stocké est-il bien celui de cette émission ?
+	 *
+	 * @param int                                        $compte  Identifiant.
+	 * @param array{generation: int, cible: string}      $attente Émission décodée.
+	 * @return bool
+	 */
+	private function emission_porte_le_jeton( int $compte, array $attente ): bool {
+		$generation = $this->comptes->lire_meta( $compte, JetonVerification::META_GENERATION );
+		$cible      = $this->comptes->lire_meta( $compte, JetonVerification::META_CIBLE );
+
+		if ( null === $generation || null === $cible ) {
+			return false;
+		}
+
+		if ( ! ctype_digit( (string) $generation ) || (int) $generation !== (int) $attente['generation'] ) {
+			return false;
+		}
+
+		return hash_equals( (string) $cible, (string) $attente['cible'] );
 	}
 
 	/**
@@ -183,7 +325,11 @@ final class VerificationService {
 	public function consommer( int $compte, string $jeton, ?int $maintenant = null ): string {
 		$maintenant = null === $maintenant ? time() : $maintenant;
 
-		// (1) Préfiltre : n'autorise rien, évite seulement un verrou inutile.
+		// (1) Contrôle d'ARGUMENTS, pas de lecture d'état : ni base, ni
+		// métadonnée n'est interrogée ici. Il n'autorise rien et n'écarte que
+		// des valeurs qui ne peuvent pas être un jeton, quel que soit l'état du
+		// stockage. La règle « aucune lecture avant le verrou » est donc
+		// entière, et c'est bien l'ordre des opérations qui l'établit.
 		if ( $compte <= 0 || ! JetonVerification::forme_valide( $jeton ) ) {
 			return 'jeton_invalide';
 		}
@@ -254,7 +400,30 @@ final class VerificationService {
 
 			$this->comptes->ecrire_meta( $compte, self::META_VERIFIE_LE, gmdate( 'Y-m-d H:i:s', $maintenant ) );
 
-			// (9) Le condensat n'est effacé qu'ici, après preuve.
+			/*
+			 * (9) Une émission de ce jeton était-elle encore en attente ?
+			 *
+			 * Alors le courriel est bel et bien parti — le destinataire vient
+			 * d'en suivre le lien. C'est la preuve d'envoi la plus forte qui
+			 * soit, et le créneau doit être décompté ici : sans cela, cliquer
+			 * plus vite que l'appelant ne confirme rendrait le créneau gratuit,
+			 * et l'opération répétée viderait le quota de sa fonction.
+			 */
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
+			);
+
+			if ( null !== $attente
+				&& empty( $attente['corrompue'] )
+				&& (int) $generation === (int) $attente['generation']
+				&& hash_equals( (string) $attente['cible'], $cible )
+			) {
+				$this->consommer_quota( $compte, $maintenant );
+			}
+
+			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
+
+			// (10) Le condensat n'est effacé qu'ici, après preuve.
 			$this->effacer_jeton( $compte );
 			$this->comptes->supprimer_meta( $compte, self::META_EN_ATTENTE );
 
@@ -264,9 +433,30 @@ final class VerificationService {
 		} catch ( Throwable $e ) {
 			return 'exception';
 		} finally {
-			// (10) Libération dans tous les cas.
+			// (11) Libération dans tous les cas.
 			$verrou->liberer();
 		}
+	}
+
+	/**
+	 * Ajoute un créneau confirmé au quota. Verrou déjà tenu.
+	 *
+	 * @param int $compte     Identifiant.
+	 * @param int $maintenant Horloge.
+	 * @return bool
+	 */
+	private function consommer_quota( int $compte, int $maintenant ): bool {
+		$etat = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+
+		// Un quota illisible est réécrit proprement plutôt que conservé : on
+		// repart d'un envoi connu, jamais d'un état qu'on ne sait pas lire.
+		$base = empty( $etat['corrompue'] ) ? $etat['horodatages'] : array();
+
+		return $this->comptes->ecrire_meta(
+			$compte,
+			LimiteEnvois::META,
+			LimiteEnvois::encoder( LimiteEnvois::confirmer( $base, $maintenant ) )
+		);
 	}
 
 	/**

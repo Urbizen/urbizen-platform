@@ -16,6 +16,7 @@ declare( strict_types = 1 );
 require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/doublures.php';
 
+use Urbizen\Platform\Account\EmissionEnAttente;
 use Urbizen\Platform\Account\JetonVerification as J;
 use Urbizen\Platform\Account\LimiteEnvois;
 use Urbizen\Platform\Account\VerificationService;
@@ -53,21 +54,32 @@ check( '1 · LE JETON BRUT N’EST PAS STOCKÉ',
 	false === strpos( json_encode( $comptes->metas ), $r->jeton() ) );
 check( '1 · LE QUOTA N’EST PAS ENCORE CONSOMMÉ',
 	null === $comptes->lire_meta( $id, LimiteEnvois::META ) );
+check( '1 · une émission en attente est posée',
+	null !== $comptes->lire_meta( $id, EmissionEnAttente::META ) );
+check( '1 · elle porte un identifiant, rendu à l’appelant', 26 === strlen( $r->emission_id() ) );
+check( '1 · et la génération du jeton', 1 === $r->generation() );
 check( '1 · le verrou est libéré', array() === $db->options );
 
 // ======================================================================
 // 2 · CONFIRMATION ET ANNULATION
 // ======================================================================
-check( '2 · la confirmation réussit', $service->confirmer_emission( $id, $t ) );
+check( '2 · la confirmation réussit', $service->confirmer_emission( $id, $r->emission_id(), $t ) );
 check( '2 · le quota porte un horodatage',
 	array( $t ) === LimiteEnvois::decoder( $comptes->lire_meta( $id, LimiteEnvois::META ) )['horodatages'] );
+check( '2 · L’ÉMISSION EN ATTENTE EST CLOSE',
+	null === $comptes->lire_meta( $id, EmissionEnAttente::META ) );
+check( '2 · le jeton, lui, reste actif', null !== $comptes->lire_meta( $id, J::META_CONDENSAT ) );
 
 list( $c2, $db2, $s2, $id2 ) = monter( 'paul@exemple.fr' );
-$s2->preparer( $id2, $t );
-$s2->annuler_emission( $id2 );
+$r2 = $s2->preparer( $id2, $t );
 
+check( '2 · l’annulation réussit', $s2->annuler_emission( $id2, $r2->emission_id(), $t ) );
 check( '2 · L’ANNULATION NE CONSOMME PAS LE QUOTA', null === $c2->lire_meta( $id2, LimiteEnvois::META ) );
-check( '2 · et le jeton reste valide', null !== $c2->lire_meta( $id2, J::META_CONDENSAT ) );
+check( '2 · ELLE DÉTRUIT LE JETON', null === $c2->lire_meta( $id2, J::META_CONDENSAT ) );
+check( '2 · et libère l’émission en attente',
+	null === $c2->lire_meta( $id2, EmissionEnAttente::META ) );
+check( '2 · une nouvelle préparation est aussitôt possible',
+	$s2->preparer( $id2, $t )->est_prepare() );
 
 // ======================================================================
 // 3 · CONSOMMATION
@@ -109,6 +121,7 @@ check( '3 · et le compte reste non vérifié',
 list( $c5, $db5, $s5, $id5 ) = monter( 'marie@exemple.fr' );
 
 $ancien = $s5->preparer( $id5, $t );
+$s5->confirmer_emission( $id5, $ancien->emission_id(), $t );
 $nouveau = $s5->preparer( $id5, $t + 120 );
 
 check( '4 · P2 a bien obtenu un second jeton', $nouveau->est_prepare() );
@@ -236,7 +249,10 @@ $r9 = $s9->preparer( $id9, $t );
 $condensat9 = (string) $c9->lire_meta( $id9, J::META_CONDENSAT );
 
 $s9->consommer( $id9, $r9->jeton(), $t + 10 );
-$s9->annuler_emission( $id9 );
+
+list( $c9b, $db9b, $s9b, $id9b ) = monter( 'secrete2@exemple.fr' );
+$r9b = $s9b->preparer( $id9b, $t );
+$s9b->annuler_emission( $id9b, $r9b->emission_id(), $t );
 
 $journal = Logger::tout();
 

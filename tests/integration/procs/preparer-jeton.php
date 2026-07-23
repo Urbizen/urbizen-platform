@@ -3,9 +3,14 @@
  * Processus fils : prépare une émission, au signal.
  *
  * Deux fils préparent en même temps pour le même compte. Le verrou doit les
- * sérialiser : jamais deux jetons actifs, jamais d'incrémentation perdue.
+ * sérialiser, et le nouvel état d'émission en attente doit interdire au second
+ * de repartir : jamais deux courriels pour une même demande, jamais deux jetons
+ * actifs, jamais d'incrémentation perdue.
  *
- * Usage : php preparer-jeton.php <compte> <fichier> <depart>
+ * Le quatrième argument, facultatif, demande de NE PAS confirmer — c'est ainsi
+ * qu'on reproduit un appelant encore en train d'envoyer son courriel.
+ *
+ * Usage : php preparer-jeton.php <compte> <fichier> <depart> [confirmer|attendre]
  */
 
 declare( strict_types = 1 );
@@ -13,6 +18,7 @@ declare( strict_types = 1 );
 $compte   = (int) ( $argv[1] ?? 0 );
 $resultat = (string) ( $argv[2] ?? '' );
 $depart   = (float) ( $argv[3] ?? 0 );
+$suite    = (string) ( $argv[4] ?? 'confirmer' );
 
 if ( $compte <= 0 || '' === $resultat ) {
 	fwrite( STDERR, "arguments attendus\n" );
@@ -35,13 +41,16 @@ $service = new VerificationService( new WpComptes(), new WpdbGateway() );
 $r       = $service->preparer( $compte );
 
 if ( $r->est_prepare() ) {
-	// Confirmation immédiate : c'est elle qui touche le quota, et c'est donc
-	// elle qui pourrait perdre une incrémentation.
-	$service->confirmer_emission( $compte );
+	if ( 'confirmer' === $suite ) {
+		// Confirmation immédiate : c'est elle qui touche le quota, et c'est
+		// donc elle qui pourrait perdre une incrémentation.
+		$service->confirmer_emission( $compte, $r->emission_id() );
+	}
 
-	// Le jeton n'est PAS écrit : un fichier de banc n'a pas à le porter. Seul
-	// son condensat, déjà en base, permettra au parent de compter.
-	file_put_contents( $resultat, 'prepare' );
+	// Ni le jeton, ni l'adresse ne sont écrits : un fichier de banc n'a pas à
+	// les porter. Seul l'identifiant d'émission ressort, pour que le parent
+	// puisse éprouver qu'un ancien identifiant ne clôt rien.
+	file_put_contents( $resultat, 'prepare:' . $r->emission_id() );
 
 	exit( 0 );
 }

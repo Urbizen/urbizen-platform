@@ -29,6 +29,7 @@ bancs=(
 	test-verrou.php
 	test-limite.php
 	test-jeton.php
+	test-emission.php
 	test-verification.php
 	test-inscription.php
 )
