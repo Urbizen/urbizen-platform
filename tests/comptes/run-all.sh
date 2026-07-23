@@ -37,6 +37,7 @@ bancs=(
 	test-envoi.php
 	test-comptes-controller.php
 	test-verification-page.php
+	test-quota-verify.php
 	test-inscription.php
 )
 

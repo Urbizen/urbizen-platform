@@ -16,6 +16,8 @@
 namespace Urbizen\Platform\Adapter;
 
 use Urbizen\Platform\Account\LimiteEnvois;
+use Urbizen\Platform\Account\VerrouCompte;
+use Urbizen\Platform\Schema\DatabaseGateway;
 use Urbizen\Platform\Account\RoleClient;
 use WP_CLI;
 
@@ -149,6 +151,7 @@ final class WpCliAccountsCommand {
 		$divergents = 0;
 		$corrompus  = 0;
 		$repares    = 0;
+		$echecs     = 0;
 		$examines   = 0;
 
 		foreach ( self::comptes_a_examiner() as $compte ) {
@@ -192,10 +195,13 @@ final class WpCliAccountsCommand {
 				continue;
 			}
 
-			// Le MIROIR SEUL est réécrit, depuis la source.
-			update_user_meta( $compte, LimiteEnvois::META, LimiteEnvois::encoder( $attendu ) );
+			if ( self::reparer_miroir( $compte ) ) {
+				$repares++;
 
-			$repares++;
+				continue;
+			}
+
+			$echecs++;
 		}
 
 		WP_CLI::log( sprintf( 'comptes examinés : %d', $examines ) );
@@ -203,12 +209,13 @@ final class WpCliAccountsCommand {
 		WP_CLI::log( sprintf( 'sources illisibles : %d', $corrompus ) );
 
 		if ( $reparer ) {
-			WP_CLI::log( sprintf( 'miroirs réécrits : %d', $repares ) );
+			WP_CLI::log( sprintf( 'miroirs réécrits et RELUS : %d', $repares ) );
+			WP_CLI::log( sprintf( 'réparations échouées : %d', $echecs ) );
 		}
 
 		// Code de sortie non nul en cas de divergence : de quoi arrêter un
 		// déploiement, ou vérifier avant un retour arrière.
-		if ( $divergents > $repares || $corrompus > 0 ) {
+		if ( $echecs > 0 || $divergents > $repares || $corrompus > 0 ) {
 			WP_CLI::error( 'divergence constatée' );
 
 			return;
@@ -237,5 +244,99 @@ final class WpCliAccountsCommand {
 		);
 
 		return array_map( 'intval', is_array( $ids ) ? $ids : array() );
+	}
+
+	/**
+	 * Réécrit le miroir d'un compte, SOUS VERROU, et le PROUVE.
+	 *
+	 * Écrire sans relire n'est pas une réparation : c'est une intention. Le
+	 * retour de l'écriture est contrôlé, puis le miroir est RELU et comparé à
+	 * ce qu'il devait devenir. Sans cette relecture, la commande annoncerait
+	 * des réparations qui n'ont pas eu lieu — et l'on s'y fierait pour valider
+	 * un retour arrière.
+	 *
+	 * Le verrou est indispensable : sans lui, on écrirait un miroir dérivé
+	 * d'une source lue AVANT qu'une émission concurrente ne la fasse avancer,
+	 * et l'on remettrait le compte en arrière. Source et miroir sont donc
+	 * relus APRÈS acquisition.
+	 *
+	 * La source n'est jamais écrite, et une source absente ou illisible ne
+	 * donne lieu à AUCUNE écriture : on ne saurait pas quoi écrire.
+	 *
+	 * @param int $compte Identifiant.
+	 * @return bool Vrai seulement si la réparation est prouvée.
+	 */
+	private static function reparer_miroir( int $compte ): bool {
+		$verrou = VerrouCompte::acquerir( self::passerelle(), $compte );
+
+		if ( null === $verrou ) {
+			WP_CLI::warning( sprintf( 'compte %d : verrou indisponible, aucune réparation', $compte ) );
+
+			return false;
+		}
+
+		try {
+			// Relecture SOUS verrou : la source a pu avancer depuis le constat.
+			$brut   = get_user_meta( $compte, LimiteEnvois::META_SOURCE, true );
+			$source = LimiteEnvois::decoder_source( '' === $brut ? null : (string) $brut );
+
+			if ( ! empty( $source['corrompue'] ) || ! empty( $source['absente'] ) ) {
+				WP_CLI::warning( sprintf( 'compte %d : source inexploitable sous verrou', $compte ) );
+
+				return false;
+			}
+
+			$attendu = LimiteEnvois::horodatages_de( $source['entrees'] );
+
+			// LE MIROIR SEUL.
+			if ( false === update_user_meta( $compte, LimiteEnvois::META, LimiteEnvois::encoder( $attendu ) ) ) {
+				WP_CLI::warning( sprintf( 'compte %d : écriture du miroir refusée', $compte ) );
+
+				return false;
+			}
+
+			// La preuve : on relit.
+            $relu = get_user_meta( $compte, LimiteEnvois::META, true );
+
+			if ( LimiteEnvois::decoder( '' === $relu ? null : (string) $relu )['horodatages'] !== $attendu ) {
+				WP_CLI::warning( sprintf( 'compte %d : miroir relu divergent', $compte ) );
+
+				return false;
+			}
+
+			return true;
+		} finally {
+			// Libéré AVANT tout `WP_CLI::error()`, qui termine le processus et
+			// laisserait sinon le verrou posé jusqu'à son expiration.
+			$verrou->liberer();
+		}
+	}
+
+	/**
+	 * Passerelle de base, pour le verrou.
+	 *
+	 * Isolée en une méthode plutôt qu'appelée sur place : `WpdbGateway` exige un
+	 * `$wpdb` réel, et les bancs sans WordPress doivent pouvoir substituer une
+	 * doublure sans qu'un état mutable ne traîne en production.
+	 *
+	 * @var DatabaseGateway|null
+	 */
+	private static ?DatabaseGateway $passerelle = null;
+
+	/**
+	 * Substitue la passerelle. **Réservé aux bancs.**
+	 *
+	 * @param DatabaseGateway|null $passerelle Passerelle, ou null pour rétablir.
+	 * @return void
+	 */
+	public static function substituer_passerelle( ?DatabaseGateway $passerelle ): void {
+		self::$passerelle = $passerelle;
+	}
+
+	/**
+	 * @return DatabaseGateway
+	 */
+	private static function passerelle(): DatabaseGateway {
+		return self::$passerelle ?? new WpdbGateway();
 	}
 }
