@@ -243,7 +243,25 @@ check( '7 · la préparation passe par preparer_sous_verrou(), verrou déjà ten
 	false !== strpos( $corps, 'preparer_sous_verrou(' ) );
 check( '7 · et JAMAIS par le preparer() public, qui réacquerrait',
 	1 !== preg_match( '/->preparer\\s*\\(/', $corps ) );
-check( '7 · aucune libération de verrou au milieu de la section critique',
-	false === strpos( $corps, '->liberer()' ) || 1 === substr_count( $corps, '->liberer()' ) );
+// Positions réelles dans le corps borné. Compter les libérations ne suffit
+// pas : une unique `->liberer()` DÉPLACÉE juste avant `preparer_sous_verrou()`
+// (hors `finally`) laisserait toute la préparation s'exécuter sans verrou, tout
+// en gardant une acquisition, un appel et une libération. On éprouve donc
+// l'ORDRE, et l'appartenance au `finally`.
+$p_acq  = strpos( $corps, 'VerrouCompte::acquerir' );
+$p_meta = strpos( $corps, 'ecrire_meta( $compte, self::META_EN_ATTENTE' );
+$p_prep = strpos( $corps, 'preparer_sous_verrou(' );
+$p_fin  = strpos( $corps, 'finally' );
+$p_lib  = strpos( $corps, '->liberer()' );
+
+check( '7 · UNE SEULE libération de verrou', 1 === substr_count( $corps, '->liberer()' ) );
+check( '7 · l\'acquisition PRÉCÈDE l\'écriture de META_EN_ATTENTE',
+	false !== $p_acq && false !== $p_meta && $p_acq < $p_meta );
+check( '7 · preparer_sous_verrou() SUIT l\'écriture de la cible',
+	false !== $p_prep && $p_meta < $p_prep );
+check( '7 · l\'unique libération SUIT preparer_sous_verrou()',
+	false !== $p_lib && $p_prep < $p_lib );
+check( '7 · et la libération APPARTIENT AU finally, jamais au corps du try',
+	false !== $p_fin && $p_fin < $p_lib );
 
 verdict();
