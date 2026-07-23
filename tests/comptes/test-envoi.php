@@ -242,7 +242,93 @@ check( '8 · une exception de l\'avertissement ne bloque pas non plus', true ===
 
 // Un avertissement sans destinataire ne tente rien.
 check( '8 · destinataire vide : aucun envoi tenté',
-	false === $e8b->avertir_ancienne_adresse( '', $i8b )['ok'] );
+	false === $e8b->avertir_ancienne_adresse( '' )['ok'] );
+
+/*
+ * La trace de l'avertissement ne porte QUE le code technique. On l'isole :
+ * les autres traces du domaine portent légitimement un identifiant de compte —
+ * c'est la convention de D-046, « un identifiant de compte et jamais une
+ * adresse ». C'est cette ligne-ci qui ne doit rien porter de plus.
+ */
+$ligne_avert = '';
+
+foreach ( explode( "\n", $journal ) as $ligne ) {
+	if ( false !== strpos( $ligne, 'avertissement non remis' ) ) {
+		$ligne_avert = $ligne;
+	}
+}
+
+check( '8 · la trace de l\'avertissement existe', '' !== $ligne_avert );
+check( '8 · AUCUN IDENTIFIANT DE COMPTE dans cette trace — donnée personnelle indirecte',
+	1 !== preg_match( '/compte\s*\d+/', $ligne_avert ) );
+check( '8 · aucune adresse dans cette trace', false === strpos( $ligne_avert, '@' ) );
+check( '8 · aucun jeton dans cette trace', 1 !== preg_match( '/[0-9a-f]{64}/', $ligne_avert ) );
+check( '8 · elle ne porte que le code technique',
+	false !== strpos( $ligne_avert, 'transport_refused' ) );
+
+/*
+ * La signature interdit la fuite : `avertir_ancienne_adresse()` ne reçoit pas
+ * l'identifiant du compte. Ce qu'elle ne connaît pas ne peut pas atteindre le
+ * journal.
+ */
+$params_avert = array();
+
+foreach ( ( new ReflectionMethod( EnvoiVerification::class, 'avertir_ancienne_adresse' ) )->getParameters() as $p ) {
+	$params_avert[] = $p->getName();
+}
+
+check( '8 · la méthode ne reçoit QUE le destinataire', array( 'ancienne' ) === $params_avert );
+
+// ======================================================================
+// 11 · UNE ÉMISSION DÉJÀ PRÉPARÉE NE SE PRÉPARE PAS UNE SECONDE FOIS
+// ======================================================================
+list( $ca1, $da1, $sa1, $tra1, $ea1, $ia1 ) = monter_envoi();
+
+$inscription = ( new Urbizen\Platform\Account\InscriptionService( $ca1, $sa1 ) )
+	->inscrire( 'nouvelle-cliente@exemple.fr', 'motdepasse-long', $t );
+
+check( '11 · l\'inscription a préparé son émission',
+	null !== $inscription['emission'] && $inscription['emission']->est_prepare() );
+
+$prepare_id = $inscription['emission']->emission_id();
+
+JournalOrdre::armer();
+$ra1     = $ea1->emettre_prepare( $inscription['compte'], $inscription['emission'], $t );
+$suite11 = JournalOrdre::$suite;
+JournalOrdre::reset();
+
+check( '11 · l\'envoi aboutit', true === $ra1['ok'] && '' === $ra1['motif'] );
+check( '11 · AUCUN REFUS emission_en_attente', 'emission_en_attente' !== $ra1['motif'] );
+check( '11 · UN SEUL courriel remis', 1 === count( $tra1->messages ) );
+check( '11 · remis à la bonne adresse',
+	'nouvelle-cliente@exemple.fr' === $tra1->messages[0]['destinataire'] );
+check( '11 · AUCUNE SECONDE PRÉPARATION : aucun jeton réengendré pendant l\'envoi',
+	0 === count( array_filter(
+		$suite11,
+		static fn( $a ) => 'ecrire:' . Urbizen\Platform\Account\JetonVerification::META_CONDENSAT === $a
+	) ) );
+check( '11 · le créneau est décompté une seule fois',
+	1 === count( LimiteEnvois::decoder_source(
+		$ca1->lire_meta( $inscription['compte'], LimiteEnvois::META_SOURCE ) )['entrees'] ) );
+check( '11 · CLÔTURE AVEC L\'IDENTIFIANT EXACT de l\'émission préparée',
+	$prepare_id === LimiteEnvois::decoder_source(
+		$ca1->lire_meta( $inscription['compte'], LimiteEnvois::META_SOURCE ) )['entrees'][0]['e'] );
+check( '11 · l\'émission en attente est close',
+	null === $ca1->lire_meta( $inscription['compte'], EmissionEnAttente::META ) );
+
+// Le chemin fautif, pour mémoire : repasser par `emettre()` échouerait.
+list( $cb1, $db1, $sb1, $trb1, $eb1, $ib1 ) = monter_envoi();
+$ins2 = ( new Urbizen\Platform\Account\InscriptionService( $cb1, $sb1 ) )
+	->inscrire( 'autre@exemple.fr', 'motdepasse-long', $t );
+
+check( '11 · REPASSER PAR emettre() serait refusé, et n\'enverrait rien',
+	'emission_en_attente' === $eb1->emettre( $ins2['compte'], $t )['motif']
+	&& array() === $trb1->messages );
+
+// Une émission refusée ne passe pas non plus par la nouvelle entrée.
+check( '11 · une émission NON préparée est refusée telle quelle',
+	'quota_epuise' === $ea1->emettre_prepare(
+		$ia1, Urbizen\Platform\Account\ResultatEmission::refuse( 'quota_epuise' ), $t )['motif'] );
 
 // ======================================================================
 // 9 · UN REFUS DE CHANGEMENT N'ENVOIE RIEN DU TOUT

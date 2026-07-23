@@ -119,6 +119,31 @@ final class EnvoiVerification {
 	}
 
 	/**
+	 * Envoie et clôt une émission **déjà préparée** par un autre appelant.
+	 *
+	 * `InscriptionService::inscrire()` prépare lui-même son émission et la
+	 * rend. Repasser par `emettre()` la ferait préparer une seconde fois, et
+	 * cette seconde préparation serait refusée par `emission_en_attente` — la
+	 * première étant encore en vol. Le résultat serait un compte créé et
+	 * **aucun courriel envoyé**, sans que rien ne le signale.
+	 *
+	 * Cette entrée prend l'émission telle quelle et va droit au chemin
+	 * rendre → envoyer → clore. Elle ne prépare rien.
+	 *
+	 * @param int              $compte     Identifiant.
+	 * @param ResultatEmission $resultat   Émission déjà préparée.
+	 * @param int|null         $maintenant Horloge injectable.
+	 * @return array{ok: bool, motif: string, code: string}
+	 */
+	public function emettre_prepare( int $compte, ResultatEmission $resultat, ?int $maintenant = null ): array {
+		if ( ! $resultat->est_prepare() ) {
+			return array( 'ok' => false, 'motif' => $resultat->motif(), 'code' => '' );
+		}
+
+		return $this->rendre_envoyer_clore( $compte, $resultat, $maintenant );
+	}
+
+	/**
 	 * Enregistre un changement d'adresse, avertit l'ancienne, puis vérifie.
 	 *
 	 * **L'avertissement part AVANT la vérification.** L'ordre inverse laisserait
@@ -143,7 +168,7 @@ final class EnvoiVerification {
 		}
 
 		// (a) L'ancienne adresse est prévenue, sans lien ni jeton.
-		$this->avertir_ancienne_adresse( $demande['ancienne'], $compte );
+		$this->avertir_ancienne_adresse( $demande['ancienne'] );
 
 		// (b) Puis la vérification part vers la NOUVELLE adresse.
 		return $this->rendre_envoyer_clore( $compte, $demande['emission'], $maintenant );
@@ -157,11 +182,13 @@ final class EnvoiVerification {
 	 * pas une émission. La décompter reviendrait à faire payer à la personne le
 	 * fait d'avoir été prévenue.
 	 *
-	 * @param string   $ancienne Adresse à prévenir.
-	 * @param int      $compte   Identifiant, pour le journal.
+	 * **Ne reçoit pas l'identifiant du compte** : rien de personnel, même
+	 * indirect, ne doit pouvoir atteindre le journal depuis ici.
+	 *
+	 * @param string $ancienne Adresse à prévenir.
 	 * @return array{ok: bool, code: string}
 	 */
-	public function avertir_ancienne_adresse( string $ancienne, int $compte = 0 ): array {
+	public function avertir_ancienne_adresse( string $ancienne ): array {
 		if ( '' === $ancienne ) {
 			return array( 'ok' => false, 'code' => 'destinataire_absent' );
 		}
@@ -184,10 +211,13 @@ final class EnvoiVerification {
 		}
 
 		if ( ! $ok ) {
-			// Code technique et identifiant de compte. JAMAIS l'adresse.
-			Logger::error(
-				sprintf( 'avertissement non remis : %s (compte %d)', $code, $compte )
-			);
+			/*
+			 * CODE TECHNIQUE SEUL. Ni adresse, ni jeton, ni identifiant de
+			 * compte : un identifiant est une donnée personnelle indirecte,
+			 * et un journal qui le porte permet de rattacher une trace à une
+			 * personne. Ce qui manque ici ne peut pas fuiter.
+			 */
+			Logger::error( sprintf( 'avertissement non remis : %s', $code ) );
 		}
 
 		return array( 'ok' => $ok, 'code' => $code );
