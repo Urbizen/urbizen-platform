@@ -211,4 +211,39 @@ check( '6 · et l\'adresse en attente est effacée',
 check( '6 · l\'émission en attente est close',
 	null === $c6->lire_meta( $i6, EmissionEnAttente::META ) );
 
+// ======================================================================
+// 7 · SECTION CRITIQUE UNIQUE — structurelle, bornée à la méthode
+// ======================================================================
+// L'atomicité du changement d'adresse repose sur UNE seule acquisition de
+// verrou : écrire la cible, puis préparer, sans relâcher entre les deux. Un
+// mutant qui libère puis réacquiert (ou qui repasse par preparer() public,
+// lequel réacquiert) rouvre la fenêtre concurrente. On l'interdit au niveau
+// de la structure, indépendamment de tout ordonnancement.
+$src_vs = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Account/VerificationService.php'
+);
+
+$src_vs_sc = implode(
+	'',
+	array_map(
+		static fn( $t ) => is_array( $t ) && in_array( $t[0], array( T_COMMENT, T_DOC_COMMENT ), true )
+			? ' '
+			: ( is_array( $t ) ? $t[1] : $t ),
+		token_get_all( $src_vs )
+	)
+);
+
+$deb  = strpos( $src_vs_sc, 'function demander_changement_adresse(' );
+$fin  = strpos( $src_vs_sc, 'function restaurer_en_attente(' );
+$corps = substr( $src_vs_sc, $deb, $fin - $deb );
+
+check( '7 · UNE SEULE acquisition de verrou dans demander_changement_adresse()',
+	1 === substr_count( $corps, 'VerrouCompte::acquerir' ) );
+check( '7 · la préparation passe par preparer_sous_verrou(), verrou déjà tenu',
+	false !== strpos( $corps, 'preparer_sous_verrou(' ) );
+check( '7 · et JAMAIS par le preparer() public, qui réacquerrait',
+	1 !== preg_match( '/->preparer\\s*\\(/', $corps ) );
+check( '7 · aucune libération de verrou au milieu de la section critique',
+	false === strpos( $corps, '->liberer()' ) || 1 === substr_count( $corps, '->liberer()' ) );
+
 verdict();

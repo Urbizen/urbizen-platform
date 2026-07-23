@@ -397,4 +397,31 @@ check( '12 · la finalisation incomplète est journalisée sans détail',
 	false !== strpos( \Urbizen\Platform\Support\Logger::tout(), 'finalisation incomplete' )
 	&& false === strpos( \Urbizen\Platform\Support\Logger::tout(), 'stockage indisponible' ) );
 
+// ======================================================================
+// 13 · ANTI-ÉNUMÉRATION — la réponse ne dépend jamais de l'état du compte
+// ======================================================================
+// La comparaison OCTET des réponses réelles (adresse libre / prise non
+// vérifiée / prise vérifiée / quota épuisé) appartient au banc d'intégration :
+// `handle_inscription()` instancie `new WpComptes()` et `new WpdbGateway()` en
+// dur, non substituables sans un WordPress réel. On éprouve ici, par la
+// structure, l'invariant qui rend cette comparaison vraie : APRÈS la frontière
+// de coût, il n'existe qu'UNE redirection, vers `CODE_UNIFORME`, et le résultat
+// de l'inscription ne l'atteint jamais. Un mutant qui différencie une issue
+// métier ajoute une seconde redirection dans cette zone.
+$bloc_insc = substr(
+	$source,
+	(int) strpos( $source, 'function handle_inscription(' ),
+	(int) strpos( $source, 'function handle_resultat(' ) - (int) strpos( $source, 'function handle_inscription(' )
+);
+
+$apres_frontiere_insc = substr( $bloc_insc, (int) strpos( $bloc_insc, '══ FRONTIÈRE DE COÛT ══' ) );
+
+check( '13 · APRÈS la frontière, une SEULE redirection',
+	1 === substr_count( $apres_frontiere_insc, 'self::rediriger(' ) );
+check( '13 · et elle vise CODE_UNIFORME, littéralement',
+	false !== strpos( $apres_frontiere_insc, 'self::rediriger( self::CODE_UNIFORME );' ) );
+check( '13 · le résultat d\'inscription ne touche jamais la redirection',
+	false === strpos( $apres_frontiere_insc, 'rediriger( $inscription' )
+	&& 1 !== preg_match( '/rediriger\\([^)]*\\$inscription/', $apres_frontiere_insc ) );
+
 verdict();
