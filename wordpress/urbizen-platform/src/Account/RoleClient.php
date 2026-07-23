@@ -11,12 +11,21 @@
  * Une seule capacité : `read`. Elle ne sert que la navigation WordPress et
  * **n'accorde aucun droit métier** — toute décision passe par `Authorization`.
  *
- * **Le rôle n'est jamais retiré pour être corrigé.** Deux raisons, toutes deux
- * concrètes. Une panne entre la suppression et la recréation laisserait
- * l'installation sans rôle, donc toute inscription refusée. Et `remove_role()`
- * dépossède au passage **tous les utilisateurs qui le portent** : corriger une
- * capacité en trop déconnecterait les clients existants de leur rôle. La
- * correction se fait donc en place, capacité par capacité.
+ * **Le rôle n'est jamais retiré pour être corrigé**, et la raison mérite d'être
+ * dite exactement. `remove_role()` ne touche pas au `wp_capabilities` des
+ * utilisateurs : leur métadonnée continue de nommer `urbizen_client`, et le rôle
+ * recréé leur revient. Ce n'est donc pas une dépossession définitive.
+ *
+ * C'est la **fenêtre** qui est inacceptable. Entre la suppression et la
+ * recréation, aucun objet de rôle ne répond à cette métadonnée : `$user->roles`
+ * est vide et `read` est refusée. Toute requête concurrente d'un client tombe
+ * pendant ce laps de temps. Et si le processus meurt là — un `kill` de
+ * déploiement, un dépassement de mémoire — l'installation reste sans rôle :
+ * inscriptions refusées, et tous les clients existants privés de la moindre
+ * capacité jusqu'à une intervention manuelle.
+ *
+ * La correction se fait donc en place, capacité par capacité. À chaque écriture
+ * de l'option, le rôle est présent.
  *
  * @package Urbizen\Platform\Account
  */

@@ -187,6 +187,52 @@ clean_user_cache( $porteur );
 check( '2 · L’UTILISATEUR CONSERVE SON RÔLE APRÈS CORRECTION',
 	in_array( RoleClient::ROLE, (array) get_userdata( $porteur )->roles, true ) );
 
+// ----------------------------------------------------------------------
+// (d bis) LE RÔLE N'EST ABSENT D'AUCUNE ÉCRITURE INTERMÉDIAIRE.
+//
+// C'est la forme exacte de l'exigence. `remove_role()` ne vide pas le
+// `wp_capabilities` des utilisateurs — la métadonnée nomme toujours le rôle, et
+// il leur revient s'il est recréé. Le danger n'est donc pas la dépossession
+// définitive, c'est la FENÊTRE : entre le retrait et la repose, aucun objet de
+// rôle ne répond, `read` est refusée à tout client, et une mort du processus à
+// cet instant laisse l'installation sans rôle. On observe donc chaque écriture
+// de l'option, et le rôle doit y figurer à chaque fois.
+// ----------------------------------------------------------------------
+get_role( RoleClient::ROLE )->add_cap( 'edit_posts' );
+
+$photos    = array();
+$observer  = static function ( $ancienne, $nouvelle ) use ( &$photos, $porteur ) {
+	clean_user_cache( $porteur );
+
+	$photos[] = array(
+		'role_present' => isset( ( (array) $nouvelle )[ RoleClient::ROLE ] ),
+		'porteur_read' => user_can( $porteur, 'read' ),
+	);
+};
+
+add_action( 'update_option_' . $wpdb->prefix . 'user_roles', $observer, 10, 2 );
+RoleClient::installer();
+remove_action( 'update_option_' . $wpdb->prefix . 'user_roles', $observer, 10 );
+
+$sans_role_ecrit = 0;
+$sans_read       = 0;
+
+foreach ( $photos as $photo ) {
+	if ( ! $photo['role_present'] ) {
+		++$sans_role_ecrit;
+	}
+
+	if ( ! $photo['porteur_read'] ) {
+		++$sans_read;
+	}
+}
+
+check( '2 · la correction a bien écrit l’option', count( $photos ) >= 1 );
+check( '2 · LE RÔLE FIGURE DANS CHAQUE ÉCRITURE INTERMÉDIAIRE', 0 === $sans_role_ecrit );
+check( '2 · ET LE PORTEUR N’EST JAMAIS PRIVÉ DE read', 0 === $sans_read );
+
+clean_user_cache( $porteur );
+
 // (e) Une capacité surnuméraire posée à `false` compte aussi : elle traîne dans
 // l'option, et la laisser rendrait la correction non idempotente.
 get_role( RoleClient::ROLE )->add_cap( 'manage_options', false );
