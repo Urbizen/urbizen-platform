@@ -126,4 +126,76 @@ check( '7 · et le reste 23 heures plus tard',
 check( '7 · MAIS PLUS APRÈS 24 H',
 	'' === LimiteEnvois::motif_de_refus( etat( $h ), $t + 86500 ) );
 
+// ======================================================================
+// 8 · SOURCE DE VÉRITÉ — `{a, e}`
+// ======================================================================
+$src = LimiteEnvois::decoder_source( null );
+check( '8 · source absente : absente, NON corrompue',
+	true === $src['absente'] && false === $src['corrompue'] );
+
+$src = LimiteEnvois::decoder_source( '[]' );
+check( '8 · source vide : ni absente ni corrompue',
+	false === $src['absente'] && false === $src['corrompue'] && array() === $src['entrees'] );
+
+$src = LimiteEnvois::decoder_source( '[{"a":' . $t . ',"e":"01J8Z"}]' );
+check( '8 · une entrée bien formée', 1 === count( $src['entrees'] ) && '01J8Z' === $src['entrees'][0]['e'] );
+
+check( '8 · objet JSON refusé', true === LimiteEnvois::decoder_source( '{"a":1}' )['corrompue'] );
+check( '8 · entrée sans « e » refusée', true === LimiteEnvois::decoder_source( '[{"a":1}]' )['corrompue'] );
+check( '8 · entrée sans « a » refusée', true === LimiteEnvois::decoder_source( '[{"e":"x"}]' )['corrompue'] );
+check( '8 · « e » non chaîne refusé', true === LimiteEnvois::decoder_source( '[{"a":1,"e":5}]' )['corrompue'] );
+check( '8 · « a » non entier refusé', true === LimiteEnvois::decoder_source( '[{"a":"x","e":"y"}]' )['corrompue'] );
+check( '8 · charabia refusé', true === LimiteEnvois::decoder_source( 'nawak' )['corrompue'] );
+
+$quatre = '[{"a":1,"e":"a"},{"a":2,"e":"b"},{"a":3,"e":"c"},{"a":4,"e":"d"}]';
+check( '8 · PLUS DE MAX ENTRÉES : CORROMPU, jamais tronqué',
+	true === LimiteEnvois::decoder_source( $quatre )['corrompue'] );
+check( '8 · et un quota corrompu est traité comme PLEIN',
+	'quota_illisible' === LimiteEnvois::motif_de_refus(
+		LimiteEnvois::etat_depuis_source( LimiteEnvois::decoder_source( $quatre ) ), $t ) );
+
+// ======================================================================
+// 9 · AMORÇAGE DEPUIS LE MIROIR — borne sans autoriser
+// ======================================================================
+$amorce = LimiteEnvois::amorcer_depuis_miroir( array( $t - 100, $t - 200 ) );
+check( '9 · chaque horodatage hérité devient {a, e:""}',
+	2 === count( $amorce ) && '' === $amorce[0]['e'] && '' === $amorce[1]['e'] );
+check( '9 · un identifiant vide NE CORRESPOND JAMAIS',
+	false === LimiteEnvois::contient_emission( $amorce, '' ) );
+check( '9 · ni à un identifiant réel',
+	false === LimiteEnvois::contient_emission( $amorce, '01J8Z' ) );
+check( '9 · mais les créneaux hérités BORNENT bien le quota',
+	2 === count( LimiteEnvois::horodatages_de( $amorce ) ) );
+
+// ======================================================================
+// 10 · RECONNAISSANCE ET AJOUT
+// ======================================================================
+$e = LimiteEnvois::ajouter_emission( array(), $t, '01J8Z' );
+check( '10 · ajout : un créneau nommé', 1 === count( $e ) && '01J8Z' === $e[0]['e'] );
+check( '10 · reconnu au rejeu', true === LimiteEnvois::contient_emission( $e, '01J8Z' ) );
+check( '10 · un autre identifiant ne l\'est pas',
+	false === LimiteEnvois::contient_emission( $e, '01J9A' ) );
+
+$e = LimiteEnvois::ajouter_emission( $e, $t + 100, '01J9A' );
+$e = LimiteEnvois::ajouter_emission( $e, $t + 200, '01J9B' );
+check( '10 · trois créneaux : quota épuisé',
+	'quota_epuise' === LimiteEnvois::motif_de_refus(
+		LimiteEnvois::etat_depuis_source(
+			array( 'entrees' => $e, 'corrompue' => false, 'absente' => false ) ), $t + 300 ) );
+check( '10 · le miroir dérive exactement de la source',
+	array( $t, $t + 100, $t + 200 ) === LimiteEnvois::horodatages_de( $e ) );
+
+$vieux = LimiteEnvois::ajouter_emission(
+	array( array( 'a' => $t - 90000, 'e' => 'vieux' ) ), $t, '01J8Z' );
+check( '10 · l\'ajout purge ce qui est sorti de la fenêtre',
+	1 === count( $vieux ) && '01J8Z' === $vieux[0]['e'] );
+
+// ======================================================================
+// 11 · ALLER-RETOUR
+// ======================================================================
+$aller  = LimiteEnvois::ajouter_emission( array(), $t, '01J8Z' );
+$retour = LimiteEnvois::decoder_source( LimiteEnvois::encoder_source( $aller ) );
+check( '11 · encoder puis décoder rend la même source',
+	false === $retour['corrompue'] && $aller === $retour['entrees'] );
+
 verdict();
