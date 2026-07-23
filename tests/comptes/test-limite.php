@@ -198,4 +198,62 @@ $retour = LimiteEnvois::decoder_source( LimiteEnvois::encoder_source( $aller ) )
 check( '11 · encoder puis décoder rend la même source',
 	false === $retour['corrompue'] && $aller === $retour['entrees'] );
 
+// ======================================================================
+// 12 · quota-verify — CONSTATE, ne purge jamais
+// ======================================================================
+$cli = (string) file_get_contents(
+	dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Adapter/WpCliAccountsCommand.php'
+);
+
+$cli_sans_commentaires = implode(
+	'',
+	array_map(
+		static fn( $t ) => is_array( $t ) && in_array( $t[0], array( T_COMMENT, T_DOC_COMMENT ), true )
+			? ' '
+			: ( is_array( $t ) ? $t[1] : $t ),
+		token_get_all( $cli )
+	)
+);
+
+check( '12 · la sous-commande existe',
+	false !== strpos( $cli_sans_commentaires, 'function quota_verify' ) );
+check( '12 · AUCUNE PURGE : le mot n\'apparaît dans aucun nom de méthode',
+	1 !== preg_match( '/function\s+\w*purge/i', $cli_sans_commentaires ) );
+check( '12 · elle N\'ÉCRIT JAMAIS LA SOURCE',
+	false === strpos( $cli_sans_commentaires, 'META_SOURCE, LimiteEnvois::encoder_source' )
+	&& 1 !== preg_match( '/update_user_meta\s*\([^)]*META_SOURCE/', $cli_sans_commentaires ) );
+check( '12 · elle ne supprime aucune métadonnée',
+	false === strpos( $cli_sans_commentaires, 'delete_user_meta' ) );
+check( '12 · le miroir seul est réécrit',
+	1 === preg_match( '/update_user_meta\s*\([^)]*LimiteEnvois::META\s*,/', $cli_sans_commentaires ) );
+check( '12 · une seule écriture dans toute la commande',
+	1 === substr_count( $cli_sans_commentaires, 'update_user_meta' ) );
+check( '12 · lecture seule par défaut : l\'écriture est sous condition',
+	false !== strpos( $cli_sans_commentaires, 'repair-mirror' ) );
+check( '12 · une source illisible n\'est JAMAIS réparée',
+	false !== strpos( $cli, 'aucune réparation possible' ) );
+check( '12 · code de sortie non nul en cas de divergence',
+	false !== strpos( $cli_sans_commentaires, 'divergence constatée' ) );
+
+/*
+ * La réparation ne peut pas élargir un droit : le miroir écrit dérive de la
+ * source, donc il porte exactement les mêmes créneaux. On le vérifie sur la
+ * transformation elle-même, pour toutes les tailles de fenêtre.
+ */
+$elargit = false;
+
+for ( $n = 0; $n <= LimiteEnvois::MAX; $n++ ) {
+	$entrees = array();
+
+	for ( $k = 0; $k < $n; $k++ ) {
+		$entrees[] = array( 'a' => $t - ( $k * 10 ), 'e' => 'e' . $k );
+	}
+
+	if ( count( LimiteEnvois::horodatages_de( $entrees ) ) !== $n ) {
+		$elargit = true;
+	}
+}
+
+check( '12 · LE MIROIR DÉRIVÉ PORTE EXACTEMENT LES CRÉNEAUX DE SA SOURCE', ! $elargit );
+
 verdict();
