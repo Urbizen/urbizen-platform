@@ -1,5 +1,12 @@
 # Protocole de déploiement limité — composant cadastre
 
+> **⚠️ Ne pas réutiliser tel quel pour `0.12.0`.** Ce protocole visait un plugin
+> **sans option ni métadonnée**. Depuis E2.2, `0.12.0` crée des **options**
+> (limitation de débit, jetons anti-robot) et des **métadonnées de comptes**, et
+> installe un **rôle** par commande explicite. Pour déployer `0.12.0`, suivre
+> [DEPLOY_ACCOUNTS_0_12.md](DEPLOY_ACCOUNTS_0_12.md). Le présent document reste
+> l'archive du déploiement cadastre.
+
 > **Protocole exécuté le 19 juillet 2026, sur autorisation explicite.**
 > Résultat : les 13 contrôles sont passés, aucun retour arrière n'a été
 > nécessaire. Sauvegardes conservées : `urbizen-plugin-20260719-2000.tar.gz`

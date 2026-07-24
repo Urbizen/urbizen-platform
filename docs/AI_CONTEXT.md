@@ -64,25 +64,25 @@ Fluent SMTP, All in One SEO, LiteSpeed Cache, Kadence Blocks, Google Site Kit,
 MonsterInsights, plus les extensions Hostinger. WooCommerce est **inactif** mais
 ses 4 pages boutique sont publiées.
 
-**Extension Urbizen** : trois numéros de version à ne pas confondre.
+**Extension Urbizen** : deux numéros de version à ne pas confondre.
 
+- **`main` : `0.12.0`** — parcours public des comptes (E2.2, D-046), **fusionné
+  par la PR #26**. C'est l'état du dépôt, **non déployé**.
 - **Dernière production constatée : `0.10.0`** — état observé lors du dernier
-  accès. La production **n'a pas été recontactée** pour cette mise à jour : ce
-  numéro n'est pas revérifié ici, il est reporté tel qu'il était constaté.
-- **`main` : `0.11.0`** — socle E2.1 des comptes (rôle client, vérification du
-  courriel). **Fusionnée dans `main` mais non déployée.**
-- **Candidate locale : `0.12.0`** — parcours public des comptes (E2.2, D-046).
-  Présente **uniquement sur la branche de travail**, **non poussée et non
-  déployée**.
+  accès. La production **n'a pas été recontactée** : ce numéro n'est pas
+  revérifié ici, il est reporté tel qu'il était constaté.
+
+**`0.12.0` n'est pas déployée.** Son déploiement suivra le protocole
+[DEPLOY_ACCOUNTS_0_12.md](DEPLOY_ACCOUNTS_0_12.md), sous autorisation distincte.
 
 L'extension ne crée **ni table propre, ni route REST**. En revanche elle emploie
 désormais des **options** (limitation de débit, jetons anti-robot) et des
 métadonnées utilisateur privées (préfixe `_urbizen_`) pour les comptes :
 l'ancienne mention « ni option » ne valait que pour 0.4.0. Les shortcodes du
-parcours des comptes existent dans le code de la candidate `0.12.0` ; celle-ci
-étant **non déployée**, E2.2 n'est **pas visible** sur le site. La livraison
-`0.12.0` ne crée ni ne publie aucune page WordPress ; l'exposition des
-shortcodes reste un geste d'exploitation distinct.
+parcours des comptes existent dans le code de `0.12.0` ; `main` n'étant **pas
+déployée**, E2.2 n'est **pas visible** sur le site. La livraison `0.12.0` ne crée
+ni ne publie aucune page WordPress ; l'exposition des shortcodes reste un geste
+d'exploitation distinct.
 
 **Aucune extension de sécurité applicative** : la protection est assurée par
 Imunify360 côté hébergeur. Un seul compte administrateur.
