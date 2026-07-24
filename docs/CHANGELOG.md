@@ -24,6 +24,27 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
   l'instant). `urbizen_child_est_accueil_urbizen()` est inchangée ; l'accueil
   conserve exactement son comportement (bancs `test-front-page` et
   `test-fidelite` verts).
+- `theme.json` : déclaration du gabarit `page-declaration-prealable` dans
+  `customTemplates` (prérequis pour l'assignation et le rendu sous thème à
+  blocs) ; `page-accueil-urbizen` reste en tête.
+
+### Modifié
+
+- **Contenu de la page « Déclaration préalable » différencié de l'accueil.**
+  Retrait des sections en doublon (bandeau de réassurance, « Comment ça marche »,
+  trois questions de FAQ déjà présentes sur l'accueil) et ajout d'informations
+  utiles et spécifiques, **mises en forme avec les seules classes existantes** :
+  seuils par projet (repères 2026), définition de la DP (surface de plancher vs
+  emprise au sol), déroulé après le dépôt (récépissé → achèvement), cas
+  particuliers, erreurs qui font rejeter un dossier, et une FAQ propre à la DP.
+  Contenu réglementaire **fourni et validé par Anaïs**, repris mot pour mot
+  (coquille « after travaux » → « après travaux » corrigée). Un seul `<h1>`,
+  aucune CSS nouvelle, accueil intact.
+- `urbizen-child/assets/js/urbizen-homepage.js` : la sélection des cartes projet
+  est conditionnée à la présence du tunnel de l'accueil (`#js-continue`) ;
+  ailleurs, les vignettes `.pcard` restent informatives (ni écouteur, ni
+  `aria-pressed`). Source `frontend/homepage/` non touchée ; l'écart volontaire
+  est documenté dans l'en-tête du script.
 
 ---
 
