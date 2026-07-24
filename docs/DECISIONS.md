@@ -2209,3 +2209,40 @@ c'est la source d'un autre contexte, protégée par les bancs de fidélité de l
   une évolution du script rendra la dérive probable — pas avant.
 
 Ceci est une **dette consignée**, pas un travail planifié.
+
+---
+
+## D-049 — Une feuille dédiée aux pages internes, scopée `.urbizen-page`
+
+**Contexte.** La première itération de l'Étape 6 (page Déclaration préalable) a suivi une
+doctrine **« aucune CSS nouvelle »** : n'employer que les classes de l'accueil, servies par
+`urbizen-homepage.css` (elle-même générée depuis `frontend/homepage/homepage.css` par
+`scripts/scope-css.py`). Cette règle protégeait l'accueil de toute régression, mais elle a
+atteint sa limite dès qu'une page a porté un **contenu riche** : des seuils réglementaires,
+une procédure en étapes, coulés dans des `pcard` prévues pour trois mots — sections
+brouillonnes, illisibles, et un hero identique à l'accueil.
+
+**Décision.** Les **pages internes** reçoivent une feuille dédiée,
+`wordpress/urbizen-child/assets/css/urbizen-pages.css`, **intégralement scopée
+`.urbizen-page`**. Cette classe est **absente de l'accueil** : aucune règle de cette feuille
+ne peut donc l'atteindre, et le risque de régression y est **nul par construction**. La
+feuille n'emploie que les tokens `--u-*`, respecte `prefers-reduced-motion`, et n'est chargée
+— par `functions.php` — que **sur les pages internes, après `urbizen-homepage`**, jamais sur
+l'accueil.
+
+**Conséquences.**
+
+- **La doctrine « zéro CSS nouveau » est remplacée pour les pages internes.** Elle était juste
+  pour le premier cadrage — ne pas toucher à la feuille de l'accueil — mais trop stricte pour
+  un vrai contenu de page. La contrainte réelle n'était pas « aucune CSS » : c'était « ne pas
+  modifier l'accueil ». Le scope `.urbizen-page` tient cette contrainte-là.
+- **L'accueil reste protégé.** Sa feuille `urbizen-homepage.css` est générée et **inchangée** ;
+  ses bancs de fidélité (`tests/homepage/test-fidelite.php`) restent verts.
+- **Règle opposable.** Toute règle de `urbizen-pages.css` **commence par `.urbizen-page`** ;
+  un simple `grep` (ou un banc) peut le vérifier. Une règle non scopée est un défaut.
+- **Réemploi.** Les pages internes suivantes (permis de construire, etc.) reprennent les
+  mêmes composants de `urbizen-pages.css`.
+- **Dette à surveiller.** Contrairement au CSS de l'accueil, `urbizen-pages.css` est écrit à
+  la main, sans source dans `frontend/` ni génération. Sa discipline tient à deux règles :
+  rester scopé `.urbizen-page` et n'utiliser que des tokens `--u-*`. Se rapproche de la dette
+  du script d'accueil (D-048).
