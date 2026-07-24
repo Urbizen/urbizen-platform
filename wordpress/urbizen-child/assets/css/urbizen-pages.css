@@ -196,12 +196,12 @@
 
 /* ===== Frise de procédure ===== */
 .urbizen-page .frise { list-style: none; margin: 0; padding: 0; position: relative; max-width: 760px; }
-.urbizen-page .frise::before {
+.urbizen-page .frise li:not(:last-child)::before {
   content: "";
   position: absolute;
   left: 21px;
-  top: 10px;
-  bottom: 10px;
+  top: 48px;
+  bottom: 0;
   width: 2px;
   background: var(--u-line-strong);
 }
@@ -326,4 +326,11 @@
 /* ===== Accessibilité / mouvement ===== */
 @media (prefers-reduced-motion: reduce) {
   .urbizen-page * { transition: none !important; animation: none !important; }
+}
+
+/* ===== Planche : codes plus lisibles sur les pages internes ===== */
+.urbizen-page .planche-item .code {
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
