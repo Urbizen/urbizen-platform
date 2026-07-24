@@ -23,6 +23,13 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+/*
+ * Préfixe des liens d'ancre : vide sur l'accueil (défilement en page), URL de
+ * l'accueil ailleurs. Les pages internes partagent cet en-tête ; sans ce
+ * préfixe, « Nos prestations », « Tarifs », etc. ne mèneraient nulle part.
+ */
+$pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
 ?>
 <!-- wp:html -->
 <header class="site" id="top">
@@ -34,14 +41,14 @@ defined( 'ABSPATH' ) || exit;
     <nav class="nav-links" aria-label="Navigation principale">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="#prestations">Nos prestations</a>
-      <a href="#methode">Comment ça marche</a>
-      <a href="#tarifs">Tarifs</a>
-      <a href="#faq">Questions fréquentes</a>
+      <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
+      <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
+      <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
+      <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
     </nav>
     <div class="nav-right">
       <a class="link-login" href="#" title="Espace client — bientôt disponible">Se connecter</a>
-      <a class="btn btn-primary btn-sm js-start" href="#localisation">Démarrer mon projet</a>
+      <a class="btn btn-primary btn-sm js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
@@ -51,12 +58,12 @@ defined( 'ABSPATH' ) || exit;
     <div class="wrap">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="#prestations">Nos prestations</a>
-      <a href="#methode">Comment ça marche</a>
-      <a href="#tarifs">Tarifs</a>
-      <a href="#faq">Questions fréquentes</a>
+      <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
+      <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
+      <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
+      <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
       <a href="#" class="link-login">Se connecter</a>
-      <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+      <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
   </div>
 </header>
