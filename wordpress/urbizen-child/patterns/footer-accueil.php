@@ -12,6 +12,10 @@
  */
 
 defined( 'ABSPATH' ) || exit;
+
+// Préfixe des liens d'ancre (voir header-accueil.php) : vide sur l'accueil,
+// URL de l'accueil sur les pages internes qui partagent ce pied.
+$pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
 ?>
 <!-- wp:html -->
 <footer class="site-footer">
@@ -26,7 +30,7 @@ defined( 'ABSPATH' ) || exit;
       <ul>
         <li><a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a></li>
         <li><a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a></li>
-        <li><a href="#tarifs">Tarifs</a></li>
+        <li><a href="<?php echo $pfx; ?>#tarifs">Tarifs</a></li>
       </ul>
     </div>
     <div>
