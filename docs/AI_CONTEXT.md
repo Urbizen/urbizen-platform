@@ -4,7 +4,7 @@
 > de reprendre le projet **sans connaître l'historique des conversations**.
 > Il décrit l'état réel, les pièges vérifiés et les règles de travail.
 
-Dernière mise à jour : 19 juillet 2026.
+Dernière mise à jour : 24 juillet 2026.
 
 ---
 
@@ -64,10 +64,25 @@ Fluent SMTP, All in One SEO, LiteSpeed Cache, Kadence Blocks, Google Site Kit,
 MonsterInsights, plus les extensions Hostinger. WooCommerce est **inactif** mais
 ses 4 pages boutique sont publiées.
 
-**Extension Urbizen** : `urbizen-platform` **0.4.0**, **active**, avec le module
-cadastre et le formulaire de localisation. Toujours **ni table, ni option, ni
-route REST** : la validation du formulaire est locale, rien n'est transmis à un
-serveur en 0.4.0.
+**Extension Urbizen** : trois numéros de version à ne pas confondre.
+
+- **Dernière production constatée : `0.10.0`** — état observé lors du dernier
+  accès. La production **n'a pas été recontactée** pour cette mise à jour : ce
+  numéro n'est pas revérifié ici, il est reporté tel qu'il était constaté.
+- **`main` : `0.11.0`** — socle E2.1 des comptes (rôle client, vérification du
+  courriel). **Fusionnée dans `main` mais non déployée.**
+- **Candidate locale : `0.12.0`** — parcours public des comptes (E2.2, D-046).
+  Présente **uniquement sur la branche de travail**, **non poussée et non
+  déployée**.
+
+L'extension ne crée **ni table propre, ni route REST**. En revanche elle emploie
+désormais des **options** (limitation de débit, jetons anti-robot) et des
+métadonnées utilisateur privées (préfixe `_urbizen_`) pour les comptes :
+l'ancienne mention « ni option » ne valait que pour 0.4.0. Les shortcodes du
+parcours des comptes existent dans le code de la candidate `0.12.0` ; celle-ci
+étant **non déployée**, E2.2 n'est **pas visible** sur le site. La livraison
+`0.12.0` ne crée ni ne publie aucune page WordPress ; l'exposition des
+shortcodes reste un geste d'exploitation distinct.
 
 **Aucune extension de sécurité applicative** : la protection est assurée par
 Imunify360 côté hébergeur. Un seul compte administrateur.
