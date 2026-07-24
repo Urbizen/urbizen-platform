@@ -78,6 +78,13 @@
       "postTypes": [
         "page"
       ]
+    },
+    {
+      "name": "page-permis-de-construire",
+      "title": "Permis de construire",
+      "postTypes": [
+        "page"
+      ]
     }
   ],
   "templateParts": [
