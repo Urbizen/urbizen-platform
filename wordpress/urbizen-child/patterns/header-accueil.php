@@ -6,9 +6,12 @@
  * Inserter: no
  *
  * Markup repris à l'identique de frontend/homepage/index.html, lignes 77 à 110.
- * Seule différence : l'URL du logo, résolue par get_theme_file_uri(). Un
- * fichier .html de gabarit n'exécute pas PHP, d'où ce pattern — les patterns
- * de thème sont des fichiers PHP par conception.
+ * Deux différences, résolues en PHP (un .html de gabarit n'exécute pas PHP,
+ * d'où ce pattern) :
+ *   1. l'URL du logo (`get_theme_file_uri()`) ;
+ *   2. le lien du logo : `#top` (défilement) sur l'accueil, mais l'URL de
+ *      l'accueil (`home_url('/')`) sur les pages internes, qui partagent cet
+ *      en-tête — sans quoi le logo n'y renvoie nulle part.
  *
  * Aucun attribut width/height sur le logo : mesuré en conditions réelles, les
  * ajouter donne à l'image un rapport d'aspect définitif qui change le calcul
@@ -24,7 +27,7 @@ defined( 'ABSPATH' ) || exit;
 <!-- wp:html -->
 <header class="site" id="top">
   <div class="wrap nav">
-    <a class="logo" href="#top" aria-label="Urbizen — accueil">
+    <a class="logo" href="<?php echo is_front_page() ? '#top' : esc_url( home_url( '/' ) ); ?>" aria-label="Urbizen — accueil">
       <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>"
            alt="Urbizen · urbanisme & projets" />
     </a>

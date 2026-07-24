@@ -22,6 +22,12 @@ function get_theme_file_uri( $chemin = '' ) {
 function esc_url( $url ) {
 	return htmlspecialchars( (string) $url, ENT_QUOTES, 'UTF-8' );
 }
+// Le pattern rend l'en-tête de l'ACCUEIL ici : le logo y pointe vers « #top »,
+// comme dans la maquette. Sur les pages internes (hors test), il pointe vers
+// home_url('/') — voir header-accueil.php.
+function is_front_page() {
+	return true;
+}
 
 $fail = 0;
 function check( $label, $cond ) {
