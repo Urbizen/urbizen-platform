@@ -134,7 +134,7 @@ Toutes les pages sont refaites à partir de `frontend/homepage/` et de
 conservant les URL existantes.
 
 - [ ] Accueil
-- [ ] Déclaration préalable · Permis de construire
+- [ ] Déclaration préalable · Permis de construire — *gabarit DP livré (thème enfant) ; PC à suivre*
 - [ ] Tarifs · Autres projets · Espace professionnels
 - [ ] Commander un dossier · Contact
 - [ ] Pages légales : mentions, confidentialité, CGV

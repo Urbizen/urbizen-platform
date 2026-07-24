@@ -1,7 +1,10 @@
 /* ============================================================================
    homepage.js — logique de la page d'accueil Urbizen.
-   Copie de frontend/homepage/homepage.js, à une différence près : le montage
-   manuel du cadastre est retiré, le bloc WordPress s'en charge.
+   Copie de frontend/homepage/homepage.js, à deux différences près :
+     1. le montage manuel du cadastre est retiré, le bloc WordPress s'en charge ;
+     2. la sélection des cartes projet est conditionnée à la présence du bouton
+        de continuation (le tunnel de l'accueil). La même feuille étant partagée
+        par les pages internes, leurs vignettes .pcard y restent informatives.
    Chargé en `defer` : le DOM est prêt à l'exécution.
    ========================================================================== */
 (function () {
@@ -37,20 +40,24 @@
   var continueHint = document.getElementById("js-continue-hint");
   var cards = document.querySelectorAll(".pcard");
 
-  cards.forEach(function (card) {
-    card.setAttribute("aria-pressed", "false");
-    card.addEventListener("click", function () {
-      cards.forEach(function (c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
-      card.classList.add("is-selected");
-      card.setAttribute("aria-pressed", "true");
-      selectedProjet = card.getAttribute("data-projet");
-      try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
-      if (continueBtn) {
+  // La sélection des cartes n'a de sens que dans le tunnel de l'accueil, dont le
+  // bouton de continuation est le marqueur naturel. Ailleurs (pages internes),
+  // les mêmes vignettes .pcard restent purement informatives : aucun écouteur,
+  // aucun aria-pressed, aucun état sélectionné qui promettrait une suite.
+  if (continueBtn) {
+    cards.forEach(function (card) {
+      card.setAttribute("aria-pressed", "false");
+      card.addEventListener("click", function () {
+        cards.forEach(function (c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
+        card.classList.add("is-selected");
+        card.setAttribute("aria-pressed", "true");
+        selectedProjet = card.getAttribute("data-projet");
+        try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
         continueBtn.disabled = false;
         if (continueHint) continueHint.textContent = "Vos informations de localisation seront reprises dans le formulaire.";
-      }
+      });
     });
-  });
+  }
 
   if (continueBtn) {
     continueBtn.addEventListener("click", function () {
