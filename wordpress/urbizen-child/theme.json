@@ -71,6 +71,13 @@
       "postTypes": [
         "page"
       ]
+    },
+    {
+      "name": "page-declaration-prealable",
+      "title": "Déclaration préalable",
+      "postTypes": [
+        "page"
+      ]
     }
   ],
   "templateParts": [
