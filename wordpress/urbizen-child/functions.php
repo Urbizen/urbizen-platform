@@ -190,6 +190,7 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
  */
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
+	'page-permis-de-construire',
 );
 
 /**
