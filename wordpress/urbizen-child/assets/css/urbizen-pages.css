@@ -1,0 +1,329 @@
+/**
+ * Urbizen — pages internes (Déclaration préalable, Permis de construire, …)
+ *
+ * Feuille dédiée aux gabarits de pages, chargée en complément de
+ * urbizen-homepage.css. Chaque règle est scopée sous `.urbizen-page` :
+ * la page d'accueil, qui ne porte pas cette classe, n'est jamais affectée.
+ *
+ * Composants : hero de page (bandeau encre), fil d'ariane, tableau des
+ * seuils, frise de procédure, cartes d'information, liste d'erreurs,
+ * encarts. Couleurs et typographies : uniquement les tokens --u-*.
+ */
+
+/* ===== Hero de page — bandeau encre, distinct de l'accueil ===== */
+.urbizen-page .page-hero {
+  position: relative;
+  background: var(--u-ink);
+  color: #fff;
+  padding: clamp(48px, 7vw, 84px) 0 clamp(40px, 6vw, 68px);
+  overflow: hidden;
+}
+.urbizen-page .page-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+}
+.urbizen-page .page-hero .wrap { position: relative; }
+.urbizen-page .page-hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 380px);
+  gap: clamp(24px, 5vw, 64px);
+  align-items: center;
+}
+.urbizen-page .fil-ariane {
+  font-family: var(--u-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--u-mint);
+  margin-bottom: 18px;
+}
+.urbizen-page .fil-ariane a {
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: none;
+}
+.urbizen-page .fil-ariane a:hover { color: #fff; }
+.urbizen-page .fil-ariane .sep { margin: 0 8px; color: rgba(255, 255, 255, 0.35); }
+.urbizen-page .page-hero h1 {
+  font-family: var(--u-font-title);
+  font-weight: 600;
+  font-size: clamp(28px, 4vw, 42px);
+  line-height: 1.15;
+  color: #fff;
+  margin: 0 0 16px;
+  letter-spacing: -0.01em;
+}
+.urbizen-page .page-hero .lead {
+  font-size: clamp(15px, 1.6vw, 17.5px);
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.78);
+  max-width: 58ch;
+  margin: 0 0 26px;
+}
+.urbizen-page .page-hero .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.urbizen-page .page-hero .btn-ghost {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: transparent;
+}
+.urbizen-page .page-hero .btn-ghost:hover {
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+.urbizen-page .page-hero-meta {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.urbizen-page .page-hero-meta .m {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.72);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.urbizen-page .page-hero-meta .m b {
+  font-family: var(--u-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--u-mint);
+  font-weight: 500;
+}
+.urbizen-page .page-hero-plan {
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--u-radius);
+  padding: 14px;
+}
+.urbizen-page .page-hero-plan svg { display: block; width: 100%; height: auto; }
+.urbizen-page .page-hero-plan .hero-plan-tag {
+  position: absolute;
+  top: -11px;
+  left: 14px;
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  color: var(--u-mint);
+  background: var(--u-ink);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--u-radius-sm);
+  padding: 3px 9px;
+}
+@media (max-width: 900px) {
+  .urbizen-page .page-hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page .page-hero-plan { max-width: 420px; }
+}
+
+/* ===== Rythme des sections ===== */
+.urbizen-page main > section { padding: clamp(48px, 7vw, 76px) 0; }
+.urbizen-page .sec-blanc { background: var(--u-surface); border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+.urbizen-page .sec-head p { color: var(--u-ink-soft); }
+.urbizen-page .note {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--u-ink-faint);
+  max-width: 82ch;
+  margin-top: 16px;
+}
+
+/* ===== Tableau des seuils ===== */
+.urbizen-page .seuils-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.urbizen-page .seuils {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius);
+  overflow: hidden;
+  font-size: 14.5px;
+  box-shadow: var(--u-shadow-card);
+}
+.urbizen-page .seuils th {
+  font-family: var(--u-font-mono);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--u-ink-soft);
+  text-align: left;
+  padding: 13px 16px;
+  background: var(--u-surface-2);
+  border-bottom: 1px solid var(--u-line-strong);
+}
+.urbizen-page .seuils td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--u-line);
+  vertical-align: top;
+  color: var(--u-ink);
+  line-height: 1.5;
+}
+.urbizen-page .seuils tr:last-child td { border-bottom: none; }
+.urbizen-page .seuils td:first-child { font-weight: 600; }
+.urbizen-page .seuils th.dp, .urbizen-page .seuils td.dp { background: var(--u-brand-sf); }
+.urbizen-page .seuils th.dp { color: var(--u-brand-dk); }
+.urbizen-page .seuils td.dp { font-weight: 600; color: var(--u-brand-dk); }
+.urbizen-page .seuils .vide { color: var(--u-ink-faint); font-weight: 400; }
+@media (max-width: 760px) {
+  .urbizen-page .seuils thead { display: none; }
+  .urbizen-page .seuils, .urbizen-page .seuils tbody, .urbizen-page .seuils tr, .urbizen-page .seuils td { display: block; }
+  .urbizen-page .seuils tr { border-bottom: 1px solid var(--u-line-strong); }
+  .urbizen-page .seuils tr:last-child { border-bottom: none; }
+  .urbizen-page .seuils td { border-bottom: none; padding: 6px 16px; }
+  .urbizen-page .seuils td:first-child { padding-top: 14px; font-size: 15px; }
+  .urbizen-page .seuils td:last-child { padding-bottom: 14px; }
+  .urbizen-page .seuils td[data-th]::before {
+    content: attr(data-th);
+    display: block;
+    font-family: var(--u-font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--u-ink-faint);
+    margin-bottom: 2px;
+  }
+  .urbizen-page .seuils td.dp[data-th]::before { color: var(--u-brand-dk); }
+}
+
+/* ===== Frise de procédure ===== */
+.urbizen-page .frise { list-style: none; margin: 0; padding: 0; position: relative; max-width: 760px; }
+.urbizen-page .frise::before {
+  content: "";
+  position: absolute;
+  left: 21px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--u-line-strong);
+}
+.urbizen-page .frise li { position: relative; padding: 0 0 30px 66px; }
+.urbizen-page .frise li:last-child { padding-bottom: 0; }
+.urbizen-page .frise .f-n {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--u-surface);
+  border: 2px solid var(--u-brand);
+  display: grid;
+  place-items: center;
+  font-family: var(--u-font-mono);
+  font-size: 14px;
+  color: var(--u-brand);
+}
+.urbizen-page .frise h3 {
+  font-family: var(--u-font-title);
+  font-weight: 600;
+  font-size: 17.5px;
+  color: var(--u-ink);
+  margin: 8px 0 6px;
+}
+.urbizen-page .frise p { font-size: 15px; line-height: 1.65; color: var(--u-ink-soft); margin: 0; max-width: 66ch; }
+
+/* ===== Cartes d'information ===== */
+.urbizen-page .infos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.urbizen-page .info {
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-top: 3px solid var(--u-mint);
+  border-radius: var(--u-radius);
+  padding: 20px 22px;
+  box-shadow: var(--u-shadow-card);
+}
+.urbizen-page .info h3 {
+  font-family: var(--u-font-title);
+  font-weight: 600;
+  font-size: 16px;
+  color: var(--u-ink);
+  margin: 0 0 8px;
+}
+.urbizen-page .info p { font-size: 14.5px; line-height: 1.6; color: var(--u-ink-soft); margin: 0; }
+@media (max-width: 640px) { .urbizen-page .infos { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Liste des erreurs ===== */
+.urbizen-page .erreurs { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; max-width: 820px; }
+.urbizen-page .erreurs li {
+  position: relative;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  padding: 16px 20px 16px 54px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--u-ink-soft);
+}
+.urbizen-page .erreurs li b { color: var(--u-ink); }
+.urbizen-page .erreurs li::before {
+  content: "✕";
+  position: absolute;
+  left: 20px;
+  top: 15px;
+  font-family: var(--u-font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--u-error);
+}
+
+/* ===== Encart ===== */
+.urbizen-page .encart {
+  border: 1px solid var(--u-line-strong);
+  border-left: 4px solid var(--u-brand);
+  background: var(--u-brand-sf);
+  border-radius: var(--u-radius);
+  padding: 18px 22px;
+  margin-top: 28px;
+  max-width: 820px;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--u-ink);
+}
+.urbizen-page .encart b { font-family: var(--u-font-title); }
+.urbizen-page .encart .k {
+  display: block;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--u-brand-dk);
+  margin-bottom: 6px;
+}
+
+/* ===== Définitions (surface de plancher / emprise) ===== */
+.urbizen-page .defs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 26px; }
+.urbizen-page .def {
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius);
+  padding: 18px 20px;
+}
+.urbizen-page .def .k {
+  display: block;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--u-brand);
+  margin-bottom: 8px;
+}
+.urbizen-page .def p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--u-ink); }
+@media (max-width: 640px) { .urbizen-page .defs { grid-template-columns: minmax(0, 1fr); } }
+
+/* ===== Accessibilité / mouvement ===== */
+@media (prefers-reduced-motion: reduce) {
+  .urbizen-page * { transition: none !important; animation: none !important; }
+}

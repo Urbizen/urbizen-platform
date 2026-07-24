@@ -9,6 +9,17 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ### Ajouté
 
+- **Feuille dédiée aux pages internes** — `urbizen-child/assets/css/urbizen-pages.css`,
+  **100 % scopée `.urbizen-page`** (classe absente de l'accueil → aucune incidence
+  sur celui-ci), tokens `--u-*` uniquement, `prefers-reduced-motion` respecté.
+  Elle apporte les composants propres aux pages internes (hero de page à bandeau
+  encre, vrai tableau de seuils qui s'empile en fiches sous 760 px, frise de
+  procédure, cartes, définitions, encarts). Chargée par `functions.php` sur les
+  pages internes seulement (après `urbizen-homepage`), jamais sur l'accueil.
+  Elle **remplace la doctrine « aucune CSS nouvelle »** de la première itération
+  de l'Étape 6, qui coulait du contenu riche dans des composants d'accueil trop
+  étroits (à consigner dans `DECISIONS.md`).
+
 - **Thème enfant — gabarit de page « Déclaration préalable »**
   (`templates/page-declaration-prealable.html`), première page interne de
   l'Étape 6. Elle est construite **entièrement sur la charte et la feuille
