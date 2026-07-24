@@ -5,6 +5,28 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [Non publié]
+
+### Ajouté
+
+- **Thème enfant — gabarit de page « Déclaration préalable »**
+  (`templates/page-declaration-prealable.html`), première page interne de
+  l'Étape 6. Elle est construite **entièrement sur la charte et la feuille
+  générée de l'accueil** (`urbizen-homepage.css`) : aucun CSS nouveau, aucune
+  classe inventée, aucune police tierce. Un seul `<h1>`, nomenclature DP1–DP8
+  conforme au backend (DP6 insertion, DP7 environnement proche, DP8 paysage
+  lointain), formulations prudentes (« souvent », « selon »), sans garantie
+  d'obtention.
+- `urbizen-child/functions.php` : chargement conditionnel des ressources de
+  l'accueil **étendu aux pages internes Urbizen** via
+  `urbizen_child_est_page_urbizen()` et la constante
+  `URBIZEN_CHILD_TEMPLATES_PAGES` (slug `page-declaration-prealable` seul pour
+  l'instant). `urbizen_child_est_accueil_urbizen()` est inchangée ; l'accueil
+  conserve exactement son comportement (bancs `test-front-page` et
+  `test-fidelite` verts).
+
+---
+
 ## [0.12.0] — 24 juillet 2026
 
 Parcours public des comptes (E2.2), conformément à D-046 : inscription,

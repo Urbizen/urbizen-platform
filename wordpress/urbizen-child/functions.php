@@ -182,6 +182,43 @@ add_action( 'after_setup_theme', 'urbizen_child_setup' );
 const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
 
 /**
+ * Gabarits Urbizen des pages internes (hors accueil).
+ *
+ * Ces pages réutilisent la charte, les polices et la feuille générée de
+ * l'accueil, sans écrire de CSS propre. On n'y inscrit un slug que lorsque son
+ * gabarit existe réellement dans le thème.
+ */
+const URBIZEN_CHILD_TEMPLATES_PAGES = array(
+	'page-declaration-prealable',
+);
+
+/**
+ * La page affichée utilise-t-elle un gabarit Urbizen — accueil ou page interne ?
+ *
+ * Étend `urbizen_child_est_accueil_urbizen()` aux pages internes qui empruntent
+ * la même charte : elles doivent recevoir les mêmes polices, tokens et feuille.
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_urbizen() {
+	if ( urbizen_child_est_accueil_urbizen() ) {
+		return true;
+	}
+
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return in_array( get_page_template_slug( $id ), URBIZEN_CHILD_TEMPLATES_PAGES, true );
+}
+
+/**
  * La page affichée utilise-t-elle le gabarit de l'accueil Urbizen ?
  *
  * Deux gabarits rendent cette page, pour une raison tenant à la hiérarchie de
@@ -228,7 +265,7 @@ function urbizen_child_est_accueil_urbizen() {
  * @return void
  */
 function urbizen_child_enqueue_accueil() {
-	if ( ! urbizen_child_est_accueil_urbizen() ) {
+	if ( ! urbizen_child_est_page_urbizen() ) {
 		return;
 	}
 
@@ -272,7 +309,7 @@ add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_accueil', 30 );
  * @return array<int, string>
  */
 function urbizen_child_body_class( $classes ) {
-	if ( urbizen_child_est_accueil_urbizen() ) {
+	if ( urbizen_child_est_page_urbizen() ) {
 		$classes[] = 'u-grid-bg';
 	}
 
