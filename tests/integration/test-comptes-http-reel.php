@@ -174,6 +174,15 @@ $comptes->ecrire_meta(
 
 check( '0 · préparation : trois comptes créés', $id_non_ver > 0 && $id_verifiee > 0 && $id_quota > 0 );
 
+// URBIZEN_HTTP_BASE étant défini, l'interception du courriel n'est PLUS
+// optionnelle : sans boîte réellement inscriptible, la preuve « aucun envoi
+// réel » et le décompte exact des messages sont invérifiables. On EXIGE donc
+// une URBIZEN_MAILBOX valide — chemin renseigné, répertoire parent existant et
+// accessible en écriture — et son absence FAIT ÉCHOUER le banc plutôt que de
+// produire une preuve ambiguë.
+$mailbox_valide = ( '' !== $mailbox && is_dir( dirname( $mailbox ) ) && is_writable( dirname( $mailbox ) ) );
+check( '0 · URBIZEN_MAILBOX valide et inscriptible (interception exigée)', $mailbox_valide );
+
 // ----------------------------------------------------------------------
 // Les quatre requêtes d'inscription
 // ----------------------------------------------------------------------
@@ -244,6 +253,21 @@ check( '2 · la Location ne porte NI adresse NI jeton NI motif technique',
 	&& false === strpos( $loc_ref, 'prise' )
 	&& false === strpos( $loc_ref, 'quota' ) );
 
+// Analyse fine de la requête : elle doit contenir EXACTEMENT deux paramètres,
+// action=urbizen_resultat et code=verifiez, sans aucun autre paramètre, sans
+// fragment, sans information utilisateur (auth, user, host portant une @).
+$parts = parse_url( $loc_ref );
+$query = array();
+parse_str( $parts['query'] ?? '', $query );
+
+check( '2 · la Location ne porte AUCUN fragment', ! isset( $parts['fragment'] ) || '' === $parts['fragment'] );
+check( '2 · la Location ne porte AUCUNE information d’authentification', ! isset( $parts['user'] ) && ! isset( $parts['pass'] ) );
+ksort( $query );
+$query_attendue = array( 'action' => 'urbizen_resultat', 'code' => 'verifiez' );
+ksort( $query_attendue );
+check( '2 · la requête contient EXACTEMENT action=urbizen_resultat et code=verifiez, rien d’autre',
+	$query === $query_attendue );
+
 // ----------------------------------------------------------------------
 // 3 · La page de résultat, chargée en GET, est identique octet par octet
 // ----------------------------------------------------------------------
@@ -256,11 +280,28 @@ foreach ( $cas as $nom => $rep ) {
 $ref = $resultats['A_libre'];
 
 foreach ( $resultats as $nom => $res ) {
+	check( sprintf( '3 · %s : page de résultat servie en HTTP 200', $nom ), 200 === $res['status'] );
 	check( sprintf( '3 · %s : statut de la page identique', $nom ), $res['status'] === $ref['status'] );
 	check( sprintf( '3 · %s : CORPS IDENTIQUE À L\'OCTET PRÈS', $nom ), $res['body'] === $ref['body'] );
 }
 
-// En-têtes publics pertinents de la page de résultat.
+// En-têtes protecteurs de la page de résultat : PRÉSENCE ET VALEUR, sur CHACUNE
+// des quatre pages. L'égalité d'une page à l'autre ne suffit pas : quatre
+// en-têtes absents seraient tous « identiques » et passeraient. On vérifie donc
+// la valeur protectrice attendue avant de vérifier qu'elle ne varie pas.
+foreach ( $resultats as $nom => $res ) {
+	$cc = strtolower( $res['headers']['cache-control'] ?? '' );
+	check( sprintf( '3 · %s : Cache-Control contient private, no-store ET max-age=0', $nom ),
+		false !== strpos( $cc, 'private' )
+		&& false !== strpos( $cc, 'no-store' )
+		&& false !== strpos( $cc, 'max-age=0' ) );
+	check( sprintf( '3 · %s : Referrer-Policy = no-referrer', $nom ),
+		'no-referrer' === strtolower( trim( $res['headers']['referrer-policy'] ?? '' ) ) );
+	check( sprintf( '3 · %s : X-Robots-Tag = noindex, nofollow', $nom ),
+		'noindex, nofollow' === strtolower( trim( $res['headers']['x-robots-tag'] ?? '' ) ) );
+}
+
+// Et ces en-têtes ne varient pas d'un état de compte à l'autre.
 foreach ( array( 'cache-control', 'referrer-policy', 'x-robots-tag' ) as $h ) {
 	$ref_h = $ref['headers'][ $h ] ?? '__absent__';
 
@@ -349,12 +390,36 @@ $mails_apres = array_slice( $mails, $mailbox_avant );
 $destinataires = array_map( static fn( $m ) => is_array( $m['to'] ) ? implode( ',', $m['to'] ) : (string) $m['to'], $mails_apres );
 $dest_concat   = implode( ' | ', $destinataires );
 
-check( '6 · des courriels ont été INTERCEPTÉS (aucun envoi réel possible)',
-	count( $mails_apres ) >= 2 );
-check( '6 · A (adresse libre) a bien reçu un message', false !== strpos( $dest_concat, $adr_libre ) );
-check( '6 · B (non vérifiée) a bien reçu un message', false !== strpos( $dest_concat, $adr_non_ver ) );
-check( '6 · C (déjà vérifiée) NE reçoit AUCUN message', false === strpos( $dest_concat, $adr_verifiee ) );
-check( '6 · D (quota épuisé) NE reçoit AUCUN message', false === strpos( $dest_concat, $adr_quota ) );
+check( '6 · EXACTEMENT deux courriels interceptés (aucun envoi réel possible)',
+	2 === count( $mails_apres ) );
+
+// Ensemble EXACT des destinataires : A et B, une fois chacun, sans troisième
+// message ni destinataire supplémentaire. On décompose chaque champ « to »
+// (qui peut être une liste) et l'on compare l'inventaire complet.
+$compte_dest = array();
+
+foreach ( $destinataires as $d ) {
+	foreach ( explode( ',', $d ) as $un ) {
+		$un = trim( $un );
+
+		if ( '' !== $un ) {
+			$compte_dest[ $un ] = ( $compte_dest[ $un ] ?? 0 ) + 1;
+		}
+	}
+}
+
+$attendu = array( $adr_libre => 1, $adr_non_ver => 1 );
+ksort( $compte_dest );
+ksort( $attendu );
+
+check( '6 · destinataires EXACTEMENT { A, B }, une fois chacun, rien d’autre',
+	$compte_dest === $attendu );
+
+// Contrôles nominatifs, redondants mais lisibles, sur le même inventaire.
+check( '6 · A (adresse libre) a bien reçu un message', 1 === ( $compte_dest[ $adr_libre ] ?? 0 ) );
+check( '6 · B (non vérifiée) a bien reçu un message', 1 === ( $compte_dest[ $adr_non_ver ] ?? 0 ) );
+check( '6 · C (déjà vérifiée) NE reçoit AUCUN message', ! isset( $compte_dest[ $adr_verifiee ] ) );
+check( '6 · D (quota épuisé) NE reçoit AUCUN message', ! isset( $compte_dest[ $adr_quota ] ) );
 
 // ----------------------------------------------------------------------
 // Nettoyage des comptes de banc
