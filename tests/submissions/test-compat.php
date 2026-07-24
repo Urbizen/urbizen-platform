@@ -343,10 +343,77 @@ foreach ( $sources as $chemin => $contenu ) {
 	}
 }
 
-check( 'AUCUNE VUE NI CONTRÔLEUR N’UTILISE L’INFRASTRUCTURE INACTIVE',
-	array() === $consommateurs );
+/*
+ * ASSERTION HISTORIQUE RESSERRÉE — inventoriée, non affaiblie.
+ *
+ * Elle interdisait l'infrastructure d'autorisation à TOUTE vue et TOUT
+ * contrôleur. E2.2 la branche légitimement, et à deux endroits seulement : les
+ * actions de session doivent demander « cet acteur peut-il agir sur ce compte »,
+ * et c'est précisément ce à quoi une politique répond.
+ *
+ * L'assertion ne devient pas « sauf les contrôleurs » : elle NOMME les deux
+ * fichiers autorisés. Un troisième la fait tomber. C'est plus strict qu'une
+ * liste de répertoires exemptés, qui se relâcherait à chaque ajout.
+ *
+ * Les trois actions ANONYMES n'ont aucune politique, et ne peuvent pas en
+ * avoir : à l'inscription il n'y a ni acteur ni ressource ; à la consommation
+ * du jeton, l'autorisation EST la validation du condensat. C'est pourquoi
+ * `ComptesController` figure ici pour ses deux actions de session, et
+ * `VerificationController` pour aucune — il est nommé par prudence, et le
+ * contrôle ci-dessous vérifie qu'il ne s'en sert effectivement pas.
+ */
+$autorises = array( 'src/Http/ComptesController.php' );
+
+$consommateurs_hors_liste = array_values( array_diff( $consommateurs, $autorises ) );
+
+check( 'AUCUNE VUE NI CONTRÔLEUR N’UTILISE L’INFRASTRUCTURE, HORS LES DEUX NOMMÉS',
+	array() === $consommateurs_hors_liste );
+check( 'le contrôleur de vérification NE S’EN SERT PAS — le jeton est sa seule autorisation',
+	! preg_match(
+		'/\bAuthorization\b|\bPolicyRegistry\b|\bActeurCourant\b/',
+		$sources['src/Http/VerificationController.php'] ?? ''
+	) );
+check( 'la liste des autorisés reste courte et explicite', 1 === count( $autorises ) );
 check( 'les répertoires de vues et contrôleurs ont bien été parcourus',
 	count( $vues_et_controleurs ) === 5 );
+
+/*
+ * `MailTransport::send()` n'est appelé, dans le domaine des comptes, que depuis
+ * `EnvoiVerification`. Contrôle ADDITIF : celui qui borne `wp_mail` à un seul
+ * fichier reste inchangé, au caractère près.
+ */
+$emetteurs = array();
+
+foreach ( $sources as $chemin => $contenu ) {
+	if ( 0 !== strpos( $chemin, 'src/Account/' ) && 0 !== strpos( $chemin, 'src/Http/' ) ) {
+		continue;
+	}
+
+	if ( preg_match( '/->send\s*\(/', $contenu ) ) {
+		$emetteurs[] = $chemin;
+	}
+}
+
+check( 'SEUL EnvoiVerification ÉMET dans le domaine des comptes',
+	array( 'src/Account/EnvoiVerification.php' ) === $emetteurs );
+
+/*
+ * Aucun sixième fichier de classe non décidé. D-046 prévoit exactement cinq
+ * classes ajoutées ; un fichier de plus est un ajout que personne n'a tranché.
+ */
+$attendus_account = array(
+	'AutorisationComptes.php', 'ComptesGateway.php', 'CourrielVerification.php',
+	'EmissionEnAttente.php', 'EnvoiVerification.php', 'InscriptionService.php',
+	'JetonVerification.php', 'LienVerification.php', 'LimiteEnvois.php',
+	'ResultatEmission.php', 'RoleClient.php', 'VerificationService.php',
+	'VerrouCompte.php',
+);
+
+$reels_account = array_map( 'basename', glob( URBIZEN_PLATFORM_DIR . 'src/Account/*.php' ) ?: array() );
+sort( $reels_account );
+
+check( 'AUCUN FICHIER DE CLASSE NON DÉCIDÉ dans src/Account/',
+	$attendus_account === $reels_account );
 check( 'l’en-tête concorde avec la constante', trim( $mh[1] ?? '' ) === $version );
 
 foreach ( array( 'cadastre', 'formulaire' ) as $bloc ) {

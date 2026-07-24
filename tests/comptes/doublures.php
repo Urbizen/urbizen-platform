@@ -241,6 +241,20 @@ final class ComptesDouble implements ComptesGateway {
 	 */
 	public ?array $piege = null;
 
+	/**
+	 * `trouver_par_id()` doit-il lever ?
+	 *
+	 * @var bool
+	 */
+	public bool $lever_trouver = false;
+
+	/**
+	 * Clé dont la LECTURE doit lever.
+	 *
+	 * @var string
+	 */
+	public string $lever_lecture = '';
+
 	public function canoniser( string $brute ): string {
 		$valeur = (string) preg_replace( '/[\x00-\x1F\x7F]/', '', $brute );
 
@@ -248,6 +262,10 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function trouver_par_id( int $id ): ?Compte {
+		if ( $this->lever_trouver ) {
+			throw new RuntimeException( 'base indisponible : trouver_par_id' );
+		}
+
 		if ( ! isset( $this->utilisateurs[ $id ] ) ) {
 			return null;
 		}
@@ -311,6 +329,10 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function lire_meta( int $id, string $cle ): ?string {
+		if ( '' !== $this->lever_lecture && $this->lever_lecture === $cle ) {
+			throw new RuntimeException( 'base indisponible : lire_meta' );
+		}
+
 		// Une clé absente rend `null` ; une clé vide rend la chaîne vide. La
 		// distinction est ce qui permet de détecter un état partiel.
 		JournalEvenements::noter( 'lecture:' . $cle );
@@ -329,6 +351,8 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function ecrire_meta( int $id, string $cle, string $valeur ): bool {
+		JournalOrdre::noter( 'ecrire:' . $cle );
+
 		if ( in_array( $cle, $this->ecritures_refusees, true ) ) {
 			return false;
 		}
@@ -339,6 +363,8 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function supprimer_meta( int $id, string $cle ): bool {
+		JournalOrdre::noter( 'supprimer:' . $cle );
+
 		unset( $this->metas[ $id ][ $cle ] );
 
 		return true;
@@ -372,5 +398,116 @@ final class IdentiteDouble implements Urbizen\Platform\Domain\Identity\CurrentUs
 
 	public function acteur(): Urbizen\Platform\Domain\Identity\ActeurCourant {
 		return $this->acteur;
+	}
+}
+
+/**
+ * Transport de courriel pilotable, avec journal d'ordre.
+ *
+ * Il n'appelle **jamais** la fonction d'envoi de WordPress : c'est une
+ * doublure fidèle du contrat `MailTransport`, rien de plus. Chaque envoi est
+ * enregistré, et l'ordre des appels — envoi, confirmation, annulation — est
+ * noté dans un journal partagé. C'est ce journal qui prouve qu'aucun appel
+ * applicatif ne s'intercale entre le retour de l'envoi et la clôture.
+ */
+final class TransportDouble implements Urbizen\Platform\Mail\MailTransport {
+
+	/**
+	 * Réponses à rendre, dans l'ordre. Une valeur `Throwable` est lancée.
+	 *
+	 * @var array<int, array{ok: bool, code: string}|Throwable>
+	 */
+	public array $reponses = array();
+
+	/**
+	 * Réponse par défaut, une fois `reponses` épuisée.
+	 *
+	 * @var array{ok: bool, code: string}
+	 */
+	public array $defaut = array( 'ok' => true, 'code' => 'accepted' );
+
+	/**
+	 * Messages remis, dans l'ordre.
+	 *
+	 * @var array<int, array{destinataire: string, sujet: string, corps: string, entetes: array<int, string>}>
+	 */
+	public array $messages = array();
+
+	/**
+	 * Rappel exécuté pendant l'envoi, avant qu'il ne rende.
+	 *
+	 * @var callable|null
+	 */
+	public $pendant = null;
+
+	public function send( string $destinataire, string $sujet, string $corps, array $entetes ): array {
+		$this->messages[] = array(
+			'destinataire' => $destinataire,
+			'sujet'        => $sujet,
+			'corps'        => $corps,
+			'entetes'      => $entetes,
+		);
+
+		JournalOrdre::noter( 'send' );
+
+		if ( null !== $this->pendant ) {
+			( $this->pendant )( $this );
+		}
+
+		$reponse = array_shift( $this->reponses );
+
+		if ( null === $reponse ) {
+			return $this->defaut;
+		}
+
+		if ( $reponse instanceof Throwable ) {
+			throw $reponse;
+		}
+
+		return $reponse;
+	}
+}
+
+/**
+ * Journal d'ordre : la suite exacte des appels observés.
+ */
+final class JournalOrdre {
+
+	/**
+	 * @var array<int, string>
+	 */
+	public static array $suite = array();
+
+	/**
+	 * Le journal n'enregistre que lorsqu'il est armé : les autres bancs ne
+	 * doivent pas payer le coût d'une instrumentation qu'ils n'utilisent pas.
+	 *
+	 * @var bool
+	 */
+	public static bool $actif = false;
+
+	public static function armer(): void {
+		self::$suite = array();
+		self::$actif = true;
+	}
+
+	public static function reset(): void {
+		self::$suite  = array();
+		self::$actif  = false;
+	}
+
+	public static function noter( string $appel ): void {
+		if ( ! self::$actif ) {
+			return;
+		}
+
+		self::$suite[] = $appel;
+	}
+
+	/**
+	 * @return string
+	 */
+	public static function rendu(): string {
+		return implode( ' → ', self::$suite );
 	}
 }

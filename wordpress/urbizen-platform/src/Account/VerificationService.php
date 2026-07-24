@@ -100,6 +100,31 @@ final class VerificationService {
 		}
 
 		try {
+			return $this->preparer_sous_verrou( $compte, $maintenant );
+		} finally {
+			$verrou->liberer();
+		}
+	}
+
+	/**
+	 * Prépare une émission, le verrou du compte étant **déjà détenu**.
+	 *
+	 * Extraite de `preparer()` pour qu'un appelant qui tient déjà le verrou
+	 * puisse préparer sans le relâcher. C'est ce qui rend
+	 * `demander_changement_adresse()` atomique : enregistrer la cible puis
+	 * préparer l'émission en deux acquisitions successives ouvrirait une
+	 * fenêtre où une demande concurrente remplacerait la cible entre les deux,
+	 * et le jeton confirmerait alors une adresse que personne n'a demandée.
+	 *
+	 * N'acquiert ni ne libère aucun verrou : c'est la responsabilité de
+	 * l'appelant, et elle n'est pas partageable.
+	 *
+	 * @param int $compte     Identifiant.
+	 * @param int $maintenant Horloge.
+	 * @return ResultatEmission
+	 */
+	private function preparer_sous_verrou( int $compte, int $maintenant ): ResultatEmission {
+		try {
 			// Relecture SOUS verrou : le compte a pu changer entre-temps.
 			$objet = $this->comptes->trouver_par_id( $compte );
 
@@ -130,7 +155,7 @@ final class VerificationService {
 			}
 
 			// (3-4) Quota et délai.
-			$etat  = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+			$etat  = LimiteEnvois::etat_depuis_source( $this->lire_source_quota( $compte ) );
 			$motif = LimiteEnvois::motif_de_refus( $etat, $maintenant );
 
 			if ( '' !== $motif ) {
@@ -184,9 +209,206 @@ final class VerificationService {
 			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 
 			return ResultatEmission::refuse( 'exception' );
+		}
+	}
+
+	/**
+	 * Authentifie un lien SANS RIEN CONSOMMER, ni rien écrire.
+	 *
+	 * Le GET de la page de vérification doit prouver que le lien est le bon
+	 * AVANT d'afficher l'adresse qu'il confirme. Sans cette preuve, il suffirait
+	 * d'essayer des identifiants numériques avec un jeton bien formé pour se
+	 * faire afficher l'adresse de tout compte ayant une vérification en cours —
+	 * exactement l'annuaire que le reste du parcours refuse de fournir.
+	 *
+	 * **Aucune écriture, aucun verrou écrivant, aucune clôture, aucun quota.**
+	 * La méthode lit et compare, rien de plus. Elle ne prend pas non plus
+	 * `VerrouCompte` : le verrou sert à sérialiser des ÉCRITURES, et une lecture
+	 * qui le prendrait bloquerait une émission légitime pour rien.
+	 *
+	 * Les motifs rendus sont ceux de `consommer()`, de sorte que compte absent
+	 * et jeton invalide restent indiscernables du dehors.
+	 *
+	 * @param int      $compte     Identifiant présenté.
+	 * @param string   $jeton      Jeton présenté.
+	 * @param int|null $maintenant Horloge injectable.
+	 * @return array{motif: string, cible: string}
+	 */
+	public function inspecter( int $compte, string $jeton, ?int $maintenant = null ): array {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+
+		/*
+		 * TOUTE lecture est encadrée. Une panne de la base pendant l'inspection
+		 * n'a pas à devenir un 500 : c'est un service momentanément
+		 * indisponible, et le parcours a déjà une issue publique pour cela.
+		 *
+		 * Rien n'est journalisé depuis ce chemin — ni jeton, ni adresse, ni
+		 * identifiant. Une trace prise ici porterait précisément ce que la
+		 * méthode existe pour ne pas divulguer.
+		 */
+		try {
+			if ( $compte <= 0 || ! JetonVerification::forme_valide( $jeton ) ) {
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			$objet = $this->comptes->trouver_par_id( $compte );
+
+			if ( null === $objet ) {
+				// MÊME motif qu'un jeton invalide : distinguer révélerait quels
+				// identifiants correspondent à un compte.
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			$condensat  = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CONDENSAT );
+			$expire     = $this->comptes->lire_meta( $compte, JetonVerification::META_EXPIRE );
+			$cible      = (string) $this->comptes->lire_meta( $compte, JetonVerification::META_CIBLE );
+			$generation = $this->comptes->lire_meta( $compte, JetonVerification::META_GENERATION );
+
+			if ( '' === $condensat || null === $expire || '' === $cible || null === $generation ) {
+				return array( 'motif' => 'jeton_absent', 'cible' => '' );
+			}
+
+			if ( ! JetonVerification::correspond( $condensat, $compte, $cible, (int) $generation, $jeton ) ) {
+				return array( 'motif' => 'jeton_invalide', 'cible' => '' );
+			}
+
+			if ( ! ctype_digit( (string) $expire ) || (int) $expire <= $maintenant ) {
+				return array( 'motif' => 'jeton_expire', 'cible' => '' );
+			}
+
+			if ( ! hash_equals( $objet->cible_de_verification()->valeur(), $cible ) ) {
+				return array( 'motif' => 'cible_obsolete', 'cible' => '' );
+			}
+
+			// La cible n'est rendue QU'ICI, une fois le condensat prouvé.
+			return array( 'motif' => '', 'cible' => $cible );
+		} catch ( Throwable $e ) {
+			return array( 'motif' => 'exception', 'cible' => '' );
+		}
+	}
+
+	/**
+	 * Enregistre une demande de changement d'adresse et prépare son émission.
+	 *
+	 * **Tout se fait sous UNE seule acquisition du verrou.** Écrire la cible
+	 * puis appeler `preparer()` — qui reverrouillerait — ouvrirait une fenêtre
+	 * entre les deux : une demande concurrente y remplacerait la cible, et le
+	 * jeton confirmerait alors une adresse que personne n'a demandée. C'est la
+	 * raison d'être de `preparer_sous_verrou()`.
+	 *
+	 * **L'adresse du compte ne bouge pas ici.** Seule `consommer()` promeut
+	 * l'adresse en attente, et `WpComptes` protège cette promotion de sa garde.
+	 * L'ancienne adresse reste donc celle du compte jusqu'à ce que le
+	 * destinataire de la nouvelle ait suivi son lien.
+	 *
+	 * **Si la préparation échoue, la cible est restaurée.** Laisser une adresse
+	 * en attente sans jeton ferait viser cette adresse jamais confirmée par le
+	 * renvoi suivant. Le tout aboutit, ou rien ne bouge.
+	 *
+	 * @param int      $compte         Identifiant.
+	 * @param string   $nouvelle_brute Adresse demandée, telle que saisie.
+	 * @param int|null $maintenant     Horloge injectable.
+	 * @return array{motif: string, ancienne: string, emission: ResultatEmission|null}
+	 */
+	public function demander_changement_adresse( int $compte, string $nouvelle_brute, ?int $maintenant = null ): array {
+		$maintenant = null === $maintenant ? time() : $maintenant;
+		$verrou     = VerrouCompte::acquerir( $this->db, $compte, $maintenant );
+
+		if ( null === $verrou ) {
+			return self::changement_refuse( 'verrou_indisponible' );
+		}
+
+		try {
+			// Relecture SOUS verrou : tout ce qui suit décide sur cet état-là.
+			$objet = $this->comptes->trouver_par_id( $compte );
+
+			if ( null === $objet ) {
+				return self::changement_refuse( 'compte_absent' );
+			}
+
+			$ancienne = $objet->adresse()->valeur();
+
+			// Ce qu'il faudra remettre si la préparation échoue : la valeur
+			// exacte d'avant, ou son absence.
+			$precedente = $this->comptes->lire_meta( $compte, self::META_EN_ATTENTE );
+
+			$canonique = $this->comptes->canoniser( $nouvelle_brute );
+			$adresse   = AdresseCourriel::ou_null( $canonique );
+
+			if ( null === $adresse ) {
+				return self::changement_refuse( 'adresse_invalide', $ancienne );
+			}
+
+			if ( hash_equals( $ancienne, $adresse->valeur() ) ) {
+				return self::changement_refuse( 'adresse_inchangee', $ancienne );
+			}
+
+			// Le compte lui-même est écarté du contrôle : sa propre adresse ne
+			// doit pas se rendre indisponible à lui-même.
+			if ( ! $this->comptes->adresse_disponible( $adresse->valeur(), $compte ) ) {
+				// Le motif part au journal, jamais à l'utilisateur : dire
+				// « cette adresse est prise » offrirait un annuaire.
+				return self::changement_refuse( 'adresse_indisponible', $ancienne );
+			}
+
+			if ( ! $this->comptes->ecrire_meta( $compte, self::META_EN_ATTENTE, $adresse->valeur() ) ) {
+				return self::changement_refuse( 'ecriture_incomplete', $ancienne );
+			}
+
+			// Le verrou est TOUJOURS détenu : la cible qu'on vient d'écrire est
+			// celle que cette préparation lira.
+			$emission = $this->preparer_sous_verrou( $compte, $maintenant );
+
+			if ( ! $emission->est_prepare() ) {
+				$this->restaurer_en_attente( $compte, $precedente );
+
+				return self::changement_refuse( $emission->motif(), $ancienne );
+			}
+
+			Logger::info( sprintf( 'changement d adresse demande (compte %d)', $compte ) );
+
+			return array(
+				'motif'    => '',
+				'ancienne' => $ancienne,
+				'emission' => $emission,
+			);
+		} catch ( Throwable $e ) {
+			return self::changement_refuse( 'exception' );
 		} finally {
+			// Libéré AVANT tout rendu et tout envoi : un verrou de 60 secondes
+			// ne survivrait pas à un envoi SMTP.
 			$verrou->liberer();
 		}
+	}
+
+	/**
+	 * Remet l'adresse en attente dans l'état où elle était.
+	 *
+	 * @param int         $compte     Identifiant.
+	 * @param string|null $precedente Valeur d'avant, ou null si absente.
+	 * @return void
+	 */
+	private function restaurer_en_attente( int $compte, ?string $precedente ): void {
+		if ( null === $precedente || '' === $precedente ) {
+			$this->comptes->supprimer_meta( $compte, self::META_EN_ATTENTE );
+
+			return;
+		}
+
+		$this->comptes->ecrire_meta( $compte, self::META_EN_ATTENTE, $precedente );
+	}
+
+	/**
+	 * @param string $motif    Motif technique.
+	 * @param string $ancienne Adresse actuelle, si connue.
+	 * @return array{motif: string, ancienne: string, emission: ResultatEmission|null}
+	 */
+	private static function changement_refuse( string $motif, string $ancienne = '' ): array {
+		return array(
+			'motif'    => $motif,
+			'ancienne' => $ancienne,
+			'emission' => null,
+		);
 	}
 
 	/**
@@ -230,12 +452,18 @@ final class VerificationService {
 				return false;
 			}
 
-			if ( ! $this->consommer_quota( $compte, $maintenant ) ) {
+			// (2-4) Source, puis miroir. La source reconnaît l'identifiant si
+			// c'est un rejeu et n'ajoute alors aucun créneau.
+			if ( ! $this->consommer_quota( $compte, $maintenant, $emission_id ) ) {
 				return false;
 			}
 
-			// L'émission est close ; le jeton, lui, reste actif jusqu'à sa
-			// consommation ou son échéance.
+			// (5) L'émission n'est effacée QUE si source et miroir ont été
+			// écrits. C'est elle qui permet le rejeu : la supprimer sur un
+			// miroir en échec fermerait la seule porte de reprise.
+			//
+			// (6) Le jeton, lui, reste actif jusqu'à sa consommation ou son
+			// échéance.
 			return $this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 		} finally {
 			$verrou->liberer();
@@ -375,6 +603,37 @@ final class VerificationService {
 				return 'cible_obsolete';
 			}
 
+			/*
+			 * (6 bis) LE QUOTA D'ABORD, avant toute mutation irréversible.
+			 *
+			 * Le destinataire vient de suivre le lien : c'est la preuve d'envoi
+			 * la plus forte qui soit, et le créneau doit être décompté. Le faire
+			 * APRÈS la promotion et le marquage — comme auparavant — laissait un
+			 * chemin où le compte se vérifiait, le jeton disparaissait, et le
+			 * décompte se perdait si la source ou le miroir échouait. D-046 exige
+			 * un quota exact : on refuse plutôt que de perdre un créneau.
+			 *
+			 * Rien n'est encore altéré ici. Un échec rend `indisponible` et
+			 * laisse le jeton, l'émission, l'adresse et l'état non vérifié
+			 * exactement où ils étaient : le clic est rejouable.
+			 */
+			$attente = EmissionEnAttente::decoder(
+				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
+			);
+
+			$emission_du_jeton = null !== $attente
+				&& empty( $attente['corrompue'] )
+				&& (int) $generation === (int) $attente['generation']
+				&& hash_equals( (string) $attente['cible'], $cible );
+
+			if ( $emission_du_jeton
+				&& ! $this->consommer_quota( $compte, $maintenant, (string) $attente['id'] ) ) {
+				// Un rejeu du même clic reconnaîtra l'identifiant dans la
+				// source, réparera le miroir sans second créneau, et ira
+				// jusqu'au bout.
+				return 'quota_non_clos';
+			}
+
 			// (7) Changement d'adresse : est-elle encore libre ?
 			if ( $objet->a_un_changement_en_cours() ) {
 				if ( ! $this->comptes->adresse_disponible( $cible, $compte ) ) {
@@ -400,27 +659,9 @@ final class VerificationService {
 
 			$this->comptes->ecrire_meta( $compte, self::META_VERIFIE_LE, gmdate( 'Y-m-d H:i:s', $maintenant ) );
 
-			/*
-			 * (9) Une émission de ce jeton était-elle encore en attente ?
-			 *
-			 * Alors le courriel est bel et bien parti — le destinataire vient
-			 * d'en suivre le lien. C'est la preuve d'envoi la plus forte qui
-			 * soit, et le créneau doit être décompté ici : sans cela, cliquer
-			 * plus vite que l'appelant ne confirme rendrait le créneau gratuit,
-			 * et l'opération répétée viderait le quota de sa fonction.
-			 */
-			$attente = EmissionEnAttente::decoder(
-				$this->comptes->lire_meta( $compte, EmissionEnAttente::META )
-			);
-
-			if ( null !== $attente
-				&& empty( $attente['corrompue'] )
-				&& (int) $generation === (int) $attente['generation']
-				&& hash_equals( (string) $attente['cible'], $cible )
-			) {
-				$this->consommer_quota( $compte, $maintenant );
-			}
-
+			// (9) Le créneau est déjà décompté (6 bis). L'émission peut être
+			// close : une confirmation tardive de l'émetteur reconnaîtra son
+			// identifiant dans la source et n'ajoutera aucun second créneau.
 			$this->comptes->supprimer_meta( $compte, EmissionEnAttente::META );
 
 			// (10) Le condensat n'est effacé qu'ici, après preuve.
@@ -445,17 +686,83 @@ final class VerificationService {
 	 * @param int $maintenant Horloge.
 	 * @return bool
 	 */
-	private function consommer_quota( int $compte, int $maintenant ): bool {
-		$etat = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+	private function consommer_quota( int $compte, int $maintenant, string $emission_id ): bool {
+		$source = $this->lire_source_quota( $compte );
 
-		// Un quota illisible est réécrit proprement plutôt que conservé : on
-		// repart d'un envoi connu, jamais d'un état qu'on ne sait pas lire.
-		$base = empty( $etat['corrompue'] ) ? $etat['horodatages'] : array();
+		// Une source illisible ferme : on n'écrit pas par-dessus un état qu'on
+		// ne sait pas lire, et l'on ne repart pas d'un tableau vide — ce serait
+		// offrir une fenêtre entière à qui aurait corrompu la valeur.
+		if ( ! empty( $source['corrompue'] ) ) {
+			Logger::error( sprintf( 'confirmation refusee : quota_illisible (compte %d)', $compte ) );
 
+			return false;
+		}
+
+		$entrees = $source['entrees'];
+
+		// (2) L'identifiant y figure déjà : c'est un rejeu. On n'ajoute pas un
+		// second créneau, mais on poursuit — le miroir et l'effacement de
+		// l'émission restent peut-être à faire.
+		if ( ! LimiteEnvois::contient_emission( $entrees, $emission_id ) ) {
+			$entrees = LimiteEnvois::ajouter_emission( $entrees, $maintenant, $emission_id );
+		}
+
+		// (3) La source d'abord, toujours. Le miroir ne s'écrit jamais seul :
+		// il ne doit pas pouvoir devancer ce dont il n'est que la trace.
+		if ( ! $this->comptes->ecrire_meta( $compte, LimiteEnvois::META_SOURCE, LimiteEnvois::encoder_source( $entrees ) ) ) {
+			return false;
+		}
+
+		// (4) Le miroir est réécrit EN ENTIER depuis la source. Il n'est pas
+		// rattrapé par incréments : la première écriture qui aboutit le remet
+		// exactement à jour, quel que soit le nombre d'échecs précédents.
 		return $this->comptes->ecrire_meta(
 			$compte,
 			LimiteEnvois::META,
-			LimiteEnvois::encoder( LimiteEnvois::confirmer( $base, $maintenant ) )
+			LimiteEnvois::encoder( LimiteEnvois::horodatages_de( $entrees ) )
+		);
+	}
+
+	/**
+	 * Lit la source du quota, amorcée depuis le miroir si elle est absente.
+	 *
+	 * **Absente n'est pas corrompue.** Absente veut dire « jamais migrée » :
+	 * on amorce depuis le miroir hérité, chaque horodatage devenant `{a, e:''}`.
+	 * Corrompue veut dire « état incompris » : elle se propage, et l'appelant
+	 * refuse.
+	 *
+	 * L'amorçage reste **en mémoire** : une lecture n'écrit pas. La source
+	 * amorcée sera persistée par la première confirmation qui aboutit, avec le
+	 * créneau qu'elle ajoute.
+	 *
+	 * Le miroir n'est lu **que** dans ce cas d'amorçage, jamais en recours sur
+	 * une source corrompue : ce serait transformer un état incompris en
+	 * autorisation.
+	 *
+	 * @param int $compte Identifiant.
+	 * @return array{entrees: array<int, array{a: int, e: string}>, corrompue: bool, absente: bool}
+	 */
+	private function lire_source_quota( int $compte ): array {
+		$source = LimiteEnvois::decoder_source(
+			$this->comptes->lire_meta( $compte, LimiteEnvois::META_SOURCE )
+		);
+
+		if ( empty( $source['absente'] ) ) {
+			return $source;
+		}
+
+		$miroir = LimiteEnvois::decoder( $this->comptes->lire_meta( $compte, LimiteEnvois::META ) );
+
+		// Un miroir hérité illisible n'autorise pas davantage : on le traite
+		// comme plein, dans le sens restrictif.
+		if ( ! empty( $miroir['corrompue'] ) ) {
+			return array( 'entrees' => array(), 'corrompue' => true, 'absente' => false );
+		}
+
+		return array(
+			'entrees'   => LimiteEnvois::amorcer_depuis_miroir( $miroir['horodatages'] ),
+			'corrompue' => false,
+			'absente'   => false,
 		);
 	}
 

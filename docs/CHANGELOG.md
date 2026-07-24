@@ -5,103 +5,117 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
-## [0.12.0] — non publiée · périmètre arrêté
+## [0.12.0] — 24 juillet 2026
 
-Parcours public des comptes (E2.2) : inscription, vérification du courriel et
-changement d'adresse.
+Parcours public des comptes (E2.2), conformément à D-046 : inscription,
+vérification de l'adresse, renvoi du lien et changement d'adresse.
 
-> **Aucun code livré à ce jour.** Cette entrée consigne le **périmètre arrêté**
-> par D-046 ; elle précède la livraison au lieu de l'accompagner, contrairement
-> à la règle de ce fichier. Rien n'est ajouté, modifié ni déployé : la version
-> `0.12.0` n'est portée par aucun fichier, et le comportement du site est celui
-> de `0.11.0`. Les sections ci-dessous seront reprises et complétées, sans
-> nouvelle version, dans le commit qui livrera E2.2.
+> **Le code est livré ; son exposition est un geste distinct.** Les shortcodes,
+> actions et gabarits existent dans l'extension. **Cette livraison ne crée ni
+> ne publie aucune page WordPress ; l'exposition des shortcodes reste un geste
+> d'exploitation distinct.** Cette entrée décrit l'état réellement présent dans
+> le dépôt, pas une mise en ligne.
 
-### Prévu — production ajoutée (5 classes)
+### Ajouté
 
-| Fichier | Rôle |
-|---|---|
-| `src/Account/EnvoiVerification.php` | **Unique** orchestrateur : préparer → rendre → `MailTransport::send()` → clore. Reçoit le transport par construction. |
-| `src/Account/CourrielVerification.php` | Sujet, corps texte et corps HTML. Aucune dépendance HTTP, aucun `wp_mail()`. |
-| `src/Account/LienVerification.php` | Fabrication et relecture de l'URL de vérification. |
-| `src/Http/ComptesController.php` | Actions `admin-post` : inscription, renvoi public, renvoi connecté, changement d'adresse. |
-| `src/Http/VerificationController.php` | Page de vérification : GET affiche, POST consomme. Porte les en-têtes de protection. |
+- **Quatre parcours de compte** (D-046), servis par `admin-post.php` — certains
+  actes exigent une session :
+  - **inscription** — création du compte et envoi du lien de vérification ;
+  - **vérification de l'adresse** — le **GET** authentifie et inspecte le lien
+    puis affiche la page de confirmation, sans consommation ; seul le **POST**
+    confirmé consomme le jeton et vérifie l'adresse ;
+  - **renvoi** du lien de vérification, par **deux entrées réelles** : en
+    public, le shortcode `[urbizen_renvoi]` poste vers l'action uniforme
+    `urbizen_inscription` (il n'existe pas d'action de renvoi public distincte) ;
+    depuis une session, l'action distincte `urbizen_renvoi_connecte` est
+    réservée au compte connecté non vérifié ;
+  - **changement d'adresse** d'un compte connecté.
+- `src/Http/ComptesController.php` — actions `admin-post` et shortcodes :
+  - `urbizen_inscription` et `urbizen_resultat` : **anonymes et de session** ;
+  - `urbizen_changer_adresse` et `urbizen_renvoi_connecte` : **session
+    uniquement** ;
+  - shortcodes `[urbizen_inscription]`, `[urbizen_renvoi]`,
+    `[urbizen_changer_adresse]`.
+- `src/Http/VerificationController.php` — action `urbizen_verification`
+  (`LienVerification::ACTION`), **anonyme et de session** : le GET affiche, le
+  POST consomme (voir le parcours de vérification ci-dessus).
+- Gabarits `templates/comptes/verification.php` et `templates/comptes/resultat.php`,
+  feuille de style `assets/css/urbizen-comptes.css`.
+- `src/Account/EnvoiVerification.php` : **orchestrateur d'émission unique** —
+  un seul chemin de code envoie. Il prépare, rend, envoie hors verrou, puis
+  clôt immédiatement ; une exception du transport est un échec ; après un envoi
+  accepté, l'annulation est interdite (un échec de clôture est journalisé, pas
+  annulé).
+- `src/Account/LienVerification.php`, `src/Account/CourrielVerification.php` :
+  construction du lien signé et rendu du courriel (vérification et
+  avertissement de changement d'adresse).
+- `wp urbizen accounts quota-verify` : compare la source du quota à son miroir,
+  **en lecture seule** ; `--repair-mirror` réécrit le **miroir seul**, jamais
+  la source.
 
-### Prévu — production modifiée (6)
+### Sécurité et anti-énumération
 
-| Fichier | Modification |
-|---|---|
-| `src/Account/LimiteEnvois.php` | Source `{a, e}`, miroir hérité, amorçage depuis l'hérité, refus au-delà de `MAX` |
-| `src/Account/VerificationService.php` | Confirmation idempotente et rejouable ; `consommer()` transmet l'identifiant d'émission |
-| `src/Adapter/WpCliAccountsCommand.php` | `quota-verify [--repair-mirror]`, lecture seule par défaut |
-| `src/Plugin.php` | Enregistrement des deux contrôleurs |
-| `urbizen-platform.php` | Version 0.12.0 |
-| `blocks/cadastre/block.json`, `blocks/formulaire/block.json` | Version 0.12.0 |
+- **Réponse uniforme** de l'inscription : les quatre états — adresse libre,
+  déjà prise, déjà vérifiée, quota épuisé — produisent le **même HTTP 303, la
+  même `Location` et la même page de résultat**, corps **identique à l'octet
+  près** et en-têtes protecteurs identiques. Une exception interne rejoint le
+  même code public `verifiez`.
+- **Vérification en deux temps** : le **GET** authentifie et inspecte le lien
+  puis affiche la page de confirmation, **sans consommation** (aucune écriture,
+  aucun verrou, aucun quota) ; seul le **POST** confirmé consomme le jeton et
+  vérifie l'adresse. Un lien qui vérifierait en GET serait consommé par le
+  pré-chargement des clients de messagerie.
+- **Changement d'adresse différé** : `demander_changement_adresse()` enregistre
+  la cible et prépare l'émission sous une **section critique unique** ; **après
+  libération du verrou**, l'ancienne adresse est avertie, puis le lien est
+  envoyé à la nouvelle adresse. L'échec de l'avertissement est **journalisé mais
+  ne bloque pas** l'envoi de vérification. Le changement n'est effectif qu'après
+  vérification de la nouvelle adresse.
+- **Quota idempotent** avec **source de vérité** (`_urbizen_verif_emissions`) et
+  **miroir** de compatibilité : une confirmation rejouée ne décompte pas deux
+  fois. La distinction *absente* / *corrompue* porte la sûreté : une **source
+  absente** déclenche l'**amorçage depuis le miroir** ; une **source corrompue**
+  entraîne un refus `quota_illisible`, **sans recours au miroir** — l'illisible
+  est traité comme plein, jamais comme vide.
+- Réutilisation des protections existantes : nonce, jeton anti-robot à délai
+  minimal, limiteur de fréquence par origine.
 
-### Prévu — vues et styles (3)
+### Éprouvé
 
-| Fichier | Ce qu'il rend |
-|---|---|
-| `templates/comptes/verification.php` | Page de confirmation servie en GET : adresse concernée, jeton en **champ caché**, nonce, bouton unique. Aucune ressource externe. |
-| `templates/comptes/resultat.php` | Page de destination **unique** de toutes les redirections 303. Affiche le message correspondant au code court reçu. |
-| `assets/css/urbizen-comptes.css` | Styles des formulaires et des deux pages, chargés localement. |
+- Bancs d'intégration **réels** (WordPress + base jetables) : cœur métier,
+  concurrence multiprocessus, socle des comptes E2.1, et **parcours HTTP réel**
+  des comptes — anti-énumération comprise, courriels interceptés sans sortie.
+- **Campagne de mutations** sur le parcours : chaque mutation qualifiée est
+  tuée par au moins un banc ; la fuite d'énumération (redirection distincte
+  selon l'existence du compte) est tuée par le banc HTTP réel.
 
-Interfaces publiques prévues : shortcodes `[urbizen_inscription]`,
-`[urbizen_renvoi]` et `[urbizen_changer_adresse]` — ce dernier **ne rend rien**
-hors session. **Hors PR, geste d'exploitant** : la création et la publication
-des pages WordPress portant ces shortcodes. Aucune page n'est créée par le code.
+### Risques assumés
 
-### Prévu — métadonnée de quota
+- **Canal temporel résiduel — réel et exploitable.** Une inscription sur
+  adresse libre crée un utilisateur et remet un message au transport ; sur
+  adresse déjà vérifiée, elle sort presque aussitôt. L'écart de durée est
+  mesurable et **demeure exploitable, notamment par des origines distribuées**
+  qui échappent à la limitation par origine. E2.2 **réduit** ce canal mais **ne
+  le ferme ni ne le nivelle** ; le fermer supposerait une mise en file uniforme
+  et un envoi hors requête. C'est un risque assumé et consigné (D-046), pas un
+  point réglé — d'où des bancs qui n'éprouvent que le stable : corps et statuts
+  identiques.
+- **Jeton dans les journaux d'accès.** Le lien de vérification, devant
+  fonctionner sans JavaScript, porte le jeton dans sa chaîne de requête ; il
+  peut donc apparaître dans les **journaux d'accès du serveur** pendant sa
+  fenêtre de **validité de 24 heures** et **avant** consommation — quiconque les
+  lit dans cet intervalle peut consommer le jeton à la place du destinataire.
+  La page **empêche sa propagation ultérieure par `Referer`** grâce à
+  `Referrer-Policy: no-referrer`, et ne charge aucune ressource externe. Le
+  risque est borné — sans être supprimé — par l'usage unique, la consommation
+  au POST et l'absence de connexion automatique après vérification.
 
-| Clé | Contenu | Rôle | Lue pour décider |
-|---|---|---|---|
-| `_urbizen_verif_emissions` | liste JSON de 0 à `MAX` entrées `{a: horodatage, e: identifiant d'émission}` | **source de vérité** du quota | **oui, seule** |
-| `_urbizen_verif_envois` | liste JSON d'horodatages, format 0.11.0 | **miroir** dérivé, réécrit en entier depuis la source | **jamais** |
+### Inchangé
 
-Compatibilité descendante assurée par le miroir : du code 0.11.0 continue de
-lire `_urbizen_verif_envois`. Source **absente** → amorcée depuis le miroir,
-identifiants vides, jamais reconnus. Source **corrompue** → `quota_illisible`,
-refus ; le miroir n'est jamais un recours.
-
-### Prévu — bancs
-
-- `test-envoi.php` : `confirmer` après un `send()` réussi, `annuler` après un
-  échec **et après une exception**, jamais `annuler` après un `send()` réussi ;
-  aucun appel applicatif intercalé, prouvé par journal d'ordre.
-- `test-idempotence.php` : rejeu sans second créneau ; émission non supprimée
-  tant que le miroir échoue ; amorçage hérité et sa non-reconnaissance ; refus
-  au-delà de `MAX` ; source corrompue qui ferme ; miroir jamais lu pour décider.
-- `test-comptes-http-reel.php` : actions `admin-post` réelles ; refus des
-  méthodes non prévues ; **corps et statuts identiques à l'octet près** entre
-  adresse libre, prise non vérifiée et prise vérifiée ; GET qui ne consomme pas ;
-  redirection sans jeton ; en-têtes de cache et de robots ; double clic
-  multiprocessus ; mort du processus entre `send()` et la clôture.
-- Le contrôle lexical de `test-compat.php` sur `wp_mail()` **reste inchangé** ;
-  un contrôle **additif** impose que `MailTransport::send()` ne soit appelé, dans
-  le domaine des comptes, que depuis `EnvoiVerification`. L'assertion d'E2.1
-  interdisant l'autorisation aux vues et contrôleurs sera **resserrée**, non
-  affaiblie, pour nommer les deux seuls contrôleurs autorisés. Dix-neuf
-  mutations obligatoires, chacune devant faire tomber un contrôle **nommé**.
-
-### Risques consignés, non réglés
-
-- **Canal temporel résiduel.** Réponses et statuts sont uniformes, mais la durée
-  ne l'est pas : une origine distribuée peut reconstituer statistiquement quelles
-  adresses sont connues. Aucun `sleep()` n'est ajouté — il ouvrirait une voie de
-  saturation sans fermer le canal. E2.2 **réduit** ce canal, elle ne le ferme
-  pas.
-- **Jeton présent dans les journaux d'accès.** Le parcours fonctionnant sans
-  JavaScript, le lien porte le jeton en chaîne de requête. Borné par la validité
-  de 24 h, l'usage unique, l'invalidation à la consommation et le fait qu'une
-  vérification **ne connecte pas**.
-
-### Décisions
-- **D-046** — quatre parcours et rien d'autre ; authentification et session
-  laissées à WordPress ; une vérification ne connecte pas ; réponse uniforme à
-  l'inscription et au renvoi ; un seul émetteur de courriel ; annulation
-  interdite après `ok = true` ; quota idempotent avec source et miroir ; nonce
-  anonyme non présenté comme une protection ; canal temporel et jeton en
-  journaux d'accès assumés et consignés.
+- Aucune table propre créée, aucune route REST ajoutée (D-044).
+- Le miroir du quota reste écrit **au format 0.11.0** : c'est sa raison d'être,
+  garantir qu'un retour arrière en 0.11.0 continue de trouver un quota lisible.
+- Les formulaires DP, PC, Conception et le composant cadastre sont inchangés.
 
 ---
 
