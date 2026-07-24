@@ -9,153 +9,116 @@ Architecture et cap du projet : [PROJECT_MASTER_PLAN.md](PROJECT_MASTER_PLAN.md)
 
 ---
 
-## Session du 20 juillet 2026
+## Session du 24 juillet 2026
 
 ### Point de reprise
 
 | Élément | Valeur |
 |---|---|
 | Branche stable | **`main`** |
-| Commit courant | **`90191f062b0e1ef4e0804d9af1c9b1b4d8c56a79`** |
-| Dernière PR fusionnée | [#7](https://github.com/Urbizen/urbizen-platform/pull/7) — **MERGED** |
-| Plugin en production | `urbizen-platform` **0.4.0**, **actif** |
-| Production vs `main` | **identiques fichier par fichier** (53 fichiers, empreinte `7834f6a4…`) |
-| Page 1157 | **brouillon de validation interne**, conservé |
+| Commit courant | **`8f716420d4fd0a885c940669c420808d65e89e87`** |
+| Dernière PR fusionnée | [#30](https://github.com/Urbizen/urbizen-platform/pull/30) — **MERGED** |
+| PR ouverte | [#31](https://github.com/Urbizen/urbizen-platform/pull/31) — contenu de la page DP, **en revue par Anaïs**, non déployée |
+| Version dans `main` | `urbizen-platform` **0.12.0** (comptes E2.2), **non déployée** |
+| Production — plugin | **0.10.0**, dernière constatée (non revérifiée cette session) |
+| Production — thème | page **Déclaration préalable en ligne** (version initiale des PR #29/#30) |
+| Déploiement 0.12.0 | **bloqué** — voir l'issue [#28](https://github.com/Urbizen/urbizen-platform/issues/28) |
 | Dépôt | `Urbizen/urbizen-platform` — **public** |
 
-Historique des fusions : PR [#4](https://github.com/Urbizen/urbizen-platform/pull/4)
-socle (`5989ba9`) · [#5](https://github.com/Urbizen/urbizen-platform/pull/5)
-reproductibilité backend (`8214ae6`) ·
-[#6](https://github.com/Urbizen/urbizen-platform/pull/6) composant cadastre
-(`639e131`) · [#7](https://github.com/Urbizen/urbizen-platform/pull/7)
-formulaire de localisation (`90191f0`).
+Historique récent : PR [#23](https://github.com/Urbizen/urbizen-platform/pull/23)
+E2.1 socle des comptes · [#24](https://github.com/Urbizen/urbizen-platform/pull/24)
+D-046 · [#25](https://github.com/Urbizen/urbizen-platform/pull/25) D-047 ·
+[#26](https://github.com/Urbizen/urbizen-platform/pull/26) E2.2 (0.12.0) ·
+[#27](https://github.com/Urbizen/urbizen-platform/pull/27) protocole de déploiement ·
+[#29](https://github.com/Urbizen/urbizen-platform/pull/29) gabarit DP ·
+[#30](https://github.com/Urbizen/urbizen-platform/pull/30) déclaration du gabarit
+dans `theme.json`.
 
 ### Où en est le projet
 
-Le socle WordPress, le composant cadastre et le **premier formulaire Urbizen**
-sont fusionnés dans `main` et déployés. La chaîne **cadastre → formulaire de
-localisation est validée en conditions réelles** : une parcelle confirmée sur la
-carte remplit le formulaire, la personne peut corriger ses valeurs, revenir
-modifier son adresse, ou effacer ses données.
+Deux fils avancent en parallèle.
 
-**Aucune transmission serveur en 0.4.0.** La validation est entièrement locale :
-ni `fetch`, ni `XMLHttpRequest`, ni `sendBeacon`, ni soumission HTML. Le contrat
-validé est publié par l'événement `urbizen:location-form-validated`, à charge de
-l'hôte d'en faire quelque chose. Rien n'est écrit en base, aucune route REST
-n'existe.
+1. **Comptes E2.2 (plugin 0.12.0)** — parcours public des comptes (inscription,
+   vérification, renvoi, changement d'adresse), **fusionné dans `main`**, éprouvé
+   (bancs réels + campagne de mutations), **mais pas déployé**. Le déploiement suit
+   le protocole `docs/DEPLOY_ACCOUNTS_0_12.md`.
+2. **Refonte des pages (Étape 6)** — la page **Déclaration préalable** est **en
+   ligne** (thème enfant, sans CSS nouvelle, sur la charte de l'accueil). La PR #31
+   en **différencie le contenu** de l'accueil (seuils, procédure, cas particuliers,
+   erreurs) ; elle attend la relecture et le feu vert d'Anaïs avant déploiement.
 
-### Ce qui a été fait
+### Ce qui a été fait cette session
 
-- Socle : thème enfant `urbizen-child` et extension `urbizen-platform`, avec les
-  correctifs de compatibilité du thème FSE Hostinger.
-- Gabarits FSE exportés en fichiers versionnés : le rendu ne dépend plus de la base.
-- Composant cadastre : bloc et shortcode au rendu commun, Leaflet 1.9.4 embarqué
-  avec sa licence, aucun `innerHTML` sur une donnée, identifiants uniques.
-- **Contrat canonique 1.0** (D-009) : structure imbriquée et versionnée, sans
-  géométrie, avec les deux codes commune conservés séparément.
-- **Formulaire de localisation** : `FormDefinition`, `FormRegistry`, `Renderer`,
-  bloc `urbizen/formulaire` et shortcode `[urbizen_formulaire]`, pont
-  `urbizen-form.js` indépendant du script cadastre.
-- Reproductibilité du backend Python : `requirements.txt`, `.env.example`,
-  documentation de lancement local.
-- Documentation permanente : plan directeur, contexte, décisions, changelog,
-  feuille de route, ce fichier.
+- Fusion de **#29** (gabarit DP) et **#30** (déclaration `theme.json` — un gabarit
+  de thème à blocs doit y figurer pour être assignable et rendu ; le brief l'avait
+  omis, corrigé avant tout déploiement).
+- **Déploiement de la page DP** en production, indépendamment du plugin 0.12.0
+  (thème vs plugin, aucune dépendance) : sauvegarde du thème vérifiée, contrôle des
+  empreintes, lint PHP 8.3, remplacement atomique des fichiers, purge LiteSpeed,
+  puis assignation du gabarit à `/declarations-prealables/` en WP-CLI. Accueil
+  vérifié intact.
+- **PR #31** — contenu de la page DP différencié de l'accueil, texte réglementaire
+  **fourni et validé par Anaïs**, repris mot pour mot.
+- **D-048** consignée : le script `urbizen-homepage.js` du thème est une copie
+  manuelle de `frontend/homepage/homepage.js`, avec deux écarts documentés et sans
+  synchronisation automatique — dette assumée.
+- Tentative de reprise du **déploiement 0.12.0** (phases 0-1 en lecture seule) :
+  connectivité SSH OK, mais **arrêt** faute d'identifier avec certitude le journal
+  PHP web (voir ci-dessous).
 
-### Contrôles effectués
+### Déploiement 0.12.0 — pourquoi c'est bloqué
 
-- **243 assertions automatisées**, toutes vertes, par une commande unique :
-  `cd tests/cadastre && npm test`. Elle régénère la fixture depuis le rendu réel
-  de `Renderer.php`, puis enchaîne les quatre bancs et s'arrête au premier échec.
-  Répartition : 32 + 126 côté JavaScript, 36 + 49 côté rendu PHP.
-- **Validation navigateur réussie** sur la page 1157 : bloc présent dans l'outil
-  d'insertion, réglages, enregistrement et rechargement sans erreur de
-  validation, parcelle réelle reprise dans le formulaire, messages d'erreur
-  accessibles, correction d'adresse, deux instances cloisonnées, effacement
-  explicite, rendu mobile sans débordement horizontal.
-- **Aucune erreur PHP liée à Urbizen** : le journal du serveur ne contient
-  aucune entrée mentionnant l'extension, ni aucune erreur fatale.
-- Aucune requête réseau émise par la validation locale, mesurée par interception.
-- Aucune donnée personnelle en console, y compris en cas d'erreur.
+Le protocole `DEPLOY_ACCOUNTS_0_12.md` exige, pour surveiller les erreurs après
+bascule, le **vrai journal PHP web (PHP-FPM/LSAPI)**. Sur cet hébergement
+LiteSpeed, aucune directive `error_log` explicite n'est lisible côté docroot
+(`.user.ini`/`php.ini` absents), et l'activation de `log_errors` en hPanel n'a pas
+fait apparaître de fichier identifiable **avec certitude** en lecture seule.
+Provoquer une erreur pour le localiser est interdit. **Reprise : fournir le chemin
+exact du journal comme `URBIZEN_PHP_WEB_LOG`** dans le fichier d'environnement
+opérateur, puis exécuter strictement les phases 0-1, arrêt avant la phase 2.
+Détail dans l'issue #28.
 
-### Réserves non bloquantes
+### Chantiers ouverts / prochaine étape
 
-1. **Une correction manuelle n'est pas persistée.** Une surface corrigée dans le
-   formulaire figure bien dans le contrat validé, mais `sessionStorage` conserve
-   la valeur cadastrale : après rechargement, la correction est perdue. Cohérent
-   avec la règle « la validation n'écrit pas dans le stockage », mais surprenant
-   pour la personne. À trancher avec la soumission serveur.
-2. **Accords grammaticaux** de certains messages d'erreur, composés par
-   concaténation, sans accord en genre ni en nombre : « Section cadastrale
-   incorrect », « 5 chiffres attendu ».
-3. **Google Fonts est encore chargé par le thème** — connu, **hors périmètre**
-   de la 0.4.0, à traiter avec l'auto-hébergement des polices.
-
-### Prochaine étape — décision d'architecture, pas encore du code
-
-**Définir le contrat de soumission serveur sécurisé avant toute implémentation.**
-
-C'est une décision à prendre, pas un développement autorisé. Rien ne doit être
-écrit tant que les points suivants ne sont pas tranchés et consignés dans
-`DECISIONS.md` :
-
-- **Périmètre d'une demande client** : quelles données la constituent, et
-  lesquelles restent hors dossier.
-- **Autorité de la saisie** : à quel moment la correction manuelle devient la
-  valeur de référence face à la donnée cadastrale.
-- **Confirmation explicite** avant tout envoi : rien ne part sans un acte clair.
-- **Validation PHP complète**, sans aucune confiance envers les champs masqués.
-- **Nonce REST** et contrôle des capacités.
-- **Limitation de débit** et **anti-spam** (honeypot, délai minimal de saisie).
-- **Stockage WordPress ou transmission directe** au service Python : l'un,
-  l'autre, ou les deux, et pourquoi.
-- **Politique de conservation et de suppression RGPD**, avec durées chiffrées.
-- **Gestion des pièces jointes** : type MIME réel, plafonds, stockage hors
-  racine web.
-- **Relation avec le backend Python** : authentification, idempotence, rejeu.
-- **États métier d'une soumission**, à raccorder aux 13 statuts du `CLAUDE.md`.
-- **Stratégie de reprise après erreur** : ce que voit la personne, ce que
-  devient sa saisie.
-
-### État des branches
-
-| Branche | État | Recommandation |
-|---|---|---|
-| `feature/cadastre-block` | fusionnée par la PR #6 | **supprimable** — contenu doublement recouvert depuis |
-| `feature/form-cadastre-integration` | fusionnée par la PR #7 | **temporairement conservée** — isole proprement les deux commits en cas de retour arrière ciblé |
-| `docs/passation-0.4.0` | branche documentaire courante | à supprimer après le merge de sa PR |
-
-Supprimer une branche distante n'efface aucun commit : tous restent atteignables
-depuis `main`.
+- [ ] **PR #31** : relecture Anaïs → si OK, déploiement de la page DP mise à jour
+      (même motif : sauvegarde → sync du seul gabarit → purge → vérification).
+- [ ] **Déploiement 0.12.0** : débloquer via `URBIZEN_PHP_WEB_LOG`, puis phases 0-1.
+- [ ] **Page « Permis de construire »** : même risque de doublon que la DP ;
+      refonte de contenu équivalente à prévoir, en héritant des ajustements de charte
+      éventuels issus de la relecture de la DP.
+- [ ] **Correctifs hors-code (Anaïs, côté wp-admin)** : balises SEO Site Kit
+      (`title`, `og:type`, `og:site_name`, image OG) ; retrait des liens morts
+      « Se connecter » / « Espace client (bientôt) ». **Ne pas traiter côté code
+      sans demande explicite.**
 
 ### Interdictions
 
-1. **Ne pas publier la page 1157** : elle reste en brouillon et sert de page de
-   validation interne et de non-régression. Aucune page publiée n'utilise le
-   composant.
-2. Ne pas fusionner de branche sans revue ni sauvegarde préalable.
-3. Ne jamais pousser directement sur `main`.
-4. **Ancien format 0.3.0** : un onglet ouvert avant le déploiement conserve un
-   payload plat, désormais ignoré. La personne devra confirmer à nouveau sa
-   parcelle. Aucune migration n'est prévue, rien n'est effacé automatiquement.
-5. Ne jamais versionner de coordonnée serveur, de secret, de donnée personnelle
-   ni de sauvegarde : le dépôt est public.
-6. Ne jamais afficher le contenu de `wp-config.php`.
-7. Ne rien modifier en production via l'éditeur de fichiers de WordPress.
+1. Ne jamais pousser directement sur `main` ; toute évolution passe par une PR.
+2. Ne rien déployer sans autorisation explicite ; **la page DP mise à jour (#31)
+   ne se déploie qu'après le feu vert d'Anaïs**.
+3. Ne pas exécuter la phase 2 (ni suivantes) du déploiement 0.12.0 sans autorisation
+   distincte : pas de sauvegarde-remplacement de plugin, pas de maintenance, pas
+   d'installation de rôle.
+4. Ne jamais versionner de coordonnée serveur, secret, donnée personnelle ni
+   sauvegarde : le dépôt est public. Ne jamais afficher `wp-config.php`.
+5. Ne pas modifier `frontend/homepage/`, l'accueil, `urbizen-homepage.css` ni le
+   plugin pour un besoin propre à une page interne (voir D-048).
 
 ### Points de vigilance pour la reprise
 
-1. **Palette et filtre du parent** — le thème parent écrase palette et police des
-   titres via `wp_theme_json_data_theme` en priorité 999 ; l'enfant les réapplique
-   en priorité 1000. Recontrôler le rendu après toute mise à jour du parent
-   (2.0.29 disponible).
-2. **Gabarits en base** — `wp_template_part` et `wp_global_styles` restent
-   rattachés au terme `wp_theme` du **parent**. La source de vérité est le
-   dossier `parts/` du thème enfant.
-3. **Dépôt public** — aucune coordonnée serveur, aucune donnée personnelle,
-   aucune sauvegarde dans Git.
-4. **Données réelles** — les 4 entrées Fluent Forms sont des données
-   personnelles : les exporter chiffrées, hors dépôt, avant toute désactivation.
-5. **`wp db export` échoue sous CageFS** — passer par `mysqldump` avec un fichier
-   d'identifiants temporaire en mode 600, détruit par `shred -u` après usage.
-6. **Cas corse** — les codes INSEE de Corse ne sont pas cinq chiffres (`2B033`
-   pour Bastia). Toute règle de validation sur un code commune doit les accepter.
+1. **Gabarit de thème à blocs = deux endroits.** Une nouvelle page interne exige
+   son fichier `templates/…html` **et** sa déclaration dans `theme.json →
+   customTemplates`, sinon elle n'est ni assignable ni rendue (leçon de #30).
+2. **Script d'accueil partagé (D-048).** `urbizen-homepage.js` est une copie
+   manuelle de la source `frontend/homepage/homepage.js`, avec deux écarts
+   documentés dans son en-tête. Une recopie naïve les effacerait.
+3. **Journal PHP web** — sur LiteSpeed/CageFS, ni le SAPI CLI ni un `.user.ini`
+   absent ne renseignent le vrai journal. Il faut le chemin fourni par hPanel.
+4. **`wp db export` échoue sous CageFS** — passer par `mysqldump` avec un fichier
+   d'options temporaire en mode 600, détruit après usage (le protocole 0.12.0 le
+   fait déjà).
+5. **Cas corse** — les codes INSEE de Corse ne font pas cinq chiffres (`2B033`) ;
+   toute règle sur un code commune doit les accepter.
+6. **Palette et police du parent** — le thème parent Hostinger écrase palette et
+   police des titres via `wp_theme_json_data_theme` (priorité 999) ; l'enfant les
+   réapplique en priorité 1000. Recontrôler après toute mise à jour du parent.

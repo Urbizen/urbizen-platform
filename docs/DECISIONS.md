@@ -2171,3 +2171,41 @@ rendu des pièces graphiques ; le modèle de stockage des versions de pièces ; 
 d'ancienneté au-delà duquel une photographie est refusée ; l'ouverture à d'autres
 instances Panoramax et aux licences CC-BY-SA ; la tarification des lots ; le dépôt sur
 le guichet dématérialisé, qui reste hors du système.
+
+---
+
+## D-048 — Le script d'accueil du thème est une copie manuelle, à écart documenté
+
+**Contexte.** La feuille de l'accueil est **générée** : `scripts/scope-css.py` transforme
+`frontend/homepage/homepage.css` en `wordpress/urbizen-child/assets/css/urbizen-homepage.css`
+en préfixant chaque sélecteur par `.urbizen-accueil`. Le **script**, lui, ne l'est pas :
+`wordpress/urbizen-child/assets/js/urbizen-homepage.js` est une **copie manuelle** de
+`frontend/homepage/homepage.js`. Aucun script de synchronisation n'existe pour le JS.
+
+Deux écarts volontaires séparent désormais la copie de sa source :
+
+1. **Pas de montage manuel du cadastre.** Sous WordPress, le bloc `urbizen/cadastre` monte
+   son propre conteneur ; un `mount()` manuel provoquerait un double montage.
+2. **Sélection des cartes projet conditionnée au tunnel de l'accueil.** La même feuille et
+   le même script sont partagés par les pages internes (déclaration préalable, etc.). La
+   liaison de sélection des `.pcard` est donc gardée derrière la présence du bouton de
+   continuation (`#js-continue`) : ailleurs, ces vignettes restent purement informatives —
+   ni écouteur, ni `aria-pressed`, ni état sélectionné qui promettrait une suite.
+
+**Décision.** La copie manuelle est **assumée**, et ses écarts sont **énumérés dans l'en-tête
+du fichier**. `frontend/homepage/` n'est **pas** modifié pour un besoin propre au thème :
+c'est la source d'un autre contexte, protégée par les bancs de fidélité de l'accueil.
+
+**Conséquences — dette consignée.**
+
+- **Risque de dérive.** Les deux fichiers peuvent diverger, et une recopie naïve de la
+  source **effacerait silencieusement** les deux écarts voulus.
+- **Garde-fous actuels.** L'en-tête du script documente les écarts ; `tests/homepage/test-fidelite.php`
+  vérifie des invariants du JS (`js-start`, `burger`, `urbizen:parcel-confirmed`, absence de
+  montage manuel du cadastre) — mais **pas** encore la garde de sélection des cartes.
+- **Options non tranchées ici.** Un jour, au choix : une étape de génération/synchronisation
+  du JS (comme `scope-css.py` pour le CSS) ; un banc qui affirme l'ensemble exact des écarts
+  autorisés ; ou l'extraction d'un JS partagé. À décider quand une deuxième page interne ou
+  une évolution du script rendra la dérive probable — pas avant.
+
+Ceci est une **dette consignée**, pas un travail planifié.
