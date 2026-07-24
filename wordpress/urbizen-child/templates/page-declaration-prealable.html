@@ -8,161 +8,195 @@
 <!-- wp:html -->
 <main id="contenu">
 
-<!-- ===== Hero ===== -->
-<section class="hero" id="accueil">
-  <div class="wrap hero-grid">
-    <div class="hero-text">
-      <span class="eyebrow">Déclaration préalable</span>
-      <h1>Votre déclaration préalable de travaux, préparée de A à Z.</h1>
-      <p class="lead">La déclaration préalable (DP) est l'autorisation d'urbanisme des projets courants : piscine, abri, extension, clôture, panneaux solaires, ravalement. Nous vérifions si votre projet en relève, puis nous préparons le dossier complet — CERFA et pièces graphiques — prêt à déposer en mairie.</p>
+<!-- ===== Hero de page ===== -->
+<section class="page-hero">
+  <div class="wrap page-hero-grid">
+    <div>
+      <nav class="fil-ariane" aria-label="Fil d'ariane"><a href="/">Accueil</a><span class="sep">›</span>Déclaration préalable</nav>
+      <h1>La déclaration préalable de travaux, sans prise de tête.</h1>
+      <p class="lead">Piscine, abri, extension, façade, panneaux solaires&nbsp;: la DP est l'autorisation des projets courants. Nous vérifions si votre projet en relève, puis nous préparons le dossier complet — CERFA et pièces graphiques — prêt à déposer.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="/#localisation">Démarrer mon projet</a>
+        <a class="btn btn-primary" href="/#localisation">Démarrer ma déclaration</a>
         <a class="btn btn-ghost" href="#tarifs">Voir les tarifs</a>
       </div>
-      <ul class="hero-reassure">
-        <li>Dossier complet</li>
-        <li>Un concepteur humain dédié</li>
-        <li><b>Service 100&nbsp;% à distance</b></li>
-      </ul>
+      <div class="page-hero-meta">
+        <span class="m"><b>149&nbsp;€</b> à partir de</span>
+        <span class="m"><b>1&nbsp;mois</b> d'instruction en général</span>
+        <span class="m"><b>100&nbsp;%</b> à distance</span>
+      </div>
     </div>
-
-    <!-- Composition technique (plan d'implantation) -->
-    <div class="hero-plan" aria-hidden="true">
-      <span class="hero-plan-tag">DOSSIER DP</span>
-      <svg viewBox="0 0 440 360" xmlns="http://www.w3.org/2000/svg">
+    <div class="page-hero-plan" aria-hidden="true">
+      <span class="hero-plan-tag">DP2 · PLAN DE MASSE</span>
+      <svg viewBox="0 0 380 260" xmlns="http://www.w3.org/2000/svg">
         <defs>
-          <pattern id="dpg" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M20 0H0V20" fill="none" stroke="#DCE3EA" stroke-width="1"/>
+          <pattern id="dpg2" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0H0V20" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
           </pattern>
         </defs>
-        <rect width="440" height="360" fill="url(#dpg)"/>
-        <text x="24" y="34" font-family="IBM Plex Mono, monospace" font-size="10" fill="#128A5A">DP2 · PLAN DE MASSE</text>
-
-        <!-- Parcelle -->
-        <path d="M40 70 L392 58 L404 300 L52 316 Z" fill="#54CF99" fill-opacity="0.10" stroke="#128A5A" stroke-width="2"/>
-
-        <!-- Maison existante (en plan) -->
-        <rect x="96" y="120" width="150" height="96" rx="2" fill="#14233B" fill-opacity="0.88"/>
-        <path d="M96 120 L246 120 L246 216 L96 216 Z" fill="none" stroke="#0E6E48" stroke-width="1" stroke-opacity="0.4"/>
-        <text x="118" y="172" font-family="IBM Plex Mono, monospace" font-size="9" fill="#FBFCFD">EXISTANT</text>
-
-        <!-- Bassin de piscine (projet) -->
-        <rect x="278" y="196" width="98" height="66" rx="10" fill="#54CF99" fill-opacity="0.45" stroke="#128A5A" stroke-width="2"/>
-        <path d="M292 216 q7 -4 14 0 t14 0 t14 0 t14 0" fill="none" stroke="#14233B" stroke-width="1" opacity="0.45"/>
-        <path d="M292 232 q7 -4 14 0 t14 0 t14 0 t14 0" fill="none" stroke="#14233B" stroke-width="1" opacity="0.35"/>
-        <text x="292" y="250" font-family="IBM Plex Mono, monospace" font-size="9" fill="#0E6E48">PROJET</text>
-
-        <!-- Ligne de cote -->
-        <line x1="278" y1="286" x2="376" y2="286" stroke="#9FADBC" stroke-width="1"/>
-        <line x1="278" y1="280" x2="278" y2="292" stroke="#9FADBC" stroke-width="1"/>
-        <line x1="376" y1="280" x2="376" y2="292" stroke="#9FADBC" stroke-width="1"/>
-        <text x="312" y="300" font-family="IBM Plex Mono, monospace" font-size="8" fill="#55617A">8,00 m</text>
-
-        <!-- Flèche nord bicolore -->
-        <g>
-          <path d="M400 92 L392 116 L400 110 Z" fill="#14233B"/>
-          <path d="M400 92 L408 116 L400 110 Z" fill="#128A5A"/>
-          <text x="394" y="130" font-family="IBM Plex Mono, monospace" font-size="10" fill="#14233B">N</text>
+        <rect width="380" height="260" fill="url(#dpg2)"/>
+        <path d="M28 36 L352 26 L360 226 L36 236 Z" fill="#54CF99" fill-opacity="0.10" stroke="#54CF99" stroke-width="2"/>
+        <rect x="72" y="84" width="128" height="88" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="2.2"/>
+        <line x1="136" y1="84" x2="136" y2="172" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1.2"/>
+        <text x="136" y="76" font-family="IBM Plex Mono, monospace" font-size="10" fill="rgba(255,255,255,0.6)" text-anchor="middle">EXISTANT</text>
+        <rect x="232" y="104" width="96" height="60" rx="10" fill="#54CF99" fill-opacity="0.4" stroke="#54CF99" stroke-width="2.2"/>
+        <text x="280" y="96" font-family="IBM Plex Mono, monospace" font-size="10" fill="#54CF99" text-anchor="middle">PROJET</text>
+        <line x1="232" y1="180" x2="328" y2="180" stroke="#54CF99" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="280" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="#54CF99" text-anchor="middle">8,00 m</text>
+        <g transform="translate(338,52)">
+          <text y="-16" font-family="IBM Plex Mono, monospace" font-size="9" fill="rgba(255,255,255,0.7)" text-anchor="middle">N</text>
+          <path d="M0 -11 L-4 6 L0 3 Z" fill="#FFFFFF" fill-opacity="0.85"/>
+          <path d="M0 -11 L4 6 L0 3 Z" fill="#54CF99"/>
         </g>
       </svg>
     </div>
   </div>
 </section>
 
-<!-- ===== Les seuils ===== -->
-<section class="dossier" id="seuils">
+<!-- ===== Seuils ===== -->
+<section id="seuils">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Repères 2026</span>
       <h2>Quel projet relève d'une déclaration préalable&nbsp;?</h2>
+      <p>Le régime dépend de la surface créée et de la zone. Voici les repères nationaux, projet par projet.</p>
     </div>
-    <div class="projet-grid">
-      <div class="pcard"><span class="pcard-t">Abri, garage, annexe non accolée</span><span class="pcard-d"><b>Sans formalité</b> : moins de 5&nbsp;m² · <b>Déclaration</b> : 5 à 20&nbsp;m² · <b>Permis</b> : plus de 20&nbsp;m²</span></div>
-      <div class="pcard"><span class="pcard-t">Extension en zone U (avec PLU)</span><span class="pcard-d"><b>Sans formalité</b> : moins de 5&nbsp;m² · <b>Déclaration</b> : 5 à 40&nbsp;m²&nbsp;* · <b>Permis</b> : plus de 40&nbsp;m², ou total supérieur à 150&nbsp;m²</span></div>
-      <div class="pcard"><span class="pcard-t">Extension hors zone U (sans PLU)</span><span class="pcard-d"><b>Sans formalité</b> : moins de 5&nbsp;m² · <b>Déclaration</b> : 5 à 20&nbsp;m² · <b>Permis</b> : plus de 20&nbsp;m²</span></div>
-      <div class="pcard"><span class="pcard-t">Piscine enterrée ou semi-enterrée</span><span class="pcard-d"><b>Sans formalité</b> : bassin jusqu'à 10&nbsp;m² · <b>Déclaration</b> : bassin de 10 à 100&nbsp;m² (profondeur ≤&nbsp;1,80&nbsp;m) · <b>Permis</b> : bassin supérieur à 100&nbsp;m², ou abri de plus de 1,80&nbsp;m</span></div>
-      <div class="pcard"><span class="pcard-t">Clôture, portail</span><span class="pcard-d"><b>Déclaration</b> : si la commune l'impose</span></div>
-      <div class="pcard"><span class="pcard-t">Modification de façade, fenêtre de toit, ravalement</span><span class="pcard-d"><b>Déclaration</b> : oui (aspect extérieur modifié)</span></div>
-      <div class="pcard"><span class="pcard-t">Panneaux solaires en toiture</span><span class="pcard-d"><b>Déclaration</b> : oui</span></div>
-      <div class="pcard"><span class="pcard-t">Terrasse surélevée (plus de 60&nbsp;cm)</span><span class="pcard-d"><b>Sans formalité</b> : moins de 5&nbsp;m² · <b>Déclaration</b> : 5 à 20&nbsp;m² · <b>Permis</b> : plus de 20&nbsp;m²</span></div>
+    <div class="seuils-scroll">
+      <table class="seuils">
+        <thead>
+          <tr>
+            <th scope="col">Projet</th>
+            <th scope="col">Sans formalité</th>
+            <th scope="col" class="dp">Déclaration préalable</th>
+            <th scope="col">Permis de construire</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-th="Projet">Abri, garage, annexe non accolée</td>
+            <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
+            <td data-th="Déclaration préalable" class="dp">5 à 20&nbsp;m²</td>
+            <td data-th="Permis de construire">plus de 20&nbsp;m²</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Extension en zone U (avec PLU)</td>
+            <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
+            <td data-th="Déclaration préalable" class="dp">5 à 40&nbsp;m²&nbsp;*</td>
+            <td data-th="Permis de construire">plus de 40&nbsp;m², ou total supérieur à 150&nbsp;m²</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Extension hors zone U (sans PLU)</td>
+            <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
+            <td data-th="Déclaration préalable" class="dp">5 à 20&nbsp;m²</td>
+            <td data-th="Permis de construire">plus de 20&nbsp;m²</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Piscine enterrée ou semi-enterrée</td>
+            <td data-th="Sans formalité">bassin jusqu'à 10&nbsp;m²</td>
+            <td data-th="Déclaration préalable" class="dp">bassin de 10 à 100&nbsp;m² (profondeur ≤&nbsp;1,80&nbsp;m)</td>
+            <td data-th="Permis de construire">bassin supérieur à 100&nbsp;m², ou abri de plus de 1,80&nbsp;m</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Clôture, portail</td>
+            <td data-th="Sans formalité" class="vide">—</td>
+            <td data-th="Déclaration préalable" class="dp">si la commune l'impose</td>
+            <td data-th="Permis de construire" class="vide">—</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Façade, fenêtre de toit, ravalement</td>
+            <td data-th="Sans formalité" class="vide">—</td>
+            <td data-th="Déclaration préalable" class="dp">oui, dès que l'aspect extérieur change</td>
+            <td data-th="Permis de construire" class="vide">—</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Panneaux solaires en toiture</td>
+            <td data-th="Sans formalité" class="vide">—</td>
+            <td data-th="Déclaration préalable" class="dp">oui</td>
+            <td data-th="Permis de construire" class="vide">—</td>
+          </tr>
+          <tr>
+            <td data-th="Projet">Terrasse surélevée (plus de 60&nbsp;cm)</td>
+            <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
+            <td data-th="Déclaration préalable" class="dp">5 à 20&nbsp;m²</td>
+            <td data-th="Permis de construire">plus de 20&nbsp;m²</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-    <p class="tarif-note">* En zone urbaine, le seuil de 40&nbsp;m² suppose une surface totale après travaux inférieure ou égale à 150&nbsp;m² ; au-delà, le recours à un architecte devient en principe obligatoire. Ces seuils sont les repères nationaux 2026 (Code de l'urbanisme). Votre PLU peut être plus strict — en secteur protégé notamment, une déclaration peut être exigée dès le premier mètre carré. Nous vérifions votre cas lors de l'étude gratuite.</p>
+    <p class="note">* En zone urbaine, le seuil de 40&nbsp;m² suppose une surface totale après travaux inférieure ou égale à 150&nbsp;m²&nbsp;; au-delà, le recours à un architecte devient en principe obligatoire. Ces seuils sont les repères nationaux 2026 (Code de l'urbanisme). Votre PLU peut être plus strict — en secteur protégé notamment, une déclaration peut être exigée dès le premier mètre carré. Nous vérifions votre cas lors de l'étude gratuite.</p>
   </div>
 </section>
 
-<!-- ===== C'est quoi une déclaration préalable ===== -->
-<section class="projet" id="definition">
+<!-- ===== C'est quoi ===== -->
+<section class="sec-blanc">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">L'essentiel</span>
-      <h2>C'est quoi une déclaration préalable&nbsp;?</h2>
+      <h2>C'est quoi, une déclaration préalable&nbsp;?</h2>
+      <p>Une autorisation d'urbanisme allégée, prévue par le Code de l'urbanisme (articles L.421-1 et suivants). Elle concerne les travaux de faible ampleur qui modifient l'aspect extérieur d'un bâtiment, créent une petite surface ou changent la destination d'un local, sans atteindre les seuils du permis de construire. La mairie vérifie que le projet respecte les règles locales (PLU, carte communale). Le dossier est plus simple qu'un permis, mais il doit être complet et exact&nbsp;: c'est là que se joue l'acceptation.</p>
     </div>
-    <p class="lead">La déclaration préalable est une autorisation d'urbanisme allégée, prévue par le Code de l'urbanisme (articles L.421-1 et suivants). Elle concerne les travaux de faible ampleur qui modifient l'aspect extérieur d'un bâtiment, créent une petite surface ou changent la destination d'un local, sans atteindre les seuils du permis de construire.</p>
-    <p class="lead">La mairie vérifie que le projet respecte les règles d'urbanisme locales (PLU, carte communale). Le dossier est plus simple qu'un permis, mais il doit être complet et exact : c'est là que se joue l'acceptation.</p>
-    <h3>Deux repères qui décident de tout</h3>
-    <div class="projet-grid">
-      <div class="pcard"><span class="pcard-t">Surface de plancher</span><span class="pcard-d">Les m² clos et couverts, sous une hauteur d'au moins 1,80&nbsp;m.</span></div>
-      <div class="pcard"><span class="pcard-t">Emprise au sol</span><span class="pcard-d">La projection au sol de la construction, débords compris.</span></div>
+    <div class="defs">
+      <div class="def"><span class="k">Surface de plancher</span><p>Les m² clos et couverts, sous une hauteur d'au moins 1,80&nbsp;m.</p></div>
+      <div class="def"><span class="k">Emprise au sol</span><p>La projection au sol de la construction, débords compris.</p></div>
     </div>
-    <p class="tarif-note">On retient la plus grande des deux : dès qu'une seule dépasse un seuil, le régime supérieur s'applique.</p>
+    <div class="encart"><span class="k">La règle qui décide de tout</span>On retient <b>la plus grande des deux</b>&nbsp;: dès qu'une seule dépasse un seuil, le régime supérieur s'applique.</div>
   </div>
 </section>
 
-<!-- ===== Ce qui se passe après le dépôt ===== -->
-<section class="dossier" id="procedure">
+<!-- ===== Procédure ===== -->
+<section>
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">La procédure</span>
       <h2>Ce qui se passe après le dépôt</h2>
     </div>
-    <ol class="steps">
-      <li class="step"><span class="step-n">01</span><h3>Récépissé</h3><p>Au dépôt, la mairie remet un récépissé avec un numéro de dossier et une date. Il fait courir le délai d'instruction.</p></li>
-      <li class="step"><span class="step-n">02</span><h3>Instruction : 1 mois en général</h3><p>Délai de droit commun d'une DP, à compter d'un dossier complet. Il peut être majoré (secteur protégé, abords de monument historique) ; la mairie le signale dans le premier mois.</p></li>
-      <li class="step"><span class="step-n">03</span><h3>La réponse</h3><p>Non-opposition expresse (décision écrite) ou non-opposition tacite : si la mairie garde le silence à la fin du délai, l'accord est acquis.</p></li>
-      <li class="step"><span class="step-n">04</span><h3>Affichage obligatoire</h3><p>Dès l'accord, un panneau réglementaire (plus de 80&nbsp;cm), visible depuis la voie publique, doit rester en place pendant toute la durée des travaux et au moins deux mois continus.</p></li>
-      <li class="step"><span class="step-n">05</span><h3>Recours des tiers : 2 mois</h3><p>À compter du premier jour d'affichage continu, un tiers peut contester la décision. Sans recours, l'autorisation est consolidée.</p></li>
-      <li class="step"><span class="step-n">06</span><h3>Achèvement</h3><p>En fin de chantier, vous adressez à la mairie la déclaration attestant l'achèvement et la conformité des travaux (DAACT).</p></li>
+    <ol class="frise">
+      <li><span class="f-n">01</span><h3>Récépissé</h3><p>Au dépôt, la mairie remet un récépissé avec un numéro de dossier et une date. Il fait courir le délai d'instruction.</p></li>
+      <li><span class="f-n">02</span><h3>Instruction&nbsp;: 1 mois en général</h3><p>Délai de droit commun d'une DP, à compter d'un dossier complet. Il peut être majoré (secteur protégé, abords de monument historique)&nbsp;; la mairie le signale dans le premier mois.</p></li>
+      <li><span class="f-n">03</span><h3>La réponse</h3><p>Non-opposition expresse (décision écrite) ou non-opposition tacite&nbsp;: si la mairie garde le silence à la fin du délai, l'accord est acquis.</p></li>
+      <li><span class="f-n">04</span><h3>Affichage obligatoire</h3><p>Dès l'accord, un panneau réglementaire (plus de 80&nbsp;cm), visible depuis la voie publique, doit rester en place pendant toute la durée des travaux et au moins deux mois continus.</p></li>
+      <li><span class="f-n">05</span><h3>Recours des tiers&nbsp;: 2 mois</h3><p>À compter du premier jour d'affichage continu, un tiers peut contester la décision. Sans recours, l'autorisation est consolidée.</p></li>
+      <li><span class="f-n">06</span><h3>Achèvement</h3><p>En fin de chantier, vous adressez à la mairie la déclaration attestant l'achèvement et la conformité des travaux (DAACT).</p></li>
     </ol>
-    <p class="tarif-note">Vous pouvez commencer les travaux dès la non-opposition acquise. Il est toutefois prudent d'attendre la fin du délai de recours des tiers pour sécuriser le chantier.</p>
+    <div class="encart">Vous pouvez commencer les travaux dès la non-opposition acquise. Il est toutefois prudent d'attendre la fin du délai de recours des tiers pour sécuriser le chantier.</div>
   </div>
 </section>
 
-<!-- ===== Cas particuliers à connaître ===== -->
-<section class="projet" id="cas-particuliers">
+<!-- ===== Cas particuliers ===== -->
+<section class="sec-blanc">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Bon à savoir</span>
       <h2>Cas particuliers à connaître</h2>
     </div>
-    <div class="projet-grid">
-      <div class="pcard"><span class="pcard-t">Secteur protégé / avis ABF</span><span class="pcard-d">Aux abords d'un monument historique, en site classé ou inscrit, l'Architecte des Bâtiments de France donne son avis et le délai est allongé ; une DP peut être exigée dès les premiers m².</span></div>
-      <div class="pcard"><span class="pcard-t">Lotissement</span><span class="pcard-d">Le règlement du lotissement s'ajoute au PLU (implantation, teintes, clôtures).</span></div>
-      <div class="pcard"><span class="pcard-t">Taxe d'aménagement</span><span class="pcard-d">La création de surface peut générer une taxe, calculée par les services fiscaux d'après votre déclaration.</span></div>
-      <div class="pcard"><span class="pcard-t">Copropriété</span><span class="pcard-d">L'accord de la copropriété peut être requis en plus de l'autorisation d'urbanisme.</span></div>
+    <div class="infos">
+      <div class="info"><h3>Secteur protégé / avis ABF</h3><p>Aux abords d'un monument historique, en site classé ou inscrit, l'Architecte des Bâtiments de France donne son avis et le délai est allongé&nbsp;; une DP peut être exigée dès les premiers m².</p></div>
+      <div class="info"><h3>Lotissement</h3><p>Le règlement du lotissement s'ajoute au PLU (implantation, teintes, clôtures).</p></div>
+      <div class="info"><h3>Taxe d'aménagement</h3><p>La création de surface peut générer une taxe, calculée par les services fiscaux d'après votre déclaration.</p></div>
+      <div class="info"><h3>Copropriété</h3><p>L'accord de la copropriété peut être requis en plus de l'autorisation d'urbanisme.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ===== Les erreurs qui font rejeter un dossier ===== -->
-<section class="projet" id="erreurs">
+<!-- ===== Erreurs ===== -->
+<section>
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Notre valeur ajoutée</span>
       <h2>Les erreurs qui font rejeter un dossier</h2>
     </div>
-    <div class="projet-grid">
-      <div class="pcard"><span class="pcard-t">Surface</span><span class="pcard-d">Se tromper de surface : confondre surface habitable, surface de plancher et emprise au sol. Une dalle sous auvent compte dans l'emprise et peut faire basculer un «&nbsp;18&nbsp;m²&nbsp;» au-dessus du seuil.</span></div>
-      <div class="pcard"><span class="pcard-t">Plan de masse</span><span class="pcard-d">Un plan de masse incomplet : cotes manquantes, distances aux limites séparatives absentes, orientation oubliée.</span></div>
-      <div class="pcard"><span class="pcard-t">Façades &amp; insertion</span><span class="pcard-d">Des façades ou une insertion non cotées ou incohérentes avec le projet.</span></div>
-      <div class="pcard"><span class="pcard-t">Formulaire CERFA</span><span class="pcard-d">Le mauvais formulaire CERFA selon la nature du projet.</span></div>
-      <div class="pcard"><span class="pcard-t">Pièce du PLU</span><span class="pcard-d">Une pièce oubliée exigée par le PLU local (volet paysager, notice).</span></div>
-    </div>
-    <p class="lead">Un dossier incomplet, c'est une demande de pièces complémentaires — et le délai qui repart. Nous constituons un dossier complet et cohérent pour éviter ces allers-retours.</p>
+    <ul class="erreurs">
+      <li><b>Se tromper de surface.</b> Confondre surface habitable, surface de plancher et emprise au sol. Une dalle sous auvent compte dans l'emprise et peut faire basculer un «&nbsp;18&nbsp;m²&nbsp;» au-dessus du seuil.</li>
+      <li><b>Un plan de masse incomplet.</b> Cotes manquantes, distances aux limites séparatives absentes, orientation oubliée.</li>
+      <li><b>Des façades ou une insertion non cotées</b> ou incohérentes avec le projet.</li>
+      <li><b>Le mauvais formulaire CERFA</b> selon la nature du projet.</li>
+      <li><b>Une pièce oubliée</b> exigée par le PLU local (volet paysager, notice).</li>
+    </ul>
+    <div class="encart">Un dossier incomplet, c'est une demande de pièces complémentaires — et le délai qui repart. Nous constituons un dossier <b>complet et cohérent</b> pour éviter ces allers-retours.</div>
   </div>
 </section>
 
-<!-- ===== Contenu du dossier (pièces DP1–DP8) ===== -->
-<section class="dossier" id="contenu-dossier">
+<!-- ===== Pièces du dossier ===== -->
+<section class="dossier sec-blanc">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Contenu du dossier</span>
@@ -181,26 +215,24 @@
       <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span></div>
       <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span></div>
     </div>
-    <p class="tarif-note">Toutes les pièces ne sont pas requises pour chaque projet&nbsp;: elles sont sélectionnées selon sa nature et les règles applicables. Le CERFA et le bordereau des pièces sont toujours inclus.</p>
+    <p class="note">Toutes les pièces ne sont pas requises pour chaque projet&nbsp;: elles sont sélectionnées selon sa nature et les règles applicables. Le CERFA et le bordereau des pièces sont toujours inclus.</p>
   </div>
 </section>
 
-<!-- ===== Prestations + tarifs ===== -->
-<section class="prestations" id="prestations">
+<!-- ===== Tarifs ===== -->
+<section class="prestations" id="tarifs">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Tarifs</span>
       <h2>Des forfaits clairs pour la déclaration préalable</h2>
     </div>
-
-    <div id="tarifs" class="tarifs">
+    <div class="tarifs">
       <div class="tarif"><span class="tarif-badge">Déclaration préalable</span><h3>Panneaux solaires</h3><div class="tarif-price">149&nbsp;€</div></div>
       <div class="tarif featured"><span class="tarif-badge">Le plus demandé</span><h3>Projet standard</h3><div class="tarif-price">249&nbsp;€</div></div>
       <div class="tarif"><span class="tarif-badge">Orientation</span><h3>Étude de votre projet</h3><div class="tarif-price">Gratuite</div></div>
     </div>
     <p class="tarif-note">Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard, adaptés à la nature du projet. Le tarif exact est confirmé après l'étude gratuite. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables&nbsp;: elle n'est pas garantie.</p>
-
-    <div class="presta-grid">
+    <div class="presta-grid" style="margin-top:40px">
       <article class="presta">
         <h3>Permis de construire</h3>
         <p>Pour une maison individuelle ou les projets nécessitant une autorisation plus importante.</p>
@@ -218,18 +250,18 @@
 </section>
 
 <!-- ===== FAQ ===== -->
-<section class="faq-wrap" id="faq">
+<section class="faq-wrap sec-blanc">
   <div class="wrap">
     <div class="sec-head center">
       <span class="eyebrow">Questions fréquentes</span>
       <h2>Vos questions sur la déclaration préalable</h2>
     </div>
     <div class="faq">
-      <details><summary>Quelle différence entre surface de plancher et emprise au sol&nbsp;?</summary><div class="a">La surface de plancher, ce sont les m² clos et couverts sous une hauteur d'au moins 1,80&nbsp;m ; l'emprise au sol, c'est la projection au sol de la construction, débords compris. On retient la plus grande des deux : dès qu'une seule dépasse un seuil, le régime supérieur s'applique.</div></details>
-      <details><summary>Mon PLU peut-il être plus strict que ces seuils&nbsp;?</summary><div class="a">Oui, toujours. Les seuils indiqués sont les repères nationaux ; votre PLU (ou carte communale) peut être plus exigeant, et en secteur protégé une déclaration peut être exigée dès le premier mètre carré. Nous vérifions votre cas lors de l'étude gratuite.</div></details>
-      <details><summary>Combien de temps après l'accord puis-je commencer&nbsp;?</summary><div class="a">Vous pouvez commencer dès la non-opposition acquise. Il est toutefois prudent d'attendre la fin du délai de recours des tiers — deux mois à compter du premier jour d'affichage continu — pour sécuriser le chantier.</div></details>
-      <details><summary>Dois-je afficher un panneau sur le terrain&nbsp;?</summary><div class="a">Oui, c'est obligatoire. Dès l'accord, un panneau réglementaire (plus de 80&nbsp;cm) visible depuis la voie publique doit rester en place pendant toute la durée des travaux et au moins deux mois continus.</div></details>
-      <details><summary>Une déclaration préalable peut-elle être refusée&nbsp;?</summary><div class="a">Oui — on parle alors d'opposition. C'est pourquoi un dossier complet et conforme aux règles locales est déterminant : nous le constituons pour éviter les demandes de pièces et les refus.</div></details>
+      <details><summary>Quelle différence entre surface de plancher et emprise au sol&nbsp;?</summary><div class="a">La surface de plancher compte les m² clos et couverts sous au moins 1,80&nbsp;m de hauteur&nbsp;; l'emprise au sol est la projection au sol de la construction, débords compris. On retient la plus grande des deux&nbsp;: dès qu'une seule dépasse un seuil, le régime supérieur s'applique.</div></details>
+      <details><summary>Mon PLU peut-il être plus strict que ces seuils&nbsp;?</summary><div class="a">Oui. Les seuils présentés sont les repères nationaux&nbsp;; le PLU de votre commune peut imposer des règles plus strictes, et en secteur protégé une déclaration peut être exigée dès le premier mètre carré. C'est pour cela que nous vérifions toujours votre cas précis.</div></details>
+      <details><summary>Combien de temps après l'accord puis-je commencer&nbsp;?</summary><div class="a">Dès que la non-opposition est acquise. Il est toutefois prudent d'attendre la fin du délai de recours des tiers — deux mois à compter du premier jour d'affichage continu — pour sécuriser le chantier.</div></details>
+      <details><summary>Dois-je afficher un panneau sur le terrain&nbsp;?</summary><div class="a">Oui, c'est obligatoire dès l'accord&nbsp;: un panneau réglementaire visible de la voie publique, maintenu pendant toute la durée des travaux et au moins deux mois continus. Un panneau absent ou incomplet laisse le droit de recours des tiers ouvert.</div></details>
+      <details><summary>Une déclaration préalable peut-elle être refusée&nbsp;?</summary><div class="a">Oui&nbsp;: la mairie peut s'opposer au projet s'il ne respecte pas les règles d'urbanisme, ou demander des pièces complémentaires. D'où l'importance d'un dossier complet, cohérent et conforme dès le premier dépôt.</div></details>
     </div>
   </div>
 </section>

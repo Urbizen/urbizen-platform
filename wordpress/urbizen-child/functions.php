@@ -291,6 +291,16 @@ function urbizen_child_enqueue_accueil() {
 		wp_enqueue_style( $handle, $uri . $chemin, $deps, (string) filemtime( $dir . $chemin ) );
 	}
 
+	// Feuille des pages internes (hero de page, tableaux, frise) — scopée
+	// `.urbizen-page`, classe absente de l'accueil : aucune incidence dessus.
+	if ( ! urbizen_child_est_accueil_urbizen() ) {
+		$pages_css = '/assets/css/urbizen-pages.css';
+
+		if ( file_exists( $dir . $pages_css ) ) {
+			wp_enqueue_style( 'urbizen-pages', $uri . $pages_css, array( 'urbizen-homepage' ), (string) filemtime( $dir . $pages_css ) );
+		}
+	}
+
 	$script = '/assets/js/urbizen-homepage.js';
 
 	if ( file_exists( $dir . $script ) ) {
