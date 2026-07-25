@@ -15,6 +15,7 @@
 
 namespace Urbizen\Platform\Adapter;
 
+use Urbizen\Platform\Schema\ConnexionPerdue;
 use Urbizen\Platform\Schema\DatabaseGateway;
 use wpdb;
 
@@ -29,6 +30,22 @@ final class WpdbGateway implements DatabaseGateway {
 	 * @var wpdb
 	 */
 	private wpdb $wpdb;
+
+	/**
+	 * Valeur de `reconnect_retries` sauvegardée le temps d'une section non
+	 * reconnectable, ou `null` hors d'une telle section.
+	 *
+	 * @var int|null
+	 */
+	private ?int $reconnexions_sauvees = null;
+
+	/**
+	 * Filtre `wp_die_handler` posé le temps de la section, conservé pour être
+	 * retiré exactement.
+	 *
+	 * @var callable|null
+	 */
+	private $filtre_die = null;
 
 	/**
 	 * @param wpdb|null $wpdb Passerelle WordPress ; celle du contexte par défaut.
@@ -114,6 +131,58 @@ final class WpdbGateway implements DatabaseGateway {
 	 */
 	public function derniere_erreur(): string {
 		return (string) $this->wpdb->last_error;
+	}
+
+	/**
+	 * Interdit la reconnexion de `wpdb` : aucune écriture ne peut être rejouée
+	 * sur une connexion neuve après la perte de la connexion courante.
+	 *
+	 * Deux leviers, tous deux rétablis par {@see autoriser_reconnexion()} :
+	 *
+	 * - `reconnect_retries = 0` : `wpdb::query()` détecte « le serveur est
+	 *   parti » (erreur 2006), appelle `check_connection()`, mais celle-ci ne
+	 *   tente plus aucune reconnexion — la requête ne sera pas rejouée ;
+	 * - un gestionnaire `wp_die` qui **lève** {@see ConnexionPerdue} : sans
+	 *   reconnexion, `check_connection()` finit par appeler `dead_db()`, qui
+	 *   afficherait la page « Error establishing a database connection » et
+	 *   terminerait le processus. On l'intercepte pour en faire une exception
+	 *   attrapable, et transformer la mort en échec restrictif.
+	 *
+	 * @return void
+	 */
+	public function interdire_reconnexion(): void {
+		$this->reconnexions_sauvees    = (int) $this->wpdb->reconnect_retries;
+		$this->wpdb->reconnect_retries = 0;
+
+		// Ce filtre rend un gestionnaire `wp_die` qui lève au lieu de terminer
+		// le processus. On conserve la fermeture exacte pour la retirer.
+		$this->filtre_die = static function () {
+			return static function () {
+				throw new ConnexionPerdue( 'connexion a la base perdue en section critique' );
+			};
+		};
+
+		if ( function_exists( 'add_filter' ) ) {
+			add_filter( 'wp_die_handler', $this->filtre_die, PHP_INT_MAX );
+		}
+	}
+
+	/**
+	 * Rétablit la reconnexion normale de `wpdb` et retire le gestionnaire.
+	 *
+	 * @return void
+	 */
+	public function autoriser_reconnexion(): void {
+		if ( null !== $this->reconnexions_sauvees ) {
+			$this->wpdb->reconnect_retries = $this->reconnexions_sauvees;
+			$this->reconnexions_sauvees    = null;
+		}
+
+		if ( null !== $this->filtre_die && function_exists( 'remove_filter' ) ) {
+			remove_filter( 'wp_die_handler', $this->filtre_die, PHP_INT_MAX );
+		}
+
+		$this->filtre_die = null;
 	}
 
 	/**

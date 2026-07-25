@@ -309,4 +309,50 @@ check( '10 · aucun troisième compte n’est créé', $avant === count( $compte
 check( '10 · aucun des deux comptes n’est supprimé',
 	isset( $comptes10->utilisateurs[ 501 ], $comptes10->utilisateurs[ 502 ] ) );
 
+// ======================================================================
+// 11 · LIBÉRATION NON PROUVÉE — RELEASE_LOCK rend 0 ou NULL
+// ======================================================================
+// Le compte est bien créé, mais la libération du verrou n'est pas prouvée. On
+// n'émet alors AUCUN jeton, on retourne un échec technique, et le compte
+// demeure — non vérifié et récupérable par une nouvelle demande.
+foreach ( array( array( '0', 'RELEASE_LOCK rend 0' ), array( '', 'RELEASE_LOCK rend NULL' ) ) as $cas ) {
+	list( $forced, $libelle ) = $cas;
+	list( $c11, $db11, $s11 ) = inscription();
+	$db11->forcer_release     = $forced;
+
+	$r11 = $s11->inscrire( 'liberation@exemple.fr', 'MotDePasse12chars', $t );
+
+	check( "11 · $libelle : motif « liberation_non_prouvee »", 'liberation_non_prouvee' === $r11['motif'] );
+	check( "11 · $libelle : aucun jeton n’est préparé", null === $r11['emission'] );
+	check( "11 · $libelle : rien n’est tenu pour créé", false === $r11['cree'] );
+	// Le compte a bien été écrit : il est récupérable.
+	check( "11 · $libelle : le compte demeure (récupérable)", 1 === $c11->compter_par_adresse( 'liberation@exemple.fr' ) );
+
+	// Récupération : une nouvelle demande (libération rétablie) retrouve le
+	// compte non vérifié et relance un lien, sans doublon.
+	$db11->forcer_release = null;
+	$r11b                 = $s11->inscrire( 'liberation@exemple.fr', 'MotDePasse12chars', $t + 1 );
+
+	check( "11 · $libelle : la reprise retrouve le compte et prépare l’émission",
+		false === $r11b['cree'] && 'adresse_prise_non_verifiee' === $r11b['motif'] && null !== $r11b['emission'] );
+	check( "11 · $libelle : toujours un seul compte", 1 === $c11->compter_par_adresse( 'liberation@exemple.fr' ) );
+}
+
+// ======================================================================
+// 12 · CONNEXION PERDUE EN SECTION CRITIQUE — l'écriture ne peut être rejouée
+// ======================================================================
+// La connexion tombe pendant la création, en section non reconnectable. La
+// passerelle réelle empêche `wpdb` de rejouer l'INSERT sur une connexion neuve
+// et lève ConnexionPerdue. Le service échoue de façon restrictive, sans jeton,
+// sans compte créé sur une connexion sans verrou.
+list( $c12, $db12, $s12 ) = inscription();
+$c12->creer_perd_connexion = true;
+
+$r12 = $s12->inscrire( 'connexion@exemple.fr', 'MotDePasse12chars', $t );
+
+check( '12 · le motif est « connexion_perdue »', 'connexion_perdue' === $r12['motif'] );
+check( '12 · rien n’est tenu pour créé', false === $r12['cree'] );
+check( '12 · aucun jeton n’est préparé', null === $r12['emission'] );
+check( '12 · aucun compte n’est créé', 0 === $c12->compter_par_adresse( 'connexion@exemple.fr' ) );
+
 verdict();

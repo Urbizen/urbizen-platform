@@ -14,6 +14,7 @@
 declare( strict_types = 1 );
 
 use Urbizen\Platform\Account\ComptesGateway;
+use Urbizen\Platform\Schema\ConnexionPerdue;
 
 /**
  * Journal d'événements partagé par les deux doublures.
@@ -143,6 +144,14 @@ final class PasserelleOptions implements DatabaseGateway {
 		if ( false !== strpos( $sql, 'RELEASE_LOCK' ) ) {
 			$nom = (string) ( $parametres[0] ?? '' );
 
+			// Épreuve : on force la valeur rendue, sans toucher au registre —
+			// pour simuler un RELEASE_LOCK qui rend 0 ou NULL.
+			if ( null !== $this->forcer_release ) {
+				unset( self::$verrous[ $nom ] );
+
+				return '' === $this->forcer_release ? null : $this->forcer_release;
+			}
+
 			if ( ! isset( self::$verrous[ $nom ] ) ) {
 				return null;
 			}
@@ -233,6 +242,18 @@ final class PasserelleOptions implements DatabaseGateway {
 	}
 
 	/**
+	 * Valeur forcée pour `RELEASE_LOCK` — pour éprouver l'échec de libération.
+	 * `null` = comportement normal (le détenteur libère).
+	 *
+	 * @var string|null
+	 */
+	public ?string $forcer_release = null;
+
+	public function interdire_reconnexion(): void {}
+
+	public function autoriser_reconnexion(): void {}
+
+	/**
 	 * L'instruction porte-t-elle réellement la condition sur l'ancienne valeur ?
 	 *
 	 * @param string $sql Instruction.
@@ -266,6 +287,13 @@ final class ComptesDouble implements ComptesGateway {
 	 * @var bool
 	 */
 	public bool $role_conforme = true;
+
+	/**
+	 * `creer()` doit-il lever ConnexionPerdue (perte de connexion à l'écriture) ?
+	 *
+	 * @var bool
+	 */
+	public bool $creer_perd_connexion = false;
 
 	/**
 	 * Prochain identifiant attribué.
@@ -389,6 +417,13 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function creer( string $identifiant, string $canonique, string $mot_de_passe ): int {
+		// Épreuve : la connexion tombe pendant l'écriture, en section non
+		// reconnectable. La passerelle réelle lèverait cette exception ; la
+		// création n'aboutit pas.
+		if ( $this->creer_perd_connexion ) {
+			throw new ConnexionPerdue( 'création interrompue : connexion perdue' );
+		}
+
 		if ( ! $this->role_conforme ) {
 			return 0;
 		}

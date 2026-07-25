@@ -82,4 +82,29 @@ interface DatabaseGateway {
 	 * @return string
 	 */
 	public function derniere_erreur(): string;
+
+	/**
+	 * Entre en section **non reconnectable** : si la connexion tombe, la
+	 * requête échoue au lieu d'être rejouée sur une nouvelle connexion.
+	 *
+	 * C'est la barrière de fencing. Un verrou consultatif (`GET_LOCK`) est lié
+	 * à la connexion : si celle-ci meurt, le verrou se libère. Mais `wpdb`
+	 * reconnecte et **rejoue** silencieusement l'écriture sur une connexion
+	 * neuve, qui ne tient plus le verrou. Interdire cette reconnexion pendant la
+	 * section critique garantit qu'aucune écriture ne peut aboutir après la
+	 * perte du verrou : elle échoue, et la passerelle lève {@see ConnexionPerdue}.
+	 *
+	 * L'appel doit être **équilibré** par {@see autoriser_reconnexion()},
+	 * toujours dans un `finally`.
+	 *
+	 * @return void
+	 */
+	public function interdire_reconnexion(): void;
+
+	/**
+	 * Quitte la section non reconnectable et rétablit le comportement normal.
+	 *
+	 * @return void
+	 */
+	public function autoriser_reconnexion(): void;
 }

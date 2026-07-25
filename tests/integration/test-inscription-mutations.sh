@@ -47,9 +47,9 @@ echecs=0
 # manifester ; un banc réellement aveugle échoue les N fois. Les mutations
 # DÉTERMINISTES (M3, M4, scénario D) sont détectées du premier coup ($5 = 1).
 #
-#   verifier_mutation "libellé" "fragment du contrôle" fichier 'py' tentatives
+#   verifier_mutation "libellé" "fragment du contrôle" fichier 'py' tentatives banc
 verifier_mutation() {
-	local libelle="$1" attendu="$2" fichier="$3" py="$4" tentatives="${5:-1}"
+	local libelle="$1" attendu="$2" fichier="$3" py="$4" tentatives="${5:-1}" banc="${6:-test-inscription-concurrente.php}"
 
 	rm -rf "$MUT"; mkdir -p "$MUT"
 	cp -RL "$PLUGIN"/. "$MUT/"
@@ -72,7 +72,7 @@ verifier_mutation() {
 	for (( essai = 1; essai <= tentatives; essai++ )); do
 		local sortie
 		sortie="$( URBIZEN_WP_ROOT="$URBIZEN_WP_ROOT" "$PHP_BIN" "${PHP_FLAGS[@]}" \
-			"$ICI/test-inscription-concurrente.php" 2>/dev/null )"
+			"$ICI/$banc" 2>/dev/null )"
 
 		if printf '%s\n' "$sortie" | grep -F "$attendu" | grep -q 'ECHEC'; then
 			detecte=1
@@ -126,9 +126,20 @@ verifier_mutation \
 	"src/Account/InscriptionService.php" \
 	'$s=preg_replace("/if \\( \\\$deja > 1 \\)/", "if ( false )", $s, 1, $c); if($c!==1){exit(1);}'
 
+# M5 · retirer la protection contre la reconnexion de wpdb : interdire_reconnexion
+#      devient un no-op. L'INSERT de P1 est alors rejoué sur une connexion neuve
+#      après la mort de la sienne -> doublon. Le banc de reconnexion tombe.
+verifier_mutation \
+	"M5 · protection anti-reconnexion retirée" \
+	"AUCUN doublon : exactement UN compte au terme de l’entrelacement" \
+	"src/Adapter/WpdbGateway.php" \
+	'$s=preg_replace("/public function interdire_reconnexion\\(\\): void \\{/", "public function interdire_reconnexion(): void { return; // MUTANT: protection retirée", $s, 1, $c); if($c!==1){exit(1);}' \
+	1 \
+	"test-inscription-reconnexion.php"
+
 echo
 if [ "$echecs" -eq 0 ]; then
-	echo "Les 4 mutations sont détectées : le banc n'est pas aveugle."
+	echo "Les 5 mutations sont détectées : les bancs ne sont pas aveugles."
 	exit 0
 fi
 

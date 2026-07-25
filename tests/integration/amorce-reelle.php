@@ -65,6 +65,7 @@ foreach (
 		'src/Domain/Support/Ulid.php',
 		'src/Domain/Support/Texte.php',
 		'src/Schema/DatabaseGateway.php',
+		'src/Schema/ConnexionPerdue.php',
 		'src/Schema/Migration.php',
 		'src/Schema/MigrationCatalogue.php',
 		'src/Schema/ResultatMigration.php',

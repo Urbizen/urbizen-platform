@@ -35,6 +35,7 @@ $urbizen_fichiers = array(
 	'Domain/Support/Ulid.php',
 	'Domain/Support/Texte.php',
 	'Schema/DatabaseGateway.php',
+	'Schema/ConnexionPerdue.php',
 	'Domain/Account/AdresseCourriel.php',
 	'Domain/Account/Compte.php',
 	'Domain/Account/DemandeVerification.php',

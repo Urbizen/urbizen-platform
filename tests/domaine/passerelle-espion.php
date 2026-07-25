@@ -67,6 +67,14 @@ final class PasserelleMuette implements DatabaseGateway {
 	public function derniere_erreur(): string {
 		$this->interdit( 'derniere_erreur' );
 	}
+
+	public function interdire_reconnexion(): void {
+		$this->interdit( 'interdire_reconnexion' );
+	}
+
+	public function autoriser_reconnexion(): void {
+		$this->interdit( 'autoriser_reconnexion' );
+	}
 }
 
 /**
@@ -175,6 +183,10 @@ final class PasserelleMemoire implements DatabaseGateway {
 	public function derniere_erreur(): string {
 		return '';
 	}
+
+	public function interdire_reconnexion(): void {}
+
+	public function autoriser_reconnexion(): void {}
 
 	/**
 	 * Table d'options simulée : nom → valeur brute.

@@ -41,6 +41,10 @@ echecs=0
 # du propriétaire, unicité non prouvée — le verrou GET_LOCK et son fencing.
 "$PHP_BIN" "$ICI/test-inscription-concurrente.php" || echecs=$(( echecs + 1 ))
 
+# Reconnexion de wpdb : la connexion tenant le verrou meurt juste avant l'INSERT
+# ; sans section non reconnectable, wpdb rejoue l'écriture sans verrou (doublon).
+"$PHP_BIN" "$ICI/test-inscription-reconnexion.php" || echecs=$(( echecs + 1 ))
+
 # Les mutations du verrou et de la preuve d'unicité doivent faire tomber un
 # contrôle nommé : sans quoi le banc ci-dessus serait aveugle.
 bash "$ICI/test-inscription-mutations.sh" || echecs=$(( echecs + 1 ))
