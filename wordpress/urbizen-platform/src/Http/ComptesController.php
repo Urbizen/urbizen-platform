@@ -540,7 +540,7 @@ final class ComptesController {
 	 * @return InscriptionService
 	 */
 	private static function inscription_service(): InscriptionService {
-		return new InscriptionService( self::comptes(), self::verification() );
+		return new InscriptionService( self::comptes(), self::verification(), new WpdbGateway() );
 	}
 
 	/**

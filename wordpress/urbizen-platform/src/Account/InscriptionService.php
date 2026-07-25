@@ -26,6 +26,7 @@ namespace Urbizen\Platform\Account;
 
 use Urbizen\Platform\Domain\Account\AdresseCourriel;
 use Urbizen\Platform\Domain\Support\Ulid;
+use Urbizen\Platform\Schema\DatabaseGateway;
 use Urbizen\Platform\Support\Logger;
 
 /**
@@ -49,6 +50,16 @@ final class InscriptionService {
 	public const TENTATIVES_LOGIN = 3;
 
 	/**
+	 * Tentatives d'acquisition du verrou d'adresse, et attente entre deux.
+	 *
+	 * Un concurrent qui perd la course doit attendre la libération du gagnant
+	 * pour retrouver le compte qu'il a créé, jamais échouer. 40 × 50 ms ≈ 2 s
+	 * couvrent largement une inscription, qui dure des millisecondes.
+	 */
+	public const VERROU_TENTATIVES = 40;
+	public const VERROU_ATTENTE_US = 50000;
+
+	/**
 	 * @var ComptesGateway
 	 */
 	private ComptesGateway $comptes;
@@ -59,12 +70,19 @@ final class InscriptionService {
 	private VerificationService $verification;
 
 	/**
+	 * @var DatabaseGateway
+	 */
+	private DatabaseGateway $db;
+
+	/**
 	 * @param ComptesGateway      $comptes      Port des comptes.
 	 * @param VerificationService $verification Service de vérification.
+	 * @param DatabaseGateway     $db           Passerelle, pour le verrou d'adresse.
 	 */
-	public function __construct( ComptesGateway $comptes, VerificationService $verification ) {
+	public function __construct( ComptesGateway $comptes, VerificationService $verification, DatabaseGateway $db ) {
 		$this->comptes      = $comptes;
 		$this->verification = $verification;
+		$this->db           = $db;
 	}
 
 	/**
@@ -96,62 +114,125 @@ final class InscriptionService {
 			return $this->echec( 'role_non_conforme' );
 		}
 
-		$existant = $this->comptes->trouver_par_adresse( $adresse->valeur() );
+		// ── Section critique : trouver-ou-créer sous verrou d'adresse ──
+		// WordPress ne garantit pas l'unicité de `user_email` en base ; sans ce
+		// verrou, deux inscriptions simultanées créeraient deux comptes pour la
+		// même boîte. Le verrou est relâché AVANT la préparation du jeton, pour
+		// ne pas imbriquer durablement ce verrou et VerrouCompte.
+		$verrou = $this->acquerir_verrou_adresse( $adresse->valeur(), $maintenant );
 
-		if ( null !== $existant ) {
-			// Adresse déjà employée. On ne le dit pas, et l'on ne relance un
-			// lien que pour un compte encore non vérifié — jamais de courriel
-			// répété vers un compte vérifié, quel que soit le nombre d'essais.
-			//
-			// Le mot de passe n'est PAS exigé ici : c'est ce qui permet au
-			// renvoi public d'emprunter cette même action, sans seconde règle
-			// à tenir en cohérence. Aucun compte n'est modifié sur ce chemin,
-			// et le lien part toujours à l'adresse déjà enregistrée : savoir
-			// l'écrire ne donne donc aucun pouvoir sur le compte.
-			if ( $existant->est_verifie() ) {
-				return $this->echec( 'adresse_prise_verifiee' );
+		if ( null === $verrou ) {
+			Logger::error( 'inscription refusee : verrou_adresse_indisponible' );
+
+			return $this->echec( 'verrou_adresse_indisponible' );
+		}
+
+		$compte_id = 0;
+		$cree      = false;
+
+		try {
+			$existant = $this->comptes->trouver_par_adresse( $adresse->valeur() );
+
+			if ( null !== $existant ) {
+				// Adresse déjà employée. On ne le dit pas, et l'on ne relance un
+				// lien que pour un compte encore non vérifié — jamais de courriel
+				// répété vers un compte vérifié. Le mot de passe n'est PAS exigé
+				// ici : le renvoi public emprunte cette même action, sans seconde
+				// règle. Aucun compte n'est modifié, et le lien part toujours à
+				// l'adresse déjà enregistrée.
+				if ( $existant->est_verifie() ) {
+					return $this->echec( 'adresse_prise_verifiee' );
+				}
+
+				$compte_id = $existant->id();
+			} else {
+				// L'adresse est libre : inscription complète. Le mot de passe
+				// n'est contrôlé qu'ICI, une fois établi qu'on créerait un compte.
+				if ( ! $this->longueur_mdp_conforme( $mot_de_passe ) ) {
+					return $this->echec( 'inscription_incomplete' );
+				}
+
+				$id = $this->creer_avec_identifiant_unique( $adresse->valeur(), $mot_de_passe );
+
+				if ( 0 === $id ) {
+					return $this->echec( 'creation_echouee' );
+				}
+
+				// Preuve d'unicité : sous verrou, un seul compte doit porter
+				// l'adresse. Un décompte différent trahirait une course non
+				// couverte ; on le journalise sans jamais écrire l'adresse.
+				if ( 1 !== $this->comptes->compter_par_adresse( $adresse->valeur() ) ) {
+					Logger::error( sprintf( 'inscription : unicite d adresse non prouvee (compte %d)', $id ) );
+				}
+
+				$compte_id = $id;
+				$cree      = true;
 			}
-
-			$emission = $this->verification->preparer( $existant->id(), $maintenant );
-
-			return array(
-				'cree'     => false,
-				'compte'   => $existant->id(),
-				'motif'    => 'adresse_prise_non_verifiee',
-				'emission' => $emission,
-			);
+		} finally {
+			$verrou->liberer();
 		}
 
-		// L'adresse est libre : il faut alors une inscription complète. Le mot
-		// de passe n'est contrôlé qu'ICI, une fois établi qu'on créerait un
-		// compte. Le contrôler d'entrée — ce que faisait la version
-		// précédente — rendait tout renvoi impossible sans mot de passe.
-		if ( strlen( $mot_de_passe ) < self::MDP_MINIMUM ) {
-			return $this->echec( 'inscription_incomplete' );
-		}
+		// ── Hors verrou d'adresse : préparation du jeton (qui prend VerrouCompte). ──
+		$emission = $this->verification->preparer( $compte_id, $maintenant );
 
-		$id = $this->creer_avec_identifiant_unique( $adresse->valeur(), $mot_de_passe );
-
-		if ( 0 === $id ) {
-			return $this->echec( 'creation_echouee' );
-		}
-
-		$emission = $this->verification->preparer( $id, $maintenant );
-
-		if ( ! $emission->est_prepare() ) {
+		if ( $cree && ! $emission->est_prepare() ) {
 			// Le compte demeure, non vérifié et récupérable. On journalise un
 			// code et un identifiant, jamais l'adresse.
 			Logger::error(
-				sprintf( 'compte cree mais emission echouee : %s (compte %d)', $emission->motif(), $id )
+				sprintf( 'compte cree mais emission echouee : %s (compte %d)', $emission->motif(), $compte_id )
 			);
 		}
 
 		return array(
-			'cree'     => true,
-			'compte'   => $id,
-			'motif'    => $emission->est_prepare() ? '' : 'emission_echouee',
+			'cree'     => $cree,
+			'compte'   => $compte_id,
+			'motif'    => $cree ? ( $emission->est_prepare() ? '' : 'emission_echouee' ) : 'adresse_prise_non_verifiee',
 			'emission' => $emission,
 		);
+	}
+
+	/**
+	 * Acquiert le verrou d'une adresse, avec une brève attente en cas de course.
+	 *
+	 * Le concurrent qui perd retente : quand le gagnant relâche son verrou,
+	 * l'insertion redevient possible, et le perdant retrouvera le compte créé.
+	 *
+	 * @param string $canonique  Adresse canonique.
+	 * @param int    $maintenant Horloge.
+	 * @return VerrouAdresse|null
+	 */
+	private function acquerir_verrou_adresse( string $canonique, int $maintenant ): ?VerrouAdresse {
+		for ( $essai = 0; $essai < self::VERROU_TENTATIVES; $essai++ ) {
+			$verrou = VerrouAdresse::acquerir( $this->db, $canonique, $maintenant );
+
+			if ( null !== $verrou ) {
+				return $verrou;
+			}
+
+			usleep( self::VERROU_ATTENTE_US );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Le mot de passe atteint-il la longueur minimale, en CARACTÈRES ?
+	 *
+	 * La règle est douze **caractères** (points de code Unicode), pas douze
+	 * octets : « garçon12345 » fait douze caractères mais treize octets, et
+	 * `strlen()` l'accepterait par erreur en le comptant en octets. Un UTF-8
+	 * invalide est refusé — on ne compte pas des caractères sur des octets qui
+	 * n'en forment pas. La valeur n'est ni modifiée ni journalisée.
+	 *
+	 * @param string $mot_de_passe Mot de passe en clair.
+	 * @return bool
+	 */
+	private function longueur_mdp_conforme( string $mot_de_passe ): bool {
+		if ( ! mb_check_encoding( $mot_de_passe, 'UTF-8' ) ) {
+			return false;
+		}
+
+		return mb_strlen( $mot_de_passe, 'UTF-8' ) >= self::MDP_MINIMUM;
 	}
 
 	/**

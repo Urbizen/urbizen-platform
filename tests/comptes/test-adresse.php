@@ -107,4 +107,20 @@ foreach ( array( 'sanitize_email', 'is_email', 'wp_', 'apply_filters', 'Validato
 	);
 }
 
+// ======================================================================
+// 8 · LONGUEUR — bornée à la capacité du stockage (VARCHAR(100)), en CARACTÈRES
+// ======================================================================
+// Partie locale de 64 (maximum RFC accepté par filter_var), domaine complété.
+$a100 = str_repeat( 'a', 64 ) . '@' . str_repeat( 'b', 31 ) . '.com';   // 64+1+31+4 = 100
+$a101 = str_repeat( 'a', 64 ) . '@' . str_repeat( 'b', 32 ) . '.com';   // 101
+
+check( '8 · la borne est bien 100 (alignée sur wp_users.user_email)', 100 === AdresseCourriel::LONGUEUR_MAX );
+check( '8 · une adresse de 100 caractères est acceptée', null !== AdresseCourriel::ou_null( $a100 ) );
+check( '8 · relue à l’identique, sans troncature', AdresseCourriel::ou_null( $a100 )->valeur() === $a100 );
+check( '8 · une adresse de 101 caractères est REFUSÉE', null === AdresseCourriel::ou_null( $a101 ) );
+check( '8 · et le motif est « trop longue »', 'adresse_trop_longue' === AdresseCourriel::motif_de_refus( $a101 ) );
+// Cette borne vaut aussi pour le changement d'adresse : demander_changement_adresse()
+// construit la nouvelle adresse par AdresseCourriel::ou_null() — même validation.
+check( '8 · un UTF-8 invalide est refusé', null === AdresseCourriel::ou_null( "clef\xC3\x28@e.fr" ) );
+
 verdict();

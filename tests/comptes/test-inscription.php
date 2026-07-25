@@ -29,7 +29,7 @@ function inscription(): array {
 	$comptes = new ComptesDouble();
 	$db      = new PasserelleOptions();
 
-	return array( $comptes, $db, new InscriptionService( $comptes, new VerificationService( $comptes, $db ) ) );
+	return array( $comptes, $db, new InscriptionService( $comptes, new VerificationService( $comptes, $db ), $db ) );
 }
 
 // ======================================================================
@@ -257,5 +257,33 @@ $journal = Logger::tout();
 check( '8 · le journal a reçu une ligne', '' !== $journal );
 check( '8 · AUCUNE ADRESSE', false === strpos( $journal, 'confidentielle@exemple.fr' ) );
 check( '8 · AUCUN MOT DE PASSE', false === strpos( $journal, 'motdepasse-tres-secret' ) );
+
+// ======================================================================
+// 9 · MOT DE PASSE — DOUZE CARACTÈRES, PAS DOUZE OCTETS
+// ======================================================================
+/**
+ * Une inscription sur adresse libre aboutit-elle avec ce mot de passe ?
+ *
+ * @param string $mdp Mot de passe éprouvé.
+ * @return bool `true` si le compte est créé, `false` sinon.
+ */
+function mdp_accepte( string $mdp ): bool {
+	static $n = 0;
+	list( , , $service ) = inscription();
+
+	$r = $service->inscrire( sprintf( 'mdp-%d@exemple.fr', ++$n ), $mdp, 1785000000 );
+
+	return true === $r['cree'];
+}
+
+check( '9 · 12 caractères ASCII : accepté', mdp_accepte( 'abcdEF123456' ) );
+check( '9 · 11 caractères ASCII : refusé', ! mdp_accepte( 'abcdEF12345' ) );
+// « garçon12345 » : 11 caractères mais 12 octets (ç en fait deux). strlen() le
+// prenait par erreur ; mb_strlen() le refuse. C'est le cœur du correctif.
+check( '9 · 11 caractères = 12 octets : REFUSÉ (caractères, pas octets)', ! mdp_accepte( 'garçon12345' ) );
+check( '9 · 12 caractères accentués : accepté', mdp_accepte( 'garçon123456' ) );
+check( '9 · 12 émojis : accepté', mdp_accepte( str_repeat( '😀', 12 ) ) );
+check( '9 · UTF-8 invalide : refusé', ! mdp_accepte( "clef\xC3\x28-invalide" ) );
+check( '9 · apostrophe et antislash (≥ 12) : accepté', mdp_accepte( "a'b\\cdef12345" ) );
 
 verdict();

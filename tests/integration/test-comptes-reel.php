@@ -106,7 +106,7 @@ register_shutdown_function( 'menage_comptes' );
 $comptes = new WpComptes();
 $db      = new WpdbGateway();
 $verif   = new VerificationService( $comptes, $db );
-$inscr   = new InscriptionService( $comptes, $verif );
+$inscr   = new InscriptionService( $comptes, $verif, $db );
 $mdp     = 'motdepasse-de-banc-1';
 
 // ======================================================================

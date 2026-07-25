@@ -48,6 +48,18 @@ interface ComptesGateway {
 	public function trouver_par_adresse( string $canonique ): ?Compte;
 
 	/**
+	 * Nombre de comptes portant exactement cette adresse.
+	 *
+	 * Sert de preuve d'unicité après une création sous verrou : la valeur
+	 * attendue est toujours 1. `trouver_par_adresse()` ne renvoie qu'un compte
+	 * et masquerait un doublon ; ce décompte le révèle.
+	 *
+	 * @param string $canonique Adresse canonique.
+	 * @return int
+	 */
+	public function compter_par_adresse( string $canonique ): int;
+
+	/**
 	 * Cette adresse est-elle libre ?
 	 *
 	 * @param string $canonique Adresse canonique.

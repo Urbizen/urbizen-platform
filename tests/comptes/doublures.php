@@ -294,6 +294,18 @@ final class ComptesDouble implements ComptesGateway {
 		return null;
 	}
 
+	public function compter_par_adresse( string $canonique ): int {
+		$n = 0;
+
+		foreach ( $this->utilisateurs as $donnees ) {
+			if ( $donnees['adresse'] === $canonique ) {
+				++$n;
+			}
+		}
+
+		return $n;
+	}
+
 	public function adresse_disponible( string $canonique, int $sauf_id = 0 ): bool {
 		foreach ( $this->utilisateurs as $id => $donnees ) {
 			if ( $donnees['adresse'] === $canonique ) {

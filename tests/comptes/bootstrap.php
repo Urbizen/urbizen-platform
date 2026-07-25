@@ -43,6 +43,7 @@ $urbizen_fichiers = array(
 	'Domain/Authorization/PolitiqueActionVerifiee.php',
 	'Account/ComptesGateway.php',
 	'Account/VerrouCompte.php',
+	'Account/VerrouAdresse.php',
 	'Account/LimiteEnvois.php',
 	'Account/JetonVerification.php',
 	'Account/EmissionEnAttente.php',

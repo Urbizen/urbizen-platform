@@ -27,6 +27,7 @@ bancs=(
 	test-adresse.php
 	test-politiques.php
 	test-verrou.php
+	test-verrou-adresse.php
 	test-limite.php
 	test-jeton.php
 	test-emission.php
