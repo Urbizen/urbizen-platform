@@ -73,6 +73,44 @@ final class PasserelleOptions implements DatabaseGateway {
 	 */
 	public array $instructions = array();
 
+	/**
+	 * Identité de « connexion » de cette passerelle.
+	 *
+	 * `GET_LOCK()` est lié à la connexion : deux passerelles d'identités
+	 * différentes modélisent deux connexions concurrentes, et c'est ce qui
+	 * permet d'éprouver l'exclusivité dans un seul processus PHP.
+	 *
+	 * @var string
+	 */
+	public string $connexion;
+
+	/**
+	 * Verrous consultatifs tenus, **partagés entre toutes les passerelles** :
+	 * nom → identité de la connexion qui le tient. Statique, car `GET_LOCK()`
+	 * est global au serveur, pas à une connexion.
+	 *
+	 * @var array<string, string>
+	 */
+	private static array $verrous = array();
+
+	/**
+	 * @var int
+	 */
+	private static int $prochaine_connexion = 1;
+
+	public function __construct( ?string $connexion = null ) {
+		$this->connexion = $connexion ?? 'c' . self::$prochaine_connexion++;
+	}
+
+	/**
+	 * Oublie tous les verrous consultatifs — isolation entre bancs.
+	 *
+	 * @return void
+	 */
+	public static function reinitialiser_verrous(): void {
+		self::$verrous = array();
+	}
+
 	public function prefixe(): string {
 		return 'wp_';
 	}
@@ -83,6 +121,40 @@ final class PasserelleOptions implements DatabaseGateway {
 
 	public function valeur( string $sql, array $parametres = array() ): ?string {
 		$this->instructions[] = $sql;
+
+		// GET_LOCK() : accordé si le verrou est libre ou déjà tenu par CETTE
+		// connexion ; refusé (0, « l'attente expire ») s'il est tenu par une
+		// autre. On ne bloque pas dans un banc mono-processus : un verrou déjà
+		// tenu ailleurs rend immédiatement 0.
+		if ( false !== strpos( $sql, 'GET_LOCK' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			if ( isset( self::$verrous[ $nom ] ) && self::$verrous[ $nom ] !== $this->connexion ) {
+				return '0';
+			}
+
+			self::$verrous[ $nom ] = $this->connexion;
+
+			return '1';
+		}
+
+		// RELEASE_LOCK() : 1 si CETTE connexion le tenait, 0 s'il est tenu par
+		// une autre, NULL s'il n'était pas pris.
+		if ( false !== strpos( $sql, 'RELEASE_LOCK' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			if ( ! isset( self::$verrous[ $nom ] ) ) {
+				return null;
+			}
+
+			if ( self::$verrous[ $nom ] !== $this->connexion ) {
+				return '0';
+			}
+
+			unset( self::$verrous[ $nom ] );
+
+			return '1';
+		}
 
 		if ( false !== strpos( $sql, 'option_value' ) && false !== strpos( $sql, 'option_name' ) ) {
 			return $this->options[ (string) ( $parametres[0] ?? '' ) ] ?? null;

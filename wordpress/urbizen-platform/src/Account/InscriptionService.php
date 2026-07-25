@@ -25,6 +25,7 @@
 namespace Urbizen\Platform\Account;
 
 use Urbizen\Platform\Domain\Account\AdresseCourriel;
+use Urbizen\Platform\Domain\Support\Texte;
 use Urbizen\Platform\Domain\Support\Ulid;
 use Urbizen\Platform\Schema\DatabaseGateway;
 use Urbizen\Platform\Support\Logger;
@@ -50,14 +51,13 @@ final class InscriptionService {
 	public const TENTATIVES_LOGIN = 3;
 
 	/**
-	 * Tentatives d'acquisition du verrou d'adresse, et attente entre deux.
+	 * Attente maximale, en secondes, pour obtenir le verrou d'adresse.
 	 *
-	 * Un concurrent qui perd la course doit attendre la libération du gagnant
-	 * pour retrouver le compte qu'il a créé, jamais échouer. 40 × 50 ms ≈ 2 s
-	 * couvrent largement une inscription, qui dure des millisecondes.
+	 * Le verrou est un `GET_LOCK()` : il **attend** de lui-même jusqu'à cette
+	 * borne que le gagnant relâche, sans boucle applicative. Le concurrent qui
+	 * perd la course patiente donc dans la base, puis retrouve le compte créé.
 	 */
-	public const VERROU_TENTATIVES = 40;
-	public const VERROU_ATTENTE_US = 50000;
+	public const VERROU_ATTENTE = VerrouAdresse::ATTENTE;
 
 	/**
 	 * @var ComptesGateway
@@ -119,7 +119,7 @@ final class InscriptionService {
 		// verrou, deux inscriptions simultanées créeraient deux comptes pour la
 		// même boîte. Le verrou est relâché AVANT la préparation du jeton, pour
 		// ne pas imbriquer durablement ce verrou et VerrouCompte.
-		$verrou = $this->acquerir_verrou_adresse( $adresse->valeur(), $maintenant );
+		$verrou = VerrouAdresse::acquerir( $this->db, $adresse->valeur(), self::VERROU_ATTENTE );
 
 		if ( null === $verrou ) {
 			Logger::error( 'inscription refusee : verrou_adresse_indisponible' );
@@ -131,6 +131,20 @@ final class InscriptionService {
 		$cree      = false;
 
 		try {
+			// Combien de comptes portent déjà cette adresse ? La question passe
+			// AVANT toute décision. Zéro : on créera. Un : il existe, on le
+			// récupère. Plus d'un : un doublon historique — on ne tranche pas
+			// lequel est légitime, on refuse de façon restrictive. Prendre
+			// simplement le premier résultat de `trouver_par_adresse()`
+			// masquerait ce doublon.
+			$deja = $this->comptes->compter_par_adresse( $adresse->valeur() );
+
+			if ( $deja > 1 ) {
+				Logger::error( sprintf( 'inscription refusee : unicite non prouvee (%d comptes pour l adresse)', $deja ) );
+
+				return $this->echec( 'unicite_non_prouvee' );
+			}
+
 			$existant = $this->comptes->trouver_par_adresse( $adresse->valeur() );
 
 			if ( null !== $existant ) {
@@ -158,11 +172,28 @@ final class InscriptionService {
 					return $this->echec( 'creation_echouee' );
 				}
 
-				// Preuve d'unicité : sous verrou, un seul compte doit porter
-				// l'adresse. Un décompte différent trahirait une course non
-				// couverte ; on le journalise sans jamais écrire l'adresse.
-				if ( 1 !== $this->comptes->compter_par_adresse( $adresse->valeur() ) ) {
-					Logger::error( sprintf( 'inscription : unicite d adresse non prouvee (compte %d)', $id ) );
+				// Preuve d'unicité APRÈS création, toujours sous verrou : un seul
+				// compte doit porter l'adresse, et le relire doit rendre celui
+				// que l'on vient de créer. Un décompte ou un identifiant qui
+				// diffère trahirait une course non couverte : on n'émet alors
+				// AUCUN jeton, on ne tient PAS le compte pour créé avec succès,
+				// et l'on ne supprime rien — on ne saurait dire quel utilisateur
+				// est légitime. Le journal ne porte qu'un code et des
+				// identifiants, jamais l'adresse.
+				$apres = $this->comptes->compter_par_adresse( $adresse->valeur() );
+				$relu  = $this->comptes->trouver_par_adresse( $adresse->valeur() );
+
+				if ( 1 !== $apres || null === $relu || $relu->id() !== $id ) {
+					Logger::error(
+						sprintf(
+							'inscription refusee : unicite non prouvee apres creation (compte %d, decompte %d, relu %d)',
+							$id,
+							$apres,
+							null === $relu ? 0 : $relu->id()
+						)
+					);
+
+					return $this->echec( 'unicite_non_prouvee' );
 				}
 
 				$compte_id = $id;
@@ -192,47 +223,21 @@ final class InscriptionService {
 	}
 
 	/**
-	 * Acquiert le verrou d'une adresse, avec une brève attente en cas de course.
-	 *
-	 * Le concurrent qui perd retente : quand le gagnant relâche son verrou,
-	 * l'insertion redevient possible, et le perdant retrouvera le compte créé.
-	 *
-	 * @param string $canonique  Adresse canonique.
-	 * @param int    $maintenant Horloge.
-	 * @return VerrouAdresse|null
-	 */
-	private function acquerir_verrou_adresse( string $canonique, int $maintenant ): ?VerrouAdresse {
-		for ( $essai = 0; $essai < self::VERROU_TENTATIVES; $essai++ ) {
-			$verrou = VerrouAdresse::acquerir( $this->db, $canonique, $maintenant );
-
-			if ( null !== $verrou ) {
-				return $verrou;
-			}
-
-			usleep( self::VERROU_ATTENTE_US );
-		}
-
-		return null;
-	}
-
-	/**
 	 * Le mot de passe atteint-il la longueur minimale, en CARACTÈRES ?
 	 *
 	 * La règle est douze **caractères** (points de code Unicode), pas douze
-	 * octets : « garçon12345 » fait douze caractères mais treize octets, et
+	 * octets : « garçon12345 » fait onze caractères mais douze octets, et
 	 * `strlen()` l'accepterait par erreur en le comptant en octets. Un UTF-8
 	 * invalide est refusé — on ne compte pas des caractères sur des octets qui
-	 * n'en forment pas. La valeur n'est ni modifiée ni journalisée.
+	 * n'en forment pas. La mesure passe par {@see Texte}, en PCRE, sans dépendre
+	 * de `mbstring`, qui n'est pas garanti partout. La valeur n'est ni modifiée
+	 * ni journalisée.
 	 *
 	 * @param string $mot_de_passe Mot de passe en clair.
 	 * @return bool
 	 */
 	private function longueur_mdp_conforme( string $mot_de_passe ): bool {
-		if ( ! mb_check_encoding( $mot_de_passe, 'UTF-8' ) ) {
-			return false;
-		}
-
-		return mb_strlen( $mot_de_passe, 'UTF-8' ) >= self::MDP_MINIMUM;
+		return Texte::au_moins( $mot_de_passe, self::MDP_MINIMUM );
 	}
 
 	/**

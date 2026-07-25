@@ -1,10 +1,13 @@
 <?php
 /**
- * Banc : le verrou temporaire d'inscription, dérivé de l'adresse.
+ * Banc : le verrou d'exclusion d'inscription, dérivé de l'adresse.
  *
- * Il reprend le compare-et-échange de VerrouCompte, mais garantit en plus que
- * le nom d'option **ne révèle jamais l'adresse** : il en est un HMAC avec le
- * secret du site, non un simple condensat que l'on pourrait recalculer.
+ * Le verrou repose sur `GET_LOCK()` : il tient tant que la **connexion** vit,
+ * sans échéance. Deux passerelles d'identités différentes modélisent deux
+ * connexions concurrentes, et l'on éprouve l'exclusivité, la libération par le
+ * seul détenteur, et — propriété de sûreté centrale — que le nom du verrou **ne
+ * révèle jamais l'adresse** : il en est un HMAC avec le secret du site, tronqué
+ * sous la limite de 64 caractères du moteur, non un condensat recalculable.
  */
 
 declare( strict_types = 1 );
@@ -13,65 +16,73 @@ require __DIR__ . '/bootstrap.php';
 require __DIR__ . '/doublures.php';
 
 use Urbizen\Platform\Account\VerrouAdresse;
-use Urbizen\Platform\Domain\Support\Ulid;
 
-$db      = new PasserelleOptions();
+PasserelleOptions::reinitialiser_verrous();
+
 $adresse = 'claire@exemple.fr';
+$conn_a  = new PasserelleOptions( 'A' );
+$conn_b  = new PasserelleOptions( 'B' );
 
 // ======================================================================
-// 1 · ACQUISITION
+// 1 · ACQUISITION ET EXCLUSIVITÉ ENTRE CONNEXIONS
 // ======================================================================
-$v1 = VerrouAdresse::acquerir( $db, $adresse, 1000 );
+$v1 = VerrouAdresse::acquerir( $conn_a, $adresse, 0 );
 
 check( '1 · le verrou s’acquiert', $v1 instanceof VerrouAdresse );
-check( '1 · son propriétaire est un ULID', Ulid::est_valide( $v1->proprietaire() ) );
-check( '1 · il est vivant', $v1->est_vivant( 1000 ) );
-check( '1 · UN SECOND PROCESSUS EST REFUSÉ', null === VerrouAdresse::acquerir( $db, $adresse, 1001 ) );
+check( '1 · il est tenu', $v1->est_tenu() );
+check( '1 · UNE AUTRE CONNEXION EST REFUSÉE PENDANT QU’ON TIENT',
+	null === VerrouAdresse::acquerir( $conn_b, $adresse, 0 ) );
 check( '1 · une autre adresse n’est pas bloquée',
-	VerrouAdresse::acquerir( $db, 'bob@exemple.fr', 1001 ) instanceof VerrouAdresse );
-check( '1 · une adresse vide est refusée', null === VerrouAdresse::acquerir( $db, '', 1000 ) );
+	VerrouAdresse::acquerir( $conn_b, 'bob@exemple.fr', 0 ) instanceof VerrouAdresse );
+check( '1 · une adresse vide est refusée', null === VerrouAdresse::acquerir( $conn_a, '', 0 ) );
 
 // ======================================================================
-// 2 · LE NOM D'OPTION NE PORTE PAS L'ADRESSE, ET C'EST UN HMAC
+// 2 · LE NOM DE VERROU NE PORTE PAS L'ADRESSE, ET C'EST UN HMAC
 // ======================================================================
-$option = VerrouAdresse::option_pour( $adresse );
+$nom = VerrouAdresse::nom_pour( $adresse );
 
-check( '2 · le nom d’option ne contient pas l’adresse',
-	false === strpos( $option, $adresse )
-	&& false === strpos( $option, 'claire' )
-	&& false === strpos( $option, 'exemple' ) );
+check( '2 · le nom de verrou ne contient pas l’adresse',
+	false === strpos( $nom, $adresse )
+	&& false === strpos( $nom, 'claire' )
+	&& false === strpos( $nom, 'exemple' ) );
+check( '2 · le nom du verrou tenu est bien celui-là', $v1->nom() === $nom );
 check( '2 · il n’est PAS un simple sha256 de l’adresse (donc dérivé par secret)',
-	$option !== VerrouAdresse::PREFIXE . substr( hash( 'sha256', $adresse ), 0, 32 ) );
+	$nom !== VerrouAdresse::PREFIXE . substr( hash( 'sha256', $adresse ), 0, 48 ) );
 check( '2 · deux adresses différentes donnent deux noms différents',
-	VerrouAdresse::option_pour( 'a@exemple.fr' ) !== VerrouAdresse::option_pour( 'b@exemple.fr' ) );
+	VerrouAdresse::nom_pour( 'a@exemple.fr' ) !== VerrouAdresse::nom_pour( 'b@exemple.fr' ) );
 check( '2 · la même adresse donne toujours le même nom (déterministe)',
-	VerrouAdresse::option_pour( $adresse ) === VerrouAdresse::option_pour( $adresse ) );
+	VerrouAdresse::nom_pour( $adresse ) === VerrouAdresse::nom_pour( $adresse ) );
+check( '2 · le nom tient sous la limite de 64 caractères du moteur',
+	strlen( $nom ) <= 64 );
 
 // ======================================================================
-// 3 · LIBÉRATION PAR LE SEUL PROPRIÉTAIRE
+// 3 · LIBÉRATION PAR LE SEUL DÉTENTEUR
 // ======================================================================
-$expire    = 1000 + VerrouAdresse::TTL + 1;
-$repreneur = VerrouAdresse::acquerir( $db, $adresse, $expire ); // reprise du verrou expiré
-
-check( '3 · un verrou expiré est repris', $repreneur instanceof VerrouAdresse );
-check( '3 · l’ancien propriétaire ne libère PAS le verrou du repreneur', false === $v1->liberer() );
-check( '3 · l’option existe toujours (celle du repreneur)',
-	isset( $db->options[ $option ] ) );
-check( '3 · le repreneur, lui, libère', true === $repreneur->liberer() );
-check( '3 · l’option a disparu', ! isset( $db->options[ $option ] ) );
-check( '3 · après libération, une nouvelle acquisition passe',
-	VerrouAdresse::acquerir( $db, $adresse, $expire + 1 ) instanceof VerrouAdresse );
+check( '3 · une autre connexion ne libère PAS notre verrou',
+	false === VerrouAdresse::acquerir( $conn_b, $adresse, 0 ) instanceof VerrouAdresse );
+check( '3 · le détenteur, lui, libère', true === $v1->liberer() );
+check( '3 · une seconde libération ne porte pas', false === $v1->liberer() );
+check( '3 · le verrou n’est plus tenu après libération', false === $v1->est_tenu() );
+check( '3 · après libération, une autre connexion peut acquérir',
+	VerrouAdresse::acquerir( $conn_b, $adresse, 0 ) instanceof VerrouAdresse );
 
 // ======================================================================
-// 4 · REPRISE ATOMIQUE — un lecteur périmé ne détruit pas un verrou neuf
+// 4 · MORT DE LA CONNEXION — le verrou n'a pas d'échéance à attendre
 // ======================================================================
-$db2 = new PasserelleOptions();
-$a   = VerrouAdresse::acquerir( $db2, $adresse, 2000 );          // A tient
-$exp = 2000 + VerrouAdresse::TTL + 1;
-$b   = VerrouAdresse::acquerir( $db2, $adresse, $exp );          // B reprend (A expiré)
+// Ici, « la connexion B meurt » se modélise en oubliant ses verrous : c'est ce
+// que fait le moteur quand la connexion se ferme. Aucune fenêtre à deux
+// détenteurs : tant que B tient, A échoue ; dès que B disparaît, A prend.
+PasserelleOptions::reinitialiser_verrous();
+$conn_c = new PasserelleOptions( 'C' );
+$conn_d = new PasserelleOptions( 'D' );
 
-check( '4 · B reprend le verrou expiré de A', $b instanceof VerrouAdresse );
-check( '4 · A, périmé, ne peut plus rien libérer', false === $a->liberer() );
-check( '4 · le verrou de B est intact', $b->est_vivant( $exp ) );
+$vc = VerrouAdresse::acquerir( $conn_c, $adresse, 0 );
+check( '4 · C tient le verrou', $vc instanceof VerrouAdresse );
+check( '4 · D est refusé tant que C tient', null === VerrouAdresse::acquerir( $conn_d, $adresse, 0 ) );
+
+PasserelleOptions::reinitialiser_verrous(); // C « meurt » : le moteur libère.
+
+check( '4 · C mort, D acquiert immédiatement — pas d’échéance à attendre',
+	VerrouAdresse::acquerir( $conn_d, $adresse, 0 ) instanceof VerrouAdresse );
 
 verdict();

@@ -25,6 +25,7 @@ fi
 
 bancs=(
 	test-adresse.php
+	test-texte.php
 	test-politiques.php
 	test-verrou.php
 	test-verrou-adresse.php

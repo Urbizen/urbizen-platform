@@ -33,6 +33,7 @@ $urbizen_fichiers = array(
 	'Domain/Authorization/PolicyRegistry.php',
 	'Domain/Authorization/Authorization.php',
 	'Domain/Support/Ulid.php',
+	'Domain/Support/Texte.php',
 	'Schema/DatabaseGateway.php',
 	'Domain/Account/AdresseCourriel.php',
 	'Domain/Account/Compte.php',

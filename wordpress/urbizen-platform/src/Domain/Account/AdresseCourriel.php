@@ -20,6 +20,7 @@
 namespace Urbizen\Platform\Domain\Account;
 
 use InvalidArgumentException;
+use Urbizen\Platform\Domain\Support\Texte;
 
 /**
  * Adresse valide et immuable.
@@ -83,14 +84,15 @@ final class AdresseCourriel {
 			return 'adresse_vide';
 		}
 
-		// Un UTF-8 invalide n'est pas une adresse mesurable ni stockable.
-		if ( ! mb_check_encoding( $valeur, 'UTF-8' ) ) {
+		// Un UTF-8 invalide n'est pas une adresse mesurable ni stockable. La
+		// mesure passe par {@see Texte}, en PCRE, sans dépendre de `mbstring`.
+		if ( ! Texte::est_utf8( $valeur ) ) {
 			return 'adresse_invalide';
 		}
 
 		// En CARACTÈRES : la borne vise la capacité de stockage (VARCHAR(100)),
 		// exprimée en caractères, pas en octets.
-		if ( mb_strlen( $valeur, 'UTF-8' ) > self::LONGUEUR_MAX ) {
+		if ( ! Texte::au_plus( $valeur, self::LONGUEUR_MAX ) ) {
 			return 'adresse_trop_longue';
 		}
 

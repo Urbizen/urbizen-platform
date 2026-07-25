@@ -63,6 +63,7 @@ foreach (
 		'src/Domain/Authorization/PolicyRegistry.php',
 		'src/Domain/Authorization/Authorization.php',
 		'src/Domain/Support/Ulid.php',
+		'src/Domain/Support/Texte.php',
 		'src/Schema/DatabaseGateway.php',
 		'src/Schema/Migration.php',
 		'src/Schema/MigrationCatalogue.php',

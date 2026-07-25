@@ -279,11 +279,34 @@ function mdp_accepte( string $mdp ): bool {
 check( '9 · 12 caractères ASCII : accepté', mdp_accepte( 'abcdEF123456' ) );
 check( '9 · 11 caractères ASCII : refusé', ! mdp_accepte( 'abcdEF12345' ) );
 // « garçon12345 » : 11 caractères mais 12 octets (ç en fait deux). strlen() le
-// prenait par erreur ; mb_strlen() le refuse. C'est le cœur du correctif.
+// prenait par erreur ; la mesure PCRE de Texte le refuse. C'est le cœur du
+// correctif, et il ne dépend plus de l'extension mbstring.
 check( '9 · 11 caractères = 12 octets : REFUSÉ (caractères, pas octets)', ! mdp_accepte( 'garçon12345' ) );
 check( '9 · 12 caractères accentués : accepté', mdp_accepte( 'garçon123456' ) );
 check( '9 · 12 émojis : accepté', mdp_accepte( str_repeat( '😀', 12 ) ) );
 check( '9 · UTF-8 invalide : refusé', ! mdp_accepte( "clef\xC3\x28-invalide" ) );
 check( '9 · apostrophe et antislash (≥ 12) : accepté', mdp_accepte( "a'b\\cdef12345" ) );
+
+// ======================================================================
+// 10 · UNICITÉ NON PROUVÉE — un doublon historique fait ÉCHOUER, sans rien créer
+// ======================================================================
+// Deux comptes portent déjà la même adresse (doublon antérieur au verrou).
+// L'inscription ne doit pas « prendre le premier » et poursuivre : elle doit
+// refuser de façon restrictive, ne préparer aucun jeton, ne créer aucun
+// troisième compte, et ne supprimer aucun des deux.
+list( $comptes10, , $service10 ) = inscription();
+
+$comptes10->utilisateurs[ 501 ] = array( 'adresse' => 'doublon@exemple.fr', 'login' => 'urb_a' );
+$comptes10->utilisateurs[ 502 ] = array( 'adresse' => 'doublon@exemple.fr', 'login' => 'urb_b' );
+$avant = count( $comptes10->utilisateurs );
+
+$r10 = $service10->inscrire( 'doublon@exemple.fr', 'MotDePasse12chars', 1785000000 );
+
+check( '10 · le motif est « unicite_non_prouvee »', 'unicite_non_prouvee' === $r10['motif'] );
+check( '10 · rien n’est tenu pour créé', false === $r10['cree'] );
+check( '10 · aucun jeton n’est préparé', null === $r10['emission'] );
+check( '10 · aucun troisième compte n’est créé', $avant === count( $comptes10->utilisateurs ) );
+check( '10 · aucun des deux comptes n’est supprimé',
+	isset( $comptes10->utilisateurs[ 501 ], $comptes10->utilisateurs[ 502 ] ) );
 
 verdict();

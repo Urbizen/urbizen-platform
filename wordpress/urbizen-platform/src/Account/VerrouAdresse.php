@@ -1,45 +1,58 @@
 <?php
 /**
- * Verrou **temporaire** par adresse canonique, pour sérialiser l'inscription.
+ * Verrou **d'exclusion** par adresse canonique, pour sérialiser l'inscription.
  *
  * `trouver_par_adresse()` puis `creer()` n'est pas atomique : WordPress ne pose
  * aucune contrainte SQL `UNIQUE` sur `user_email`, donc deux inscriptions
  * simultanées peuvent toutes deux constater l'absence avant d'insérer, et créer
  * deux utilisateurs pour la même boîte. Ce verrou ferme cette course.
  *
- * Il reprend le compare-et-échange de {@see VerrouCompte} — insertion via
- * l'index unique sur `option_name`, reprise conditionnelle d'un verrou expiré,
- * libération conditionnée à la valeur exacte — mais s'en distingue sur un point :
+ * **Pourquoi un verrou consultatif de la base, et non un bail à échéance.** Une
+ * option horodatée avec un TTL est un *bail sans fencing* : si le propriétaire
+ * est suspendu au-delà de l'échéance, un second processus reprend le verrou
+ * expiré, constate l'adresse libre, et **les deux** peuvent créer un compte —
+ * la reprise par compare-et-échange protège le verrou, pas la section critique
+ * de l'ancien propriétaire. `GET_LOCK()` n'a pas d'échéance : il tient tant que
+ * la **connexion** qui l'a pris vit, et se libère **de lui-même** dès qu'elle
+ * meurt. Il n'existe donc aucune fenêtre à deux propriétaires : ou bien le
+ * premier vit et tient (le second attend, puis échoue), ou bien il est mort et
+ * ne peut plus rien écrire sur une connexion fermée.
  *
- * **Le nom d'option ne porte jamais l'adresse en clair.** Il dérive d'un HMAC de
- * l'adresse canonique avec le secret du site : personne ne peut, en lisant la
- * table des options, retrouver quelles adresses s'inscrivent, ni fabriquer le
- * nom du verrou d'une adresse ciblée sans connaître le secret.
+ * Trois conditions rendent ce fencing réel :
+ *
+ * - **une seule connexion** pour l'acquisition, la recherche, la création et la
+ *   libération — c'est le cas : `$wpdb` n'ouvre qu'une connexion par requête, et
+ *   `wp_insert_user()` comme cette passerelle passent par elle ;
+ * - **un nom qui ne révèle pas l'adresse** — HMAC de l'adresse canonique avec le
+ *   secret du site, tronqué sous la limite du moteur (64 caractères). Le secret
+ *   sert aussi de cloison : deux sites sur le même serveur MySQL, où les noms de
+ *   `GET_LOCK()` sont **globaux au serveur**, ne se marchent pas dessus ;
+ * - **une attente bornée** à l'acquisition, jamais infinie.
  *
  * @package Urbizen\Platform\Account
  */
 
 namespace Urbizen\Platform\Account;
 
-use Urbizen\Platform\Domain\Support\Ulid;
 use Urbizen\Platform\Schema\DatabaseGateway;
 
 /**
- * Verrou d'inscription dérivé de l'adresse, à compare-et-échange.
+ * Verrou d'inscription dérivé de l'adresse, sur `GET_LOCK()`.
  */
 final class VerrouAdresse {
 
 	/**
-	 * Préfixe des options de verrou.
+	 * Préfixe du nom de verrou. Court : le nom complet doit tenir sous la
+	 * limite de 64 caractères qu'impose MySQL 8 aux noms de `GET_LOCK()`.
 	 */
-	public const PREFIXE = 'urbizen_adresse_lock_';
+	public const PREFIXE = 'urbz_adr_';
 
 	/**
-	 * Durée de vie, en secondes. Courte : une inscription dure des
-	 * millisecondes ; un verrou long transformerait un processus mort en
-	 * blocage durable de toute nouvelle inscription sur cette adresse.
+	 * Attente maximale, en secondes, à l'acquisition. Bornée : une inscription
+	 * dure des millisecondes, et le concurrent qui patiente doit obtenir la
+	 * main dès que le gagnant relâche, sans jamais bloquer indéfiniment.
 	 */
-	public const TTL = 60;
+	public const ATTENTE = 10;
 
 	/**
 	 * @var DatabaseGateway
@@ -49,53 +62,28 @@ final class VerrouAdresse {
 	/**
 	 * @var string
 	 */
-	private string $option;
+	private string $nom;
 
 	/**
-	 * @var string
-	 */
-	private string $proprietaire;
-
-	/**
-	 * Valeur exacte en base, telle qu'on l'y a écrite.
+	 * Le verrou est-il encore tenu par cet objet ? Passe à `false` dès la
+	 * première libération, pour qu'un second appel ne prétende pas libérer.
 	 *
-	 * @var string
-	 */
-	private string $valeur_courante;
-
-	/**
-	 * @var int
-	 */
-	private int $expire_le;
-
-	/**
 	 * @var bool
 	 */
-	private bool $actif = true;
+	private bool $tenu = true;
 
 	/**
-	 * @param DatabaseGateway $db              Passerelle.
-	 * @param string          $option          Nom d'option.
-	 * @param string          $proprietaire    Jeton du propriétaire.
-	 * @param string          $valeur_courante Valeur en base.
-	 * @param int             $expire_le       Échéance.
+	 * @param DatabaseGateway $db  Passerelle — la **même** connexion que la
+	 *                             recherche et la création qui suivront.
+	 * @param string          $nom Nom du verrou, déjà dérivé.
 	 */
-	private function __construct(
-		DatabaseGateway $db,
-		string $option,
-		string $proprietaire,
-		string $valeur_courante,
-		int $expire_le
-	) {
-		$this->db              = $db;
-		$this->option          = $option;
-		$this->proprietaire    = $proprietaire;
-		$this->valeur_courante = $valeur_courante;
-		$this->expire_le       = $expire_le;
+	private function __construct( DatabaseGateway $db, string $nom ) {
+		$this->db  = $db;
+		$this->nom = $nom;
 	}
 
 	/**
-	 * Secret du site, servant de clé au HMAC du nom d'option.
+	 * Secret du site, servant de clé au HMAC du nom de verrou.
 	 *
 	 * `wp_salt()` est le secret de WordPress. Le repli n'est atteint qu'en
 	 * l'absence de WordPress — les bancs sans WP — et n'affaiblit pas la
@@ -112,191 +100,83 @@ final class VerrouAdresse {
 	}
 
 	/**
-	 * Nom d'option pour une adresse canonique.
+	 * Nom de verrou pour une adresse canonique.
 	 *
-	 * HMAC-SHA-256 de l'adresse avec le secret du site : le nom ne révèle pas
-	 * l'adresse et ne peut être forgé sans le secret.
+	 * HMAC-SHA-256 de l'adresse avec le secret du site, tronqué à 48 caractères
+	 * hexadécimaux : avec le préfixe, 57 caractères, sous la limite de 64. Le
+	 * nom ne révèle pas l'adresse et ne peut être forgé sans le secret.
 	 *
 	 * @param string $adresse Adresse canonique.
 	 * @return string
 	 */
-	public static function option_pour( string $adresse ): string {
-		return self::PREFIXE . substr( hash_hmac( 'sha256', $adresse, self::secret() ), 0, 32 );
+	public static function nom_pour( string $adresse ): string {
+		return self::PREFIXE . substr( hash_hmac( 'sha256', $adresse, self::secret() ), 0, 48 );
 	}
 
 	/**
-	 * Tente d'acquérir le verrou d'une adresse.
+	 * Tente d'acquérir le verrou d'une adresse, avec une attente bornée.
 	 *
-	 * @param DatabaseGateway $db         Passerelle.
-	 * @param string          $adresse    Adresse canonique, non vide.
-	 * @param int|null        $maintenant Horloge injectable.
-	 * @return self|null `null` si une autre inscription est en cours sur cette adresse.
+	 * `GET_LOCK()` rend `1` si le verrou est obtenu, `0` si l'attente expire
+	 * sans l'obtenir, `NULL` sur erreur. On n'accepte que `1` : tout le reste
+	 * est un refus, jamais une présomption d'exclusivité.
+	 *
+	 * @param DatabaseGateway $db      Passerelle.
+	 * @param string          $adresse Adresse canonique, non vide.
+	 * @param int             $attente Attente maximale en secondes.
+	 * @return self|null `null` si le verrou n'a pas été obtenu.
 	 */
-	public static function acquerir( DatabaseGateway $db, string $adresse, ?int $maintenant = null ): ?self {
+	public static function acquerir( DatabaseGateway $db, string $adresse, int $attente = self::ATTENTE ): ?self {
 		if ( '' === $adresse ) {
 			return null;
 		}
 
-		$maintenant   = null === $maintenant ? time() : $maintenant;
-		$option       = self::option_pour( $adresse );
-		$proprietaire = Ulid::generer();
-		$expire_le    = $maintenant + self::TTL;
-		$valeur       = self::encoder( $proprietaire, $maintenant, $expire_le );
+		$nom    = self::nom_pour( $adresse );
+		$obtenu = $db->valeur( 'SELECT GET_LOCK(%s, %d)', array( $nom, $attente ) );
 
-		// Chemin 1 : personne ne tient le verrou. L'index unique sur
-		// `option_name` tranche entre deux insertions simultanées.
-		$pose = $db->lignes_affectees(
-			sprintf(
-				'INSERT INTO `%s` ( option_name, option_value, autoload ) VALUES ( %%s, %%s, %%s )',
-				self::table( $db )
-			),
-			array( $option, $valeur, 'no' )
-		);
-
-		if ( 1 === $pose ) {
-			self::vider_cache( $option );
-
-			return new self( $db, $option, $proprietaire, $valeur, $expire_le );
-		}
-
-		// Chemin 2 : quelqu'un tient, ou tenait.
-		$brut = $db->valeur(
-			sprintf( 'SELECT option_value FROM `%s` WHERE option_name = %%s', self::table( $db ) ),
-			array( $option )
-		);
-
-		if ( null === $brut ) {
+		if ( '1' !== $obtenu ) {
 			return null;
 		}
 
-		$existant = self::decoder( $brut );
-
-		if ( null === $existant || $existant['expire_le'] > $maintenant ) {
-			// Illisible ou vivant : on refuse plutôt que de présumer libre.
-			return null;
-		}
-
-		// Reprise d'un verrou expiré, par compare-et-échange sur la valeur
-		// exacte lue. Deux repreneurs simultanés : un seul touche une ligne.
-		$repris = $db->lignes_affectees(
-			sprintf(
-				'UPDATE `%s` SET option_value = %%s WHERE option_name = %%s AND option_value = %%s',
-				self::table( $db )
-			),
-			array( $valeur, $option, $brut )
-		);
-
-		if ( 1 !== $repris ) {
-			return null;
-		}
-
-		self::vider_cache( $option );
-
-		return new self( $db, $option, $proprietaire, $valeur, $expire_le );
+		return new self( $db, $nom );
 	}
 
 	/**
-	 * Libère, **si et seulement si** la valeur en base est encore la nôtre.
+	 * Libère le verrou, **une seule fois**, et dit si la libération a bien porté.
+	 *
+	 * `RELEASE_LOCK()` rend `1` si cette connexion tenait le verrou et l'a
+	 * relâché, `0` s'il était tenu par une autre connexion, `NULL` s'il n'était
+	 * pas pris. On exige `1`.
 	 *
 	 * @return bool
 	 */
 	public function liberer(): bool {
-		if ( ! $this->actif ) {
+		if ( ! $this->tenu ) {
 			return false;
 		}
 
-		$supprimees = $this->db->lignes_affectees(
-			sprintf(
-				'DELETE FROM `%s` WHERE option_name = %%s AND option_value = %%s',
-				self::table( $this->db )
-			),
-			array( $this->option, $this->valeur_courante )
-		);
+		$this->tenu = false;
 
-		$this->actif = false;
+		$libere = $this->db->valeur( 'SELECT RELEASE_LOCK(%s)', array( $this->nom ) );
 
-		self::vider_cache( $this->option );
-
-		return 1 === $supprimees;
+		return '1' === $libere;
 	}
 
 	/**
+	 * Nom du verrou tenu — pour les bancs, qui vérifient qu'il ne porte pas
+	 * l'adresse en clair.
+	 *
 	 * @return string
 	 */
-	public function proprietaire(): string {
-		return $this->proprietaire;
+	public function nom(): string {
+		return $this->nom;
 	}
 
 	/**
-	 * @param int|null $maintenant Horloge injectable.
+	 * Le verrou est-il encore tenu par cet objet ?
+	 *
 	 * @return bool
 	 */
-	public function est_vivant( ?int $maintenant = null ): bool {
-		$maintenant = null === $maintenant ? time() : $maintenant;
-
-		return $this->actif && $this->expire_le > $maintenant;
-	}
-
-	/**
-	 * @param DatabaseGateway $db Passerelle.
-	 * @return string
-	 */
-	private static function table( DatabaseGateway $db ): string {
-		return $db->prefixe() . 'options';
-	}
-
-	/**
-	 * @param string $proprietaire Jeton.
-	 * @param int    $cree_le      Création.
-	 * @param int    $expire_le    Échéance.
-	 * @return string
-	 */
-	private static function encoder( string $proprietaire, int $cree_le, int $expire_le ): string {
-		return (string) json_encode(
-			array(
-				'proprietaire' => $proprietaire,
-				'cree_le'      => $cree_le,
-				'expire_le'    => $expire_le,
-			)
-		);
-	}
-
-	/**
-	 * @param string $brut Valeur brute.
-	 * @return array{proprietaire: string, cree_le: int, expire_le: int}|null
-	 */
-	private static function decoder( string $brut ): ?array {
-		$decode = json_decode( $brut, true );
-
-		if ( ! is_array( $decode ) ) {
-			return null;
-		}
-
-		foreach ( array( 'proprietaire', 'cree_le', 'expire_le' ) as $cle ) {
-			if ( ! isset( $decode[ $cle ] ) ) {
-				return null;
-			}
-		}
-
-		if ( ! Ulid::est_valide( (string) $decode['proprietaire'] ) ) {
-			return null;
-		}
-
-		return array(
-			'proprietaire' => (string) $decode['proprietaire'],
-			'cree_le'      => (int) $decode['cree_le'],
-			'expire_le'    => (int) $decode['expire_le'],
-		);
-	}
-
-	/**
-	 * @param string $option Nom d'option.
-	 * @return void
-	 */
-	private static function vider_cache( string $option ): void {
-		if ( function_exists( 'wp_cache_delete' ) ) {
-			wp_cache_delete( $option, 'options' );
-			wp_cache_delete( 'alloptions', 'options' );
-		}
+	public function est_tenu(): bool {
+		return $this->tenu;
 	}
 }
