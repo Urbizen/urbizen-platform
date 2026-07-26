@@ -398,15 +398,17 @@ check( 'SEUL EnvoiVerification ÉMET dans le domaine des comptes',
 	array( 'src/Account/EnvoiVerification.php' ) === $emetteurs );
 
 /*
- * Aucun sixième fichier de classe non décidé. D-046 prévoit exactement cinq
- * classes ajoutées ; un fichier de plus est un ajout que personne n'a tranché.
+ * Aucun fichier de classe non décidé. D-046 a tranché les treize classes
+ * d'origine ; le correctif ciblé 0.12.0 en ajoute une seule et unique,
+ * VerrouAdresse — le verrou temporaire dérivé de l'adresse qui sérialise les
+ * inscriptions concurrentes. Tout fichier de plus reste un ajout non tranché.
  */
 $attendus_account = array(
 	'AutorisationComptes.php', 'ComptesGateway.php', 'CourrielVerification.php',
 	'EmissionEnAttente.php', 'EnvoiVerification.php', 'InscriptionService.php',
 	'JetonVerification.php', 'LienVerification.php', 'LimiteEnvois.php',
 	'ResultatEmission.php', 'RoleClient.php', 'VerificationService.php',
-	'VerrouCompte.php',
+	'VerrouAdresse.php', 'VerrouCompte.php',
 );
 
 $reels_account = array_map( 'basename', glob( URBIZEN_PLATFORM_DIR . 'src/Account/*.php' ) ?: array() );

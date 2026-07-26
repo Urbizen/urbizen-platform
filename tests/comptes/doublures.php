@@ -14,6 +14,7 @@
 declare( strict_types = 1 );
 
 use Urbizen\Platform\Account\ComptesGateway;
+use Urbizen\Platform\Schema\ConnexionPerdue;
 
 /**
  * Journal d'événements partagé par les deux doublures.
@@ -73,6 +74,44 @@ final class PasserelleOptions implements DatabaseGateway {
 	 */
 	public array $instructions = array();
 
+	/**
+	 * Identité de « connexion » de cette passerelle.
+	 *
+	 * `GET_LOCK()` est lié à la connexion : deux passerelles d'identités
+	 * différentes modélisent deux connexions concurrentes, et c'est ce qui
+	 * permet d'éprouver l'exclusivité dans un seul processus PHP.
+	 *
+	 * @var string
+	 */
+	public string $connexion;
+
+	/**
+	 * Verrous consultatifs tenus, **partagés entre toutes les passerelles** :
+	 * nom → identité de la connexion qui le tient. Statique, car `GET_LOCK()`
+	 * est global au serveur, pas à une connexion.
+	 *
+	 * @var array<string, string>
+	 */
+	private static array $verrous = array();
+
+	/**
+	 * @var int
+	 */
+	private static int $prochaine_connexion = 1;
+
+	public function __construct( ?string $connexion = null ) {
+		$this->connexion = $connexion ?? 'c' . self::$prochaine_connexion++;
+	}
+
+	/**
+	 * Oublie tous les verrous consultatifs — isolation entre bancs.
+	 *
+	 * @return void
+	 */
+	public static function reinitialiser_verrous(): void {
+		self::$verrous = array();
+	}
+
 	public function prefixe(): string {
 		return 'wp_';
 	}
@@ -83,6 +122,48 @@ final class PasserelleOptions implements DatabaseGateway {
 
 	public function valeur( string $sql, array $parametres = array() ): ?string {
 		$this->instructions[] = $sql;
+
+		// GET_LOCK() : accordé si le verrou est libre ou déjà tenu par CETTE
+		// connexion ; refusé (0, « l'attente expire ») s'il est tenu par une
+		// autre. On ne bloque pas dans un banc mono-processus : un verrou déjà
+		// tenu ailleurs rend immédiatement 0.
+		if ( false !== strpos( $sql, 'GET_LOCK' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			if ( isset( self::$verrous[ $nom ] ) && self::$verrous[ $nom ] !== $this->connexion ) {
+				return '0';
+			}
+
+			self::$verrous[ $nom ] = $this->connexion;
+
+			return '1';
+		}
+
+		// RELEASE_LOCK() : 1 si CETTE connexion le tenait, 0 s'il est tenu par
+		// une autre, NULL s'il n'était pas pris.
+		if ( false !== strpos( $sql, 'RELEASE_LOCK' ) ) {
+			$nom = (string) ( $parametres[0] ?? '' );
+
+			// Épreuve : on force la valeur rendue, sans toucher au registre —
+			// pour simuler un RELEASE_LOCK qui rend 0 ou NULL.
+			if ( null !== $this->forcer_release ) {
+				unset( self::$verrous[ $nom ] );
+
+				return '' === $this->forcer_release ? null : $this->forcer_release;
+			}
+
+			if ( ! isset( self::$verrous[ $nom ] ) ) {
+				return null;
+			}
+
+			if ( self::$verrous[ $nom ] !== $this->connexion ) {
+				return '0';
+			}
+
+			unset( self::$verrous[ $nom ] );
+
+			return '1';
+		}
 
 		if ( false !== strpos( $sql, 'option_value' ) && false !== strpos( $sql, 'option_name' ) ) {
 			return $this->options[ (string) ( $parametres[0] ?? '' ) ] ?? null;
@@ -161,6 +242,18 @@ final class PasserelleOptions implements DatabaseGateway {
 	}
 
 	/**
+	 * Valeur forcée pour `RELEASE_LOCK` — pour éprouver l'échec de libération.
+	 * `null` = comportement normal (le détenteur libère).
+	 *
+	 * @var string|null
+	 */
+	public ?string $forcer_release = null;
+
+	public function interdire_reconnexion(): void {}
+
+	public function autoriser_reconnexion(): void {}
+
+	/**
 	 * L'instruction porte-t-elle réellement la condition sur l'ancienne valeur ?
 	 *
 	 * @param string $sql Instruction.
@@ -194,6 +287,13 @@ final class ComptesDouble implements ComptesGateway {
 	 * @var bool
 	 */
 	public bool $role_conforme = true;
+
+	/**
+	 * `creer()` doit-il lever ConnexionPerdue (perte de connexion à l'écriture) ?
+	 *
+	 * @var bool
+	 */
+	public bool $creer_perd_connexion = false;
 
 	/**
 	 * Prochain identifiant attribué.
@@ -294,6 +394,18 @@ final class ComptesDouble implements ComptesGateway {
 		return null;
 	}
 
+	public function compter_par_adresse( string $canonique ): int {
+		$n = 0;
+
+		foreach ( $this->utilisateurs as $donnees ) {
+			if ( $donnees['adresse'] === $canonique ) {
+				++$n;
+			}
+		}
+
+		return $n;
+	}
+
 	public function adresse_disponible( string $canonique, int $sauf_id = 0 ): bool {
 		foreach ( $this->utilisateurs as $id => $donnees ) {
 			if ( $donnees['adresse'] === $canonique ) {
@@ -305,6 +417,13 @@ final class ComptesDouble implements ComptesGateway {
 	}
 
 	public function creer( string $identifiant, string $canonique, string $mot_de_passe ): int {
+		// Épreuve : la connexion tombe pendant l'écriture, en section non
+		// reconnectable. La passerelle réelle lèverait cette exception ; la
+		// création n'aboutit pas.
+		if ( $this->creer_perd_connexion ) {
+			throw new ConnexionPerdue( 'création interrompue : connexion perdue' );
+		}
+
 		if ( ! $this->role_conforme ) {
 			return 0;
 		}

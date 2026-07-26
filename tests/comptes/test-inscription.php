@@ -29,7 +29,7 @@ function inscription(): array {
 	$comptes = new ComptesDouble();
 	$db      = new PasserelleOptions();
 
-	return array( $comptes, $db, new InscriptionService( $comptes, new VerificationService( $comptes, $db ) ) );
+	return array( $comptes, $db, new InscriptionService( $comptes, new VerificationService( $comptes, $db ), $db ) );
 }
 
 // ======================================================================
@@ -257,5 +257,102 @@ $journal = Logger::tout();
 check( '8 · le journal a reçu une ligne', '' !== $journal );
 check( '8 · AUCUNE ADRESSE', false === strpos( $journal, 'confidentielle@exemple.fr' ) );
 check( '8 · AUCUN MOT DE PASSE', false === strpos( $journal, 'motdepasse-tres-secret' ) );
+
+// ======================================================================
+// 9 · MOT DE PASSE — DOUZE CARACTÈRES, PAS DOUZE OCTETS
+// ======================================================================
+/**
+ * Une inscription sur adresse libre aboutit-elle avec ce mot de passe ?
+ *
+ * @param string $mdp Mot de passe éprouvé.
+ * @return bool `true` si le compte est créé, `false` sinon.
+ */
+function mdp_accepte( string $mdp ): bool {
+	static $n = 0;
+	list( , , $service ) = inscription();
+
+	$r = $service->inscrire( sprintf( 'mdp-%d@exemple.fr', ++$n ), $mdp, 1785000000 );
+
+	return true === $r['cree'];
+}
+
+check( '9 · 12 caractères ASCII : accepté', mdp_accepte( 'abcdEF123456' ) );
+check( '9 · 11 caractères ASCII : refusé', ! mdp_accepte( 'abcdEF12345' ) );
+// « garçon12345 » : 11 caractères mais 12 octets (ç en fait deux). strlen() le
+// prenait par erreur ; la mesure PCRE de Texte le refuse. C'est le cœur du
+// correctif, et il ne dépend plus de l'extension mbstring.
+check( '9 · 11 caractères = 12 octets : REFUSÉ (caractères, pas octets)', ! mdp_accepte( 'garçon12345' ) );
+check( '9 · 12 caractères accentués : accepté', mdp_accepte( 'garçon123456' ) );
+check( '9 · 12 émojis : accepté', mdp_accepte( str_repeat( '😀', 12 ) ) );
+check( '9 · UTF-8 invalide : refusé', ! mdp_accepte( "clef\xC3\x28-invalide" ) );
+check( '9 · apostrophe et antislash (≥ 12) : accepté', mdp_accepte( "a'b\\cdef12345" ) );
+
+// ======================================================================
+// 10 · UNICITÉ NON PROUVÉE — un doublon historique fait ÉCHOUER, sans rien créer
+// ======================================================================
+// Deux comptes portent déjà la même adresse (doublon antérieur au verrou).
+// L'inscription ne doit pas « prendre le premier » et poursuivre : elle doit
+// refuser de façon restrictive, ne préparer aucun jeton, ne créer aucun
+// troisième compte, et ne supprimer aucun des deux.
+list( $comptes10, , $service10 ) = inscription();
+
+$comptes10->utilisateurs[ 501 ] = array( 'adresse' => 'doublon@exemple.fr', 'login' => 'urb_a' );
+$comptes10->utilisateurs[ 502 ] = array( 'adresse' => 'doublon@exemple.fr', 'login' => 'urb_b' );
+$avant = count( $comptes10->utilisateurs );
+
+$r10 = $service10->inscrire( 'doublon@exemple.fr', 'MotDePasse12chars', 1785000000 );
+
+check( '10 · le motif est « unicite_non_prouvee »', 'unicite_non_prouvee' === $r10['motif'] );
+check( '10 · rien n’est tenu pour créé', false === $r10['cree'] );
+check( '10 · aucun jeton n’est préparé', null === $r10['emission'] );
+check( '10 · aucun troisième compte n’est créé', $avant === count( $comptes10->utilisateurs ) );
+check( '10 · aucun des deux comptes n’est supprimé',
+	isset( $comptes10->utilisateurs[ 501 ], $comptes10->utilisateurs[ 502 ] ) );
+
+// ======================================================================
+// 11 · LIBÉRATION NON PROUVÉE — RELEASE_LOCK rend 0 ou NULL
+// ======================================================================
+// Le compte est bien créé, mais la libération du verrou n'est pas prouvée. On
+// n'émet alors AUCUN jeton, on retourne un échec technique, et le compte
+// demeure — non vérifié et récupérable par une nouvelle demande.
+foreach ( array( array( '0', 'RELEASE_LOCK rend 0' ), array( '', 'RELEASE_LOCK rend NULL' ) ) as $cas ) {
+	list( $forced, $libelle ) = $cas;
+	list( $c11, $db11, $s11 ) = inscription();
+	$db11->forcer_release     = $forced;
+
+	$r11 = $s11->inscrire( 'liberation@exemple.fr', 'MotDePasse12chars', $t );
+
+	check( "11 · $libelle : motif « liberation_non_prouvee »", 'liberation_non_prouvee' === $r11['motif'] );
+	check( "11 · $libelle : aucun jeton n’est préparé", null === $r11['emission'] );
+	check( "11 · $libelle : rien n’est tenu pour créé", false === $r11['cree'] );
+	// Le compte a bien été écrit : il est récupérable.
+	check( "11 · $libelle : le compte demeure (récupérable)", 1 === $c11->compter_par_adresse( 'liberation@exemple.fr' ) );
+
+	// Récupération : une nouvelle demande (libération rétablie) retrouve le
+	// compte non vérifié et relance un lien, sans doublon.
+	$db11->forcer_release = null;
+	$r11b                 = $s11->inscrire( 'liberation@exemple.fr', 'MotDePasse12chars', $t + 1 );
+
+	check( "11 · $libelle : la reprise retrouve le compte et prépare l’émission",
+		false === $r11b['cree'] && 'adresse_prise_non_verifiee' === $r11b['motif'] && null !== $r11b['emission'] );
+	check( "11 · $libelle : toujours un seul compte", 1 === $c11->compter_par_adresse( 'liberation@exemple.fr' ) );
+}
+
+// ======================================================================
+// 12 · CONNEXION PERDUE EN SECTION CRITIQUE — l'écriture ne peut être rejouée
+// ======================================================================
+// La connexion tombe pendant la création, en section non reconnectable. La
+// passerelle réelle empêche `wpdb` de rejouer l'INSERT sur une connexion neuve
+// et lève ConnexionPerdue. Le service échoue de façon restrictive, sans jeton,
+// sans compte créé sur une connexion sans verrou.
+list( $c12, $db12, $s12 ) = inscription();
+$c12->creer_perd_connexion = true;
+
+$r12 = $s12->inscrire( 'connexion@exemple.fr', 'MotDePasse12chars', $t );
+
+check( '12 · le motif est « connexion_perdue »', 'connexion_perdue' === $r12['motif'] );
+check( '12 · rien n’est tenu pour créé', false === $r12['cree'] );
+check( '12 · aucun jeton n’est préparé', null === $r12['emission'] );
+check( '12 · aucun compte n’est créé', 0 === $c12->compter_par_adresse( 'connexion@exemple.fr' ) );
 
 verdict();

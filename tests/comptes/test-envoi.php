@@ -284,7 +284,7 @@ check( '8 · la méthode ne reçoit QUE le destinataire', array( 'ancienne' ) ==
 // ======================================================================
 list( $ca1, $da1, $sa1, $tra1, $ea1, $ia1 ) = monter_envoi();
 
-$inscription = ( new Urbizen\Platform\Account\InscriptionService( $ca1, $sa1 ) )
+$inscription = ( new Urbizen\Platform\Account\InscriptionService( $ca1, $sa1, $da1 ) )
 	->inscrire( 'nouvelle-cliente@exemple.fr', 'motdepasse-long', $t );
 
 check( '11 · l\'inscription a préparé son émission',
@@ -318,7 +318,7 @@ check( '11 · l\'émission en attente est close',
 
 // Le chemin fautif, pour mémoire : repasser par `emettre()` échouerait.
 list( $cb1, $db1, $sb1, $trb1, $eb1, $ib1 ) = monter_envoi();
-$ins2 = ( new Urbizen\Platform\Account\InscriptionService( $cb1, $sb1 ) )
+$ins2 = ( new Urbizen\Platform\Account\InscriptionService( $cb1, $sb1, $db1 ) )
 	->inscrire( 'autre@exemple.fr', 'motdepasse-long', $t );
 
 check( '11 · REPASSER PAR emettre() serait refusé, et n\'enverrait rien',

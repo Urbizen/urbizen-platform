@@ -37,6 +37,26 @@ echecs=0
 # exécuté : le raccordement manquait.
 "$PHP_BIN" "$ICI/test-comptes-reel.php" || echecs=$(( echecs + 1 ))
 
+# Inscription concurrente (correctif 0.12.0) : course, propriétaire lent, mort
+# du propriétaire, unicité non prouvée — le verrou GET_LOCK et son fencing.
+"$PHP_BIN" "$ICI/test-inscription-concurrente.php" || echecs=$(( echecs + 1 ))
+
+# Reconnexion de wpdb : la connexion tenant le verrou meurt juste avant l'INSERT
+# ; sans section non reconnectable, wpdb rejoue l'écriture sans verrou (doublon).
+"$PHP_BIN" "$ICI/test-inscription-reconnexion.php" || echecs=$(( echecs + 1 ))
+
+# Les mutations du verrou et de la preuve d'unicité doivent faire tomber un
+# contrôle nommé : sans quoi le banc ci-dessus serait aveugle.
+bash "$ICI/test-inscription-mutations.sh" || echecs=$(( echecs + 1 ))
+
+# Mot de passe (12 caractères, pas octets) et adresse (100), authentification
+# WordPress réelle à la valeur exacte, aucun secret dans les journaux.
+"$PHP_BIN" "$ICI/test-mdp-adresse-reel.php" || echecs=$(( echecs + 1 ))
+
+# Vrai WP-CLI des comptes — status/install/verify, idempotence, surplus corrigé.
+# S'abstient sans la commande `wp`.
+bash "$ICI/wp-cli-comptes.sh" || echecs=$(( echecs + 1 ))
+
 # Parcours public des comptes (E2.2) en HTTP réel — anti-énumération comprise.
 # Il s'abstient de lui-même si URBIZEN_HTTP_BASE n'est pas fourni.
 "$PHP_BIN" "$ICI/test-comptes-http-reel.php" || echecs=$(( echecs + 1 ))

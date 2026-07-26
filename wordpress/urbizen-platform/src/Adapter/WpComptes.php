@@ -158,6 +158,27 @@ final class WpComptes implements ComptesGateway {
 	}
 
 	/**
+	 * Compte exactement les utilisateurs portant cette adresse.
+	 *
+	 * Requête directe : `get_user_by( 'email' )` ne renvoie que le premier, et
+	 * ne saurait donc révéler un doublon. `user_email` est comparé strictement.
+	 *
+	 * @param string $canonique Adresse canonique.
+	 * @return int
+	 */
+	public function compter_par_adresse( string $canonique ): int {
+		if ( '' === $canonique ) {
+			return 0;
+		}
+
+		global $wpdb;
+
+		return (int) $wpdb->get_var(
+			$wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->users} WHERE user_email = %s", $canonique )
+		);
+	}
+
+	/**
 	 * @param string $canonique Adresse canonique.
 	 * @param int    $sauf_id   Compte ignoré.
 	 * @return bool

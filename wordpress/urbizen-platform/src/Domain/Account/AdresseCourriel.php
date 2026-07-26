@@ -20,6 +20,7 @@
 namespace Urbizen\Platform\Domain\Account;
 
 use InvalidArgumentException;
+use Urbizen\Platform\Domain\Support\Texte;
 
 /**
  * Adresse valide et immuable.
@@ -27,12 +28,17 @@ use InvalidArgumentException;
 final class AdresseCourriel {
 
 	/**
-	 * Longueur maximale admise.
+	 * Longueur maximale admise, en **caractères**.
 	 *
-	 * La RFC 5321 borne la partie locale à 64 octets et le domaine à 255 ;
-	 * 254 est la limite pratique d'une adresse complète.
+	 * La RFC 5321 tolère jusqu'à 254 octets, mais le stockage d'Urbizen est
+	 * `wp_users.user_email`, un `VARCHAR(100)` : au-delà de 100 caractères,
+	 * WordPress **tronquerait** silencieusement l'adresse, et l'adresse relue
+	 * ne serait plus celle demandée. La plateforme refuse donc ce que son
+	 * stockage ne peut pas représenter fidèlement. Cette borne vaut pour
+	 * l'inscription **et** le changement d'adresse, qui construisent tous deux
+	 * cet objet.
 	 */
-	public const LONGUEUR_MAX = 254;
+	public const LONGUEUR_MAX = 100;
 
 	/**
 	 * @var string
@@ -78,7 +84,15 @@ final class AdresseCourriel {
 			return 'adresse_vide';
 		}
 
-		if ( strlen( $valeur ) > self::LONGUEUR_MAX ) {
+		// Un UTF-8 invalide n'est pas une adresse mesurable ni stockable. La
+		// mesure passe par {@see Texte}, en PCRE, sans dépendre de `mbstring`.
+		if ( ! Texte::est_utf8( $valeur ) ) {
+			return 'adresse_invalide';
+		}
+
+		// En CARACTÈRES : la borne vise la capacité de stockage (VARCHAR(100)),
+		// exprimée en caractères, pas en octets.
+		if ( ! Texte::au_plus( $valeur, self::LONGUEUR_MAX ) ) {
 			return 'adresse_trop_longue';
 		}
 

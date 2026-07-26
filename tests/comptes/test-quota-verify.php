@@ -100,6 +100,14 @@ final class PasserelleAlignante implements Urbizen\Platform\Schema\DatabaseGatew
 	public function derniere_erreur(): string {
 		return $this->inner->derniere_erreur();
 	}
+
+	public function interdire_reconnexion(): void {
+		$this->inner->interdire_reconnexion();
+	}
+
+	public function autoriser_reconnexion(): void {
+		$this->inner->autoriser_reconnexion();
+	}
 }
 
 $t = 1785000000;
