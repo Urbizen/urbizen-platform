@@ -299,10 +299,23 @@ manifeste() {
 refname() { printf '%s' "$1" | $HASHCMD | cut -c1-32; }   # nom sans collision
 # normaliser : neutralise les nonces (partout) et le paramètre ver= UNIQUEMENT
 # pour les ressources du plugin Urbizen. Tout autre ver= reste comparé.
+#
+# S'ajoutent DEUX éléments dynamiques constatés en production (juillet 2026), à
+# neutraliser mais NON à élargir : chacun doit d'abord être DÉMONTRÉ instable
+# entre deux captures du MÊME état (sinon on masquerait une régression réelle) —
+#   - l'horodatage du commentaire LiteSpeed « Page cached by LiteSpeed Cache… on
+#     <date> » : il change à chaque reconstruction de cache, sans rapport avec la
+#     version ;
+#   - les identifiants aléatoires de formulaire FluentForm, régénérés à chaque
+#     rendu : « checkbox_<hex> » et « ff_form_instance_<n>_<n> ».
+# Rien d'autre ne doit être neutralisé.
 normaliser() {
   sed -E \
     -e 's/(name="_w[a-z_]*nonce"[^>]*value=")[A-Za-z0-9]+"/\1NONCE"/g' \
-    -e 's#(wp-content/plugins/urbizen-platform/[^?" ]*\?ver=)[0-9A-Za-z._-]+#\1NORM#g'
+    -e 's#(wp-content/plugins/urbizen-platform/[^?" ]*\?ver=)[0-9A-Za-z._-]+#\1NORM#g' \
+    -e 's#(Page cached by LiteSpeed Cache [0-9.]+ on )[^>]*-->#\1TS -->#g' \
+    -e 's/checkbox_[a-f0-9]{6,}/checkbox_FFID/g' \
+    -e 's/(ff_form_instance_[0-9]+_)[0-9]+/\1N/g'
 }
 # res_norm : idem, appliqué à une liste de ressources (une URL par ligne).
 res_norm() { sed -E 's#(wp-content/plugins/urbizen-platform/[^?" ]*\?ver=)[0-9A-Za-z._-]+#\1NORM#g'; }
@@ -583,7 +596,25 @@ if [ -r "/proc/$pid/cmdline" ]; then
     || { echo "ARRÊT : PID $pid n'est pas le mainteneur attendu"; ~/.urbz-deploy/maint-off; exit 1; }
 fi
 echo "mainteneur vivant et identifié (pid $pid)"
-WP litespeed-purge all 2>/dev/null || WP cache flush
+# PURGE OBLIGATOIRE, ici, AVANT le contrôle du 503 (leçon du déploiement réel de
+# juillet 2026). Un cache LiteSpeed CHAUD continue de servir un ancien HTTP 200
+# depuis le cache, court-circuitant PHP, MALGRÉ la présence de .maintenance : le
+# 503 externe ne peut alors jamais être confirmé. On purge donc le cache pour
+# que les requêtes suivantes atteignent PHP (→ 503).
+#
+# Le succès se juge sur le CODE DE SORTIE de la commande, JAMAIS sur le texte de
+# sa sortie (langue, version et formulation varient ; « purge » peut apparaître
+# dans un message d'erreur, ou une réussite être muette). La sortie complète est
+# conservée hors racine web, à seule fin de diagnostic. AUCUN repli sur le vidage
+# du cache objet générique de WordPress : il ne prouve rien du cache de PAGE
+# LiteSpeed. Le code 0 ne suffit pas : le 503 externe (bloc suivant) reste exigé.
+PURGE_LOG="$R_STORE/litespeed-purge-$TS.out"
+if ! ( umask 077; WP litespeed-purge all >"$PURGE_LOG" 2>&1 ); then
+  echo "ARRÊT : la purge LiteSpeed a échoué — détail conservé hors racine web"
+  ~/.urbz-deploy/maint-off
+  exit 1
+fi
+echo "commande de purge LiteSpeed réussie (le 503 externe reste à confirmer)"
 ```
 
 ```bash
