@@ -3,10 +3,10 @@
  * La connexion à la base a été perdue pendant une section critique.
  *
  * Levée lorsque la passerelle est en mode « sans reconnexion » et qu'une
- * requête tombe parce que le serveur MySQL est parti. C'est le signal qu'une
- * écriture **n'a pas** pu être rejouée sur une nouvelle connexion — donc qu'elle
- * n'a pas eu lieu — et que l'appelant doit échouer de façon restrictive plutôt
- * que de poursuivre sans le verrou qu'il croyait tenir.
+ * requête tombe parce que le serveur MySQL est parti. La requête n'a pas pu être
+ * rejouée sur une nouvelle connexion. Le résultat de la tentative initiale peut
+ * être inconnu ; l'appelant doit donc échouer de façon restrictive et permettre
+ * une récupération ultérieure.
  *
  * @package Urbizen\Platform\Schema
  */

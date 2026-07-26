@@ -7,27 +7,30 @@
  * simultanées peuvent toutes deux constater l'absence avant d'insérer, et créer
  * deux utilisateurs pour la même boîte. Ce verrou ferme cette course.
  *
- * **Pourquoi un verrou consultatif de la base, et non un bail à échéance.** Une
- * option horodatée avec un TTL est un *bail sans fencing* : si le propriétaire
- * est suspendu au-delà de l'échéance, un second processus reprend le verrou
- * expiré, constate l'adresse libre, et **les deux** peuvent créer un compte —
- * la reprise par compare-et-échange protège le verrou, pas la section critique
- * de l'ancien propriétaire. `GET_LOCK()` n'a pas d'échéance : il tient tant que
- * la **connexion** qui l'a pris vit, et se libère **de lui-même** dès qu'elle
- * meurt. Il n'existe donc aucune fenêtre à deux propriétaires : ou bien le
- * premier vit et tient (le second attend, puis échoue), ou bien il est mort et
- * ne peut plus rien écrire sur une connexion fermée.
+ * **`GET_LOCK()` seul ne suffit PAS ; la garantie repose sur un ensemble.** Un
+ * verrou consultatif est lié à la connexion : si celle-ci meurt, il se libère.
+ * Mais `wpdb` reconnecte et **rejoue** silencieusement l'écriture sur une
+ * connexion neuve, qui ne tient plus le verrou — deux inscriptions pourraient
+ * encore aboutir. L'exclusion n'est réelle que par la conjonction de quatre
+ * conditions, dont aucune n'est facultative :
  *
- * Trois conditions rendent ce fencing réel :
- *
+ * - **`GET_LOCK()` lié à la connexion** — pas d'échéance, donc pas de fenêtre à
+ *   deux propriétaires par expiration d'un bail comme avec un TTL ;
  * - **une seule connexion** pour l'acquisition, la recherche, la création et la
- *   libération — c'est le cas : `$wpdb` n'ouvre qu'une connexion par requête, et
+ *   libération — `$wpdb` n'ouvre qu'une connexion par requête, et
  *   `wp_insert_user()` comme cette passerelle passent par elle ;
- * - **un nom qui ne révèle pas l'adresse** — HMAC de l'adresse canonique avec le
- *   secret du site, tronqué sous la limite du moteur (64 caractères). Le secret
- *   sert aussi de cloison : deux sites sur le même serveur MySQL, où les noms de
- *   `GET_LOCK()` sont **globaux au serveur**, ne se marchent pas dessus ;
- * - **une attente bornée** à l'acquisition, jamais infinie.
+ * - **désactivation temporaire de la reconnexion et du rejeu de `wpdb`**
+ *   pendant la section critique ({@see DatabaseGateway::interdire_reconnexion()})
+ *   — sans quoi une écriture serait rejouée sur une connexion sans verrou ;
+ * - **échec restrictif si la connexion est perdue** — la tentative lève
+ *   {@see \Urbizen\Platform\Schema\ConnexionPerdue}, aucun jeton n'est émis, et
+ *   la demande reste récupérable.
+ *
+ * Le nom du verrou, lui, ne révèle pas l'adresse : HMAC de l'adresse canonique
+ * avec le secret du site, tronqué sous la limite du moteur (64 caractères). Le
+ * secret sert aussi de cloison entre deux sites d'un même serveur MySQL, où les
+ * noms de `GET_LOCK()` sont **globaux au serveur**. L'attente à l'acquisition est
+ * bornée, jamais infinie.
  *
  * @package Urbizen\Platform\Account
  */
