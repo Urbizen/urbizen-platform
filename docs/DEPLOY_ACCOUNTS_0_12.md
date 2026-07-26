@@ -12,10 +12,15 @@ par un **arrêt de sécurité** : si un contrôle échoue, on n'enchaîne pas.
 
 | Élément | Valeur |
 |---|---|
-| Commit de fusion `main` | `16806fa9f87e492672ddfc9bbd0e3fee1ad76625` |
-| Arbre Git du plugin 0.12.0 | `2230fbb9fde3f6c25e367c60a7b0c800199304a4` |
+| Commit `main` (0.12.0, **PR #40 comprise**) | `336b5c3c7c569213ca2c39e7a38417639b477e0f` |
+| Arbre Git du plugin 0.12.0 (à `336b5c3`) | `f4ee10b3de7384449a324c033be6f42a76adaa0c` |
 | Arbre Git du plugin 0.10.0 (à `6bad17d`) | `01cd84ae5c18c8d9a7b9703a662fa7eb0aa7e00a` |
 | Production, dernière constatée | `0.10.0` — **non revérifiée** |
+
+> La 0.12.0 déployée est celle de `main` **après fusion de la PR #40** (fencing de
+> l'inscription : verrou d'exclusion + section `wpdb` non reconnectable). L'arbre
+> du plugin diffère donc de la 0.12.0 d'origine (`2230fbb9…`) : l'artefact est
+> construit depuis `336b5c3`, arbre `f4ee10b3…`.
 
 Variables d'environnement de l'opérateur (jamais versionnées, voir
 [AI_CONTEXT.md](AI_CONTEXT.md)) : `SSH_USER`, `SSH_HOST`, `SSH_PORT`, `WP_ROOT`,
@@ -367,6 +372,65 @@ stat -c '%i %s' -- "$PHPLOG" > "$R_STORE/phplog-ref.txt"
 echo "phase 1a OK"
 ```
 
+### 1a-bis — (serveur) architecture de connexion et verrou consultatif (**bloquant**)
+
+Le fencing du code fusionné (PR #40) **ne repose pas sur `GET_LOCK()` seul**. La
+sûreté vient d'un **ensemble** : verrou consultatif lié à la connexion, **même
+connexion** pendant la section critique, et **désactivation temporaire de la
+reconnexion/rejeu de `wpdb`** (sans quoi une écriture serait rejouée sur une
+connexion neuve, sans verrou). Cet ensemble suppose un **`wpdb` standard** et une
+connexion non scindée. Un intergiciel qui scinderait ou multiplexerait les
+connexions — HyperDB, LudicrousDB, tout **drop-in `db.php`** — invaliderait
+l'hypothèse : on **refuse alors de déployer**.
+
+```bash
+# (serveur)
+source ~/.urbz-deploy/common.sh
+
+# (1) wpdb STANDARD : classe exacte « wpdb », aucun drop-in db.php, aucune
+#     connexion scindée. Toute autre configuration = arrêt (hypothèse non prouvée).
+WP eval '
+  $c      = get_class($GLOBALS["wpdb"]);
+  $dropin = defined("WP_CONTENT_DIR") && file_exists(WP_CONTENT_DIR . "/db.php");
+  $split  = class_exists("hyperdb", false) || class_exists("HyperDB", false)
+         || class_exists("LudicrousDB", false) || class_exists("ludicrousdb", false);
+  if ("wpdb" !== $c || $dropin || $split) {
+    fwrite(STDERR, sprintf("ARRET : wpdb non standard (classe %s, db.php %s%s)\n",
+      $c, $dropin ? "present" : "absent", $split ? ", intergiciel de connexion detecte" : ""));
+    exit(1);
+  }
+  echo "wpdb standard : aucun drop-in db.php, aucune connexion scindee\n";
+' || { echo "ARRÊT : architecture de connexion non prouvée — pas de déploiement"; exit 1; }
+
+# (2) Sonde RÉELLE du moteur, MÊME connexion, nom ALÉATOIRE sans donnée
+#     personnelle. GET_LOCK doit rendre exactement 1, RELEASE_LOCK exactement 1.
+#     La libération est tentée dans un mécanisme de nettoyage. Tout autre
+#     résultat ARRÊTE avant toute mutation.
+#
+#     Rappel : cette sonde prouve la DISPONIBILITÉ de GET_LOCK, pas le fencing.
+#     Le fencing est assuré par la section wpdb non reconnectable du code.
+WP eval '
+  global $wpdb;
+  $nom  = "urbz_sonde_" . bin2hex(random_bytes(8));   // aléatoire, aucune adresse
+  $pris = null; $rel = null;
+  try {
+    $pris = $wpdb->get_var($wpdb->prepare("SELECT GET_LOCK(%s, %d)", $nom, 0));
+    if ("1" !== $pris) { throw new RuntimeException("GET_LOCK a rendu " . var_export($pris, true)); }
+    $rel = $wpdb->get_var($wpdb->prepare("SELECT RELEASE_LOCK(%s)", $nom));
+    if ("1" !== $rel) { throw new RuntimeException("RELEASE_LOCK a rendu " . var_export($rel, true)); }
+    echo "sonde GET_LOCK/RELEASE_LOCK : 1 / 1\n";
+  } catch (\Throwable $e) {
+    if ("1" === $pris && "1" !== $rel) {                // nettoyage : on retente la libération
+      $wpdb->get_var($wpdb->prepare("SELECT RELEASE_LOCK(%s)", $nom));
+    }
+    fwrite(STDERR, "ARRET : sonde de verrou consultatif — " . $e->getMessage() . "\n");
+    exit(1);
+  }
+' || { echo "ARRÊT : GET_LOCK/RELEASE_LOCK indisponible ou anormal — moteur/intergiciel incompatible"; exit 1; }
+
+echo "phase 1a-bis OK : wpdb standard, sonde 1/1"
+```
+
 ### 1b — (local)
 
 ```bash
@@ -399,7 +463,9 @@ echo "phase 1b OK"
 ```
 
 **Arrêts (bloquants) :** extension inactive · version ≠ 0.10.0 · WP ≠ 7.0.2 · PHP ≠
-8.3.x · rôle présent · page à shortcode · dérive du plugin.
+8.3.x · rôle présent · page à shortcode · dérive du plugin · **`wpdb` non standard
+ou connexion scindée (HyperDB/LudicrousDB/`db.php`)** · **sonde
+`GET_LOCK`/`RELEASE_LOCK` ≠ 1/1**.
 
 ---
 
@@ -459,11 +525,11 @@ echo "phase 2 OK"
 ```bash
 # (local)
 source ~/.urbz-deploy-local/common.sh
-git rev-parse '16806fa9f87e492672ddfc9bbd0e3fee1ad76625:wordpress/urbizen-platform' \
-  | grep -qx '2230fbb9fde3f6c25e367c60a7b0c800199304a4' \
-  || { echo "ARRÊT : arbre du plugin ≠ 2230fbb9…"; exit 1; }
+git rev-parse '336b5c3c7c569213ca2c39e7a38417639b477e0f:wordpress/urbizen-platform' \
+  | grep -qx 'f4ee10b3de7384449a324c033be6f42a76adaa0c' \
+  || { echo "ARRÊT : arbre du plugin ≠ f4ee10b3… (0.12.0 PR #40 comprise)"; exit 1; }
 L_ART="$(mktemp -d "${TMPDIR:-/tmp}/urbz-art.XXXXXX")"
-git archive '16806fa9f87e492672ddfc9bbd0e3fee1ad76625:wordpress/urbizen-platform' | tar -x -C "$L_ART"
+git archive '336b5c3c7c569213ca2c39e7a38417639b477e0f:wordpress/urbizen-platform' | tar -x -C "$L_ART"
 manifeste "$L_ART" > "$L_REF/artefact.manifeste.local.txt"
 tar -C "$L_ART" -cf - . | SSH '~/.urbz-deploy/put-artefact'
 SSH '~/.urbz-deploy/put artefact.manifeste.local.txt' < "$L_REF/artefact.manifeste.local.txt"
@@ -605,16 +671,26 @@ source ~/.urbz-deploy/common.sh
 [ "$(WP plugin get urbizen-platform --field=version)" = "0.12.0" ] \
   || { echo "ARRÊT : version active ≠ 0.12.0"; exit 1; }
 
-WP urbizen accounts status
-WP urbizen accounts install                          # SEUL point d'entrée du rôle
-WP urbizen accounts verify || { echo "ARRÊT : verify en échec"; exit 1; }
+# La disponibilité des sous-commandes se prouve par leur EXÉCUTION RÉELLE, jamais
+# par `wp cli has-command` : la famille `wp cli` s'exécute AVANT le chargement de
+# WordPress, donc avant l'enregistrement des commandes du plugin — elle n'est pas
+# une preuve fiable pour celles-ci. Chaque exécution ci-dessous est bloquante :
+# commande inconnue, fatal PHP ou code non nul ⇒ ARRÊT sous maintenance, avant
+# toute réouverture. Le nom EXACT est « quota_verify » (souligné), pas « -verify ».
+WP urbizen accounts status \
+  || { echo "ARRÊT : accounts status indisponible ou en échec"; exit 1; }
+WP urbizen accounts install \
+  || { echo "ARRÊT : accounts install indisponible ou en échec"; exit 1; }   # SEUL point d'entrée du rôle
+WP urbizen accounts verify \
+  || { echo "ARRÊT : accounts verify indisponible ou en échec"; exit 1; }
 
-# quota-verify : code non nul ⇒ ARRÊT IMMÉDIAT sous maintenance. Sortie capturée
-# hors racine web, seuls les agrégats reportés (jamais les « compte <ID> »).
-QV="$R_STORE/quota-verify-$TS.out"
-if ! ( umask 077; WP urbizen accounts quota-verify > "$QV" 2>&1 ); then
+# quota_verify : code non nul (commande inconnue comprise) ⇒ ARRÊT IMMÉDIAT sous
+# maintenance. Sortie capturée hors racine web, seuls les agrégats reportés
+# (jamais les « compte <ID> »).
+QV="$R_STORE/quota_verify-$TS.out"
+if ! ( umask 077; WP urbizen accounts quota_verify > "$QV" 2>&1 ); then
   grep -E '^(comptes examinés|miroirs divergents|sources illisibles)' "$QV" || true
-  echo "ARRÊT : quota-verify signale une divergence (détail hors racine web, non recopié)"; exit 1
+  echo "ARRÊT : quota_verify signale une divergence (détail hors racine web, non recopié)"; exit 1
 fi
 grep -E '^(comptes examinés|miroirs divergents|sources illisibles)' "$QV" || true
 echo "phase 5 OK"
@@ -854,10 +930,11 @@ echo "sauvegardes conservées sous : $R_STORE"
 |---|---|
 | 0 | aucun emplacement hors racine web (canonique, sans lien) sur le même volume ; chemin non absolu ; `setsid`/`nohup` absents ; journal PHP illisible ; état local préexistant |
 | 1 | extension inactive ; version ≠ 0.10.0 ; WP ≠ 7.0.2 ; PHP ≠ 8.3.x ; rôle présent ; page à shortcode ; dérive du plugin |
+| 1a-bis | `wpdb` non standard, drop-in `db.php` ou connexion scindée (HyperDB/LudicrousDB) ; sonde `GET_LOCK`/`RELEASE_LOCK` ≠ `1`/`1` |
 | 2 | sauvegarde vide, `mysqldump`/`gzip -t` en échec (pipefail), empreinte non revérifiée, inventaire illisible |
-| 3 | arbre ≠ `2230fbb9…`, manifeste divergent, erreur `php -l` |
+| 3 | arbre ≠ `f4ee10b3…` (0.12.0 PR #40 comprise), manifeste divergent, erreur `php -l` |
 | 4 | volume différent (avant `maint-on`) ; mainteneur mort/non identifié ; 503 non confirmé (levée immédiate) ; renommage 1 refusé (0.10.0 intacte) ; renommage 2 refusé (0.10.0 restaurée et vérifiée) — levée seulement si 0.10.0 active |
-| 5 | `verify` en échec, ou `quota-verify` de code non nul → arrêt immédiat sous maintenance |
+| 5 | l'**exécution** de `urbizen accounts status`, `install`, `verify` ou `quota_verify` échoue (commande inconnue, fatal PHP ou code non nul) → arrêt immédiat sous maintenance |
 | 6 | hook `nopriv` interdit, capacité ≠ `read`, **nouvelle** table ou `{prefixe}urbizen_*` |
 | 7 | page/ressource/en-tête modifiés, résultat ≠ 200, **nouvelle erreur PHP**, journal disparu/roté/tronqué → maintenance ré-armée |
 | 8 | arbre restauré ≠ 0.10.0, utilisateur portant le rôle, ou accueil non conforme après levée → maintenance (ré)armée |
