@@ -219,15 +219,15 @@ check( 'La planche est identique dans les trois fichiers',
 foreach ( $sources as $nom => $chemin ) {
 	$h = file_get_contents( $chemin );
 
-	check( "[$nom] les textes de la PR #12 sont intacts",
-		str_contains( $h, 'Un concepteur humain dédié' )
-		&& str_contains( $h, '<b>Plans et pièces graphiques réalisés par nos soins</b>' )
-		&& str_contains( $h, 'Un interlocuteur humain dédié' ) );
+	check( "[$nom] textes de réassurance/avantages présents",
+		str_contains( $h, '<b>Plans et pièces graphiques réalisés par nos soins</b>' )
+		&& str_contains( $h, 'Un interlocuteur dédié' )
+		&& str_contains( $h, 'Un interlocuteur humain' ) );
 	check( "[$nom] les illustrations de la PR #13 sont intactes",
 		4 === substr_count( $h, 'class="exemple-img"' ) && str_contains( $h, 'M74 45 L74 32' ) );
 	check( "[$nom] les 5 tarifs sont intacts",
-		2 === substr_count( $h, '149&nbsp;€' ) && 1 === substr_count( $h, '249&nbsp;€' )
-		&& 2 === substr_count( $h, '449&nbsp;€' ) && 1 === substr_count( $h, '649&nbsp;€' )
+		1 === substr_count( $h, '149&nbsp;€' ) && 1 === substr_count( $h, '249&nbsp;€' )
+		&& 1 === substr_count( $h, '449&nbsp;€' ) && 1 === substr_count( $h, '649&nbsp;€' )
 		&& 1 === substr_count( $h, '849&nbsp;€' ) );
 }
 

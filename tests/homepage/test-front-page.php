@@ -81,6 +81,29 @@ check( 'front-page : bloc urbizen/cadastre présent',
 check( 'front-page : bloc cadastre avec storageKey « accueil »',
 	(bool) preg_match( '/<!-- wp:urbizen\/cadastre \{[^}]*"storageKey":"accueil"[^}]*\} \/-->/', $front ) );
 
+// ------------------------------------------- contenu de l'accueil (mission) ---
+check( 'front-page : bande de réassurance unique',
+	1 === substr_count( $front, 'class="trust"' ) );
+check( 'front-page : panneau « Espace Urbizen » présent une seule fois',
+	1 === substr_count( $front, 'class="espace-band"' ) );
+check( 'front-page : SVG animé du hero — quatre tracés hp-draw',
+	4 === substr_count( $front, 'hp-draw' ) );
+check( 'front-page : huit mini-illustrations de pièces du dossier',
+	8 === substr_count( $front, 'class="planche-fig"' ) );
+check( 'front-page : carte CERFA mise en avant, statut honnête',
+	str_contains( $front, 'parcours-card featured' ) && str_contains( $front, 'Votre CERFA, gratuitement' ) );
+
+$css_accueil = file_get_contents( $theme . '/assets/css/urbizen-homepage.css' );
+$css_source  = file_get_contents( dirname( __DIR__, 2 ) . '/frontend/homepage/homepage.css' );
+check( 'CSS : quadrillage clair de la charte (--u-grid-bg), jamais #C2D0DE ni --u-grid-line',
+	str_contains( $css_accueil, 'var(--u-grid-bg)' )
+	&& ! preg_match( '/:\s*#C2D0DE/i', $css_accueil )
+	&& ! str_contains( $css_accueil, '--u-grid-line' ) );
+check( 'CSS : aucun quadrillage global imposé au wrapper .urbizen-accueil',
+	! (bool) preg_match( '/\.urbizen-accueil\s*\{[^}]*linear-gradient/s', $css_accueil ) );
+check( 'CSS : aucun !important ajouté par rapport à la source',
+	substr_count( $css_accueil, '!important' ) === substr_count( $css_source, '!important' ) );
+
 // ------------------------------------------------- pas de contenu ancien ---
 // Le gabarit parent rendait <!-- wp:post-content /-->, c'est-à-dire les
 // 106 Ko de blocs Gutenberg historiques de la page 4. Le nôtre ne doit rien

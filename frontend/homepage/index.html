@@ -88,11 +88,52 @@
       <a href="#faq">Questions fréquentes</a>
     </nav>
     <div class="nav-right">
-      <a class="link-login" href="#" title="Espace client — bientôt disponible">Se connecter</a>
+      <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.5 21a13.5 13.5 0 0 1-12.5-12.5A2 2 0 0 1 5 6.4h2.2a1.4 1.4 0 0 1 1.4 1.2c.1.9.3 1.8.6 2.6a1.4 1.4 0 0 1-.32 1.5l-1 1a11 11 0 0 0 4.9 4.9l1-1a1.4 1.4 0 0 1 1.5-.32c.8.3 1.7.5 2.6.6a1.4 1.4 0 0 1 1.2 1.42V19a2 2 0 0 1-2.1 2z"/></svg>
+      </button>
+      <button type="button" class="icon-btn link-login" aria-label="Espace client (bientôt disponible)" title="Espace client — bientôt disponible" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
+      </button>
       <a class="btn btn-primary btn-sm js-start" href="#localisation">Démarrer mon projet</a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
+    </div>
+  </div>
+  <div id="contact-panel" class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contact-panel-title" hidden>
+    <div class="contact-panel-inner">
+      <div class="contact-head">
+        <h2 id="contact-panel-title">Parlons de votre projet</h2>
+        <button type="button" class="contact-close" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <ul class="contact-channels">
+        <li class="contact-ch">
+          <a class="contact-ch-link" href="tel:+33664895815">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 21a13.5 13.5 0 0 1-12.5-12.5A2 2 0 0 1 5 6.4h2.2a1.4 1.4 0 0 1 1.4 1.2c.1.9.3 1.8.6 2.6a1.4 1.4 0 0 1-.32 1.5l-1 1a11 11 0 0 0 4.9 4.9l1-1a1.4 1.4 0 0 1 1.5-.32c.8.3 1.7.5 2.6.6a1.4 1.4 0 0 1 1.2 1.42V19a2 2 0 0 1-2.1 2z"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Appeler maintenant</span><span class="contact-ch-sub">+33 6 64 89 58 15</span></span>
+          </a>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Réserver un appel</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Demander à être rappelé</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
   <div id="mmenu" class="mmenu" hidden>
@@ -103,7 +144,6 @@
       <a href="#methode">Comment ça marche</a>
       <a href="#tarifs">Tarifs</a>
       <a href="#faq">Questions fréquentes</a>
-      <a href="#" class="link-login">Se connecter</a>
       <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
     </div>
   </div>
@@ -115,17 +155,19 @@
 <section class="hero" id="accueil">
   <div class="wrap hero-grid">
     <div class="hero-text">
-      <span class="eyebrow">Dossiers d'urbanisme à distance</span>
-      <h1>Votre dossier d'urbanisme, préparé de A à Z.</h1>
-      <p class="lead">Déclaration préalable, permis de construire, plans et documents administratifs réalisés à distance par Urbizen.</p>
+      <span class="eyebrow">Plateforme d'urbanisme en ligne</span>
+      <h1>Vos démarches d'urbanisme, simplement et entièrement en ligne.</h1>
+      <p class="lead">Déclaration préalable, permis de construire ou conception de plans&nbsp;: Urbizen prépare votre dossier à distance et vous accompagne à chaque étape.</p>
+      <p class="hero-note">Le remplissage gratuit de votre CERFA et les espaces client et professionnel arrivent prochainement sur la plateforme.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
-        <a class="btn btn-ghost" href="#prestations">Découvrir nos prestations</a>
+        <a class="btn btn-primary js-start" href="#localisation">Confier mon projet à Urbizen</a>
+        <a class="btn btn-ghost" href="#services">Découvrir les services</a>
       </div>
+      <p class="hero-soon"><span class="soon-badge">Bientôt disponible</span> CERFA gratuit</p>
       <ul class="hero-reassure">
-        <li>Dossier complet</li>
-        <li>Un concepteur humain dédié</li>
-        <li><b>Service 100&nbsp;% à distance</b></li>
+        <li>Service 100&nbsp;% à distance</li>
+        <li>Accompagnement humain</li>
+        <li><b>Dossier adapté à votre projet</b></li>
       </ul>
     </div>
 
@@ -212,13 +254,46 @@
   </div>
 </div>
 
+<!-- ===== Trois parcours ===== -->
+<section class="parcours" id="parcours">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Trois parcours</span>
+      <h2>Un parcours adapté à votre besoin</h2>
+    </div>
+    <div class="parcours-grid">
+      <article class="parcours-card">
+        <span class="parcours-k">Particulier</span>
+        <h3>Je prépare mon projet</h3>
+        <p>Piscine, extension, garage, pergola, façade, toiture ou maison individuelle.</p>
+        <a class="btn btn-ghost btn-sm" href="#services">Découvrir les prestations</a>
+      </article>
+      <article class="parcours-card">
+        <span class="parcours-k">Professionnel</span>
+        <h3>Je gère des dossiers clients</h3>
+        <p>Un futur espace pour centraliser vos commandes, documents et échanges.</p>
+        <span class="soon-badge">Bientôt disponible</span>
+      </article>
+      <article class="parcours-card featured">
+        <div class="parcours-top">
+          <span class="parcours-k">CERFA gratuit</span>
+          <span class="soon-badge">Bientôt disponible</span>
+        </div>
+        <h3>Votre CERFA, gratuitement</h3>
+        <p>Bientôt, un parcours guidé pour compléter et télécharger gratuitement votre formulaire administratif.</p>
+        <span class="parcours-fig" aria-hidden="true"><svg viewBox="0 0 92 64" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="4" width="52" height="56" rx="2.5" fill="#fff" stroke="currentColor" stroke-width="1.4"/><path d="M27 13 H57" stroke="#128A5A" stroke-width="2"/><rect x="27" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="42" width="7.5" height="7.5" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M28.6 45.8 L30.8 48 L33.9 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M39 46 H65" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="52" width="7.5" height="7.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M39 56 H65" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="72" cy="12" r="7" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M69 12 L71.4 14.4 L75.2 10.4" stroke="#128A5A" stroke-width="1.4" fill="none"/></svg></span>
+      </article>
+    </div>
+  </div>
+</section>
+
 <!-- ===== Section 3 — Localisation cadastrale (interaction principale) ===== -->
 <section class="locate" id="localisation">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Étape 1</span>
-      <h2>Je renseigne l'adresse de mon projet</h2>
-      <p>Nous localisons votre terrain et retrouvons votre parcelle cadastrale.</p>
+      <h2>Commencez par localiser votre projet</h2>
+      <p>Indiquez l'adresse du terrain pour retrouver la parcelle cadastrale et préparer les premières informations de votre dossier.</p>
     </div>
     <div class="locate-card">
       <!-- Le composant partagé se monte ici -->
@@ -259,13 +334,13 @@
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Comment ça marche</span>
-      <h2>Quatre étapes, à distance</h2>
+      <h2>Votre dossier en quatre étapes</h2>
     </div>
     <ol class="steps">
       <li class="step"><span class="step-n">01</span><h3>Vous décrivez votre projet</h3><p>Adresse, dimensions, photos et caractéristiques.</p></li>
-      <li class="step"><span class="step-n">02</span><h3>Nous préparons le dossier</h3><p>Formulaire, plans, notice, insertion et pièces nécessaires.</p></li>
-      <li class="step"><span class="step-n">03</span><h3>Vous vérifiez</h3><p>Le dossier vous est transmis pour validation.</p></li>
-      <li class="step"><span class="step-n">04</span><h3>Vous déposez</h3><p>Vous recevez un dossier prêt à transmettre à la mairie.</p></li>
+      <li class="step"><span class="step-n">02</span><h3>Vous transmettez les documents disponibles</h3><p>Photos de l'existant, croquis, matériaux et informations utiles.</p></li>
+      <li class="step"><span class="step-n">03</span><h3>Urbizen prépare et vérifie votre dossier</h3><p>Formulaire, plans, notice, insertion et pièces nécessaires.</p></li>
+      <li class="step"><span class="step-n">04</span><h3>Vous recevez les documents prêts à être déposés</h3><p>Un dossier clair et structuré, prêt à transmettre à la mairie.</p></li>
     </ol>
   </div>
 </section>
@@ -279,43 +354,53 @@
       <p>Les pièces sont adaptées à la nature de chaque projet et aux exigences applicables.</p>
     </div>
     <div class="planche">
-      <div class="planche-item"><span class="code">DP1 · PCMI1</span><span class="planche-t">Plan de situation</span></div>
-      <div class="planche-item"><span class="code">DP2 · PCMI2</span><span class="planche-t">Plan de masse</span></div>
-      <div class="planche-item"><span class="code">DP3 · PCMI3</span><span class="planche-t">Plan en coupe</span></div>
-      <div class="planche-item"><span class="code">DP4 · PCMI5</span><span class="planche-t">Façades &amp; toitures</span></div>
-      <div class="planche-item"><span class="code">DP6 · PCMI6</span><span class="planche-t">Insertion graphique</span></div>
-      <div class="planche-item"><span class="code">PCMI4</span><span class="planche-t">Notice descriptive</span></div>
-      <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span></div>
-      <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span></div>
+      <div class="planche-item"><span class="code">DP1 · PCMI1</span><span class="planche-t">Plan de situation</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 42 L92 28" stroke="currentColor" stroke-width="1.3" opacity=".55"/><path d="M36 64 L50 6" stroke="currentColor" stroke-width="1.3" opacity=".55"/><rect x="56" y="30" width="26" height="20" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M18 16 a8 8 0 1 1 16 0 c0 7 -8 15 -8 15 c0 0 -8 -8 -8 -15 z" fill="#54CF99" stroke="#14233B" stroke-width="1.2"/><circle cx="26" cy="16" r="2.6" fill="#fff"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP2 · PCMI2</span><span class="planche-t">Plan de masse</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3" opacity=".7"/><rect x="20" y="22" width="32" height="24" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.5"/><path d="M52 40 L72 40 L72 59" stroke="currentColor" stroke-width="1.2" opacity=".65"/><circle cx="70" cy="18" r="6" fill="none" stroke="#54CF99" stroke-width="1.5"/><path d="M70 24 L70 30" stroke="currentColor" stroke-width="1.2" opacity=".65"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP3 · PCMI3</span><span class="planche-t">Plan en coupe</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 48 L90 48" stroke="currentColor" stroke-width="1.5"/><path d="M8 53 L12 48 M18 53 L22 48 M28 53 L32 48 M38 53 L42 48 M48 53 L52 48 M58 53 L62 48 M68 53 L72 48 M78 53 L82 48" stroke="currentColor" stroke-width="1" opacity=".45"/><path d="M36 48 L36 28 L62 28 L62 48" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M31 28 L49 15 L67 28 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M22 15 L22 48" stroke="#54CF99" stroke-width="1.3"/><path d="M19 18 L22 15 L25 18 M19 45 L22 48 L25 45" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP4 · PCMI5</span><span class="planche-t">Façades &amp; toitures</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 56 L18 30 L47 13 L76 30 L76 56 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M14 32 L47 13 L80 32" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><rect x="30" y="40" width="13" height="16" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="52" y="38" width="13" height="11" fill="#54CF99" fill-opacity=".25" stroke="currentColor" stroke-width="1.3"/><path d="M58.5 38 L58.5 49 M52 43.5 L65 43.5" stroke="currentColor" stroke-width="1"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP6 · PCMI6</span><span class="planche-t">Insertion graphique</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="15" r="6" fill="none" stroke="#54CF99" stroke-width="1.2" opacity=".7"/><path d="M2 52 L92 52" stroke="currentColor" stroke-width="1.4"/><path d="M2 52 q22 -7 46 -5 q26 2 44 -3" fill="none" stroke="#128A5A" stroke-width="1.2" opacity=".55"/><path d="M30 52 L30 33 L45 23 L60 33 L60 52 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M30 33 L45 23 L60 33" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.3"/><rect x="40" y="42" width="9" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="76" cy="40" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.3"/><path d="M76 48 L76 52" stroke="currentColor" stroke-width="1.3"/></svg></span></div>
+      <div class="planche-item"><span class="code">PCMI4</span><span class="planche-t">Notice descriptive</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="4" width="46" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><rect x="30" y="10" width="24" height="8" fill="#E4F5EC" stroke="#128A5A" stroke-width="1"/><path d="M30 27 H64 M30 33 H64 M30 39 H58 M30 45 H64 M30 51 H52" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="58" cy="51" r="4.5" fill="none" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
+      <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="4" width="50" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M28 13 H66" stroke="#128A5A" stroke-width="1.8"/><rect x="28" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="42" width="7" height="7" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M29.5 45.6 L31.5 47.6 L34.5 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M40 46 H66" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="52" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M40 56 H66" stroke="currentColor" stroke-width="1" opacity=".55"/></svg></span></div>
+      <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="6" width="58" height="54" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M25 17 L27.5 19.5 L32 14.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 17 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 28 L27.5 30.5 L32 25.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 28 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 39 L27.5 41.5 L32 36.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 39 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 50 L27.5 52.5 L32 47.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 50 H63" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg></span></div>
     </div>
   </div>
 </section>
 
 <!-- ===== Section 7 — Prestations + tarifs réels ===== -->
-<section class="prestations" id="prestations">
+<section class="prestations" id="services">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Nos prestations</span>
-      <h2>Trois parcours selon votre projet</h2>
+      <span class="eyebrow">Nos services</span>
+      <h2>Ce qu'Urbizen prépare pour vous</h2>
     </div>
-    <div class="presta-grid">
+    <div class="presta-grid presta-grid-4">
       <article class="presta">
         <h3>Déclaration préalable</h3>
-        <p>Pour les projets tels que piscine, extension, garage, abri, pergola, façade, toiture ou panneaux solaires.</p>
-        <p class="presta-price">À partir de <b>149&nbsp;€</b></p>
+        <p>Dossier adapté à votre projet avec les plans, documents et pièces nécessaires.</p>
         <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/declarations-prealables/">Découvrir la déclaration préalable</a>
       </article>
       <article class="presta featured">
         <h3>Permis de construire</h3>
-        <p>Pour une maison individuelle ou les projets nécessitant une autorisation plus importante.</p>
-        <p class="presta-price">À partir de <b>449&nbsp;€</b></p>
+        <p>Préparation du dossier pour une maison individuelle ou un projet soumis à permis.</p>
         <a class="btn btn-primary btn-sm" href="https://urbizen.fr/permis-de-construire/">Découvrir le permis de construire</a>
       </article>
       <article class="presta">
-        <h3>Orientation du projet</h3>
-        <p>Vous ne savez pas quelle démarche choisir&nbsp;? Envoyez votre projet, nous vous indiquons la formule adaptée.</p>
-        <p class="presta-price">Étude <b>gratuite</b></p>
-        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/contact/">Faire étudier mon projet</a>
+        <h3>Conception de plans</h3>
+        <p>Avant-projet personnalisé&nbsp;: plans, dimensions, organisation des espaces et modifications prévues dans l'offre.</p>
+        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/commander-un-dossier/">Faire concevoir mes plans</a>
+      </article>
+      <article class="presta">
+        <h3>Dépôt dématérialisé</h3>
+        <p>Dépôt en ligne proposé en option lorsque la commune dispose d'un guichet numérique compatible.</p>
+        <p class="presta-price"><b>En option</b></p>
       </article>
     </div>
 
@@ -331,19 +416,58 @@
   </div>
 </section>
 
-<!-- ===== Section 8 — Pourquoi Urbizen ===== -->
+<!-- ===== Section 8 — Pourquoi Urbizen (panneau « Espace Urbizen » intégré) ===== -->
 <section class="pourquoi-wrap" id="pourquoi">
   <div class="wrap">
-    <div class="pourquoi">
+    <div class="sec-head">
       <span class="eyebrow">Pourquoi Urbizen</span>
-      <h2>Un accompagnement clair et structuré</h2>
-      <div class="pourquoi-grid">
-        <div class="pq"><span class="pq-k">01</span><div><h3>Service entièrement à distance</h3><p>Vous transmettez vos informations, photos et dimensions en ligne, partout en France métropolitaine.</p></div></div>
-        <div class="pq"><span class="pq-k">02</span><div><h3>Dossier adapté au projet</h3><p>Les pièces sont choisies selon la nature du projet et les exigences applicables.</p></div></div>
-        <div class="pq"><span class="pq-k">03</span><div><h3>Un interlocuteur humain dédié</h3><p>Votre dossier est étudié et préparé par une personne qui réalise vos plans, suit votre projet et répond à vos questions.</p></div></div>
-        <div class="pq"><span class="pq-k">04</span><div><h3>Documents prêts à déposer</h3><p>CERFA, plans et pièces graphiques constituent un dossier clair et structuré.</p></div></div>
-        <div class="pq"><span class="pq-k">05</span><div><h3>Suivi clair</h3><p>Les demandes de pièces complémentaires de la mairie sont traitées jusqu'à l'accord du dossier.</p></div></div>
-        <div class="pq"><span class="pq-k">06</span><div><h3>Assurance professionnelle</h3><p>Urbizen exerce dans un cadre professionnel assuré.</p></div></div>
+      <h2>Pourquoi choisir Urbizen&nbsp;?</h2>
+      <p>Une prestation claire, humaine et cadrée, du premier échange à la remise de votre dossier.</p>
+    </div>
+    <div class="espace-band">
+      <span class="soon-badge soon-badge-light">Bientôt disponible</span>
+      <h2>Tous vos projets réunis dans votre espace Urbizen</h2>
+      <p>Un espace personnel et professionnel est en cours de préparation pour suivre et centraliser vos démarches.</p>
+      <ul class="espace-list">
+        <li>Suivi des commandes</li>
+        <li>Documents centralisés</li>
+        <li>Historique des dossiers</li>
+        <li>Échanges avec Urbizen</li>
+        <li>Espace professionnel</li>
+        <li>Formulaires CERFA guidés</li>
+      </ul>
+      <p class="espace-note">Ces fonctionnalités ne sont pas encore disponibles&nbsp;: aucune inscription n'est requise pour le moment.</p>
+    </div>
+    <div class="atouts-grid">
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></span>
+        <h3>Un interlocuteur humain</h3>
+        <p>Une personne dédiée suit votre dossier de bout en bout.</p>
+      </div>
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="11" rx="1.5"/><path d="M9 20h6M12 16v4"/><path d="M8 10.5l2.4 2.2L16 8" stroke="#54CF99"/></svg></span>
+        <h3>Une prestation entièrement à distance</h3>
+        <p>Tout se fait en ligne, partout en France métropolitaine.</p>
+      </div>
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3h7l4 4v14H6.5z"/><path d="M13.5 3v4h4"/><path d="M9.5 12.5h5M9.5 15.5h5" stroke="#54CF99"/></svg></span>
+        <h3>Des documents adaptés aux informations transmises</h3>
+        <p>Plans et pièces préparés selon ce que vous communiquez.</p>
+      </div>
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M14.8 9.2a3.6 3.6 0 1 0 0 5.6" stroke="#54CF99"/><path d="M8.4 11h5M8.4 13h5" stroke="#54CF99"/></svg></span>
+        <h3>Un prix annoncé avant la commande</h3>
+        <p>Le tarif vous est indiqué avant tout engagement.</p>
+      </div>
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7.5 3v5.2c0 4.6-3.2 7.7-7.5 9.3-4.3-1.6-7.5-4.7-7.5-9.3V6z"/><path d="M8.6 12.2l2.3 2.3 4.4-4.7" stroke="#54CF99"/></svg></span>
+        <h3>RCP et assurance décennale</h3>
+        <p>Urbizen exerce dans un cadre professionnel assuré.</p>
+      </div>
+      <div class="atout">
+        <span class="atout-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M8.2 12.4l2.6 2.6 4.9-5.4" stroke="#54CF99"/></svg></span>
+        <h3>Un accompagnement jusqu'à la remise du dossier</h3>
+        <p>Les pièces complémentaires liées au dossier sont traitées jusqu'à l'accord.</p>
       </div>
     </div>
   </div>
@@ -405,9 +529,10 @@
 <section class="cta-final">
   <div class="wrap">
     <div class="cta-band">
-      <h2>Votre projet peut commencer maintenant.</h2>
-      <p>Localisez votre terrain et laissez-vous guider.</p>
+      <h2>Prêt à faire avancer votre projet&nbsp;?</h2>
+      <p>Présentez-nous votre projet et recevez une réponse adaptée à votre démarche.</p>
       <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+      <p class="cta-soon">CERFA gratuit et espaces personnels prochainement disponibles.</p>
     </div>
   </div>
 </section>

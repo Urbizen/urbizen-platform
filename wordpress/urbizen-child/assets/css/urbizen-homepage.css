@@ -60,16 +60,41 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .nav-links a { font-size: 14px; color: var(--u-ink-soft); font-weight: 500; transition: color .15s; }
 .urbizen-accueil .nav-links a:hover { color: var(--u-brand); }
 .urbizen-accueil .nav-right { display: flex; align-items: center; gap: 14px; }
-.urbizen-accueil .link-login { font-size: 14px; color: var(--u-ink-soft); font-weight: 500; }
-.urbizen-accueil .link-login:hover { color: var(--u-brand); }
-.urbizen-accueil .burger { display: none; background: none; border: none; cursor: pointer; padding: 6px; }
+/* Espace client : icône seule (compte/profil), cible tactile ≥ 44×44, libellé
+   accessible porté par aria-label sur le lien ; destination inchangée (href="#",
+   « bientôt disponible »). Reste visible sur mobile (jamais uniquement dans le burger). */
+/* Icônes header (téléphone « Nous contacter » + compte « Espace client ») —
+   même style, cible tactile ≥ 44×44, focus clavier via :focus-visible global. */
+.urbizen-accueil .icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; color: var(--u-ink-soft); background: none; border: none; border-radius: var(--u-radius); cursor: pointer; flex: none; }
+.urbizen-accueil .icon-btn svg { width: 22px; height: 22px; display: block; }
+.urbizen-accueil .icon-btn:hover { color: var(--u-brand); background: var(--u-brand-sf); }
+/* Espace client provisoire : contrôle clairement désactivé (pas de faux lien). */
+.urbizen-accueil .link-login[aria-disabled="true"] { color: var(--u-ink-faint); cursor: not-allowed; }
+.urbizen-accueil .link-login[aria-disabled="true"]:hover { color: var(--u-ink-faint); background: none; }
+.urbizen-accueil .burger { display: none; background: none; border: none; cursor: pointer; padding: 6px; flex: none; }
 .urbizen-accueil .burger span { display: block; width: 22px; height: 2px; background: var(--u-ink); margin: 4px 0; transition: .2s; }
 .urbizen-accueil .mmenu { border-top: 1px solid var(--u-line); background: var(--u-surface); }
 .urbizen-accueil .mmenu .wrap { display: grid; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
 .urbizen-accueil .mmenu a { font-size: 15px; color: var(--u-ink); }
 @media (max-width: 900px) {
-  .urbizen-accueil .nav-links, .urbizen-accueil .nav-right .link-login { display: none; }
+  /* Menu principal dans le burger ; l'icône Espace client + le CTA restent
+     visibles dans le header (logo | icône compte | Démarrer mon projet | burger). */
+.urbizen-accueil .nav-links { display: none; }
   .urbizen-accueil .burger { display: block; }
+}
+/* En-tête mobile compact : tout tient sans débordement ni retour à la ligne,
+   dès 320 px. On resserre progressivement gaps, CTA et logo. */
+@media (max-width: 560px) {
+  .urbizen-accueil .nav { gap: 10px; }
+  .urbizen-accueil .nav-right { gap: 8px; }
+  .urbizen-accueil .nav-right .js-start { padding: 9px 13px; font-size: 13.5px; }
+}
+@media (max-width: 400px) {
+  .urbizen-accueil .nav-right { gap: 6px; }
+  .urbizen-accueil .nav-right .js-start { padding: 8px 11px; font-size: 12.5px; }
+  .urbizen-accueil .nav .logo img { height: 28px; }
+  .urbizen-accueil .link-login { width: 40px; height: 40px; }
+  .urbizen-accueil .burger { padding: 6px 2px; }
 }
 
 /* --- Sections génériques --- */
@@ -92,7 +117,10 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .hero-plan { position: relative; background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); padding: 22px; box-shadow: var(--u-shadow-card); }
 .urbizen-accueil .hero-plan-tag { position: absolute; top: -11px; left: 22px; background: var(--u-ink); color: #fff; font-family: var(--u-font-mono); font-size: 11px; letter-spacing: .08em; padding: 4px 10px; border-radius: 3px; }
 .urbizen-accueil .hero-plan svg { width: 100%; height: auto; display: block; }
-@media (max-width: 800px) { .urbizen-accueil .hero-grid { grid-template-columns: 1fr; } .urbizen-accueil .hero-plan { order: -1; } }
+/* Empilé (tablette/mobile) : le texte commercial passe AVANT l'illustration,
+   dans l'ordre du DOM (surtitre, titre, texte, boutons, puis planche animée).
+   On retire l'ancien `order: -1` qui remontait l'illustration au-dessus du titre. */
+@media (max-width: 800px) { .urbizen-accueil .hero-grid { grid-template-columns: 1fr; } }
 
 /* Animation d'entrée du plan (hero).
    Uniquement si l'utilisateur n'a pas demandé à réduire les animations :
@@ -120,10 +148,13 @@ html { scroll-behavior: smooth; }
 @keyframes hpDraw { to { stroke-dashoffset: 0; } }
 
 /* --- Bandeau confiance --- */
-.urbizen-accueil .trust { border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); background: var(--u-surface); }
+/* Bande de réassurance en BLEU NUIT uni (jeton charte --u-ink), sans quadrillage,
+   sans ombre, même hauteur : elle crée une vraie rupture entre le hero et la suite.
+   Texte blanc / blanc atténué, puces vert menthe, filets bleu légèrement plus clair. */
+.urbizen-accueil .trust { border-top: 1px solid rgba(255,255,255,.12); border-bottom: 1px solid rgba(255,255,255,.12); background: var(--u-ink); }
 .urbizen-accueil .trust .wrap { display: flex; flex-wrap: wrap; gap: 12px 40px; justify-content: space-between; padding-top: 18px; padding-bottom: 18px; }
-.urbizen-accueil .trust-item { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--u-ink-soft); }
-.urbizen-accueil .trust-item b { color: var(--u-ink); font-weight: 600; }
+.urbizen-accueil .trust-item { display: flex; align-items: center; gap: 10px; font-size: 14px; color: rgba(255,255,255,.78); }
+.urbizen-accueil .trust-item b { color: #fff; font-weight: 600; }
 .urbizen-accueil .trust-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--u-mint); flex: none; }
 
 /* --- Section 3 : localisation --- */
@@ -263,4 +294,176 @@ html { scroll-behavior: smooth; }
   .urbizen-accueil .projet-continue .btn { width: 100%; }
   .urbizen-accueil .hero-cta .btn, .urbizen-accueil .cta-band .btn { width: 100%; }
   .urbizen-accueil .hero-cta { flex-direction: column; align-items: stretch; }
+}
+
+/* ============================================================
+   Refonte plateforme — nouvelles sections (juillet 2026)
+   Réutilise les jetons existants ; n'altère aucune valeur des
+   sections existantes ni le bloc d'animation du hero.
+   ============================================================ */
+/* Hero : ligne secondaire + badge « bientôt » */
+.urbizen-accueil .hero-note { font-size: 14.5px; color: var(--u-ink-soft); max-width: 46ch; margin: -8px 0 20px; }
+.urbizen-accueil .soon-badge { display: inline-block; font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--u-brand); background: var(--u-brand-sf); border: 1px solid var(--u-mint); border-radius: 999px; padding: 3px 10px; }
+.urbizen-accueil .hero-soon { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--u-ink-faint); margin-bottom: 18px; }
+
+/* Trois parcours */
+.urbizen-accueil .parcours-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.urbizen-accueil .parcours-card { display: flex; flex-direction: column; gap: 10px; background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 26px 22px; }
+.urbizen-accueil .parcours-card:hover { border-color: var(--u-line-strong); }
+.urbizen-accueil .parcours-k { font-family: var(--u-font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--u-brand); }
+.urbizen-accueil .parcours-card h3 { font-size: 19px; }
+.urbizen-accueil .parcours-card p { font-size: 14.5px; color: var(--u-ink-soft); flex: 1; }
+.urbizen-accueil .parcours-card .btn { align-self: flex-start; }
+.urbizen-accueil .parcours-card .soon-badge { align-self: flex-start; }
+@media (max-width: 820px) { .urbizen-accueil .parcours-grid { grid-template-columns: 1fr; } }
+
+/* Carte « CERFA gratuit » mise en avant (élément différenciant), sans agressivité :
+   teinte menthe très claire, bordure verte affirmée, ombre discrète, mêmes
+   dimensions. Le badge « Bientôt disponible » passe en haut, près du libellé ;
+   une petite illustration technique (feuille CERFA) se pose en bas à droite. */
+.urbizen-accueil .parcours-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.urbizen-accueil .parcours-card.featured { background: #F1FBF6; border-color: var(--u-brand); box-shadow: 0 1px 0 rgba(20,35,59,.03), 0 14px 30px -22px rgba(18,138,90,.5); }
+.urbizen-accueil .parcours-card.featured:hover { border-color: var(--u-brand-dk); }
+.urbizen-accueil .parcours-card.featured .soon-badge { background: #fff; color: var(--u-brand-dk); border-color: var(--u-brand); }
+.urbizen-accueil .parcours-fig { align-self: flex-end; width: 84px; height: 58px; margin-top: 6px; }
+.urbizen-accueil .parcours-fig svg { width: 100%; height: 100%; display: block; color: var(--u-ink); }
+
+/* Services : grille à 4 cartes */
+.urbizen-accueil .presta-grid-4 { grid-template-columns: repeat(4, 1fr); }
+@media (max-width: 980px) { .urbizen-accueil .presta-grid-4 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .urbizen-accueil .presta-grid-4 { grid-template-columns: 1fr; } }
+
+/* Futur espace Urbizen (bande sombre, cohérente avec « pourquoi ») */
+.urbizen-accueil .espace { background: var(--u-surface-2); border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .espace-band { background: var(--u-ink); color: #fff; border-radius: var(--u-radius); padding: clamp(32px, 5vw, 52px); position: relative; overflow: hidden; }
+.urbizen-accueil .espace-band::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 0 27px, rgba(84,207,153,.05) 27px 28px) 0 0 / 28px 28px; pointer-events: none; }
+.urbizen-accueil .espace-band > * { position: relative; }
+.urbizen-accueil .soon-badge-light { color: var(--u-mint); background: rgba(84,207,153,.12); border-color: rgba(84,207,153,.5); }
+.urbizen-accueil .espace-band h2 { color: #fff; font-size: clamp(24px, 3.4vw, 32px); font-weight: 600; margin: 14px 0 10px; }
+.urbizen-accueil .espace-band > p { color: #C5CEDA; font-size: 16px; max-width: 60ch; margin-bottom: 22px; }
+.urbizen-accueil .espace-list { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 28px; margin-bottom: 20px; }
+.urbizen-accueil .espace-list li { font-size: 14.5px; color: #E6EBF1; display: flex; align-items: center; gap: 9px; }
+.urbizen-accueil .espace-list li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--u-mint); flex: none; }
+.urbizen-accueil .espace-note { font-size: 13px; color: #97A3B4; }
+@media (max-width: 760px) { .urbizen-accueil .espace-list { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .urbizen-accueil .espace-list { grid-template-columns: 1fr; } }
+
+/* CTA : mention secondaire */
+.urbizen-accueil .cta-soon { font-size: 13px; color: var(--u-ink-faint); margin-top: 16px; }
+
+/* Pourquoi Urbizen — section CLAIRE en cartes (différenciée de la bande sombre
+   « Espace Urbizen » qui la précède ; plus légère et respirante). */
+.urbizen-accueil .atouts-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.urbizen-accueil .atout { background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); padding: 22px 20px; box-shadow: 0 1px 0 rgba(20,35,59,.03); transition: border-color .15s, transform .12s; }
+.urbizen-accueil .atout:hover { border-color: var(--u-line-strong); transform: translateY(-2px); }
+.urbizen-accueil .atout-ico { display: inline-grid; place-items: center; width: 40px; height: 40px; color: var(--u-brand); background: var(--u-brand-sf); border-radius: 8px; margin-bottom: 14px; }
+.urbizen-accueil .atout-ico svg { width: 22px; height: 22px; display: block; }
+.urbizen-accueil .atout h3 { font-size: 16px; margin-bottom: 6px; }
+.urbizen-accueil .atout p { font-size: 13.5px; color: var(--u-ink-soft); }
+@media (max-width: 820px) { .urbizen-accueil .atouts-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .urbizen-accueil .atouts-grid { grid-template-columns: 1fr; } }
+
+/* Espacement resserré entre « Espace Urbizen » (sombre) et « Pourquoi » (clair) :
+   on réduit le bas de la première et le haut de la seconde (pas de marge négative). */
+.urbizen-accueil .espace { padding-bottom: clamp(30px, 4vw, 48px); }
+.urbizen-accueil .pourquoi-wrap { padding-top: clamp(30px, 4vw, 48px); }
+
+/* Panneau « Espace Urbizen » désormais intégré DANS « Pourquoi choisir Urbizen ? »,
+   entre le sous-titre (fin de .sec-head) et la grille de cartes. Le gap
+   sous-titre → panneau est celui de .sec-head (clamp 28→44 px) ; on ajoute
+   seulement l'espace panneau → cartes. Desktop ~52 px, mobile ~32 px, jamais
+   de vide > 100 px, sans marge négative. Le panneau garde son style sombre. */
+.urbizen-accueil .pourquoi-wrap .espace-band { margin-bottom: clamp(32px, 5vw, 52px); }
+
+/* ===========================================================================
+   SÉQUENCE DÉFINITIVE DES FONDS (recalage validé)
+   Quadrillage = jeton commun `--u-grid-bg` (var(--u-grid) #DCE3EA sur
+   var(--u-paper) #EAEEF2, 28×28 px, 1 px) — INCHANGÉ ; jamais #C2D0DE ; aucun
+   fond quadrillé imposé au wrapper global `.urbizen-accueil`.
+   Ordre haut→bas : hero GRID · réassurance BLEU NUIT · parcours GRID ·
+   localisation UNI · projets GRID · méthode UNI · dossier GRID · services UNI ·
+   pourquoi GRID · exemples UNI · FAQ GRID · CTA UNI. */
+/* Sections QUADRILLÉES (trame claire de la charte). */
+.urbizen-accueil .hero { background: var(--u-grid-bg); }
+.urbizen-accueil .parcours { background: var(--u-grid-bg); }
+.urbizen-accueil .projet { background: var(--u-grid-bg); }
+.urbizen-accueil .dossier { background: var(--u-grid-bg); }
+.urbizen-accueil .pourquoi-wrap { background: var(--u-grid-bg); }
+.urbizen-accueil .faq-wrap { background: var(--u-grid-bg); }
+
+/* Sections à FOND UNI clair. SÉPARATEURS conformes à main : PAS de filet propre
+   sur ces sections — c'est le contraste carreaux (grille) ↔ aplat (surface-2)
+   qui marque la rupture, exactement comme dans la version d'origine. On évite
+   ainsi les traits surnuméraires qui alourdissaient la page. */
+.urbizen-accueil .methode { background: var(--u-surface-2); }
+.urbizen-accueil .prestations { background: var(--u-surface-2); }
+.urbizen-accueil .exemples { background: var(--u-surface-2); }
+.urbizen-accueil .cta-final { background: var(--u-surface-2); }
+/* Filets fins conservés UNIQUEMENT là où main les posait (valeur d'origine
+   --u-line #C9D3DD, 1 px) : .locate (bas), .dossier (haut/bas), .avis (haut/bas)
+   et la bande .trust — via leurs règles d'origine, non surchargées ici.
+   .espace-band garde son panneau sombre à l'intérieur de .pourquoi-wrap. */
+/* --- Section 6 « Contenu d'un dossier » : cartes DP/PCMI illustrées ---------
+   Les huit pièces sont des cartes blanches posées sur le quadrillage, avec une
+   mini-illustration technique en bas à droite (~30 % de la carte). Le texte
+   reste prioritaire ; hauteur identique pour les huit. */
+.urbizen-accueil .planche-item { position: relative; overflow: hidden; padding: 15px 16px 13px; gap: 5px; min-height: 158px; box-shadow: var(--u-shadow-card); }
+.urbizen-accueil .planche-item .code { letter-spacing: .04em; }
+.urbizen-accueil .planche-t { margin-top: 2px; max-width: 58%; }
+.urbizen-accueil .planche-fig { position: absolute; right: 12px; bottom: 11px; width: 94px; height: 66px; pointer-events: none; }
+.urbizen-accueil .planche-fig svg { width: 100%; height: 100%; display: block; color: var(--u-ink); }
+@media (max-width: 820px) { .urbizen-accueil .planche-item { min-height: 152px; } .urbizen-accueil .planche-t { max-width: 62%; } .urbizen-accueil .planche-fig { width: 98px; height: 68px; } }
+@media (max-width: 460px) { .urbizen-accueil .planche { grid-template-columns: 1fr; } .urbizen-accueil .planche-t { max-width: 64%; } }
+
+/* ===========================================================================
+   CENTRE DE CONTACT « Parlons de votre projet »
+   Le JS déplace le panneau + son fond d'écran sous <body> à l'ouverture, pour
+   échapper au bloc englobant créé par le `backdrop-filter` du header (sinon le
+   `position: fixed` était relatif au header et le panneau se retrouvait tronqué).
+   Panneau TOUJOURS `position: fixed` (relatif à la fenêtre) :
+     • > 900 px  : popover compact ancré en haut à droite ;
+     • ≤ 900 px  : véritable feuille inférieure pleine largeur (même seuil que le burger).
+   Titre + croix collants en haut ; les canaux défilent en dessous.
+   =========================================================================== */
+.urbizen-accueil .contact-backdrop { position: fixed; inset: 0; z-index: 1090; background: rgba(20,35,59,.38); }
+.urbizen-accueil .contact-backdrop[hidden] { display: none; }
+
+.urbizen-accueil .contact-panel { position: fixed; top: 62px; right: 16px; width: 320px; max-width: calc(100vw - 24px); max-height: min(80dvh, 640px); display: flex; flex-direction: column; overflow: hidden; background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); box-shadow: var(--u-shadow-card); z-index: 1100; }
+.urbizen-accueil .contact-panel[hidden] { display: none; }
+.urbizen-accueil .contact-panel-inner { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* Titre + croix collants et opaques : toujours visibles pendant le défilement. */
+.urbizen-accueil .contact-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; background: var(--u-surface); border-bottom: 1px solid var(--u-line); }
+.urbizen-accueil .contact-head h2 { font-size: 17px; font-weight: 600; }
+.urbizen-accueil .contact-close { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin: -6px -6px -6px 0; background: none; border: none; border-radius: var(--u-radius); color: var(--u-ink-soft); cursor: pointer; flex: none; }
+.urbizen-accueil .contact-close svg { width: 20px; height: 20px; }
+.urbizen-accueil .contact-close:hover { color: var(--u-ink); background: var(--u-surface-2); }
+.urbizen-accueil .contact-channels { list-style: none; display: grid; gap: 8px; padding: 14px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
+.urbizen-accueil .contact-ch-link { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 1px solid var(--u-line); border-radius: var(--u-radius); color: var(--u-ink); background: var(--u-surface); transition: border-color .15s, background .15s; }
+.urbizen-accueil a.contact-ch-link:hover { border-color: var(--u-brand); background: var(--u-brand-sf); }
+.urbizen-accueil .contact-ch-ico { display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none; color: var(--u-brand); background: var(--u-brand-sf); border-radius: 8px; }
+.urbizen-accueil .contact-ch-ico svg { width: 19px; height: 19px; }
+.urbizen-accueil .contact-ch-txt { display: flex; flex-direction: column; line-height: 1.25; }
+.urbizen-accueil .contact-ch-title { font-family: var(--u-font-title); font-weight: 500; font-size: 14.5px; }
+.urbizen-accueil .contact-ch-sub { font-size: 12.5px; color: var(--u-ink-soft); }
+/* Canaux non encore fonctionnels : clairement inertes (aucune fausse action). */
+.urbizen-accueil .contact-ch.is-soon .contact-ch-link { cursor: not-allowed; opacity: .75; }
+.urbizen-accueil .contact-ch.is-soon .contact-ch-ico { color: var(--u-ink-faint); background: var(--u-surface-2); }
+.urbizen-accueil .contact-ch.is-soon .contact-ch-sub { color: var(--u-brand); font-weight: 500; }
+
+/* Feuille inférieure dès le passage en mode burger (≤ 900 px) — cohérent avec le header. */
+@media (max-width: 900px) {
+  .urbizen-accueil .contact-panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-width: none; max-height: min(85dvh, 720px); border-radius: 12px 12px 0 0; border-left: none; border-right: none; border-bottom: none; }
+  .urbizen-accueil .contact-head h2 { font-size: 18px; }
+}
+
+/* En-tête très étroit (< 340px) : le CTA passe sur une 2e ligne compacte, sans
+   masquer téléphone/compte/burger et sans tronquer « Démarrer mon projet ». */
+@media (max-width: 340px) {
+  .urbizen-accueil .nav-right { display: contents; }
+  .urbizen-accueil .nav { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; }
+  .urbizen-accueil .nav .logo { order: 1; }
+  .urbizen-accueil .nav-right .link-tel { order: 2; }
+  .urbizen-accueil .nav-right .link-login { order: 3; }
+  .urbizen-accueil .nav-right .burger { order: 4; margin-left: auto; }
+  .urbizen-accueil .nav-right .js-start { order: 5; flex: 1 0 100%; text-align: center; }
 }
