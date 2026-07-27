@@ -2246,3 +2246,155 @@ l'accueil.
   la main, sans source dans `frontend/` ni génération. Sa discipline tient à deux règles :
   rester scopé `.urbizen-page` et n'utiliser que des tokens `--u-*`. Se rapproche de la dette
   du script d'accueil (D-048).
+
+## D-050 — Socle multi-formulaire : liste blanche serveur, routage explicite, renderer générique
+
+**Statut.** Adoptée — **implémentation progressive dans le Lot 1**.
+**Incrément 1 réalisé** : généralisation sécurisée de `FormRegistry` (liste blanche +
+`register()`/`has()`/`all()`, `reset_for_tests()` réservé aux bancs, sinon `LogicException`) +
+caractérisation.
+**Incrément 2 réalisé** : routage serveur explicite des soumissions — la route Conception porte
+désormais **action + type + nonce** (`urbizen_conception → conception, urbizen_conception_submit`),
+**choisie par le hook** via une valeur littérale (jamais `$_POST`) ; le **nonce** et le **type**
+opérationnels proviennent de la route ; un `action`/`form_type` reçu dans le POST ne sert qu'à un
+**contrôle de cohérence**.
+**Incrément 3 réalisé** : extraction du renderer multi-étapes **générique** `StepFormRenderer`
+(sans dépendance ni chaîne métier), piloté par la `FormDefinition` et un objet-valeur immuable
+`StepFormRenderConfig` (valeurs techniques serveur : action, nonce, jeton déjà généré, pot de
+miel, retour, cible, `accept`). `ConceptionRenderer` est conservé comme **façade de
+compatibilité** : même API, même sortie **octet pour octet** (banc de parité contre une référence
+figée), il ne fait plus que bâtir la configuration Conception et injecter ses fragments propres
+(cartouche, consignes, brouillon).
+**Incrément 4 réalisé** : `FormBlock` (bloc + shortcode) est raccordé aux renderers **côté
+serveur**. Le type demandé par le bloc est validé par la liste blanche `FormRegistry`, puis un
+**résolveur serveur** `Blocks\FormRendererResolver` — table privée immuable de fabriques de
+confiance — associe le type à son renderer autorisé : **Localisation → `Forms\Renderer` (plat)**,
+**Conception → `Conception\ConceptionRenderer` (façade → `StepFormRenderer`)**. Le navigateur ne
+choisit jamais une classe, un chemin, un callable ou un namespace ; aucun `new $client`, aucun
+`class_exists($client)`, aucun `require` calculé. Un type absent ou hors liste blanche retombe sur
+le formulaire par défaut (repli historique contractualisé) ; un type en liste blanche mais sans
+renderer autorisé **échoue proprement** (aucun rendu public). Les ressources de bloc `urbizen-form`
+ne sont enfilées que pour le renderer plat ; Conception enfile les siennes via sa façade. Les
+quatre fragments de confiance de `StepFormRenderConfig` sont renommés `trusted_*_html` et leur
+contrat (HTML serveur de confiance, jamais issu d'une superglobale/attribut/URL, échappement à la
+charge de l'appelant, pas de moteur de template) est explicité.
+**Incrément 5 réalisé** : les politiques d'upload sont **par profil serveur**. `UploadPolicy`
+reste le **moteur de validation générique** (MIME réel `finfo`, concordance extension/contenu,
+neutralisation du nom, dernière extension, contrôle croisé WordPress, quantités, tailles) ; un
+`Files\UploadProfile` **immuable** porte les bornes métier (blocs, formats, quantités, tailles,
+dépôts ouverts ou non). `Files\UploadProfileRegistry` associe le **type serveur** (issu de la
+route) à son profil : **conception → profil ouvert** (identique à l'existant, à l'octet près),
+tout autre type — dont **localisation** — → **aucun profil** (`null`). Un seul profil commercial
+ouvre les dépôts : **conception**. Aucun profil DP, PC, PCMI, permis ou CERFA.
+**Incrément 5 bis réalisé — pipeline entièrement piloté par le profil, sans repli implicite.**
+`UploadPolicy::validate()` et `validate_one()` **exigent** un profil explicite (plus de paramètre
+nullable : le moteur ne suppose jamais Conception). `UploadNormalizer::normalize($files, $profile)`
+filtre les blocs **selon le profil**, jamais une liste Conception globale : un profil fictif dont
+les blocs diffèrent traverse la chaîne sans une ligne de code métier. `Storage` et `UploadManifest`
+n'appliquent plus la liste Conception : ils gardent un contrôle **générique** de format d'identifiant
+de bloc (`UploadPolicy::is_valid_block_id()`), sur des documents déjà validés par le profil ;
+structure du manifeste et du stockage **intactes**, aucune migration. Le `SubmissionController`
+résout le profil depuis `$type` **avant** la normalisation (jamais depuis `$_POST`/`$_FILES`) et le
+transmet à chaque étape ; un type sans profil refuse tout document (`upload_not_allowed`), jamais un
+repli « tout autorisé » ni sur Conception. `default_profile()` est renommé `conception_profile()`
+(source serveur clairement identifiable) et l'ancien nom, sans aucun appelant, est **supprimé** —
+plus aucun concept de profil « par défaut ». Un banc de bout en bout prouve qu'un profil fictif
+traverse normalisation, validation, manifeste et staging/finalisation.
+**Incrément 5 ter réalisé — rejet explicite des fichiers hors profil.** La normalisation
+distingue désormais un **emplacement réellement vide** (`UPLOAD_ERR_NO_FILE`, généré par le
+navigateur pour un champ non rempli — ignoré sans faux rejet) d'une **tentative réelle** de dépôt
+dans un bloc ou un champ hors profil : cette dernière **échoue explicitement**
+(`upload_invalid_structure`) pour tout le lot, **avant** manifeste, staging, référence, demande,
+persistance, finalisation ou courriel. Un lot mixte (un fichier autorisé + un fichier interdit) est
+rejeté **en entier**, sans persistance partielle. `ignored` ne contient plus que des emplacements
+vides inoffensifs ; aucun fichier hostile n'y est masqué en silence. Un mutant forçant
+l'écartement silencieux est mordu.
+**Incrément 6 réalisé — stratégie tarifaire par type serveur.** Le prix est **toujours recalculé
+côté serveur** ; la stratégie est résolue depuis le **type serveur** (`Forms\PricingStrategyRegistry`
+: `conception → ConceptionPricingStrategy`, tout autre type — dont `localisation` — → `null`),
+jamais depuis `$_POST`/`pricing_strategy`/`price`/`amount`, un attribut de bloc ou un nom de classe.
+`Forms\PricingStrategy` est le contrat générique ; `ConceptionPricingStrategy` n'est qu'un
+adaptateur mince sur le catalogue historique `Forms\Pricing` (constantes et calcul **inchangés**, à
+l'euro près). Le `Validator` délègue à la stratégie résolue depuis `$def->type()` au lieu d'appeler
+`Pricing` en dur ; le `SubmissionController` contrôle le socle du montant contre `strategie->base()`
+(plus de `Pricing::BASE` codé en dur). Un type sans stratégie n'obtient **aucun** prix et n'entraîne
+aucune demande (rejet avant persistance) — jamais de repli sur Conception. **Unité inchangée :
+euros entiers** (aucun flottant, aucune migration). Le montant persisté (`_urbizen_pricing`) et lu
+par `MailRenderer` reste identique. Un mutant détournant le type vers `localisation` fait disparaître
+le prix Conception ; le mutant historique du prix client POST reste mordu. **Mails non encore
+généralisés.**
+**Incrément 7 réalisé — notification interne par type serveur.** La stratégie de notification est
+résolue depuis le **type serveur** de la demande persistée (`_urbizen_form_type`, écrit par la
+route), jamais depuis `$_POST`/`mail_strategy`/`recipient`/`subject`/un nom de template.
+`Mail\NotificationStrategy` est le contrat générique ; `Mail\ConceptionNotificationStrategy` n'est
+qu'un adaptateur mince sur `MailRenderer` (destinataire serveur via `MailPolicy`, sujet à référence
+seule, corps échappé, en-têtes sûrs — **inchangés**). `MailScheduler` résout la stratégie depuis le
+type persisté et lui délègue la construction du message ; **queue, transport, verrou, backoff et
+retries restent inchangés** (la stratégie ne touche qu'au message, jamais à l'envoi). Un type sans
+stratégie n'envoie **rien** et ne retombe jamais sur Conception (`no_strategy`, la demande n'est pas
+supprimée). **Seule la notification interne `conception` existe** ; **aucun accusé de réception au
+demandeur**, aucun nouveau destinataire ; `localisation` n'a aucune notification. La notification ne
+met **pas** l'adresse du demandeur en `Reply-To` (courriel interne) : aucune surface d'injection
+d'en-tête de ce côté. **Invariant des types renforcé** : `FormRegistry::get()` **rejette** une
+définition dont le type déclaré diffère de sa clé de résolution — le type de la route reste la
+source canonique (prix, upload, notification). Deux mutants mordent : un repli Conception injecté,
+une garde d'invariant retirée. Le courriel Conception reste **identique** (`submissions 20/20`).
+Les valeurs saisies et les erreurs de validation **ne sont toujours pas** reprises au rendu (API
+ouverte, non réalisée).
+Aucun formulaire DP/PC/CERFA, aucun tunnel n'est livré par cette décision.
+
+**Contexte.** Le socle de soumission (validation serveur, nonce, anti-spam, rate limiting,
+uploads hors racine web, CPT privé `urbizen_demande`, file de courriel, rétention) est mûr
+mais **centré sur `conception`** : `SubmissionController::FORM_TYPE = 'conception'` est codé en
+dur, et `FormRegistry` connaît les deux formulaires livrés (`localisation`, `conception`) via
+une liste blanche en dur. Nous voulons accueillir plus tard plusieurs formulaires **commerciaux**
+(conception, déclaration préalable, permis de construire) **sans** régression et **sans** ouvrir
+de faille : une valeur du navigateur ne doit jamais pouvoir choisir un pipeline, charger un
+fichier, une classe ou une définition.
+
+**Décision.**
+
+- **A — Registre en liste blanche.** Seuls des types **explicitement enregistrés côté serveur**
+  sont résolubles. `FormRegistry` valide chaque identifiant (`^[a-z][a-z0-9_-]{0,63}$` : ni
+  chemin, ni classe, ni Unicode, ni majuscule, ni octet nul), refuse l'inconnu, refuse le
+  doublon **sans jamais écraser** une déclaration existante, et n'appelle `require` que pour un
+  identifiant déjà en liste blanche → jamais depuis une chaîne libre. `KNOWN` reste l'inventaire
+  minimal (`localisation`, `conception`). API additive : `register()`, `has()`, `all()` ; `get()`
+  et `default_type()` inchangés pour les appelants. **Seuls types actifs à la fin de l'incrément :
+  `localisation`, `conception`.**
+- **B — Routage — RÉALISÉ (incrément 2).** Une table serveur `SubmissionController::ROUTES`
+  associe chaque **action** à `{ type, nonce_action }`. La route est **choisie par le hook**
+  (valeur littérale de l'action enregistrée), jamais par `$_POST` ; le nonce et le type
+  opérationnels en découlent. Un `action`/`form_type` du POST ne sert qu'à un **contrôle de
+  cohérence** (rejet `invalid_form` s'il contredit la route, avant tout effet de bord). Les
+  constantes historiques `ACTION`/`NONCE_ACTION`/`FORM_TYPE` restent la **valeur canonique**
+  référencée par la route (une seule source, pas de divergence). Une seule route réelle
+  aujourd'hui ; DP/PC ajouteront leur entrée, jamais via le navigateur.
+- **C — Renderer générique — RÉALISÉ (incrément 3).** `StepFormRenderer` (namespace `Forms`, PSR-4)
+  est piloté par la `FormDefinition` et un `StepFormRenderConfig` **immuable** ; il ignore
+  Conception/DP/PC/CERFA, ne lit aucune superglobale, ne choisit aucune route et ne porte aucune
+  chaîne métier (scan statique en banc). Il conserve les neuf types de champs, les conditions
+  `visible_if`, l'accessibilité (fieldset/legend, ARIA, repli no-JS) et la navigation. Les
+  fragments propres à un formulaire (cartouche, consignes, brouillon) sont injectés par la
+  configuration (`prelude`/`header`/`footer`/`step_extras`), rendus par l'appelant. `ConceptionRenderer`
+  est désormais cette **façade** : une seule implémentation du rendu, sortie inchangée octet pour
+  octet. `FormBlock` **reste inchangé** (raccordement générique reporté à l'incrément suivant) ;
+  les formulaires plats gardent le renderer adapté ; aucune logique DP/PC/CERFA n'a rejoint le
+  renderer.
+- **D — CERFA.** Le futur outil CERFA conservera un **pipeline métier séparé** : pas de CPT
+  `urbizen_demande`, pas de rétention commerciale partagée, contrôleur dédié.
+- **E — Persistance.** **Aucune table** dans le Lot 1 ; CPT privé + post meta conservés pour les
+  parcours commerciaux ; **aucune migration**. Le type de formulaire persisté proviendra de la
+  résolution serveur, jamais d'une valeur client non vérifiée.
+
+**Alternatives rejetées.** Découverte dynamique des définitions par balayage de répertoire (ouvre
+un chemin non maîtrisé) ; sélection du type depuis un champ caché (le navigateur choisirait le
+pipeline) ; conteneur de dépendances générique (surdimensionné, sans usage réel) ; réécriture du
+renderer à neuf (risque de régression face à un `ConceptionRenderer` déjà éprouvé et testé).
+
+**Conséquences.**
+- `FormRegistry` expose une API d'enregistrement explicite, testée (`tests/forms/test-registry.php`).
+- Le comportement de `localisation` et `conception` est **inchangé** (bancs `submissions` 18/18 et
+  `conception` 4/4 verts ; rendu, prix, uploads, persistance, notification figés par la
+  caractérisation existante).
+- La suite du Lot 1 (routage, renderer, bloc, uploads) s'appuiera sur cette liste blanche.

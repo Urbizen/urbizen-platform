@@ -72,7 +72,7 @@ echo "Chaque ligne vérifie qu'une règle cassée fait bien tomber son contrôle
 $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
-	array( "if ( '' === \$nonce || ! wp_verify_nonce( \$nonce, self::NONCE_ACTION ) ) {" => 'if ( false ) {' )
+	array( "if ( '' === \$nonce || ! wp_verify_nonce( \$nonce, \$route['nonce_action'] ) ) {" => 'if ( false ) {' )
 );
 
 neuf();
@@ -224,11 +224,11 @@ $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
 	array(
-		'			$politique = UploadPolicy::validate( $normalisation[\'files\'] );
+		'			$politique = UploadPolicy::validate( $normalisation[\'files\'], $profil );
 
 			if ( ! $politique[\'ok\'] ) {
 				return $renoncer( $politique[\'code\'] );
-			}' => '			$politique = UploadPolicy::validate( $normalisation[\'files\'] );
+			}' => '			$politique = UploadPolicy::validate( $normalisation[\'files\'], $profil );
 			$politique = array( \'ok\' => true, \'code\' => \'success\', \'files\' => array(), \'block\' => \'\' );',
 	)
 );
@@ -278,6 +278,23 @@ $ps = json_decode( (string) get_post_meta( $rs->id(), '_urbizen_pricing', true )
 check( '10 · le dépôt recalcule et stocke 598 €', 598 === $ps['total'] );
 check( '10 · le total soumis n’apparaît nulle part',
 	! str_contains( (string) wp_json_encode( $GLOBALS['wpd_meta'][ $rs->id() ] ), 'urbizen_total' ) );
+
+// ===== 10 bis · la stratégie tarifaire suit le TYPE serveur, pas autre chose ====
+// Si la résolution de stratégie ignore le type de la définition, le prix
+// Conception disparaît (stratégie inexistante) au lieu d'être calculé.
+$v = mutant(
+	'src/Forms/Validator.php',
+	'Validator',
+	array(
+		'PricingStrategyRegistry::for_type( $def->type() )' => "PricingStrategyRegistry::for_type( 'localisation' )",
+	)
+);
+
+$def_c  = \Urbizen\Platform\Forms\FormRegistry::get( 'conception' );
+$post_c = soumission();
+
+check( '10 bis · type détourné → aucune stratégie → prix absent', null === $v::validate( $def_c, $post_c )['pricing'] );
+check( '10 bis · le vrai validateur résout la stratégie du type → prix présent', is_array( \Urbizen\Platform\Forms\Validator::validate( $def_c, $post_c )['pricing'] ) );
 
 // ============================ 11 · le payload brut est conservé =============
 $c = mutant(
@@ -796,9 +813,9 @@ $c = mutant(
 	'src/Http/SubmissionController.php',
 	'SubmissionController',
 	array(
-		'		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+		'		$creneau = RateLimiter::reserve( $type, $server, $now );
 
-		if ( null === $creneau ) {' => '		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+		if ( null === $creneau ) {' => '		$creneau = RateLimiter::reserve( $type, $server, $now );
 
 		if ( false ) {',
 	)
@@ -1085,12 +1102,12 @@ function un_doc( string $bloc, string $nom, string $chemin ): array {
 }
 
 /** Motifs des deux barrières de contrôle de type, mutés séparément. */
-$concordance = "		if ( self::mime_for( \$extension ) !== \$reel ) {
+$concordance = "		if ( \$profile->mime_for( \$extension ) !== \$reel ) {
 			return self::refus_un( 'upload_invalid_mime' );
 		}";
 
 $croise = "		if ( function_exists( 'wp_check_filetype_and_ext' ) ) {
-			\$wp = wp_check_filetype_and_ext( \$chemin, 'fichier.' . \$extension, self::wp_mimes() );
+			\$wp = wp_check_filetype_and_ext( \$chemin, 'fichier.' . \$extension, self::wp_mimes_for( \$profile->types ) );
 
 			if ( empty( \$wp['ext'] ) || empty( \$wp['type'] ) ) {
 				return self::refus_un( 'upload_invalid_mime' );
@@ -1101,44 +1118,60 @@ $croise = "		if ( function_exists( 'wp_check_filetype_and_ext' ) ) {
 			}
 		}";
 
-// ====== 37 · un bloc inconnu est accepté ===================================
+// ====== 37 · un fichier hostile hors profil est silencieusement ignoré =========
+// Si tout bloc hors profil est traité comme « vide », un vrai fichier déposé
+// dans un bloc interdit disparaît sans refus — la faille que cet incrément ferme.
 $n = mutant(
 	'src/Files/UploadNormalizer.php',
 	'UploadNormalizer',
 	array(
-		'			if ( ! UploadPolicy::is_block( $bloc ) ) {
-				$ignores[] = $bloc;
-				continue;
-			}' => '			// filtre de bloc retiré.',
+		'if ( self::entree_vide( $entree ) ) {' => 'if ( true ) {',
 	)
 );
 
 $brut = array( 'factures' => array( 'name' => 'f.pdf', 'type' => '', 'tmp_name' => fx_pdf(), 'error' => UPLOAD_ERR_OK, 'size' => 1 ) );
 
-check( '37 · filtre retiré → un bloc inconnu entre dans le lot', 1 === count( $n::normalize( $brut )['files'] ) );
-check( '37 · le dépôt l’écarte', array() === N::normalize( $brut )['files'] );
-check( '37 · et le nomme', array( 'factures' ) === N::normalize( $brut )['ignored'] );
+check( '37 · vide forcé → un fichier hostile est silencieusement ignoré', $n::normalize( $brut, profil_conception() )['ok'] && array( 'factures' ) === $n::normalize( $brut, profil_conception() )['ignored'] );
+check( '37 · le vrai normaliseur REJETTE tout fichier réel hors profil', ! N::normalize( $brut, profil_conception() )['ok'] && 'upload_invalid_structure' === N::normalize( $brut, profil_conception() )['code'] );
+
+// ====== 37 bis · le normaliseur ignore le profil et retombe sur Conception ====
+// Si la normalisation redevient figée sur les blocs Conception au lieu de suivre
+// le profil, un bloc d'un AUTRE profil est perdu — le pipeline multi-formulaire
+// se brise en silence. Le mutant doit être mordu par un profil fictif.
+$n2 = mutant(
+	'src/Files/UploadNormalizer.php',
+	'UploadNormalizer',
+	array(
+		'if ( ! $profile->has_block( $bloc ) ) {' => 'if ( ! \\Urbizen\\Platform\\Files\\UploadPolicy::is_block( $bloc ) ) {',
+	)
+);
+
+$profil_fictif = new \Urbizen\Platform\Files\UploadProfile( 'devis_fictif', array( 'piece_devis' ), array( 'pdf' => 'application/pdf' ), 3, 5, 1048576, 2097152, true );
+$fic_files     = array( 'piece_devis' => array( 'name' => 'd.pdf', 'type' => 'application/pdf', 'tmp_name' => fx_pdf(), 'error' => UPLOAD_ERR_OK, 'size' => 10 ) );
+
+check( '37 bis · normaliseur figé sur Conception → le bloc fictif est perdu', array() === $n2::normalize( $fic_files, $profil_fictif )['files'] );
+check( '37 bis · le vrai normaliseur suit le profil → le bloc fictif entre', 1 === count( N::normalize( $fic_files, $profil_fictif )['files'] ) );
 
 // ====== 38 · la limite par bloc est retirée ================================
 $pol = mutant(
 	'src/Files/UploadPolicy.php',
 	'UploadPolicy',
 	array(
-		'			if ( $par_bloc[ $bloc ] > self::max_per_block() ) {
+		'			if ( $par_bloc[ $bloc ] > $profile->max_per_block ) {
 				return self::refus( \'upload_count_exceeded\', $bloc );
 			}' => '			// limite par bloc retirée.',
 	)
 );
 
-check( '38 · limite retirée → onze documents dans un bloc passent', $pol::validate( lot_m( 'photos', 11 ) )['ok'] );
-check( '38 · le dépôt refuse le onzième', 'upload_count_exceeded' === P::validate( lot_m( 'photos', 11 ) )['code'] );
+check( '38 · limite retirée → onze documents dans un bloc passent', $pol::validate( lot_m( 'photos', 11 ) , profil_conception())['ok'] );
+check( '38 · le dépôt refuse le onzième', 'upload_count_exceeded' === P::validate( lot_m( 'photos', 11 ) , profil_conception())['code'] );
 
 // ====== 39 · la limite totale est retirée ==================================
 $pol = mutant(
 	'src/Files/UploadPolicy.php',
 	'UploadPolicy',
 	array(
-		'		if ( count( $lot ) > self::max_total() ) {
+		'		if ( count( $lot ) > $profile->max_total ) {
 			return self::refus( \'upload_count_exceeded\' );
 		}' => '		// limite totale retirée.',
 	)
@@ -1146,15 +1179,15 @@ $pol = mutant(
 
 $vingt_et_un = array_merge( lot_m( 'photos', 10 ), lot_m( 'croquis_plans', 10 ), lot_m( 'urbanisme', 1 ) );
 
-check( '39 · limite totale retirée → vingt-et-un documents passent', $pol::validate( $vingt_et_un )['ok'] );
-check( '39 · le dépôt refuse le vingt-et-unième', 'upload_count_exceeded' === P::validate( $vingt_et_un )['code'] );
+check( '39 · limite totale retirée → vingt-et-un documents passent', $pol::validate( $vingt_et_un , profil_conception())['ok'] );
+check( '39 · le dépôt refuse le vingt-et-unième', 'upload_count_exceeded' === P::validate( $vingt_et_un , profil_conception())['code'] );
 
 // ====== 40 · la taille par fichier n'est plus vérifiée =====================
 $pol = mutant(
 	'src/Files/UploadPolicy.php',
 	'UploadPolicy',
 	array(
-		'		if ( $taille > self::max_file_size() ) {
+		'		if ( $taille > $profile->max_file_size ) {
 			return self::refus_un( \'upload_too_large\' );
 		}' => '		// contrôle de taille retiré.',
 	)
@@ -1162,15 +1195,15 @@ $pol = mutant(
 
 $enorme = array( 'block' => 'photos', 'name' => 'g.pdf', 'tmp_name' => fx_pdf_taille( P::MAX_FILE_SIZE + 4096 ), 'error' => UPLOAD_ERR_OK );
 
-check( '40 · contrôle retiré → un fichier de plus de 10 Mio passe', $pol::validate_one( $enorme )['ok'] );
-check( '40 · le dépôt le refuse', 'upload_too_large' === P::validate_one( $enorme )['code'] );
+check( '40 · contrôle retiré → un fichier de plus de 10 Mio passe', $pol::validate_one( $enorme , profil_conception())['ok'] );
+check( '40 · le dépôt le refuse', 'upload_too_large' === P::validate_one( $enorme , profil_conception())['code'] );
 
 // ====== 41 · la taille totale n'est plus vérifiée ==========================
 $pol = mutant(
 	'src/Files/UploadPolicy.php',
 	'UploadPolicy',
 	array(
-		'			if ( $total > self::max_total_size() ) {
+		'			if ( $total > $profile->max_total_size ) {
 				return self::refus( \'upload_total_size_exceeded\', $bloc );
 			}' => '			// contrôle du cumul retiré.',
 	)
@@ -1182,8 +1215,8 @@ for ( $i = 0; $i < 20; $i++ ) {
 	$cumul[] = array( 'block' => 0 === $i % 2 ? 'photos' : 'urbanisme', 'name' => "c$i.pdf", 'tmp_name' => fx_pdf_taille( 2097152 ), 'error' => UPLOAD_ERR_OK );
 }
 
-check( '41 · contrôle retiré → 40 Mio cumulés passent', $pol::validate( $cumul )['ok'] );
-check( '41 · le dépôt refuse le cumul', 'upload_total_size_exceeded' === P::validate( $cumul )['code'] );
+check( '41 · contrôle retiré → 40 Mio cumulés passent', $pol::validate( $cumul , profil_conception())['ok'] );
+check( '41 · le dépôt refuse le cumul', 'upload_total_size_exceeded' === P::validate( $cumul , profil_conception())['code'] );
 
 // ====== 42 · le type réel n'est plus vérifié ===============================
 // Un fichier est gardé par DEUX barrières : la concordance extension/contenu
@@ -1195,10 +1228,10 @@ $sans_concordance = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array(
 $sans_croise      = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array( $croise => '		// contrôle croisé retiré.' ) );
 $sans_rien        = mutant( 'src/Files/UploadPolicy.php', 'UploadPolicy', array( $concordance => '', $croise => '' ) );
 
-check( '42 · concordance retirée → le contrôle croisé protège encore', 'upload_invalid_mime' === $sans_concordance::validate_one( $deguise )['code'] );
-check( '42 · contrôle croisé retiré → la concordance protège encore', 'upload_invalid_mime' === $sans_croise::validate_one( $deguise )['code'] );
-check( '42 · LES DEUX RETIRÉES → un PHP renommé en JPG passe', $sans_rien::validate_one( $deguise )['ok'] );
-check( '42 · le dépôt le refuse', 'upload_invalid_mime' === P::validate_one( $deguise )['code'] );
+check( '42 · concordance retirée → le contrôle croisé protège encore', 'upload_invalid_mime' === $sans_concordance::validate_one( $deguise , profil_conception())['code'] );
+check( '42 · contrôle croisé retiré → la concordance protège encore', 'upload_invalid_mime' === $sans_croise::validate_one( $deguise , profil_conception())['code'] );
+check( '42 · LES DEUX RETIRÉES → un PHP renommé en JPG passe', $sans_rien::validate_one( $deguise , profil_conception())['ok'] );
+check( '42 · le dépôt le refuse', 'upload_invalid_mime' === P::validate_one( $deguise , profil_conception())['code'] );
 
 // ====== 43 · le type annoncé par le navigateur devient fiable ==============
 $pol = mutant(
@@ -1212,8 +1245,8 @@ $pol = mutant(
 
 $menteur = array( 'block' => 'photos', 'name' => 'photo.jpg', 'tmp_name' => fx_php(), 'error' => UPLOAD_ERR_OK, 'type' => 'image/jpeg' );
 
-check( '43 · type annoncé cru → un PHP passe pour une image', $pol::validate_one( $menteur )['ok'] );
-check( '43 · le dépôt ignore le type annoncé', 'upload_invalid_mime' === P::validate_one( $menteur )['code'] );
+check( '43 · type annoncé cru → un PHP passe pour une image', $pol::validate_one( $menteur , profil_conception())['ok'] );
+check( '43 · le dépôt ignore le type annoncé', 'upload_invalid_mime' === P::validate_one( $menteur , profil_conception())['code'] );
 
 // ====== 44 · SVG devient accepté ===========================================
 $pol = mutant(
@@ -1230,8 +1263,10 @@ $pol = mutant(
 
 $svg = array( 'block' => 'photos', 'name' => 'd.svg', 'tmp_name' => fx_svg(), 'error' => UPLOAD_ERR_OK );
 
-check( '44 · SVG ajouté au catalogue → il est accepté', $pol::validate_one( $svg )['ok'] );
-check( '44 · le dépôt refuse le SVG', 'upload_invalid_extension' === P::validate_one( $svg )['code'] );
+// Le catalogue de formats vit dans le profil, assemblé par conception_profile() :
+// on bâtit donc le profil DEPUIS la classe mutée, sinon la mutation ne circule pas.
+check( '44 · SVG ajouté au catalogue → il est accepté', $pol::validate_one( $svg, $pol::conception_profile() )['ok'] );
+check( '44 · le dépôt refuse le SVG', 'upload_invalid_extension' === P::validate_one( $svg , profil_conception())['code'] );
 
 // ====== 45 · un fichier vide passe =========================================
 $pol = mutant(
@@ -1247,8 +1282,8 @@ $pol = mutant(
 $vide = array( 'block' => 'photos', 'name' => 'v.pdf', 'tmp_name' => fx_vide(), 'error' => UPLOAD_ERR_OK );
 
 check( '45 · contrôle retiré → un fichier vide franchit le contrôle de taille',
-	'upload_empty_file' !== $pol::validate_one( $vide )['code'] );
-check( '45 · le dépôt refuse le fichier vide', 'upload_empty_file' === P::validate_one( $vide )['code'] );
+	'upload_empty_file' !== $pol::validate_one( $vide , profil_conception())['code'] );
+check( '45 · le dépôt refuse le fichier vide', 'upload_empty_file' === P::validate_one( $vide , profil_conception())['code'] );
 
 // ====== 46 · le stockage peut se faire sous ABSPATH ========================
 $st = mutant(
@@ -1289,7 +1324,7 @@ $st = mutant(
 
 $st::set_mover( $GLOBALS['fx_mover'] );
 $staging = $st::open_staging();
-$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $depose  = $st::stage( (string) $staging, $valide['file'], 0 );
 $meta_m  = $st::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
 
@@ -1297,7 +1332,7 @@ check( '47 · muté → le nom d’origine devient le nom physique', str_contain
 
 neuf_fichiers();
 $staging = Storage::open_staging();
-$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'Secret Client.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $depose  = Storage::stage( (string) $staging, $valide['file'], 0 );
 $meta_s  = Storage::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
 
@@ -1479,7 +1514,7 @@ $st = mutant(
 neuf_fichiers();
 $st::set_mover( $GLOBALS['fx_mover'] );
 $staging = $st::open_staging();
-$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $depose  = $st::stage( (string) $staging, $valide['file'], 0 );
 $meta_m  = $st::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
 
@@ -1487,7 +1522,7 @@ check( '54 · muté → le chemin absolu se retrouve en métadonnée', str_start
 
 neuf_fichiers();
 $staging = Storage::open_staging();
-$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$valide  = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $depose  = Storage::stage( (string) $staging, $valide['file'], 0 );
 $meta_s  = Storage::finalize( (string) $staging, 'URB-2026-0001', array( $depose ), time() );
 
@@ -1715,7 +1750,7 @@ $p = mutant(
 function abandon_avec_fichier( int $vieux ): array {
 	$c       = transaction_abandonnee( $vieux );
 	$staging = Storage::open_staging();
-	$v       = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+	$v       = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 	Storage::finalize( (string) $staging, (string) $c['reference'], array( Storage::stage( (string) $staging, $v['file'], 0 ) ), $vieux );
 
 	return $c;
@@ -2125,7 +2160,7 @@ function abandon_verrouille( int $vieux ): array {
 	);
 	$c = SubmissionRepository::create( $v['clean'], $v['pricing'], array( 'now' => $vieux, 'files_status' => 'pending', 'finalize' => false, 'transaction' => 'tx', 'staging' => $staging ) );
 
-	$d    = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+	$d    = P::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 	$meta = Storage::finalize( (string) $staging, (string) $c['reference'], array( Storage::stage( (string) $staging, $d['file'], 0 ) ), $vieux );
 	SubmissionRepository::set_files( (int) $c['id'], (array) $meta );
 
@@ -3862,6 +3897,39 @@ check( '134 · vérification retirée → un échec réel passe pour un succès'
 check( '134 · le dépôt le détecte', false === SubmissionRepository::persist_meta( $id134, '_essai', 'x' ) );
 
 $GLOBALS['wpd_meta_fail'] = '';
+
+// ===== 135 · la notification ne retombe JAMAIS sur Conception ==================
+// Si le registre renvoie une stratégie Conception pour un type sans stratégie,
+// une demande d'un autre type recevrait le courriel interne Conception.
+$nr = mutant(
+	'src/Mail/NotificationStrategyRegistry.php',
+	'NotificationStrategyRegistry',
+	array( 'return null;' => 'return new ConceptionNotificationStrategy();' )
+);
+
+check( '135 · repli injecté → localisation obtient une stratégie', $nr::for_type( 'localisation' ) instanceof \Urbizen\Platform\Mail\ConceptionNotificationStrategy );
+check( '135 · le vrai registre n’a aucun repli (localisation → null)', null === \Urbizen\Platform\Mail\NotificationStrategyRegistry::for_type( 'localisation' ) );
+
+// ===== 136 · l'invariant type/définition est tenu ==============================
+// Sans la garde, une définition déclarant un type autre que sa clé serait
+// acceptée, et le type de la route cesserait d'être la source canonique.
+$fr = mutant(
+	'src/Forms/FormRegistry.php',
+	'FormRegistry',
+	array( '$definition->type() !== $type' => 'false' )
+);
+
+$fic136 = URBIZEN_PLATFORM_DIR . 'src/Forms/definitions/incoherent_mut.php';
+file_put_contents( $fic136, "<?php return array( 'type' => 'autre', 'title' => 'X', 'submit_label' => 'X', 'fields' => array( array( 'name' => 'a', 'type' => 'text', 'step' => 's' ) ), 'steps' => array( array( 'id' => 's', 'label' => 'S' ) ) );" );
+
+$fr::register( 'incoherent_mut' );
+$def_mut = $fr::get( 'incoherent_mut' );
+\Urbizen\Platform\Forms\FormRegistry::register( 'incoherent_mut' );
+$def_reel = \Urbizen\Platform\Forms\FormRegistry::get( 'incoherent_mut' );
+@unlink( $fic136 );
+
+check( '136 · garde retirée → une définition au type incohérent est acceptée', $def_mut instanceof \Urbizen\Platform\Forms\FormDefinition && 'autre' === $def_mut->type() );
+check( '136 · la vraie garde rejette la définition incohérente', null === $def_reel );
 
 
 verdict();

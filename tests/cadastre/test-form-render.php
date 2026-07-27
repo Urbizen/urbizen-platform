@@ -63,6 +63,7 @@ function shortcode_atts( $pairs, $atts, $sc = '' ) {
 require URBIZEN_PLATFORM_DIR . 'src/Forms/FormDefinition.php';
 require URBIZEN_PLATFORM_DIR . 'src/Forms/FormRegistry.php';
 require URBIZEN_PLATFORM_DIR . 'src/Forms/Renderer.php';
+require URBIZEN_PLATFORM_DIR . 'src/Blocks/FormRendererResolver.php';
 require URBIZEN_PLATFORM_DIR . 'src/Blocks/FormBlock.php';
 
 use Urbizen\Platform\Blocks\FormBlock;

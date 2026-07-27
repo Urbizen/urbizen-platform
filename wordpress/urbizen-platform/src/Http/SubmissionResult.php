@@ -46,6 +46,7 @@ final class SubmissionResult {
 	public const UPLOAD_INVALID_EXTENSION   = 'upload_invalid_extension';
 	public const UPLOAD_INVALID_MIME        = 'upload_invalid_mime';
 	public const UPLOAD_COUNT_EXCEEDED      = 'upload_count_exceeded';
+	public const UPLOAD_NOT_ALLOWED         = 'upload_not_allowed';
 
 	/**
 	 * Le navigateur a déclaré plus — ou autre chose — que ce qui est arrivé.

@@ -156,7 +156,7 @@ $mf2 = mutant(
 neuf();
 $un = lot( 'photos', 1 );
 unlink( $un['photos']['tmp_name'][0] );
-$n = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un );
+$n = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un , profil_conception());
 
 check( '3 · conversion seule retirée, le contrôle d’existence protège', null === $mf1::from_files( $n['files'] ) );
 check( '3 · LES DEUX RETIRÉES → UNE TAILLE DE ZÉRO EST INVENTÉE',
@@ -180,7 +180,7 @@ neuf();
 $un = lot( 'photos', 1 );
 $taille_reelle = (int) filesize( $un['photos']['tmp_name'][0] );
 unlink( $un['photos']['tmp_name'][0] );
-$n = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un );
+$n = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un , profil_conception());
 $m = $md::from_files( $n['files'] );
 
 check( '4 · repli sur declared_size → une taille est inventée',
@@ -199,7 +199,7 @@ $ma = mutant(
 
 neuf();
 $un = lot( 'photos', 1 );
-$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un );
+$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un , profil_conception());
 
 check( '5 · absence tolérée → un fichier sans manifeste passe',
 	true === $ma::verify( null, $n['files'] )['ok'] );
@@ -249,7 +249,7 @@ foreach ( array( 'name', 'type', 'tmp_name', 'error', 'size' ) as $cle ) {
 	array_pop( $tronque['plan_terrain'][ $cle ] );
 }
 
-$nt = \Urbizen\Platform\Files\UploadNormalizer::normalize( $tronque );
+$nt = \Urbizen\Platform\Files\UploadNormalizer::normalize( $tronque , profil_conception());
 
 check( '6 · total seul retiré, le nombre par bloc protège encore', false === $mc1::verify( $annonce, $nt['files'] )['ok'] );
 check( '6 · TOUTES RETIRÉES → 20 ANNONCÉS / 19 REÇUS EST ACCEPTÉ', true === $mc::verify( $annonce, $nt['files'] )['ok'] );
@@ -274,7 +274,7 @@ $ms = mutant(
 
 neuf();
 $un = lot( 'photos', 1 );
-$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un );
+$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un , profil_conception());
 $fausse = (string) wp_json_encode(
 	array( 'version' => 1, 'total_count' => 1, 'total_size' => 99999, 'blocks' => array( 'photos' => array( 'count' => 1, 'size' => 99999 ) ) )
 );
@@ -299,7 +299,7 @@ $mb = mutant(
 
 neuf();
 $un = lot( 'photos', 1 );
-$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un );
+$n  = \Urbizen\Platform\Files\UploadNormalizer::normalize( $un , profil_conception());
 $m  = UploadManifest::from_files( $n['files'] );
 $autre_bloc = (string) wp_json_encode(
 	array( 'version' => 1, 'total_count' => 1, 'total_size' => $m['total_size'], 'blocks' => array( 'urbanisme' => array( 'count' => 1, 'size' => $m['total_size'] ) ) )

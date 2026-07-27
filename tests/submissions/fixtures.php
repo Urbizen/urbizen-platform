@@ -12,6 +12,18 @@
 
 require_once __DIR__ . '/test-mover.php';
 
+/**
+ * Profil d'upload Conception, transmis EXPLICITEMENT aux appels de test.
+ *
+ * Depuis l'incrément 5 bis, le moteur n'a plus de profil implicite : chaque banc
+ * fournit le profil, comme le fait la production via UploadProfileRegistry.
+ *
+ * @return \Urbizen\Platform\Files\UploadProfile
+ */
+function profil_conception(): \Urbizen\Platform\Files\UploadProfile {
+	return \Urbizen\Platform\Files\UploadProfileRegistry::require_for_type( 'conception' );
+}
+
 $GLOBALS['fx_temp']  = array();
 $GLOBALS['fx_mover'] = new FixtureFileMover();
 

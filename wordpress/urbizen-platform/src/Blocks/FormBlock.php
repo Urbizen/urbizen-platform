@@ -17,7 +17,6 @@
 namespace Urbizen\Platform\Blocks;
 
 use Urbizen\Platform\Forms\FormRegistry;
-use Urbizen\Platform\Forms\Renderer;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -195,15 +194,25 @@ final class FormBlock {
 			$values[ $key ] = sanitize_text_field( is_scalar( $raw ) ? (string) $raw : '' );
 		}
 
-		// Le type de formulaire ne peut valoir que ce que le code connaît.
-		$type = $values['formType'] ?? '';
+		// Le type de formulaire ne peut valoir que ce que le code connaît :
+		// il est validé par la liste blanche, jamais choisi par le navigateur.
+		$type = (string) ( $values['formType'] ?? '' );
 		$def  = FormRegistry::get( $type );
 
 		if ( null === $def ) {
-			$def = FormRegistry::get( FormRegistry::default_type() );
+			// Repli historique **contractualisé** : un type absent ou hors liste
+			// blanche retombe sur le formulaire par défaut (le localisateur
+			// neutre). Ce repli est figé par tests/cadastre/test-form-render.php ;
+			// il ne substitue jamais un autre formulaire *commercial*. Le type
+			// résolu — et non le type demandé — pilote la suite.
+			$type = FormRegistry::default_type();
+			$def  = FormRegistry::get( $type );
 		}
 
-		if ( null === $def ) {
+		if ( null === $def || ! FormRendererResolver::has( $type ) ) {
+			// Échec sûr : aucun renderer autorisé (ne devrait pas arriver pour
+			// les types livrés). Rien de public, aucun détail technique, aucune
+			// déduction de classe.
 			return '';
 		}
 
@@ -216,15 +225,23 @@ final class FormBlock {
 
 		$form_id = preg_replace( '/[^A-Za-z0-9_-]/', '', (string) ( $values['formId'] ?? '' ) );
 
-		self::enqueue();
+		// Les ressources de bloc `urbizen-form` ne servent qu'au renderer plat ;
+		// Conception enfile ses propres ressources depuis sa façade. Le résolveur
+		// dit, par sa table serveur, si ce parcours en a besoin.
+		if ( FormRendererResolver::needs_block_assets( $type ) ) {
+			self::enqueue();
+		}
 
-		return Renderer::render(
+		$html = FormRendererResolver::render(
+			$type,
 			$def,
 			array(
 				'storageKey' => (string) $storage_key,
 				'formId'     => (string) $form_id,
 			)
 		);
+
+		return null === $html ? '' : $html;
 	}
 
 	/**

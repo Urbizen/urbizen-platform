@@ -145,7 +145,7 @@ foreach ( array( 'D' => 1, 'E' => 3 ) as $point => $nombre ) {
 	$lot     = array();
 
 	for ( $i = 0; $i < $nombre; $i++ ) {
-		$v     = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => "p$i.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+		$v     = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => "p$i.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 		$lot[] = Storage::stage( (string) $staging, $v['file'], $i );
 	}
 
@@ -166,7 +166,7 @@ foreach ( array( 'D' => 1, 'E' => 3 ) as $point => $nombre ) {
 neuf();
 $c       = SubmissionRepository::create( $jeu['clean'], $jeu['pricing'], array( 'now' => $vieux, 'files_status' => 'pending', 'finalize' => false, 'transaction' => 'tx-f' ) );
 $staging = Storage::open_staging();
-$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $meta    = Storage::finalize( (string) $staging, (string) $c['reference'], array( Storage::stage( (string) $staging, $v['file'], 0 ) ), $vieux );
 SubmissionRepository::set_files( (int) $c['id'], (array) $meta );
 
@@ -189,7 +189,7 @@ tout_est_propre( 'F' );
 neuf();
 $c       = SubmissionRepository::create( $jeu['clean'], $jeu['pricing'], array( 'now' => $vieux, 'files_status' => 'pending', 'finalize' => false, 'transaction' => 'tx-g' ) );
 $staging = Storage::open_staging();
-$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => 'p.pdf', 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $meta_g  = Storage::finalize( (string) $staging, (string) $c['reference'], array( Storage::stage( (string) $staging, $v['file'], 0 ) ), $vieux );
 SubmissionRepository::set_files( (int) $c['id'], (array) $meta_g );
 
@@ -356,7 +356,7 @@ $c       = SubmissionRepository::create( $jeu['clean'], $jeu['pricing'], array( 
 $lot_k   = array();
 
 foreach ( array( 'a', 'b' ) as $i => $nom ) {
-	$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => "$nom.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+	$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 'photos', 'name' => "$nom.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 	$lot_k[] = Storage::stage( (string) $staging, $v['file'], $i );
 }
 
@@ -418,7 +418,7 @@ $c       = SubmissionRepository::create( $jeu['clean'], $jeu['pricing'], array( 
 $lot_k   = array();
 
 foreach ( array( 'a', 'b' ) as $i => $nom ) {
-	$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 0 === $i ? 'photos' : 'urbanisme', 'name' => "$nom.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) );
+	$v       = \Urbizen\Platform\Files\UploadPolicy::validate_one( array( 'block' => 0 === $i ? 'photos' : 'urbanisme', 'name' => "$nom.pdf", 'tmp_name' => fx_copie( fx_pdf() ), 'error' => UPLOAD_ERR_OK ) , profil_conception());
 	$lot_k[] = Storage::stage( (string) $staging, $v['file'], $i );
 }
 

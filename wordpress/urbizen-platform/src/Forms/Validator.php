@@ -527,7 +527,20 @@ final class Validator {
 			return null;
 		}
 
-		$pricing = Pricing::compute( $selection );
+		// La stratégie est résolue depuis le TYPE serveur de la définition (issue
+		// de la liste blanche), jamais depuis une valeur cliente. Un formulaire
+		// déclarant des options tarifées mais sans stratégie serveur ne se voit
+		// inventer aucun prix et ne retombe pas sur Conception : le calcul renvoie
+		// null, et le contrôleur rejette (prix indisponible) avant tout effet.
+		$strategie = PricingStrategyRegistry::for_type( $def->type() );
+
+		if ( null === $strategie ) {
+			$notes[] = 'pricing_strategy_absente:' . $def->type();
+
+			return null;
+		}
+
+		$pricing = $strategie->calculate( $selection );
 
 		foreach ( $pricing['ignores'] as $ignore ) {
 			$notes[] = 'option_inconnue:' . $ignore;

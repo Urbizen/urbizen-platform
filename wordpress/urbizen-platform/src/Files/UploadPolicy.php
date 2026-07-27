@@ -118,6 +118,23 @@ final class UploadPolicy {
 	}
 
 	/**
+	 * Un identifiant de bloc est-il **syntaxiquement** sûr ?
+	 *
+	 * Contrôle **générique**, indépendant de tout profil : un identifiant en
+	 * minuscules ASCII, sans séparateur, sans traversée, propre à servir de
+	 * segment de chemin. Les composants de stockage et de manifeste, qui ne
+	 * traitent que des documents **déjà validés par un profil**, s'en servent
+	 * comme garde-fou de format — jamais comme politique métier, laquelle
+	 * appartient au profil.
+	 *
+	 * @param string $block Identifiant de bloc.
+	 * @return bool
+	 */
+	public static function is_valid_block_id( string $block ): bool {
+		return 1 === preg_match( '/^[a-z][a-z0-9_]*$/', $block );
+	}
+
+	/**
 	 * Nombre maximal par bloc, ajustable par filtre.
 	 *
 	 * @return int
@@ -154,37 +171,69 @@ final class UploadPolicy {
 	}
 
 	/**
-	 * Valide un lot normalisé.
+	 * Profil Conception, assemblé depuis les constantes de cette politique.
+	 *
+	 * Source serveur clairement identifiable du profil du parcours de conception :
+	 * blocs, formats, quantités et tailles historiques, filtres évalués à l'appel.
+	 * Le registre l'associe au type « conception ». Ce n'est **pas** un profil par
+	 * défaut : aucun autre formulaire n'en hérite implicitement.
+	 *
+	 * @return UploadProfile
+	 */
+	public static function conception_profile(): UploadProfile {
+		return new UploadProfile(
+			'conception',
+			self::BLOCKS,
+			self::TYPES,
+			self::max_per_block(),
+			self::max_total(),
+			self::max_file_size(),
+			self::max_total_size(),
+			true,
+		);
+	}
+
+	/**
+	 * Valide un lot normalisé contre un profil serveur **explicite**.
 	 *
 	 * Reçoit la sortie de `UploadNormalizer`, jamais `$_FILES` brut. Ne déplace
-	 * aucun fichier : elle décide, elle n'agit pas.
+	 * aucun fichier : elle décide, elle n'agit pas. Le profil est **obligatoire** :
+	 * le moteur ne suppose jamais qu'un profil absent signifie Conception. Un
+	 * profil sans dépôt refuse tout lot non vide.
 	 *
-	 * @param array<int, array<string, mixed>> $lot Documents normalisés.
+	 * @param array<int, array<string, mixed>> $lot     Documents normalisés.
+	 * @param UploadProfile                    $profile Profil serveur explicite.
 	 * @return array{ok:bool,code:string,files:array<int,array<string,mixed>>,block:string}
 	 */
-	public static function validate( array $lot ): array {
+	public static function validate( array $lot, UploadProfile $profile ): array {
+		if ( ! $profile->uploads_enabled ) {
+			return array() === $lot
+				? array( 'ok' => true, 'code' => 'success', 'files' => array(), 'block' => '' )
+				: self::refus( 'upload_not_allowed' );
+		}
+
 		$par_bloc = array();
 		$total    = 0;
 		$retenus  = array();
 
-		if ( count( $lot ) > self::max_total() ) {
+		if ( count( $lot ) > $profile->max_total ) {
 			return self::refus( 'upload_count_exceeded' );
 		}
 
 		foreach ( $lot as $doc ) {
 			$bloc = isset( $doc['block'] ) ? (string) $doc['block'] : '';
 
-			if ( ! self::is_block( $bloc ) ) {
+			if ( ! $profile->has_block( $bloc ) ) {
 				return self::refus( 'upload_invalid_structure', $bloc );
 			}
 
 			$par_bloc[ $bloc ] = ( $par_bloc[ $bloc ] ?? 0 ) + 1;
 
-			if ( $par_bloc[ $bloc ] > self::max_per_block() ) {
+			if ( $par_bloc[ $bloc ] > $profile->max_per_block ) {
 				return self::refus( 'upload_count_exceeded', $bloc );
 			}
 
-			$verdict = self::validate_one( $doc );
+			$verdict = self::validate_one( $doc, $profile );
 
 			if ( ! $verdict['ok'] ) {
 				return self::refus( $verdict['code'], $bloc );
@@ -192,7 +241,7 @@ final class UploadPolicy {
 
 			$total += (int) $verdict['file']['size'];
 
-			if ( $total > self::max_total_size() ) {
+			if ( $total > $profile->max_total_size ) {
 				return self::refus( 'upload_total_size_exceeded', $bloc );
 			}
 
@@ -208,12 +257,13 @@ final class UploadPolicy {
 	}
 
 	/**
-	 * Valide un document.
+	 * Valide un document contre un profil serveur.
 	 *
-	 * @param array<string, mixed> $doc Document normalisé.
+	 * @param array<string, mixed> $doc     Document normalisé.
+	 * @param UploadProfile        $profile Profil serveur explicite.
 	 * @return array{ok:bool,code:string,file:array<string,mixed>}
 	 */
-	public static function validate_one( array $doc ): array {
+	public static function validate_one( array $doc, UploadProfile $profile ): array {
 		$erreur = isset( $doc['error'] ) ? (int) $doc['error'] : UPLOAD_ERR_NO_FILE;
 
 		if ( UPLOAD_ERR_OK !== $erreur ) {
@@ -233,14 +283,14 @@ final class UploadPolicy {
 			return self::refus_un( 'upload_empty_file' );
 		}
 
-		if ( $taille > self::max_file_size() ) {
+		if ( $taille > $profile->max_file_size ) {
 			return self::refus_un( 'upload_too_large' );
 		}
 
 		$nom       = isset( $doc['name'] ) ? (string) $doc['name'] : '';
 		$extension = self::extension_of( $nom );
 
-		if ( null === self::mime_for( $extension ) ) {
+		if ( null === $profile->mime_for( $extension ) ) {
 			return self::refus_un( 'upload_invalid_extension' );
 		}
 
@@ -252,14 +302,14 @@ final class UploadPolicy {
 
 		// La concordance dans les deux sens : l'extension annonce un type, le
 		// contenu en révèle un autre — l'un des deux ment, on refuse.
-		if ( self::mime_for( $extension ) !== $reel ) {
+		if ( $profile->mime_for( $extension ) !== $reel ) {
 			return self::refus_un( 'upload_invalid_mime' );
 		}
 
 		// Contrôle croisé par WordPress lorsqu'il est disponible : il applique
 		// ses propres correspondances et peut corriger une extension trompeuse.
 		if ( function_exists( 'wp_check_filetype_and_ext' ) ) {
-			$wp = wp_check_filetype_and_ext( $chemin, 'fichier.' . $extension, self::wp_mimes() );
+			$wp = wp_check_filetype_and_ext( $chemin, 'fichier.' . $extension, self::wp_mimes_for( $profile->types ) );
 
 			if ( empty( $wp['ext'] ) || empty( $wp['type'] ) ) {
 				return self::refus_un( 'upload_invalid_mime' );
@@ -327,17 +377,38 @@ final class UploadPolicy {
 	}
 
 	/**
-	 * Correspondances au format attendu par WordPress.
+	 * Correspondances au format attendu par WordPress, pour le profil par défaut.
 	 *
 	 * @return array<string, string>
 	 */
 	public static function wp_mimes(): array {
-		return array(
-			'pdf'      => 'application/pdf',
-			'jpg|jpeg' => 'image/jpeg',
-			'png'      => 'image/png',
-			'webp'     => 'image/webp',
-		);
+		return self::wp_mimes_for( self::TYPES );
+	}
+
+	/**
+	 * Correspondances au format attendu par WordPress, pour un jeu d'extensions.
+	 *
+	 * Les extensions partageant un même type réel sont regroupées (`jpg|jpeg`),
+	 * en conservant leur ordre de déclaration. Pour le jeu par défaut, la sortie
+	 * est identique, à l'octet près, à l'ancienne table figée.
+	 *
+	 * @param array<string, string> $types Extensions → type réel.
+	 * @return array<string, string>
+	 */
+	private static function wp_mimes_for( array $types ): array {
+		$groupes = array();
+
+		foreach ( $types as $extension => $mime ) {
+			$groupes[ $mime ][] = $extension;
+		}
+
+		$out = array();
+
+		foreach ( $groupes as $mime => $extensions ) {
+			$out[ implode( '|', $extensions ) ] = $mime;
+		}
+
+		return $out;
 	}
 
 	/**

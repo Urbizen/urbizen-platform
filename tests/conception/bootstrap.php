@@ -21,6 +21,9 @@ require_once URBIZEN_PLATFORM_DIR . 'src/Support/Logger.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/FormDefinition.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/FormRegistry.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/Pricing.php';
+require_once URBIZEN_PLATFORM_DIR . 'src/Forms/PricingStrategy.php';
+require_once URBIZEN_PLATFORM_DIR . 'src/Forms/ConceptionPricingStrategy.php';
+require_once URBIZEN_PLATFORM_DIR . 'src/Forms/PricingStrategyRegistry.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/Validator.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/Renderer.php';
 
