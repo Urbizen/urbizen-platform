@@ -22,11 +22,12 @@
 namespace Urbizen\Platform\Http;
 
 use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Files\UploadProfileRegistry;
 use Urbizen\Platform\Files\UploadManifest;
 use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
-use Urbizen\Platform\Forms\Pricing;
+use Urbizen\Platform\Forms\PricingStrategyRegistry;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
@@ -76,9 +77,27 @@ final class SubmissionController {
 	public const RETURN_FIELD = 'urbizen_return';
 
 	/**
-	 * Identifiant du formulaire traité.
+	 * Identifiant du formulaire traité par l'action historique {@see self::ACTION}.
+	 * Conservé pour compatibilité et comme valeur de la table de routage.
 	 */
 	public const FORM_TYPE = 'conception';
+
+	/**
+	 * Configuration serveur des routes : action → { type de formulaire, action de
+	 * nonce }. Résolue EXCLUSIVEMENT côté serveur (la clé est l'action du hook) ;
+	 * le navigateur ne choisit jamais la route. Un champ POST ne sert qu'à un
+	 * contrôle de cohérence, après que la route serveur a déjà été choisie. Une
+	 * seule route réelle aujourd'hui ; DP/PC/CERFA ne sont pas anticipés.
+	 * Décision : docs/DECISIONS.md D-050 (B).
+	 *
+	 * @var array<string, array{form_type: string, nonce_action: string}>
+	 */
+	private const ROUTES = array(
+		self::ACTION => array(
+			'form_type'    => self::FORM_TYPE,
+			'nonce_action' => self::NONCE_ACTION,
+		),
+	);
 
 	/**
 	 * Accroche les deux points d'entrée.
@@ -105,7 +124,15 @@ final class SubmissionController {
 		$server = isset( $_SERVER ) ? (array) $_SERVER : array();
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
-		$result = self::process( is_array( $post ) ? $post : array(), $files, $server );
+		// La route est choisie par le HOOK, via une valeur LITTÉRALE liée à
+		// l'action enregistrée ({@see self::register()}) — jamais depuis $_POST.
+		$result = self::process(
+			is_array( $post ) ? $post : array(),
+			$files,
+			$server,
+			null,
+			self::route_for_action( self::ACTION )
+		);
 
 		wp_safe_redirect( self::redirect_url( $result, is_array( $post ) ? $post : array() ) );
 		exit;
@@ -124,13 +151,24 @@ final class SubmissionController {
 	 * @param int|null             $now    Horodatage courant (tests).
 	 * @return SubmissionResult
 	 */
-	public static function process( array $post, array $files, array $server, ?int $now = null ): SubmissionResult {
+	public static function process( array $post, array $files, array $server, ?int $now = null, ?array $route = null ): SubmissionResult {
+		// La ROUTE provient du hook (paramètre) ou, à défaut — appel direct des
+		// bancs d'essai —, de l'action historique. Jamais d'une valeur de requête.
+		$resolved = null === $route ? self::route_for_action( self::ACTION ) : self::sanitize_route( $route );
+
+		if ( null === $resolved ) {
+			$result = SubmissionResult::failure( SubmissionResult::INVALID_FORM );
+			self::log( $result, isset( $route['form_type'] ) ? (string) $route['form_type'] : self::FORM_TYPE );
+
+			return $result;
+		}
+
 		// La journalisation appartient au traitement, pas au point d'entrée
 		// HTTP : un appel direct à process() doit laisser la même trace qu'une
 		// vraie requête, sans quoi un refus pourrait passer inaperçu.
-		$result = self::evaluate( $post, $files, $server, null === $now ? time() : $now );
+		$result = self::evaluate( $post, $files, $server, null === $now ? time() : $now, $resolved );
 
-		self::log( $result );
+		self::log( $result, $resolved['form_type'] );
 
 		return $result;
 	}
@@ -144,7 +182,10 @@ final class SubmissionController {
 	 * @param int                  $now    Horodatage courant.
 	 * @return SubmissionResult
 	 */
-	private static function evaluate( array $post, array $files, array $server, int $now ): SubmissionResult {
+	private static function evaluate( array $post, array $files, array $server, int $now, array $route ): SubmissionResult {
+
+		// Type de formulaire : issu de la ROUTE serveur déjà résolue, jamais du POST.
+		$type = $route['form_type'];
 
 		// --- 1 · méthode ---
 		$methode = isset( $server['REQUEST_METHOD'] ) ? strtoupper( (string) $server['REQUEST_METHOD'] ) : '';
@@ -167,8 +208,17 @@ final class SubmissionController {
 		// --- 2 · nonce ---
 		$nonce = isset( $post[ self::NONCE_FIELD ] ) ? (string) $post[ self::NONCE_FIELD ] : '';
 
-		if ( '' === $nonce || ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
+		if ( '' === $nonce || ! wp_verify_nonce( $nonce, $route['nonce_action'] ) ) {
 			return SubmissionResult::failure( SubmissionResult::INVALID_NONCE );
+		}
+
+		// --- 2 bis · cohérence (la ROUTE, déjà choisie côté serveur, fait foi) ---
+		// Un « action » ou « form_type » présent dans le POST ne peut que
+		// CONFIRMER la route serveur ; s'il la contredit, la requête est
+		// trafiquée → refus AVANT toute réservation ou écriture.
+		if ( ( isset( $post['action'] ) && (string) $post['action'] !== $route['action'] )
+			|| ( isset( $post['form_type'] ) && (string) $post['form_type'] !== $type ) ) {
+			return SubmissionResult::failure( SubmissionResult::INVALID_FORM );
 		}
 
 		// --- 3 · pot de miel ---
@@ -197,7 +247,7 @@ final class SubmissionController {
 		}
 
 		// --- 6 · réservation d'un créneau de débit ---
-		$creneau = RateLimiter::reserve( self::FORM_TYPE, $server, $now );
+		$creneau = RateLimiter::reserve( $type, $server, $now );
 
 		if ( null === $creneau ) {
 			// Le quota est atteint : le jeton reste utilisable plus tard.
@@ -224,10 +274,10 @@ final class SubmissionController {
 		};
 
 		// --- 7 · définition ---
-		$definition = FormRegistry::get( self::FORM_TYPE );
+		$definition = FormRegistry::get( $type );
 
 		if ( null === $definition || ! $definition->is_valid() ) {
-			Logger::error( 'soumission : définition « ' . self::FORM_TYPE . ' » indisponible ou invalide' );
+			Logger::error( 'soumission : définition « ' . $type . ' » indisponible ou invalide' );
 
 			return $renoncer( SubmissionResult::INVALID_FORM );
 		}
@@ -248,17 +298,45 @@ final class SubmissionController {
 			return $renoncer( SubmissionResult::PRICING_FAILED );
 		}
 
-		if ( (int) $pricing['base'] !== Pricing::BASE ) {
-			Logger::error( 'soumission : prix de base incohérent avec le catalogue' );
+		// La stratégie tarifaire est résolue depuis le TYPE serveur, jamais depuis
+		// $_POST. Le prix persisté doit reposer sur le socle de cette stratégie —
+		// un type sans stratégie, ou un socle divergent, est refusé.
+		$strategie_prix = PricingStrategyRegistry::for_type( $type );
+
+		if ( null === $strategie_prix || (int) $pricing['base'] !== $strategie_prix->base() ) {
+			Logger::error( 'soumission : prix de base incohérent avec la stratégie du type' );
 
 			return $renoncer( SubmissionResult::PRICING_FAILED );
 		}
 
-		// --- 10 · documents : normalisation puis politique ---
-		$normalisation = UploadNormalizer::normalize( $files );
+		// --- 10 · documents : profil serveur, puis normalisation pilotée par lui ---
+		// Le profil d'upload est résolu depuis le TYPE serveur (issu de la route),
+		// jamais depuis $_POST/$_FILES : le navigateur transmet des fichiers, jamais
+		// le profil qui les juge. Le moteur ne suppose JAMAIS Conception par défaut ;
+		// la résolution précède toute décision sur les blocs acceptables.
+		$profil = UploadProfileRegistry::for_type( $type );
 
-		if ( ! $normalisation['ok'] ) {
-			return $renoncer( $normalisation['code'] );
+		if ( null === $profil || ! $profil->uploads_enabled ) {
+			// Ce type n'admet aucun document. On ne normalise pas contre une liste
+			// Conception : un vrai fichier reçu est un refus contrôlé, sinon la
+			// soumission continue sans document. (Aujourd'hui inatteignable — seule
+			// la route Conception existe — mais la garde interdit tout repli.)
+			if ( self::contient_fichiers( $files ) ) {
+				return $renoncer( SubmissionResult::UPLOAD_NOT_ALLOWED );
+			}
+
+			$normalisation = array(
+				'ok'      => true,
+				'code'    => 'success',
+				'files'   => array(),
+				'ignored' => array(),
+			);
+		} else {
+			$normalisation = UploadNormalizer::normalize( $files, $profil );
+
+			if ( ! $normalisation['ok'] ) {
+				return $renoncer( $normalisation['code'] );
+			}
 		}
 
 		// --- 10 bis · manifeste : détecter une réception partielle ---
@@ -295,7 +373,10 @@ final class SubmissionController {
 		}
 
 		if ( array() !== $normalisation['files'] ) {
-			$politique = UploadPolicy::validate( $normalisation['files'] );
+			// $profil est ici garanti non nul et ouvert : un profil absent ou fermé
+			// aurait produit une liste de fichiers vide ci-dessus. La validation
+			// s'appuie donc sur le profil serveur explicite, jamais sur un défaut.
+			$politique = UploadPolicy::validate( $normalisation['files'], $profil );
 
 			if ( ! $politique['ok'] ) {
 				return $renoncer( $politique['code'] );
@@ -357,7 +438,7 @@ final class SubmissionController {
 			$validation['clean'],
 			$pricing,
 			array(
-				'form_type'    => self::FORM_TYPE,
+				'form_type'    => $type,
 				'source_path'  => self::source_path( $post, $server ),
 				'now'          => $now,
 				'files_status' => array() === $lot ? 'none' : 'pending',
@@ -429,6 +510,35 @@ final class SubmissionController {
 	}
 
 	/**
+	 * `$_FILES` contient-il au moins un fichier réellement téléversé ?
+	 *
+	 * Contrôle **générique**, indépendant de tout profil ou bloc : il ne sert
+	 * qu'à distinguer, pour un type sans profil d'upload, une soumission sans
+	 * document (admise) d'une tentative de dépôt (refusée). Un champ laissé vide
+	 * (`UPLOAD_ERR_NO_FILE`) ne compte pas.
+	 *
+	 * @param array<string, mixed> $files Superglobale des fichiers.
+	 * @return bool
+	 */
+	private static function contient_fichiers( array $files ): bool {
+		foreach ( $files as $entree ) {
+			if ( ! is_array( $entree ) || ! isset( $entree['error'] ) ) {
+				continue;
+			}
+
+			$erreurs = is_array( $entree['error'] ) ? $entree['error'] : array( $entree['error'] );
+
+			foreach ( $erreurs as $erreur ) {
+				if ( is_numeric( $erreur ) && UPLOAD_ERR_NO_FILE !== (int) $erreur ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Retire les champs techniques avant validation.
 	 *
 	 * Le nonce, le pot de miel, le jeton et l'adresse de retour ne sont pas des
@@ -446,10 +556,50 @@ final class SubmissionController {
 			$post[ self::TOKEN_FIELD ],
 			$post[ self::RETURN_FIELD ],
 			$post['action'],
+			$post['form_type'],
 			$post['_wp_http_referer']
 		);
 
 		return $post;
+	}
+
+	/**
+	 * Route serveur associée à une action, depuis la table {@see self::ROUTES}.
+	 * Jamais construite à partir d'une valeur de requête : l'action passée est
+	 * une valeur LITTÉRALE liée au hook.
+	 *
+	 * @param string $action Nom de l'action `admin-post`.
+	 * @return array{action: string, form_type: string, nonce_action: string}|null
+	 */
+	private static function route_for_action( string $action ): ?array {
+		$route = self::ROUTES[ $action ] ?? null;
+
+		return is_array( $route ) ? self::sanitize_route( array( 'action' => $action ) + $route ) : null;
+	}
+
+	/**
+	 * Valide une route explicite : structure complète (action, type, nonce) et
+	 * type présent dans la liste blanche du registre. Sert à la résolution
+	 * serveur et aux routes fictives des bancs d'essai. Renvoie une route
+	 * normalisée, ou null si elle est incomplète ou non autorisée.
+	 *
+	 * @param array<string, mixed> $route Route candidate.
+	 * @return array{action: string, form_type: string, nonce_action: string}|null
+	 */
+	private static function sanitize_route( array $route ): ?array {
+		$action = isset( $route['action'] ) ? (string) $route['action'] : '';
+		$type   = isset( $route['form_type'] ) ? (string) $route['form_type'] : '';
+		$nonce  = isset( $route['nonce_action'] ) ? (string) $route['nonce_action'] : '';
+
+		if ( '' === $action || '' === $nonce || ! FormRegistry::has( $type ) ) {
+			return null;
+		}
+
+		return array(
+			'action'       => $action,
+			'form_type'    => $type,
+			'nonce_action' => $nonce,
+		);
 	}
 
 	/**
@@ -567,14 +717,15 @@ final class SubmissionController {
 	 * Journalise une issue, sans aucune donnée personnelle.
 	 *
 	 * @param SubmissionResult $result Issue.
+	 * @param string           $type   Type de formulaire (issu de la route serveur).
 	 * @return void
 	 */
-	private static function log( SubmissionResult $result ): void {
+	private static function log( SubmissionResult $result, string $type ): void {
 		if ( $result->is_success() ) {
 			Logger::info(
 				sprintf(
 					'soumission %s : %s (#%d)',
-					self::FORM_TYPE,
+					$type,
 					$result->reference(),
 					$result->id()
 				)
@@ -588,7 +739,7 @@ final class SubmissionController {
 		Logger::info(
 			sprintf(
 				'soumission %s refusée : %s (%d champ(s) en erreur)',
-				self::FORM_TYPE,
+				$type,
 				$result->code(),
 				count( $result->errors() )
 			)

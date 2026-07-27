@@ -109,7 +109,7 @@ function declaration( array $blocs, $total_c = null, $total_s = null, $version =
  * @return array<string, mixed>
  */
 function reel( array $files ): array {
-	$n = UploadNormalizer::normalize( $files );
+	$n = UploadNormalizer::normalize( $files , profil_conception());
 
 	return (array) UploadManifest::from_files( $n['files'] );
 }
@@ -534,7 +534,7 @@ check( '11 · declared_size n’est plus lu du tout', ! str_contains( $code, 'de
 
 // Un document mesurable donne bien une mesure.
 $reelle = lot( 'photos', 1 );
-$n      = UploadNormalizer::normalize( $reelle );
+$n      = UploadNormalizer::normalize( $reelle , profil_conception());
 $mesure = UploadManifest::from_files( $n['files'] );
 
 check( '11 · un document lisible est mesuré', is_array( $mesure ) && $mesure['total_size'] > 0 );

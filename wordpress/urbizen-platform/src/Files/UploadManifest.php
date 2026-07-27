@@ -287,9 +287,11 @@ final class UploadManifest {
 		foreach ( $decode['blocks'] as $bloc => $chiffres ) {
 			$bloc = (string) $bloc;
 
-			// Un bloc inconnu n'existe pas : le navigateur ne décide pas de la
-			// structure du dossier.
-			if ( ! UploadPolicy::is_block( $bloc ) ) {
+			// Garde-fou de format, générique : le manifeste est comparé aux
+			// fichiers réellement reçus, déjà validés par le profil serveur. On
+			// vérifie seulement que le bloc déclaré est un identifiant sûr, sans
+			// réappliquer une liste métier (Conception ou autre).
+			if ( ! UploadPolicy::is_valid_block_id( $bloc ) ) {
 				return null;
 			}
 

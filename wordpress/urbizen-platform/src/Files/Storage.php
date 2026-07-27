@@ -295,7 +295,10 @@ final class Storage {
 		foreach ( $files as $file ) {
 			$bloc = (string) $file['block'];
 
-			if ( ! UploadPolicy::is_block( $bloc ) ) {
+			// Garde-fou de format, générique : ces documents sont déjà validés
+			// par un profil serveur ; on vérifie seulement que le bloc est un
+			// segment de chemin sûr, sans réappliquer une liste métier.
+			if ( ! UploadPolicy::is_valid_block_id( $bloc ) ) {
 				self::rollback( $deposes );
 				return null;
 			}

@@ -272,7 +272,21 @@ final class MailScheduler {
 			return 'etat_non_ecrit';
 		}
 
-		$message = MailRenderer::render( $id, $now );
+		// La stratégie de notification est résolue depuis le TYPE serveur de la
+		// demande persistée (écrit par la route), jamais depuis une valeur
+		// cliente. Un type sans stratégie n'envoie rien et ne retombe jamais sur
+		// Conception ; le message lui-même reste construit par la stratégie.
+		$type      = (string) get_post_meta( $id, '_urbizen_form_type', true );
+		$strategie = NotificationStrategyRegistry::for_type( $type );
+
+		if ( null === $strategie ) {
+			Logger::error( sprintf( 'notification #%d : aucune stratégie pour le type « %s »', $id, $type ) );
+			MailQueue::mark_failure( $id, $rang, 'no_strategy', $now );
+
+			return 'strategie_absente';
+		}
+
+		$message = $strategie->build( $id, $now );
 
 		if ( null === $message ) {
 			MailQueue::mark_failure( $id, $rang, 'render_failed', $now );

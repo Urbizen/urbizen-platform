@@ -56,7 +56,7 @@ check( 'un nom finissant par un point n’a pas d’extension', '' === P::extens
 function valide( string $nom, string $chemin, string $annonce = 'application/octet-stream' ): array {
 	return P::validate_one(
 		array( 'block' => 'croquis_plans', 'name' => $nom, 'tmp_name' => $chemin, 'error' => UPLOAD_ERR_OK )
-	);
+	, profil_conception());
 }
 
 // --- formats acceptés ---
@@ -118,17 +118,17 @@ function lot( string $bloc, int $nombre ): array {
 	return $out;
 }
 
-check( 'dix documents dans un bloc sont acceptés', P::validate( lot( 'croquis_plans', 10 ) )['ok'] );
-check( 'le onzième est refusé', 'upload_count_exceeded' === P::validate( lot( 'croquis_plans', 11 ) )['code'] );
+check( 'dix documents dans un bloc sont acceptés', P::validate( lot( 'croquis_plans', 10 ) , profil_conception())['ok'] );
+check( 'le onzième est refusé', 'upload_count_exceeded' === P::validate( lot( 'croquis_plans', 11 ) , profil_conception())['code'] );
 
 $vingt = array_merge( lot( 'croquis_plans', 10 ), lot( 'photos', 10 ) );
-check( 'vingt documents au total sont acceptés', P::validate( $vingt )['ok'] );
+check( 'vingt documents au total sont acceptés', P::validate( $vingt , profil_conception())['ok'] );
 
 $vingt_et_un = array_merge( $vingt, lot( 'urbanisme', 1 ) );
-check( 'le vingt-et-unième est refusé', 'upload_count_exceeded' === P::validate( $vingt_et_un )['code'] );
+check( 'le vingt-et-unième est refusé', 'upload_count_exceeded' === P::validate( $vingt_et_un , profil_conception())['code'] );
 
 check( 'un bloc inconnu dans un lot est refusé',
-	'upload_invalid_structure' === P::validate( lot( 'factures', 1 ) )['code'] );
+	'upload_invalid_structure' === P::validate( lot( 'factures', 1 ) , profil_conception())['code'] );
 
 // --- taille cumulée ---
 $un_mio = 1048576;
@@ -146,10 +146,10 @@ for ( $i = 0; $i < 20; $i++ ) {
 	$lourds[] = array( 'block' => 0 === $i % 2 ? 'photos' : 'croquis_plans', 'name' => "l$i.pdf", 'tmp_name' => fx_pdf_taille( (int) ( P::MAX_TOTAL_SIZE / 20 ) ), 'error' => UPLOAD_ERR_OK );
 }
 
-check( 'un lot exactement à 25 Mio est accepté', P::validate( $lourds )['ok'] );
+check( 'un lot exactement à 25 Mio est accepté', P::validate( $lourds , profil_conception())['ok'] );
 
 $lourds[19]['tmp_name'] = fx_pdf_taille( (int) ( P::MAX_TOTAL_SIZE / 20 ) + 1024 );
-check( 'un lot supérieur à 25 Mio est refusé', 'upload_total_size_exceeded' === P::validate( $lourds )['code'] );
+check( 'un lot supérieur à 25 Mio est refusé', 'upload_total_size_exceeded' === P::validate( $lourds , profil_conception())['code'] );
 
 // --- codes d'erreur de téléversement ---
 $erreurs = array(
@@ -171,18 +171,20 @@ foreach ( $erreurs as $code => $attendu ) {
 // ======================================================================
 $pdf = fx_pdf();
 
-$unique = N::normalize( array( 'croquis_plans' => array( 'name' => 'p.pdf', 'type' => 'application/pdf', 'tmp_name' => $pdf, 'error' => UPLOAD_ERR_OK, 'size' => 10 ) ) );
+$unique = N::normalize( array( 'croquis_plans' => array( 'name' => 'p.pdf', 'type' => 'application/pdf', 'tmp_name' => $pdf, 'error' => UPLOAD_ERR_OK, 'size' => 10 ) ) , profil_conception());
 check( 'fichier unique normalisé', $unique['ok'] && 1 === count( $unique['files'] ) );
 
-$multiple = N::normalize( fx_files( 'photos', array( array( 'a.jpg', fx_jpeg() ), array( 'b.jpg', fx_jpeg() ) ) ) );
+$multiple = N::normalize( fx_files( 'photos', array( array( 'a.jpg', fx_jpeg() ), array( 'b.jpg', fx_jpeg() ) ) ) , profil_conception());
 check( 'fichiers multiples normalisés', $multiple['ok'] && 2 === count( $multiple['files'] ) );
 
-$vide = N::normalize( fx_files( 'photos', array( array( '', '', '', UPLOAD_ERR_NO_FILE ) ) ) );
+$vide = N::normalize( fx_files( 'photos', array( array( '', '', '', UPLOAD_ERR_NO_FILE ) ) ) , profil_conception());
 check( 'UPLOAD_ERR_NO_FILE disparaît de la liste', $vide['ok'] && array() === $vide['files'] );
 
-$inconnu = N::normalize( array( 'factures' => array( 'name' => 'f.pdf', 'type' => '', 'tmp_name' => $pdf, 'error' => 0, 'size' => 1 ) ) );
-check( 'un bloc inconnu est écarté, pas créé', $inconnu['ok'] && array() === $inconnu['files'] );
-check( 'le bloc écarté est nommé', array( 'factures' ) === $inconnu['ignored'] );
+$inconnu = N::normalize( array( 'factures' => array( 'name' => 'f.pdf', 'type' => '', 'tmp_name' => $pdf, 'error' => 0, 'size' => 1 ) ) , profil_conception());
+check( 'un VRAI fichier dans un bloc inconnu est REJETÉ, pas ignoré', ! $inconnu['ok'] && 'upload_invalid_structure' === $inconnu['code'] && array() === $inconnu['files'] );
+
+$vide_inconnu = N::normalize( array( 'factures' => array( 'name' => '', 'type' => '', 'tmp_name' => '', 'error' => UPLOAD_ERR_NO_FILE, 'size' => 0 ) ), profil_conception() );
+check( 'un bloc inconnu réellement vide est ignoré, sans faux rejet', $vide_inconnu['ok'] && array() === $vide_inconnu['files'] && array( 'factures' ) === $vide_inconnu['ignored'] );
 
 // --- structures malformées ---
 $malformees = array(
@@ -197,7 +199,7 @@ $malformees = array(
 );
 
 foreach ( $malformees as $libelle => $structure ) {
-	$r = N::normalize( $structure );
+	$r = N::normalize( $structure , profil_conception());
 	check( sprintf( 'structure refusée : %-28s', $libelle ), ! $r['ok'] && 'upload_invalid_structure' === $r['code'] );
 }
 
@@ -260,7 +262,7 @@ check( 'un staging est ouvert', null !== $staging && is_dir( (string) $staging )
 check( 'le staging est bien sous la racine privée', Storage::is_inside( (string) $staging, (string) $racine ) );
 
 $source  = fx_copie( fx_pdf() );
-$valide  = P::validate_one( array( 'block' => 'croquis_plans', 'name' => 'Mon Plan.pdf', 'tmp_name' => $source, 'error' => UPLOAD_ERR_OK ) );
+$valide  = P::validate_one( array( 'block' => 'croquis_plans', 'name' => 'Mon Plan.pdf', 'tmp_name' => $source, 'error' => UPLOAD_ERR_OK ) , profil_conception());
 $depose  = Storage::stage( (string) $staging, $valide['file'], 0 );
 
 check( 'le document est déposé dans le staging', null !== $depose );

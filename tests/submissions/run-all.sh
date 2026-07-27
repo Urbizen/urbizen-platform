@@ -45,6 +45,10 @@ titre "3/11 — Contrôleur de soumission"
 "$PHP_BIN" test-controller.php
 verdict $? "test-controller.php"
 
+titre "3 bis/11 — Routage serveur des soumissions (action→type)"
+"$PHP_BIN" test-routage.php
+verdict $? "test-routage.php"
+
 titre "4/11 — Rétention à 365 jours"
 "$PHP_BIN" test-retention.php
 verdict $? "test-retention.php"
@@ -82,6 +86,10 @@ verdict $? "test-courriel.php"
 "$PHP_BIN" test-conception-rendu.php
 verdict $? "test-conception-rendu.php"
 
+titre "Extraction du renderer générique : parité et généricité"
+"$PHP_BIN" test-renderer-parite.php
+verdict $? "test-renderer-parite.php"
+
 "$PHP_BIN" test-manifeste.php
 verdict $? "test-manifeste.php"
 
@@ -101,7 +109,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 18 bancs passent.\033[0m\n'
+	printf '\033[32mLes 20 bancs passent.\033[0m\n'
 	exit 0
 fi
 
