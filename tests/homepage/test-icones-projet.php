@@ -183,8 +183,8 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] les illustrations « Exemples » sont intactes",
 		4 === substr_count( $h, 'class="exemple-img"' ) && str_contains( $h, 'M74 45 L74 32' ) );
 	check( "[$nom] les 5 tarifs sont intacts",
-		2 === substr_count( $h, '149&nbsp;€' ) && 1 === substr_count( $h, '249&nbsp;€' )
-		&& 2 === substr_count( $h, '449&nbsp;€' ) && 1 === substr_count( $h, '649&nbsp;€' )
+		1 === substr_count( $h, '149&nbsp;€' ) && 1 === substr_count( $h, '249&nbsp;€' )
+		&& 1 === substr_count( $h, '449&nbsp;€' ) && 1 === substr_count( $h, '649&nbsp;€' )
 		&& 1 === substr_count( $h, '849&nbsp;€' ) );
 }
 

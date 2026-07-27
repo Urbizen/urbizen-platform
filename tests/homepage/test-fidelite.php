@@ -111,9 +111,30 @@ check( 'En-tête : AUCUN attribut width/height sur le logo',
 // 17 balises <a> — menu desktop, menu mobile, connexion et CTA.
 check( 'En-tête : tous les liens de la maquette présents',
 	substr_count( $entete_rendu, '<a ' ) === substr_count( $entete_ref, '<a ' ) );
-check( 'En-tête : lien de connexion et CTA « Démarrer » conservés',
-	str_contains( $entete_rendu, 'class="link-login"' )
-	&& str_contains( $entete_rendu, 'js-start' ) );
+check( 'En-tête : icônes téléphone + compte et CTA « Démarrer mon projet » présents',
+	str_contains( $entete_rendu, 'class="icon-btn link-tel"' )
+	&& str_contains( $entete_rendu, 'class="icon-btn link-login"' )
+	&& str_contains( $entete_rendu, 'js-start' )
+	&& str_contains( $entete_rendu, '>Démarrer mon projet</a>' ) );
+check( 'En-tête : espace client = contrôle honnête (bouton aria-disabled, sans faux lien ni texte « Se connecter »)',
+	str_contains( $entete_rendu, 'aria-label="Espace client (bientôt disponible)"' )
+	&& str_contains( $entete_rendu, 'aria-disabled="true"' )
+	&& ! preg_match( '/class="[^"]*link-login[^"]*" href="#"/', $entete_rendu )
+	&& ! str_contains( $entete_rendu, '>Se connecter<' ) );
+check( 'En-tête : icône téléphone « Nous contacter » pilotant le panneau de contact',
+	str_contains( $entete_rendu, 'aria-label="Nous contacter"' )
+	&& str_contains( $entete_rendu, 'aria-controls="contact-panel"' ) );
+check( 'Centre de contact : panneau unique « Parlons de votre projet » avec ses quatre canaux',
+	1 === substr_count( $entete_rendu, 'id="contact-panel"' )
+	&& str_contains( $entete_rendu, 'Parlons de votre projet' )
+	&& str_contains( $entete_rendu, 'Appeler maintenant' )
+	&& str_contains( $entete_rendu, 'Réserver un appel' )
+	&& str_contains( $entete_rendu, 'Demander à être rappelé' )
+	&& str_contains( $entete_rendu, 'Écrire à Urbizen' ) );
+check( 'Centre de contact : « Appeler » = numéro réel de la charte, 3 canaux honnêtement « bientôt »',
+	str_contains( $entete_rendu, 'href="tel:+33664895815"' )
+	&& 3 === substr_count( $entete_rendu, 'contact-ch is-soon' )
+	&& 3 === substr_count( $entete_rendu, 'Bientôt disponible' ) );
 check( 'En-tête : burger mobile et ses attributs ARIA conservés',
 	str_contains( $entete_rendu, 'class="burger"' )
 	&& str_contains( $entete_rendu, 'aria-expanded="false"' )
@@ -263,6 +284,36 @@ check( 'theme.json : CSS personnalisé intact',
 check( 'theme.json : seules customTemplates et templateParts ont été ajoutées',
 	array( 'customTemplates', 'templateParts' ) === array_values( array_diff( array_keys( $json ), array_keys( $json_ref ) ) )
 	&& array() === array_diff( array_keys( $json_ref ), array_keys( $json ) ) );
+
+// ------------------------------------ centre de contact : visibilité & ordre ---
+// Ordre des quatre canaux, du haut vers le bas.
+$pos = static function ( $s ) use ( $entete_rendu ) { return strpos( $entete_rendu, $s ); };
+check( 'Centre de contact : les quatre canaux dans l\'ordre (Appeler → Réserver → Rappelé → Écrire)',
+	$pos( 'Appeler maintenant' ) < $pos( 'Réserver un appel' )
+	&& $pos( 'Réserver un appel' ) < $pos( 'Demander à être rappelé' )
+	&& $pos( 'Demander à être rappelé' ) < $pos( 'Écrire à Urbizen' ) );
+check( 'Centre de contact : titre + première action avant la dernière (pas de troncature « Écrire » en tête)',
+	$pos( 'Parlons de votre projet' ) < $pos( 'Appeler maintenant' )
+	&& $pos( 'Appeler maintenant' ) < $pos( 'Écrire à Urbizen' ) );
+check( 'Centre de contact : panneau hors flux (position: fixed) et non un popover absolu du header',
+	(bool) preg_match( '/\.contact-panel\s*\{[^}]*position:\s*fixed/', $css )
+	&& ! (bool) preg_match( '/\.contact-panel\s*\{[^}]*position:\s*absolute/', $css ) );
+check( 'Centre de contact : feuille mobile au MÊME seuil que le burger (900px)',
+	(bool) preg_match( '/@media \(max-width: 900px\) \{[^@]*\.contact-panel[^}]*bottom:\s*0/s', $css )
+	&& str_contains( $css, 'min(85dvh, 720px)' ) );
+check( 'Centre de contact : fond d\'écran (CSS) et verrou de défilement (JS en ligne)',
+	str_contains( $css, '.contact-backdrop' ) && str_contains( $js, 'docEl.style.overflow' ) );
+check( 'JavaScript : panneau sorti du header vers .urbizen-accueil (style scopé conservé)',
+	str_contains( $js, 'closest(".urbizen-accueil")' ) && str_contains( $js, 'appendChild(panel)' ) );
+check( 'JavaScript : fermeture Échap, focus restitué sans saut (preventScroll), fond cliquable',
+	str_contains( $js, 'Escape' ) && str_contains( $js, 'preventScroll' )
+	&& str_contains( $js, 'contact-backdrop' ) && str_contains( $js, 'aria-expanded' ) );
+
+// ------------------------------------------------- hero : texte avant image ---
+check( 'Hero : le texte précède l\'illustration dans le DOM (empilé = texte puis planche)',
+	strpos( $corps_ref, 'class="hero-text"' ) < strpos( $corps_ref, 'class="hero-plan"' ) );
+check( 'Hero : aucun ordre CSS ne remonte l\'illustration au-dessus du titre',
+	! (bool) preg_match( '/\.hero-plan[^{]*\{[^}]*order:\s*-1/', $css ) );
 
 echo "\n", 0 === $fail ? "TOUS LES CONTROLES PASSENT\n" : "$fail CONTROLE(S) EN ECHEC\n";
 exit( 0 === $fail ? 0 : 1 );

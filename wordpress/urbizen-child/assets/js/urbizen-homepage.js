@@ -24,12 +24,77 @@
     });
   }
 
+  /* ----- Centre de contact « Parlons de votre projet » -----
+     Dialogue accessible ouvert par l'icône téléphone. À la 1re ouverture, le
+     panneau ET son fond d'écran sont déplacés sous <body> : cela échappe au bloc
+     englobant créé par le `backdrop-filter` du header (sinon `position: fixed`
+     était relatif au header et le panneau apparaissait tronqué — seule la
+     dernière action visible). L'ouverture ne déclenche AUCUN appel ; seul le lien
+     tel: appelle, sur clic. Fermeture : croix, Échap, clic sur le fond. Focus
+     déplacé dans le panneau sans faire défiler la page (preventScroll), restitué
+     à l'icône à la fermeture ; Tab piégé ; défilement de fond verrouillé. */
+  var telBtn = document.querySelector(".link-tel");
+  var panel = document.getElementById("contact-panel");
+  if (telBtn && panel) {
+    var closeBtn = panel.querySelector(".contact-close");
+    // Hôte de reparentage : le wrapper `.urbizen-accueil` (et NON <body>), pour
+    // sortir le panneau du header — dont le `backdrop-filter` créait un bloc
+    // englobant qui tronquait le `position: fixed` — tout en CONSERVANT le style
+    // scopé `.urbizen-accueil .contact-panel`. Repli <body> pour la maquette
+    // autonome (CSS non scopé).
+    var host = telBtn.closest(".urbizen-accueil") || document.body;
+    var docEl = document.documentElement;
+    var prevOverflow = "";
+    var backdrop = null;
+    var moved = false;
+    var focusSafe = function (el) { if (!el) return; try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } };
+    var onKeydown = function (e) {
+      if (e.key === "Escape" || e.key === "Esc") { closeContact(true); return; }
+      if (e.key !== "Tab") return;
+      var f = panel.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])');
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    var openContact = function () {
+      if (!moved) {
+        host.appendChild(panel);
+        backdrop = document.createElement("div");
+        backdrop.className = "contact-backdrop";
+        backdrop.hidden = true;
+        backdrop.addEventListener("click", function () { closeContact(true); });
+        host.appendChild(backdrop);
+        moved = true;
+      }
+      backdrop.hidden = false;
+      panel.hidden = false;
+      telBtn.setAttribute("aria-expanded", "true");
+      prevOverflow = docEl.style.overflow;   // verrou de défilement (style en ligne, insensible au scoping)
+      docEl.style.overflow = "hidden";
+      focusSafe(closeBtn || panel);
+      document.addEventListener("keydown", onKeydown);
+    };
+    var closeContact = function (restore) {
+      if (panel.hidden) return;
+      panel.hidden = true;
+      if (backdrop) backdrop.hidden = true;
+      telBtn.setAttribute("aria-expanded", "false");
+      docEl.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKeydown);
+      if (restore !== false) focusSafe(telBtn);
+    };
+    telBtn.addEventListener("click", function () { if (panel.hidden) openContact(); else closeContact(true); });
+    if (closeBtn) closeBtn.addEventListener("click", function () { closeContact(true); });
+  }
+
   /* ----- Sélection du type de projet + routage vers le formulaire ----- */
-  // URLs des formulaires. À ajuster lors de l'intégration WordPress
-  // (ex. "/commander-un-dossier/" et "/permis-de-construire/demande/").
+  // URLs internes réelles (pages WordPress publiées). Aucun chemin relatif de
+  // maquette : selon la nature du projet, on oriente vers la page du service
+  // correspondant, où la démarche est confirmée par Urbizen.
   var FORM_URLS = {
-    dp:   "../formulaires/dp-formulaire.html",
-    pcmi: "../formulaires/pc-formulaire.html"
+    dp:   "/declarations-prealables/",
+    pcmi: "/permis-de-construire/"
   };
   // Projets orientés permis de construire ; les autres démarrent en déclaration
   // préalable (Urbizen confirme la démarche après étude — pas de détermination définitive ici).

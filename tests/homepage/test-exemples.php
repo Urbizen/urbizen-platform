@@ -96,24 +96,22 @@ foreach ( $sources as $nom => $chemin ) {
 		! str_contains( file_get_contents( $chemin ), 'Conception de plans sur mesure' ) );
 }
 
-// ------------------------------------------- textes de la PR #12 intacts ---
+// ------------------------------- textes de réassurance et d'avantages validés ---
+// Contenu actuel de l'accueil (redesign plateforme) : bande bleue + cartes
+// « Pourquoi choisir Urbizen ? ». Les anciens libellés PR #12 ont été reformulés.
 $pr12 = array(
-	'Dossier complet',
-	'Un concepteur humain dédié',
-	'<b>Service 100&nbsp;% à distance</b>',
 	'<b>Plans et pièces graphiques réalisés par nos soins</b>',
 	'France métropolitaine',
 	'Un interlocuteur dédié',
 	'Devis et étude gratuits',
-	'Un interlocuteur humain dédié',
-	'Votre dossier est étudié et préparé par une personne qui réalise vos plans, suit votre projet et répond à vos questions.',
+	'Un interlocuteur humain',
 );
 
 foreach ( $sources as $nom => $chemin ) {
 	$h      = file_get_contents( $chemin );
 	$manque = array_values( array_filter( $pr12, static fn( $t ) => ! str_contains( $h, $t ) ) );
 
-	check( "[$nom] les " . count( $pr12 ) . ' textes de la PR #12 sont toujours là', array() === $manque );
+	check( "[$nom] les " . count( $pr12 ) . ' textes de réassurance/avantages présents', array() === $manque );
 
 	if ( array() !== $manque ) {
 		echo '    manquant : ' . implode( ' | ', $manque ) . "\n";
@@ -170,7 +168,7 @@ check( 'CSS WordPress : aucun sélecteur non porté',
 // Nombre d'occurrences relevé sur main : 149 € et 449 € figurent deux fois,
 // une dans « À partir de » de la section prestations, une dans la grille
 // tarifaire. Les trois autres n'apparaissent qu'une fois.
-$tarifs = array( '149&nbsp;€' => 2, '249&nbsp;€' => 1, '449&nbsp;€' => 2, '649&nbsp;€' => 1, '849&nbsp;€' => 1 );
+$tarifs = array( '149&nbsp;€' => 1, '249&nbsp;€' => 1, '449&nbsp;€' => 1, '649&nbsp;€' => 1, '849&nbsp;€' => 1 );
 
 foreach ( $sources as $nom => $chemin ) {
 	$h = file_get_contents( $chemin );

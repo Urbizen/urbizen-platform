@@ -47,11 +47,52 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
     </nav>
     <div class="nav-right">
-      <a class="link-login" href="#" title="Espace client — bientôt disponible">Se connecter</a>
+      <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.5 21a13.5 13.5 0 0 1-12.5-12.5A2 2 0 0 1 5 6.4h2.2a1.4 1.4 0 0 1 1.4 1.2c.1.9.3 1.8.6 2.6a1.4 1.4 0 0 1-.32 1.5l-1 1a11 11 0 0 0 4.9 4.9l1-1a1.4 1.4 0 0 1 1.5-.32c.8.3 1.7.5 2.6.6a1.4 1.4 0 0 1 1.2 1.42V19a2 2 0 0 1-2.1 2z"/></svg>
+      </button>
+      <button type="button" class="icon-btn link-login" aria-label="Espace client (bientôt disponible)" title="Espace client — bientôt disponible" aria-disabled="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
+      </button>
       <a class="btn btn-primary btn-sm js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
+    </div>
+  </div>
+  <div id="contact-panel" class="contact-panel" role="dialog" aria-modal="true" aria-labelledby="contact-panel-title" hidden>
+    <div class="contact-panel-inner">
+      <div class="contact-head">
+        <h2 id="contact-panel-title">Parlons de votre projet</h2>
+        <button type="button" class="contact-close" aria-label="Fermer">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <ul class="contact-channels">
+        <li class="contact-ch">
+          <a class="contact-ch-link" href="tel:+33664895815">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15.5 21a13.5 13.5 0 0 1-12.5-12.5A2 2 0 0 1 5 6.4h2.2a1.4 1.4 0 0 1 1.4 1.2c.1.9.3 1.8.6 2.6a1.4 1.4 0 0 1-.32 1.5l-1 1a11 11 0 0 0 4.9 4.9l1-1a1.4 1.4 0 0 1 1.5-.32c.8.3 1.7.5 2.6.6a1.4 1.4 0 0 1 1.2 1.42V19a2 2 0 0 1-2.1 2z"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Appeler maintenant</span><span class="contact-ch-sub">+33 6 64 89 58 15</span></span>
+          </a>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 9.5h16M8 3v4M16 3v4"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Réserver un appel</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Demander à être rappelé</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+        <li class="contact-ch is-soon">
+          <span class="contact-ch-link" role="button" aria-disabled="true">
+            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
+          </span>
+        </li>
+      </ul>
     </div>
   </div>
   <div id="mmenu" class="mmenu" hidden>
@@ -62,7 +103,6 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
       <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
-      <a href="#" class="link-login">Se connecter</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
   </div>
