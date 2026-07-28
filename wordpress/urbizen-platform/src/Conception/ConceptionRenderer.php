@@ -38,7 +38,10 @@ use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormDefinition;
 use Urbizen\Platform\Forms\StepFormRenderConfig;
 use Urbizen\Platform\Forms\StepFormRenderer;
+use Urbizen\Platform\Forms\StepFormRenderState;
+use Urbizen\Platform\Forms\ValidationMessages;
 use Urbizen\Platform\Http\SubmissionController;
+use Urbizen\Platform\Http\SubmissionResultNotice;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Support\Logger;
 
@@ -91,7 +94,62 @@ final class ConceptionRenderer {
 
 		ConceptionAssets::enqueue( $def, $id );
 
-		return StepFormRenderer::render( $def, self::config( $def, $etapes, $id ) );
+		return StepFormRenderer::render( $def, self::config( $def, $etapes, $id ), self::etat_reprise() );
+	}
+
+	/**
+	 * État de reprise à réafficher, ou état neutre.
+	 *
+	 * En **aperçu**, aucune reprise n'est lue ni consommée. En **opérationnel**,
+	 * la reprise associée au feedback signé est **consommée une seule fois**
+	 * (usage unique du store) ; les codes d'erreur y sont traduits en messages
+	 * publics. Dès qu'une reprise est réellement rendue, la réponse est marquée
+	 * **non mise en cache publiquement** (elle contient des valeurs saisies).
+	 *
+	 * @return StepFormRenderState
+	 */
+	private static function etat_reprise(): StepFormRenderState {
+		// L'aperçu ne consomme jamais de reprise (aucun feedback n'y est lu).
+		if ( ! ConceptionAvailability::is_public() ) {
+			return StepFormRenderState::vide();
+		}
+
+		$recovery = SubmissionResultNotice::consume_recovery();
+
+		if ( null === $recovery ) {
+			return StepFormRenderState::vide();
+		}
+
+		self::non_cacheable();
+
+		$erreurs = array();
+
+		foreach ( $recovery->errors as $cle => $code ) {
+			$erreurs[ (string) $cle ] = ValidationMessages::message( (string) $code );
+		}
+
+		return StepFormRenderState::reprise(
+			$recovery->values,
+			$erreurs,
+			ValidationMessages::globale( $recovery->global_error )
+		);
+	}
+
+	/**
+	 * Marque la réponse courante comme **privée et non stockable** : un cache
+	 * public partagé ne doit jamais restituer à un autre visiteur l'HTML portant
+	 * des valeurs saisies. N'affecte que la réponse portant une reprise valide.
+	 *
+	 * @return void
+	 */
+	private static function non_cacheable(): void {
+		if ( ! defined( 'DONOTCACHEPAGE' ) ) {
+			define( 'DONOTCACHEPAGE', true );
+		}
+
+		if ( function_exists( 'nocache_headers' ) ) {
+			nocache_headers();
+		}
 	}
 
 	/**
@@ -109,6 +167,25 @@ final class ConceptionRenderer {
 	 * @return StepFormRenderConfig
 	 */
 	private static function config( FormDefinition $def, array $etapes, string $id ): StepFormRenderConfig {
+		// Le mode est décidé **uniquement côté serveur** : opérationnel si le
+		// formulaire est public, aperçu inerte sinon (administration, avant
+		// publication). Aucune valeur du navigateur — GET, POST, attribut de bloc,
+		// cookie — n'entre dans ce choix et ne peut désactiver les défenses.
+		return ConceptionAvailability::is_public()
+			? self::config_operationnel( $def, $etapes, $id )
+			: self::config_apercu( $def, $etapes, $id );
+	}
+
+	/**
+	 * Configuration **opérationnelle** : défenses réelles, formulaire soumissible.
+	 * Strictement inchangée — action, nonce, jeton anti-robot, retour historiques.
+	 *
+	 * @param FormDefinition    $def    Définition serveur.
+	 * @param array<int, mixed> $etapes Étapes déclarées.
+	 * @param string            $id     Identifiant d'instance.
+	 * @return StepFormRenderConfig
+	 */
+	private static function config_operationnel( FormDefinition $def, array $etapes, string $id ): StepFormRenderConfig {
 		return new StepFormRenderConfig(
 			root: self::RACINE,
 			instance_id: $id,
@@ -122,7 +199,7 @@ final class ConceptionRenderer {
 			return_field: SubmissionController::RETURN_FIELD,
 			return_url: self::retour(),
 			file_accept: '.' . implode( ',.', array_keys( UploadPolicy::TYPES ) ),
-			trusted_prelude_html: self::apercu(),
+			trusted_prelude_html: self::prelude(),
 			trusted_header_html: self::entete( $def, $etapes ),
 			trusted_footer_html: self::brouillon( $id ),
 			trusted_step_extras_html: array( 'documents' => self::consignes_documents() ),
@@ -130,20 +207,71 @@ final class ConceptionRenderer {
 	}
 
 	/**
-	 * Bandeau d'aperçu réservé à l'administration, tant que le formulaire n'est
-	 * pas public. Vide sinon.
+	 * Configuration d'**aperçu inerte** : visuellement représentative, mais **non
+	 * soumissible**. Aucun jeton anti-robot n'est émis (`AntiSpam::issue_token()`
+	 * n'est pas appelé), aucune cible réelle, aucun nonce, aucun retour. Le
+	 * feedback C1 n'y est **pas** affiché (aucune lecture d'URL en aperçu) : seule
+	 * la notice d'aperçu figure en tête. Le renderer neutralise en plus les champs
+	 * techniques et désactive le bouton d'envoi (`render_mode: 'preview'`).
+	 *
+	 * @param FormDefinition    $def    Définition serveur.
+	 * @param array<int, mixed> $etapes Étapes déclarées.
+	 * @param string            $id     Identifiant d'instance.
+	 * @return StepFormRenderConfig
+	 */
+	private static function config_apercu( FormDefinition $def, array $etapes, string $id ): StepFormRenderConfig {
+		return new StepFormRenderConfig(
+			root: self::RACINE,
+			instance_id: $id,
+			form_action_url: '',
+			action: '',
+			nonce_action: SubmissionController::NONCE_ACTION,
+			nonce_field: SubmissionController::NONCE_FIELD,
+			token_field: SubmissionController::TOKEN_FIELD,
+			token: '',
+			honeypot_field: SubmissionController::HONEYPOT_FIELD,
+			return_field: SubmissionController::RETURN_FIELD,
+			return_url: '',
+			file_accept: '.' . implode( ',.', array_keys( UploadPolicy::TYPES ) ),
+			trusted_prelude_html: self::apercu(),
+			trusted_header_html: self::entete( $def, $etapes ),
+			trusted_footer_html: self::brouillon( $id ),
+			trusted_step_extras_html: array( 'documents' => self::consignes_documents() ),
+			render_mode: 'preview',
+		);
+	}
+
+	/**
+	 * Fragment de tête inséré avant le formulaire.
+	 *
+	 * Il réunit, dans l'ordre d'affichage, le **message de résultat** d'une
+	 * soumission précédente (confirmation ou erreur, produit et vérifié côté
+	 * serveur) puis le bandeau d'aperçu administrateur. Le message vient en
+	 * premier : c'est ce qu'attend la personne qui revient d'un envoi.
+	 *
+	 * Le message est du HTML **déjà échappé**, produit par
+	 * {@see SubmissionResultNotice} — seul endroit où l'URL est lue. En l'absence
+	 * de retour valide, il vaut la chaîne vide : le rendu du formulaire est alors
+	 * identique, au caractère près, à ce qu'il était sans ce fragment.
+	 *
+	 * @return string
+	 */
+	private static function prelude(): string {
+		return SubmissionResultNotice::html_courante( self::RACINE );
+	}
+
+	/**
+	 * Notice d'aperçu : indique clairement, de façon accessible, qu'il s'agit d'un
+	 * aperçu administrateur **non soumissible**. Rendue uniquement dans la
+	 * configuration d'aperçu ({@see self::config_apercu()}), jamais en opérationnel.
 	 *
 	 * @return string
 	 */
 	private static function apercu(): string {
-		if ( ConceptionAvailability::is_public() ) {
-			return '';
-		}
-
 		return sprintf(
 			'<p class="%s__apercu" role="status">%s</p>',
 			esc_attr( self::RACINE ),
-			esc_html__( 'Aperçu réservé à l’administration : ce formulaire n’est pas encore public.', 'urbizen-platform' )
+			esc_html__( 'Aperçu réservé à l’administration : ce formulaire n’est pas encore public et ne peut pas être envoyé.', 'urbizen-platform' )
 		);
 	}
 

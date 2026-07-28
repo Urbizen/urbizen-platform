@@ -130,6 +130,30 @@ function envoyer( string $hote, string $corps, string $frontiere ): array {
 
 require dirname( __FILE__ ) . '/amorce-reelle.php';
 
+/**
+ * Statut porté par le jeton signé présent dans une adresse de redirection.
+ *
+ * Depuis C1 bis, l'issue ne voyage plus en clair : elle est dans le jeton
+ * `urbizen_feedback`, vérifié ici avec le vrai secret du WordPress de test.
+ *
+ * @param string $location En-tête Location de la redirection.
+ * @return string 'success', 'error', ou 'aucun' si le jeton est absent/invalide.
+ */
+function statut_feedback( string $location ): string {
+	$q = array();
+	parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $q );
+
+	$feedback = \Urbizen\Platform\Http\SubmissionFeedbackToken::verify(
+		$q[ \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP ] ?? ''
+	);
+
+	if ( null === $feedback ) {
+		return 'aucun';
+	}
+
+	return $feedback->est_succes() ? 'success' : 'error';
+}
+
 // Ce banc crée son état et le rend, quoi qu'il advienne : aucun test ne doit
 // dépendre de l'ordre d'exécution.
 urbizen_banc_exiger_cron_desactive();
@@ -237,8 +261,8 @@ $corps     = corps_multipart(
 $r = envoyer( $hote, $corps, $frontiere );
 
 verifier( 'A · la requête a été servie', 302 === $r['status'] );
-verifier( 'A · LE SERVEUR REFUSE', str_contains( $r['location'], 'urbizen_submission=error' ) );
-verifier( 'A · aucune réponse de succès', ! str_contains( $r['location'], 'success' ) );
+verifier( 'A · LE SERVEUR REFUSE (jeton signé = erreur)', 'error' === statut_feedback( $r['location'] ) );
+verifier( 'A · aucun paramètre brut d’issue dans l’adresse', ! str_contains( $r['location'], 'urbizen_submission' ) && ! str_contains( $r['location'], 'success' ) );
 
 $apres = etat();
 
@@ -298,7 +322,7 @@ if ( ! str_contains( $r['location'], 'success' ) ) {
 	printf( "  [diagnostic] max_file_uploads = %s\n", ini_get( 'max_file_uploads' ) );
 }
 
-verifier( 'C · TÉMOIN : vingt envoyés, vingt annoncés → SUCCÈS', str_contains( $r['location'], 'urbizen_submission=success' ) );
+verifier( 'C · TÉMOIN : vingt envoyés, vingt annoncés → SUCCÈS (jeton signé)', 'success' === statut_feedback( $r['location'] ) );
 
 $apres = etat();
 

@@ -86,10 +86,6 @@ final class FormDefinition {
 		'accept',
 		'max_files',
 		'max_size',
-		// Familles de champs dynamiques (surfaces par pièce).
-		'family',
-		'keys',
-		'total_max',
 		// Reprise du contrat cadastre et confort de saisie.
 		'from',
 		'unit',

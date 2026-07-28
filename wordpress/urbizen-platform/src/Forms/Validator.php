@@ -27,11 +27,6 @@ defined( 'ABSPATH' ) || exit;
 final class Validator {
 
 	/**
-	 * Champ portant la famille dynamique des surfaces.
-	 */
-	private const FAMILLE_SURFACES = 'surfaces';
-
-	/**
 	 * Valeurs acceptées comme un consentement donné.
 	 *
 	 * @var array<int, string>
@@ -78,10 +73,6 @@ final class Validator {
 
 			$brut = $input[ $name ] ?? null;
 
-			if ( self::FAMILLE_SURFACES === ( $field['family'] ?? '' ) ) {
-				continue; // Traité après, une fois les compteurs connus.
-			}
-
 			$clean[ $name ] = self::clean_field( $field, $brut, $name, $errors );
 		}
 
@@ -103,27 +94,6 @@ final class Validator {
 
 				unset( $clean[ $name ] );
 				unset( $errors[ $name ] );
-			}
-		}
-
-		// --- Passe 3 : surfaces dynamiques, liste blanche reconstruite ---
-		foreach ( $def->fields() as $field ) {
-			if ( self::FAMILLE_SURFACES !== ( $field['family'] ?? '' ) ) {
-				continue;
-			}
-
-			if ( empty( $actifs[ $field['name'] ] ) ) {
-				continue;
-			}
-
-			$resultat = self::clean_surfaces( $field, $def, $input, $clean );
-
-			$clean[ $field['name'] ] = $resultat['values'];
-			$ignored                 = array_merge( $ignored, $resultat['ignored'] );
-			$notes                   = array_merge( $notes, $resultat['notes'] );
-
-			foreach ( $resultat['errors'] as $cle => $message ) {
-				$errors[ $field['name'] . '[' . $cle . ']' ] = $message;
 			}
 		}
 
@@ -362,122 +332,6 @@ final class Validator {
 
 		// Ordre du catalogue, pas ordre de réception.
 		return array_values( array_filter( $permises, static fn( $v ) => isset( $retenues[ $v ] ) ) );
-	}
-
-	/**
-	 * Reconstruit la liste blanche des surfaces et contrôle les valeurs.
-	 *
-	 * Le navigateur envoie `surfaces[chambre_1]`. La clé n'est jamais reprise
-	 * telle quelle : le serveur reconstruit la liste des pièces réellement
-	 * attendues à partir des compteurs et des cases cochées, puis n'accepte que
-	 * celles-là. Toute autre clé est écartée et nommée.
-	 *
-	 * @param array<string, mixed>  $field Déclaration de la famille.
-	 * @param FormDefinition        $def   Définition, pour les listes fermées.
-	 * @param array<string, mixed>  $input Données brutes.
-	 * @param array<string, mixed>  $clean Valeurs déjà nettoyées.
-	 * @return array{values:array<string,int>,ignored:array<int,string>,errors:array<string,string>,notes:array<int,string>}
-	 */
-	private static function clean_surfaces( array $field, FormDefinition $def, array $input, array $clean ): array {
-		$name      = $field['name'];
-		$declarees = is_array( $field['keys'] ?? null ) ? $field['keys'] : array();
-		$attendues = self::surfaces_attendues( $declarees, $clean );
-
-		$recues  = $input[ $name ] ?? array();
-		$recues  = is_array( $recues ) ? $recues : array();
-		$values  = array();
-		$ignored = array();
-		$errors  = array();
-		$notes   = array();
-
-		$min = isset( $field['min'] ) ? (int) $field['min'] : 1;
-		$max = isset( $field['max'] ) ? (int) $field['max'] : 200;
-
-		foreach ( $recues as $cle => $valeur ) {
-			$cle = (string) $cle;
-
-			// Deux barrières : la clé doit être déclarée dans la définition
-			// **et** attendue au vu des réponses. La première interdit une clé
-			// inventée, la seconde une clé plausible mais hors programme.
-			if ( ! in_array( $cle, $declarees, true ) || ! in_array( $cle, $attendues, true ) ) {
-				$ignored[] = $name . '[' . $cle . ']';
-				continue;
-			}
-
-			if ( null === $valeur || '' === $valeur || is_array( $valeur ) ) {
-				continue;
-			}
-
-			$brut = is_string( $valeur ) ? trim( $valeur ) : $valeur;
-
-			if ( ! is_numeric( $brut ) || (string) (int) $brut !== (string) $brut ) {
-				$errors[ $cle ] = 'nombre_invalide';
-				continue;
-			}
-
-			$entier = (int) $brut;
-
-			if ( $entier < $min || $entier > $max ) {
-				$errors[ $cle ] = 'hors_bornes';
-				continue;
-			}
-
-			$values[ $cle ] = $entier;
-		}
-
-		// Ordre de la définition, pour un récapitulatif stable.
-		$ordonnees = array();
-
-		foreach ( $declarees as $cle ) {
-			if ( isset( $values[ $cle ] ) ) {
-				$ordonnees[ $cle ] = $values[ $cle ];
-			}
-		}
-
-		$total     = array_sum( $ordonnees );
-		$total_max = isset( $field['total_max'] ) ? (int) $field['total_max'] : 0;
-
-		// Dépasser le seuil n'est pas une faute : c'est un projet qui sort du
-		// tarif forfaitaire. On le signale, on ne bloque pas le visiteur.
-		if ( $total_max > 0 && $total > $total_max ) {
-			$notes[] = 'devis_requis:surface_totale';
-		}
-
-		return array(
-			'values'  => $ordonnees,
-			'ignored' => $ignored,
-			'errors'  => $errors,
-			'notes'   => $notes,
-		);
-	}
-
-	/**
-	 * Liste des surfaces attendues au vu des réponses déjà nettoyées.
-	 *
-	 * @param array<int, string>   $declarees Clés déclarées dans la définition.
-	 * @param array<string, mixed> $clean     Valeurs nettoyées.
-	 * @return array<int, string>
-	 */
-	private static function surfaces_attendues( array $declarees, array $clean ): array {
-		$attendues = array( 'sejour', 'cuisine' );
-
-		$chambres = (int) ( $clean['chambres'] ?? 0 );
-
-		for ( $i = 1; $i <= $chambres; $i++ ) {
-			$attendues[] = 'chambre_' . $i;
-		}
-
-		$sdb = (int) ( $clean['sdb'] ?? 0 );
-
-		for ( $i = 1; $i <= $sdb; $i++ ) {
-			$attendues[] = 'sdb_' . $i;
-		}
-
-		foreach ( (array) ( $clean['pieces'] ?? array() ) as $piece ) {
-			$attendues[] = (string) $piece;
-		}
-
-		return array_values( array_intersect( array_unique( $attendues ), $declarees ) );
 	}
 
 	/**

@@ -474,6 +474,14 @@ accentuées, espacées, construites à partir de libellés affichés.
   laisse l'autre protéger, retirer les deux laisse entrer les clés arbitraires.
 - La même discipline s'appliquera à toute famille dynamique future.
 
+**Mise à jour — descopé (Lot 2, C2C).** La ventilation « Surface par pièce »
+(`surfaces`) décrite ici a été **entièrement retirée** : facultative, non
+tarifante et jamais réellement collectée, elle est remplacée par la **surface
+globale** `surface` et le champ libre `pieces_detail`. Les deux barrières et
+leurs clés n'existent plus dans le formulaire Conception. La discipline « aucune
+clé dynamique du navigateur » **reste** la règle pour toute famille future ; voir
+la mise à jour C2C de **D-051**.
+
 ---
 
 ## D-014 — La demande est écrite avant toute action externe
@@ -2398,3 +2406,185 @@ renderer à neuf (risque de régression face à un `ConceptionRenderer` déjà �
   `conception` 4/4 verts ; rendu, prix, uploads, persistance, notification figés par la
   caractérisation existante).
 - La suite du Lot 1 (routage, renderer, bloc, uploads) s'appuiera sur cette liste blanche.
+
+## D-051 — Confirmation post-soumission émise et vérifiée côté serveur (Lot 2, C1)
+
+**Statut.** Adoptée — **incrément C1 réalisé**. Aucune publication publique de Conception,
+aucun accusé de réception par courriel : cet incrément ne fait qu'afficher, de façon **fiable**,
+le résultat d'une soumission après la redirection.
+
+**Contexte.** Après une soumission, `SubmissionController` redirige (303) vers la page portant le
+formulaire. Jusqu'ici l'issue voyageait en clair (`?urbizen_submission=success&reference=URB-…`) et
+**rien ne l'affichait côté serveur** : une personne sans JavaScript ne voyait aucune confirmation, et
+une URL forgée à la main aurait pu faire croire à un succès ou exposer une référence arbitraire.
+
+**Décision.**
+
+- **Aucune confiance dans le GET brut.** Le résultat public n'est jamais déterminé par
+  `urbizen_submission`, `reference` ou un `error` libres de l'URL. Une URL forgée n'affiche **rien**.
+- **Jeton signé, émis par le serveur.** `Http\SubmissionFeedbackToken` émet un jeton
+  `base64url(json).base64url(hmac_sha256)` sur une charge **minimale** — `version`, `type serveur`,
+  `statut` (`success`/`error`), `catégorie publique d'erreur` **ou** `référence` (jamais les deux),
+  `expiration`. Signé par HMAC-SHA256 avec un secret adossé au sel WordPress (hors dépôt) et un
+  **contexte propre** (`|urbizen-feedback`), distinct du jeton anti-robot. Vérification à temps
+  constant (`hash_equals`), format et longueur strictement bornés, **validité courte** (600 s).
+- **Charge sans donnée personnelle.** Ni nom, ni adresse, ni téléphone, ni réponse, ni erreur par
+  champ, ni prix. La **référence** est une information technique : elle ne voyage **que** dans le
+  jeton signé (jamais comme paramètre falsifiable) et ne donne accès à **aucune** donnée persistée.
+- **Catégories d'erreur publiques en liste blanche** (`validation`, `rate_limited`, `unavailable`,
+  `technical`). Le contrôleur mappe chaque code interne vers l'une d'elles ; les défenses (nonce, pot
+  de miel, jeton, doublon), le stockage, la persistance et l'interne restent **opaques** (`technical`).
+- **Lecture confinée, rendu accessible.** `Http\SubmissionResultNotice` est le seul point qui lit
+  l'URL ; il vérifie le jeton, traduit en message public et rend un HTML **accessible**
+  (`role="status"` au succès, `role="alert"` à l'erreur, titre explicite, référence échappée, sans
+  dépendance à JavaScript). Le `StepFormRenderer` **générique** reste inchangé : il ne lit aucune
+  superglobale, ne vérifie aucun jeton. La façade Conception injecte ce HTML **déjà échappé** dans le
+  fragment de tête, **avant** le formulaire. En l'absence de jeton valide, le fragment vaut la chaîne
+  vide et le rendu du formulaire est **identique au caractère près** (parité préservée).
+- **Compatibilité de l'interface progressive.** `urbizen_submission` (`success`/`error`) reste émis
+  car le script client lit l'issue de sa propre requête ; il est **cosmétique** et ne fonde jamais, à
+  lui seul, une confirmation fiable. Le paramètre `reference` en clair est **supprimé**.
+- **Émission au mieux.** Si l'encodage du jeton échoue, la redirection se fait **sans** jeton (aucune
+  confirmation), jamais avec un jeton malformé : une demande réellement enregistrée n'est jamais
+  transformée en faux échec.
+
+**Mise à jour — C1 bis (suppression de la confiance JavaScript dans l'URL).** Le paramètre
+cosmétique `urbizen_submission` est **supprimé** : l'adresse de redirection ne transporte plus que
+`urbizen_feedback` (le jeton signé). Les paramètres historiques falsifiables — `urbizen_submission`,
+`reference`, `error` — sont **toujours purgés** de l'adresse cible, même s'ils y traînaient. La
+notice vérifiée porte désormais un **marqueur serveur** `data-urbizen-feedback-status` (`success`/
+`error`, en liste blanche, échappé, sans référence ni PII), posé **uniquement** après vérification
+du jeton. `urbizen-conception.js` ne lit **plus aucune valeur d'URL** : son verdict se fonde
+exclusivement sur ce marqueur, lu dans la **page réellement servie**. Conséquence : une URL forgée
+(`?urbizen_submission=success`) ne produit ni notice, ni marqueur, ni effacement de brouillon, ni
+apparence de succès — le **brouillon n'est jamais effacé depuis une affirmation libre de l'URL**. Le
+navigateur n'a plus de seconde source de vérité. Le jeton reste réutilisable pendant sa courte durée
+(pas de mécanisme à usage unique en C1 bis) : il ne donne accès à aucune donnée supplémentaire.
+
+**Mise à jour — C3 (aperçu administrateur inerte).** Le rendu Conception distingue désormais deux
+modes, **choisis exclusivement côté serveur** (jamais depuis GET/POST, un attribut de bloc, un
+cookie ou une valeur JavaScript) : **opérationnel** quand le formulaire est public, **aperçu** sinon
+(administration, avant publication). Le rendu **opérationnel reste strictement inchangé** — action,
+nonce, jeton anti-robot, bouton actif, feedback C1 — et la fixture de parité l'ancre désormais
+octet pour octet (elle ne diffère de l'ancienne que par le retrait du bandeau d'aperçu, propre au
+mode preview). Le rendu d'**aperçu** est visuellement représentatif (six étapes, 45 champs,
+navigation, tarification, styles, accessibilité) mais **techniquement inerte** : **aucun appel à
+`AntiSpam::issue_token()`**, aucun nonce généré (prouvé par comptage direct), aucune action
+opérationnelle, aucun champ technique exploitable, bouton d'envoi **désactivé**
+(`disabled aria-disabled="true"`), et une **notice d'aperçu** explicite (« ne peut pas être
+envoyé »). Le conteneur porte un **marqueur serveur** `data-urbizen-render-mode="preview"`
+(liste blanche, échappé, jamais issu de l'URL) ; `urbizen-conception.js` s'y fie pour **neutraliser**
+la soumission (aucun `fetch`, aucun comportement post-succès) et n'écrire **aucun brouillon réel**.
+Un marqueur absent ou inconnu vaut **opérationnel** : les défenses ne sont jamais relâchées sur un
+marqueur douteux. L'aperçu **n'affiche aucun feedback C1** (aucune lecture d'URL en aperçu). Le simple
+rendu d'aperçu **ne crée ni demande, ni référence, ni staging, ni courriel, ni réservation**. La
+**route réelle conserve toutes ses défenses** serveur (nonce, anti-robot, validation) : l'inertie de
+l'aperçu empêche une soumission *accidentelle*, elle ne prétend pas remplacer ces contrôles.
+**Conception reste désactivé publiquement** ; **C2 n'est pas commencé.**
+
+**Mise à jour — C2A (canal serveur de reprise des valeurs et erreurs).** Après un rejet
+**corrigeable** (validation métier : route, nonce, anti-robot, débit et définition tous passés,
+**aucune** demande persistée), le serveur conserve brièvement une **reprise** — les **valeurs
+nettoyées** (issues du `Validator`) et les **erreurs publiques par champ** — pour que la personne
+retrouve sa saisie. **Seul ce cas** ouvre une reprise ; nonce/formulaire invalides, pot de miel,
+anti-robot, limitation de débit, profil/stratégie manquants, structure d'upload hostile, erreur
+interne, ou demande déjà persistée n'en ouvrent **jamais**. La reprise ne contient **que** des
+champs déclarés dans la définition — **jamais** de POST brut, de nonce, de jeton, de pot de miel,
+d'URL de retour, de prix, de profil, de **donnée de fichier** (ni nom, ni chemin, ni contenu, ni
+manifeste), de référence, de trace ni de code interne ; le **consentement n'est pas conservé** (il
+est re-confirmé à chaque soumission) ; une clé d'erreur inconnue bascule en erreur globale générique.
+Le stockage (`SubmissionRecoveryStore`) est un **transient court** (600 s) derrière un **identifiant
+opaque** aléatoire fort (`random_bytes`), à **clé dérivée par HMAC** (aucune donnée personnelle dans
+la clé), **à usage unique** (lecture + suppression). L'identifiant voyage **uniquement à l'intérieur
+du jeton C1 signé** (champ `k`, couvert par la signature HMAC, présent seulement pour une erreur
+`validation`, jamais pour un succès ni une erreur de sécurité) : l'**URL ne contient toujours que**
+`urbizen_feedback=<jeton signé>`, aucune valeur ni erreur en clair. Si l'émission du jeton échoue
+après le dépôt, la reprise est **supprimée** (pas d'orphelin) ; si le dépôt échoue, le rejet reste un
+rejet générique. La couche Conception expose une API de consommation
+(`SubmissionResultNotice::consume_recovery()`), qui vérifie le feedback signé et consomme la reprise
+— **mais C2A ne branche rien au rendu** : les valeurs et erreurs **ne sont pas encore réaffichées**
+(ce sera **C2B**), aucun HTML de champ n'est modifié, la fixture opérationnelle est inchangée, et
+**l'aperçu ne lit ni ne consomme aucune reprise**. **Conception reste désactivé publiquement.**
+
+**Mise à jour — C2B (réaffichage sécurisé des valeurs et erreurs).** Le rendu opérationnel consomme
+la reprise **une seule fois** par requête (seule la première instance opérationnelle la reçoit ;
+l'aperçu jamais) et la transforme en un **état de rendu générique et immuable**
+(`Forms\StepFormRenderState` : valeurs nettoyées, messages publics par champ, message global). Le
+`StepFormRenderer` — toujours **sans connaissance métier, sans lecture de GET, de HMAC ni de
+transient** — réaffiche : la **valeur** échappée selon le type (`value` pour texte/nombre, contenu de
+`textarea`, `option selected`, `radio/checkbox checked`) ; **jamais** le consentement (re-confirmé) ;
+**jamais** de fichier (un fichier ne se restaure pas). Chaque erreur pose `aria-invalid="true"`, un
+message visible (via `Forms\ValidationMessages`, présentateur des **codes** en phrases publiques — un
+code inconnu reçoit un message générique, jamais le code brut) et un marqueur serveur strict
+(`data-urbizen-field-error`). Un **résumé accessible** (`role="alert"`, `data-urbizen-error-summary`)
+liste les erreurs **dans l'ordre de la définition** (jamais celui du POST), avec liens vers les
+champs ; l'erreur globale y figure sans lien ; **aucune référence de demande** (il n'y en a aucune
+après `VALIDATION_FAILED`). **Sans reprise, la sortie est strictement inchangée** (parité octet pour
+octet préservée). La réponse portant une reprise est marquée **non stockable** (`DONOTCACHEPAGE`,
+`nocache_headers()`) : un cache public ne restitue jamais à un autre visiteur l'HTML des valeurs
+saisies. Côté **JavaScript** (flux `fetch`), la réponse serveur est lue **une seule fois** ; ses
+erreurs par champ et son résumé sont appliqués au **formulaire courant sans le remplacer** — les
+`FileList` et les valeurs saisies **restent intactes**, aucune deuxième navigation, aucune deuxième
+consommation, aucun message construit à partir de l'URL, jamais d'`innerHTML` depuis la réponse. En
+**l'absence de JavaScript**, la navigation native suit la redirection, la page consomme la reprise et
+réaffiche valeurs, erreurs et résumé, avec un **nouveau nonce et un nouveau jeton anti-robot** ; les
+fichiers restent à re-sélectionner. **Les fichiers ne sont ni conservés ni restaurés** ; la reprise
+après **erreur d'upload** n'est pas gérée. **Conception reste désactivé publiquement.**
+
+**Mise à jour — C2B bis (renouvellement des identifiants et reprise des familles).** *Renouvellement.*
+Après une validation échouée, le serveur libère le jeton anti-robot (`release_token`, pas
+`consume_token`) : le renvoi avec l'ancien jeton **réussit déjà** (reproduit par exécution). Par
+robustesse, le JavaScript **renouvelle** malgré tout, depuis le formulaire serveur de la réponse
+**déjà téléchargée**, les identifiants techniques à usage unique — **nonce** et **jeton anti-robot** —
+selon une **liste blanche fixe de noms définie côté code** (jamais un nom reçu de la réponse) et
+après **validation de format**. Il met à jour les seuls champs cachés existants, **vide le pot de
+miel**, ne touche ni aux champs métier ni aux `file`, ne remplace pas le formulaire et ne reconstruit
+aucune `FileList`. Si la réponse ne fournit pas un nonce **et** un jeton **valides**, le renvoi est
+**bloqué** (bouton désactivé, message générique, aucune boucle) plutôt que de renvoyer avec des
+identifiants potentiellement périmés. Le parcours **sans JavaScript** utilise nativement les nouveaux
+identifiants (la page rendue les porte). *Familles dynamiques.* La famille `surfaces` était rendue
+**comme un unique contrôle** générique et n'était **pas collectée par pièce** (ni le serveur ni le
+JavaScript ne rendait de contrôle `surfaces[clé]`) : sa saisie par pièce reste dynamique et
+**dépendante de JavaScript** (les pièces dépendent des réponses précédentes). Le `Validator`
+produit néanmoins une structure `surfaces` nettoyée dès qu'un POST porte des `surfaces[clé]`, et
+C2B bis **restaure** cette structure **côté serveur** : `StepFormRenderer` rend, **avec reprise**, un
+contrôle **par clé déclarée présente** (jamais une clé reçue du POST, uniquement les `keys` de la
+définition, **bornées**, dans l'ordre de la définition, valeurs échappées), chacun avec son erreur
+`surfaces[clé]` sur le bon contrôle et un lien de résumé vers `#instance-surfaces-clé`. **Sans
+reprise, la famille conserve son contrôle unique** (parité octet pour octet préservée). Le parcours
+**sans JavaScript** réaffiche ainsi toutes les valeurs nettoyées présentes, avec nouveau nonce et
+nouveau jeton, et reste **corrigeable**. **Consommation unique, non-cache, aperçu inerte et absence
+de PII dans l'URL sont préservés. Conception reste désactivé publiquement.**
+
+**Mise à jour — C2C (descope de la ventilation facultative des surfaces par pièce).** L'audit métier
+(C2C) a établi que la « Surface par pièce » (`surfaces`, pluriel) était **facultative**, **non
+tarifante** et **jamais collectée** : aucun contrôle `surfaces[clé]` n'était rendu, ni par le serveur
+ni par le JavaScript, si bien que le contrat « famille dynamique » restauré en C2B bis n'avait aucune
+saisie réelle à reprendre. **Décision produit : Option A — retrait complet du champ `surfaces`.** Sont
+**conservés** : la **surface globale** `surface` (champ unique, bornée 10–1 000 m², « Surface de
+plancher envisagée »), les **quantités de pièces** (chambres, etc.) et le champ libre `pieces_detail`
+(« Précisions sur la distribution ») qui recueille désormais toute ventilation souhaitée en texte.
+**Retirés** avec le champ : la clôture `keys`/`total_max`, les attributs de définition `family`/`keys`/
+`total_max`, les méthodes `Validator::clean_surfaces()`/`surfaces_attendues()` et la constante
+`FAMILLE_SURFACES`, la branche famille de `StepFormRenderer` (`champ_famille()`) et la reprise
+`surfaces[clé]` de `SubmissionRecovery`. **Aucun contrat mort ne subsiste** : un POST portant
+artificiellement `surfaces[clé]` est traité comme un **champ inconnu** (écarté, nommé dans `ignored`),
+sans nettoyage ni erreur `surfaces[…]`, et la reprise n'en conserve rien. Le formulaire passe de
+**45 à 44 champs** ; la fixture de parité et la fixture JS sont régénérées **volontairement** (une
+seule ligne retirée). **Aucun impact tarifaire** (la note de devis `devis_requis:surface_totale`
+disparaît avec le cumul par pièce), **aucun** courriel demandeur, **aucune** modification de version
+plugin. **Consommation unique, non-cache, aperçu inerte, absence de PII dans l'URL et désactivation
+publique de Conception restent inchangés.**
+
+**Hors de cet incrément (dettes ouvertes).** Reprise des valeurs saisies et des erreurs par champ
+(C2) ; aperçu éditeur sans consommer de jeton (C3) ; centralisation des coordonnées Urbizen (C4) ;
+**publication publique de Conception (C5), toujours désactivée par défaut** ; aucun accusé de
+réception par courriel au demandeur.
+
+**Conséquences.**
+- Nouvelles classes `Http\SubmissionFeedback`, `Http\SubmissionFeedbackToken`,
+  `Http\SubmissionResultNotice` ; `SubmissionController::redirect_url()` émet le jeton et mappe les
+  catégories ; `ConceptionRenderer` injecte le message avant le formulaire.
+- Banc dédié `tests/submissions/test-feedback.php` : succès réel, erreur réelle, absence de feedback,
+  URL forgée, jeton altéré/expiré/d'un autre formulaire, échappement, et **aucune PII dans l'URL**.
+- Rendu Conception **inchangé** en l'absence de feedback (parité octet pour octet préservée).

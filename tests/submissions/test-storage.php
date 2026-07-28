@@ -158,8 +158,10 @@ check( 'le payload est exactement les données nettoyées', $validation['clean']
 check( 'le champ inconnu prix_total est absent', ! array_key_exists( 'prix_total', $lu['payload'] ) );
 check( 'le champ inconnu total est absent', ! array_key_exists( 'total', $lu['payload'] ) );
 check( 'la branche inactive pente est absente', ! array_key_exists( 'pente', $lu['payload'] ) );
-check( 'la surface arbitraire est écartée', ! array_key_exists( 'salon_du_roi', $lu['payload']['surfaces'] ) );
-check( 'les surfaces attendues sont conservées', array( 'sejour' => 35, 'chambre_1' => 14 ) === $lu['payload']['surfaces'] );
+// C2C : la ventilation « Surface par pièce » est descopée — un surfaces[clé]
+// artificiel n'est plus une donnée métier et n'est jamais persisté.
+check( 'la ventilation par pièce (surfaces) n’est PAS persistée', ! array_key_exists( 'surfaces', $lu['payload'] ) );
+check( 'la surface GLOBALE reste persistée', 120 === ( $lu['payload']['surface'] ?? null ) );
 
 $brut = wp_json_encode( $GLOBALS['wpd_meta'][ $id ] );
 

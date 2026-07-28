@@ -252,18 +252,46 @@ neuf();
 $succes = SubmissionResult::success( 'URB-2026-0007', 42 );
 $echec  = SubmissionResult::failure( SubmissionResult::VALIDATION_FAILED, array( 'nom' => 'requis' ) );
 
+/** Valeur du jeton de retour présent dans une adresse, ou chaîne vide. */
+function jeton_de( string $url ): string {
+	$q = array();
+	parse_str( (string) parse_url( $url, PHP_URL_QUERY ), $q );
+
+	return (string) ( $q[ \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP ] ?? '' );
+}
+
+/** Adresse privée de son jeton de retour : la part lisible, sans le jeton signé. */
+function sans_jeton( string $url ): string {
+	$q = array();
+	parse_str( (string) parse_url( $url, PHP_URL_QUERY ), $q );
+	unset( $q[ \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP ] );
+
+	return (string) parse_url( $url, PHP_URL_PATH ) . ( $q ? '?' . http_build_query( $q ) : '' );
+}
+
 $url = SubmissionController::redirect_url( $succes, array( SubmissionController::RETURN_FIELD => '/conception-plans-sur-mesure/' ) );
 
 check( 'succès : la destination est locale', str_starts_with( $url, '/conception-plans-sur-mesure/' ) );
-check( 'succès : l’issue est indiquée', str_contains( $url, 'urbizen_submission=success' ) );
-check( 'succès : la référence est transmise', str_contains( $url, 'reference=URB-2026-0007' ) );
+// C1 bis : plus aucun paramètre d'URL falsifiable. Seul le jeton signé subsiste.
+check( 'succès : aucun urbizen_submission brut', ! str_contains( $url, 'urbizen_submission' ) );
+// La référence ne voyage plus en clair : elle n'existe que dans le jeton signé.
+check( 'succès : la référence n’est PAS un paramètre brut', ! str_contains( $url, 'reference=' ) && ! str_contains( $url, 'URB-2026-0007' ) );
+check( 'succès : un jeton de retour signé est présent', str_contains( $url, \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP . '=' ) );
+
+$fb_ok = \Urbizen\Platform\Http\SubmissionFeedbackToken::verify( jeton_de( $url ) );
+check( 'succès : le jeton se vérifie et porte le succès', null !== $fb_ok && $fb_ok->est_succes() );
+check( 'succès : le jeton porte la référence serveur', null !== $fb_ok && 'URB-2026-0007' === $fb_ok->reference );
 
 $url_echec = SubmissionController::redirect_url( $echec, array( SubmissionController::RETURN_FIELD => '/conception-plans-sur-mesure/' ) );
 
-check( 'échec : l’issue est indiquée', str_contains( $url_echec, 'urbizen_submission=error' ) );
-check( 'échec : aucune référence', ! str_contains( $url_echec, 'reference=' ) );
-check( 'échec : aucun code technique dans l’adresse', ! str_contains( $url_echec, 'validation_failed' ) );
-check( 'échec : aucun champ en erreur dans l’adresse', ! str_contains( $url_echec, 'nom' ) );
+check( 'échec : aucun urbizen_submission brut', ! str_contains( $url_echec, 'urbizen_submission' ) );
+check( 'échec : aucune référence', ! str_contains( $url_echec, 'reference=' ) && ! str_contains( $url_echec, 'URB-' ) );
+// Hors du jeton signé, la part lisible de l'adresse ne porte ni code interne ni champ en erreur.
+check( 'échec : aucun code technique dans l’adresse lisible', ! str_contains( sans_jeton( $url_echec ), 'validation_failed' ) );
+check( 'échec : aucun champ en erreur dans l’adresse lisible', ! str_contains( sans_jeton( $url_echec ), 'nom' ) );
+// Le jeton d'erreur ne porte qu'une catégorie publique, jamais le code interne ni de référence.
+$fb_err = \Urbizen\Platform\Http\SubmissionFeedbackToken::verify( jeton_de( $url_echec ) );
+check( 'échec : le jeton porte une catégorie publique, pas le code interne', null !== $fb_err && 'validation' === $fb_err->categorie_erreur && null === $fb_err->reference );
 
 // --- une adresse étrangère n'est jamais suivie ---
 foreach ( array(
@@ -300,18 +328,28 @@ $u = SubmissionController::redirect_url(
 	)
 );
 
+// Les valeurs soumises n'apparaissent nulle part ; le jeton signé, provablement
+// sans PII, est écarté du contrôle de sous-chaîne (une coïncidence base64 ne doit
+// pas faire échouer un contrôle de confidentialité, ni en masquer un vrai).
 foreach ( array( 'camille', 'Camille', 'exemple.test/?', '0100000000', 'Bonjour', 'message' ) as $motif ) {
-	check( 'l’adresse ne contient pas : ' . $motif, ! str_contains( $u, $motif ) );
+	check( 'l’adresse ne contient pas : ' . $motif, ! str_contains( sans_jeton( $u ), $motif ) );
 }
 
-// --- une issue précédente ne s'accumule pas dans l'adresse ---
+// Et le jeton lui-même ne porte structurellement aucune valeur soumise.
+$fb_pii = \Urbizen\Platform\Http\SubmissionFeedbackToken::verify( jeton_de( $u ) );
+check( 'le jeton de retour ne porte que la référence, aucune saisie', null !== $fb_pii && 'URB-2026-0007' === $fb_pii->reference && $fb_pii->est_succes() );
+
+// --- les paramètres historiques falsifiables ne survivent pas à la redirection ---
 $u = SubmissionController::redirect_url(
 	$succes,
-	array( SubmissionController::RETURN_FIELD => '/page/?urbizen_submission=error&reference=URB-2020-0001' )
+	array( SubmissionController::RETURN_FIELD => '/page/?urbizen_submission=error&reference=URB-2020-0001&error=technical&' . \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP . '=vieux.jeton' )
 );
 
-check( 'une issue précédente est remplacée, pas empilée', 1 === substr_count( $u, 'urbizen_submission=' ) );
-check( 'une référence précédente est remplacée', ! str_contains( $u, 'URB-2020-0001' ) );
+check( 'C1 bis : plus aucun urbizen_submission dans l’adresse', ! str_contains( $u, 'urbizen_submission' ) );
+check( 'C1 bis : plus aucun error brut dans l’adresse', ! str_contains( $u, 'error=' ) );
+check( 'C1 bis : plus aucune reference brute dans l’adresse', ! str_contains( $u, 'reference=' ) && ! str_contains( $u, 'URB-2020-0001' ) );
+check( 'un jeton précédent est remplacé, pas empilé', 1 === substr_count( $u, \Urbizen\Platform\Http\SubmissionResultNotice::CHAMP . '=' ) );
+check( 'un jeton précédent forgé est évincé', ! str_contains( $u, 'vieux.jeton' ) );
 
 // ================================================== CHEMIN SOURCE ===========
 check( 'le chemin local est retenu',

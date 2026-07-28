@@ -38,40 +38,6 @@ $opt = static function ( string $value, string $label ): array {
 	);
 };
 
-/**
- * Liste blanche des surfaces par pièce.
- *
- * Identifiants stables, sans accent ni espace : ce sont des clés de tableau et
- * des noms de champs HTML. Le libellé lisible est reconstitué à l'affichage, il
- * ne transite jamais par le navigateur.
- *
- * @var array<int, string> $surface_keys
- */
-$surface_keys = ( static function (): array {
-	$keys = array( 'sejour', 'cuisine' );
-
-	for ( $i = 1; $i <= 20; $i++ ) {
-		$keys[] = 'chambre_' . $i;
-	}
-
-	for ( $i = 1; $i <= 10; $i++ ) {
-		$keys[] = 'sdb_' . $i;
-	}
-
-	return array_merge(
-		$keys,
-		array(
-			'suite_parentale',
-			'bureau',
-			'buanderie_cellier',
-			'dressing',
-			'sous_sol',
-			'garage',
-			'terrasse_couverte',
-		)
-	);
-} )();
-
 return array(
 	'type'         => 'conception',
 	'title'        => __( 'Conception de plans sur mesure', 'urbizen-platform' ),
@@ -92,7 +58,7 @@ return array(
 			'label'       => __( 'Pièces', 'urbizen-platform' ),
 			'title'       => __( 'Les pièces souhaitées', 'urbizen-platform' ),
 			'description' => __(
-				'Indiquez les pièces à prévoir. Les surfaces sont facultatives : elles affinent l’étude sans la conditionner.',
+				'Indiquez les pièces à prévoir. Vous pourrez préciser librement la distribution souhaitée plus bas.',
 				'urbizen-platform'
 			),
 		),
@@ -261,25 +227,6 @@ return array(
 				$opt( 'garage', __( 'Garage', 'urbizen-platform' ) ),
 				$opt( 'terrasse_couverte', __( 'Terrasse couverte', 'urbizen-platform' ) ),
 			),
-		),
-		array(
-			'name'      => 'surfaces',
-			'type'      => 'number',
-			'step'      => 'pieces',
-			'label'     => __( 'Surface par pièce', 'urbizen-platform' ),
-			'unit'      => 'm²',
-			'multiple'  => true,
-			// Famille dynamique : les lignes réellement affichées dépendent des
-			// réponses précédentes, mais l'ensemble des clés possibles est
-			// arrêté ici. Le serveur ne reconstruit jamais une clé reçue.
-			'family'    => 'surfaces',
-			'keys'      => $surface_keys,
-			'min'       => 1,
-			'max'       => 200,
-			'total_max' => 1000,
-			'increment' => 1,
-			'inputmode' => 'numeric',
-			'help'      => __( 'Facultatif. Au-delà de 1 000 m² cumulés, le projet fait l’objet d’un devis.', 'urbizen-platform' ),
 		),
 		array(
 			'name'      => 'pieces_detail',

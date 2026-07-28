@@ -189,89 +189,22 @@ check( 'sur bâtiment existant, les champs d’existant sont conservés', $r['va
 $r = Validator::validate( $def, array_merge( $existant, array( 'situation' => 'terrain_nu' ) ) );
 check( 'sur terrain nu, les champs d’existant sont écartés', ! isset( $r['clean']['bati_surface'] ) );
 
-// -------------------------------------------------- surfaces dynamiques ----
-$avec_pieces = base(
-	array(
-		'chambres' => '3',
-		'sdb'      => '1',
-		'pieces'   => array( 'bureau' ),
-		'surfaces' => array(
-			'sejour'    => '35',
-			'chambre_1' => '14',
-			'chambre_2' => '12',
-			'chambre_3' => '11',
-			'sdb_1'     => '6',
-			'bureau'    => '9',
-		),
-	)
-);
+// ------------------------ ventilation par pièce DESCOPÉE (C2C) -------------
+// La ventilation « Surface par pièce » a été retirée. Un POST portant
+// artificiellement `surfaces[clé]` n'est plus une donnée métier : `surfaces`
+// n'étant plus déclaré, il est écarté comme champ inconnu (nommé dans
+// `ignored`), jamais nettoyé, jamais transformé en erreur.
+$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '35', 'chambre_1' => '14', '<script>' => '99' ) ) ) );
 
-$r = Validator::validate( $def, $avec_pieces );
+check( 'un surfaces[clé] artificiel n’est PLUS nettoyé', ! array_key_exists( 'surfaces', $r['clean'] ) );
+check( 'surfaces est écarté comme champ inconnu, et nommé', in_array( 'surfaces', $r['ignored'], true ) );
+check( 'aucune erreur « surfaces[…] » n’est produite', array() === array_filter( array_keys( $r['errors'] ), static fn( $k ) => str_starts_with( (string) $k, 'surfaces' ) ) );
 
-check( 'les surfaces attendues sont retenues', $r['valid'] && 6 === count( $r['clean']['surfaces'] ) );
-check( 'les surfaces sont converties en entiers', 35 === $r['clean']['surfaces']['sejour'] );
-check( 'les surfaces sont ordonnées selon la définition', array( 'sejour', 'chambre_1', 'chambre_2', 'chambre_3', 'sdb_1', 'bureau' ) === array_keys( $r['clean']['surfaces'] ) );
-
-// Clé au-delà du nombre de chambres déclaré.
-$r = Validator::validate( $def, base( array( 'chambres' => '2', 'surfaces' => array( 'chambre_1' => '14', 'chambre_5' => '14' ) ) ) );
-check( 'une chambre au-delà du compteur est écartée', array( 'chambre_1' ) === array_keys( $r['clean']['surfaces'] ) );
-check( 'la clé écartée est nommée', in_array( 'surfaces[chambre_5]', $r['ignored'], true ) );
-
-// Clé purement inventée, dans l'esprit du prototype (`surf[Chambre 1]`).
-$r = Validator::validate(
-	$def,
-	base(
-		array(
-			'chambres' => '1',
-			'surfaces' => array(
-				'chambre_1'    => '14',
-				'Chambre 1'    => '99',
-				'salle_du_tr' => '99',
-				'../../etc'    => '99',
-				'<script>'     => '99',
-			),
-		)
-	)
-);
-
-check( 'une clé arbitraire est écartée', array( 'chambre_1' ) === array_keys( $r['clean']['surfaces'] ) );
-check( 'les quatre clés arbitraires sont nommées', 4 === count( array_filter( $r['ignored'], static fn( $c ) => str_starts_with( $c, 'surfaces[' ) ) ) );
-check( 'une clé arbitraire ne provoque pas d’erreur bloquante', $r['valid'] );
-
-// Une pièce non cochée n'a pas de surface attendue.
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'garage' => '20' ) ) ) );
-check( 'la surface d’une pièce non cochée est écartée', array() === $r['clean']['surfaces'] );
-
-$r = Validator::validate( $def, base( array( 'pieces' => array( 'garage' ), 'surfaces' => array( 'garage' => '20' ) ) ) );
-check( 'la surface d’une pièce cochée est retenue', array( 'garage' => 20 ) === $r['clean']['surfaces'] );
-
-// Bornes par pièce.
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '0' ) ) ) );
-check( 'une surface de 0 m² est refusée', ! $r['valid'] && isset( $r['errors']['surfaces[sejour]'] ) );
-
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '201' ) ) ) );
-check( 'une surface de 201 m² est refusée', ! $r['valid'] && isset( $r['errors']['surfaces[sejour]'] ) );
-
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '200' ) ) ) );
-check( 'une surface de 200 m² est acceptée', $r['valid'] );
-
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '-40' ) ) ) );
-check( 'une surface négative est refusée', ! $r['valid'] );
-
-// Seuil de devis sur le total cumulé.
-$grand = array( 'sejour' => '200', 'cuisine' => '200' );
-
-for ( $i = 1; $i <= 4; $i++ ) {
-	$grand[ 'chambre_' . $i ] = '200';
-}
-
-$r = Validator::validate( $def, base( array( 'chambres' => '4', 'surfaces' => $grand ) ) );
-
-check( 'un cumul de 1 200 m² ne bloque pas la soumission', $r['valid'] );
-check( 'un cumul supérieur à 1 000 m² lève la note de devis', in_array( 'devis_requis:surface_totale', $r['notes'], true ) );
-
-$r = Validator::validate( $def, base( array( 'surfaces' => array( 'sejour' => '200', 'cuisine' => '200' ) ) ) );
-check( 'un cumul de 400 m² ne lève aucune note de devis', ! in_array( 'devis_requis:surface_totale', $r['notes'], true ) );
+// La surface GLOBALE reste validée normalement, sans aucune note de devis liée
+// à une ventilation par pièce (ce seuil cumulé n'existe plus).
+$rg = Validator::validate( $def, base( array( 'surface' => '120' ) ) );
+check( 'la surface globale reste validée', 120 === ( $rg['clean']['surface'] ?? null ) );
+check( 'aucune note de devis « surface_totale » n’est plus levée', ! in_array( 'devis_requis:surface_totale', $rg['notes'], true ) );
 
 // ------------------------------------------------------- champs inconnus ---
 $r = Validator::validate( $def, base( array( 'admin' => '1', 'prix_total' => '0', 'surf' => array( 'Chambre 1' => '14' ) ) ) );

@@ -22,7 +22,7 @@ $conception = FormRegistry::get( 'conception' );
 check( 'la définition conception se charge', null !== $conception );
 check( 'elle est valide, sans anomalie', $conception->is_valid() && array() === $conception->errors() );
 check( 'six étapes', 6 === count( $conception->steps() ) );
-check( 'quarante-cinq champs', 45 === count( $conception->fields() ) );
+check( 'quarante-quatre champs', 44 === count( $conception->fields() ) );
 check( 'les étapes sont dans l’ordre',
 	array( 'programme', 'pieces', 'terrain', 'style_options', 'documents', 'contact' ) === $conception->step_ids() );
 

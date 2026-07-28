@@ -60,6 +60,10 @@ final class StepFormRenderConfig {
 	 * @param string                $trusted_header_html      Fragment de confiance inséré entre le repli no-JS et la progression.
 	 * @param string                $trusted_footer_html      Fragment de confiance inséré après la dernière étape, avant la navigation.
 	 * @param array<string, string> $trusted_step_extras_html Fragments de confiance additionnels par identifiant d'étape.
+	 * @param string                $render_mode              Mode de rendu **serveur**, en liste blanche : `operational`
+	 *                                                        (défenses réelles) ou `preview` (rendu inerte, non soumissible).
+	 *                                                        Choisi exclusivement par du code serveur — jamais par le
+	 *                                                        navigateur.
 	 */
 	public function __construct(
 		public readonly string $root,
@@ -79,6 +83,16 @@ final class StepFormRenderConfig {
 		public readonly string $trusted_header_html = '',
 		public readonly string $trusted_footer_html = '',
 		public readonly array $trusted_step_extras_html = array(),
+		public readonly string $render_mode = 'operational',
 	) {
+	}
+
+	/**
+	 * S'agit-il d'un rendu d'aperçu inerte ?
+	 *
+	 * @return bool
+	 */
+	public function est_apercu(): bool {
+		return 'preview' === $this->render_mode;
 	}
 }

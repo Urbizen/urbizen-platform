@@ -56,6 +56,8 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_redirect_leve'] = false;
 	$GLOBALS['wpd_transients'] = array();
 	$GLOBALS['wpd_filters']    = array();
+	$GLOBALS['wpd_create_nonce_calls'] = 0;
+	$GLOBALS['wpd_nocache']    = false;
 	$GLOBALS['wpd_actions']    = array();
 	$GLOBALS['wpd_done']       = array();
 	$GLOBALS['wpd_cron']       = array();
@@ -97,6 +99,12 @@ function add_filter( $hook, $callback, $priorite = 10, $args = 1 ) {
 		// WordPress.
 		'rang' => count( $GLOBALS['wpd_filters'][ $hook ] ?? array() ),
 	);
+
+	return true;
+}
+
+function remove_all_filters( $hook, $priorite = false ) {
+	unset( $GLOBALS['wpd_filters'][ $hook ] );
 
 	return true;
 }
@@ -206,6 +214,10 @@ function wp_salt( $scheme = 'auth' ) {
 
 // ------------------------------------------------------------------- nonces -
 function wp_create_nonce( $action = -1 ) {
+	// Compteur d'appels : permet de PROUVER directement qu'un rendu d'aperçu ne
+	// génère aucun nonce de soumission (et qu'un rendu opérationnel en génère un).
+	$GLOBALS['wpd_create_nonce_calls'] = ( $GLOBALS['wpd_create_nonce_calls'] ?? 0 ) + 1;
+
 	return substr( hash_hmac( 'sha256', (string) $action, wp_salt( 'nonce' ) ), 0, 10 );
 }
 
@@ -1142,7 +1154,9 @@ class WPDB_Double {
 $GLOBALS['wpdb'] = new WPDB_Double();
 
 // ------------------------------------------------------------- divers ------
-function nocache_headers() {}
+function nocache_headers() {
+	$GLOBALS['wpd_nocache'] = true;
+}
 function status_header( $code ) { $GLOBALS['wpd_status'] = $code; }
 function admin_url( $chemin = '' ) { return 'https://exemple.test/wp-admin/' . ltrim( $chemin, '/' ); }
 function size_format( $octets, $decimales = 0 ) { return round( $octets / 1024 ) . ' KB'; }

@@ -97,16 +97,22 @@ check( 'A · AUCUNE ressource Conception pour Localisation', ! in_array( $CONCEP
 // ======================================================================
 // B · CONCEPTION : façade → StepFormRenderer, parité fixture, assets propres
 // ======================================================================
+// La fixture ancre le rendu OPÉRATIONNEL : on force le mode public côté serveur
+// (le mode aperçu inerte est couvert par test-conception-rendu et le banc de
+// parité). Le mode ne dépend jamais d'une valeur du navigateur.
 contexte_admin();
 reset_assets();
+add_filter( 'urbizen_conception_public_enabled', static fn() => true );
 $conc = FormBlock::render_block( array( 'formType' => 'conception' ) );
 check( 'B · Conception résolue par la liste blanche', null !== FormRegistry::get( 'conception' ) );
 check( 'B · Conception rendue par sa façade (cartouche présent)', str_contains( $conc, 'Plans et pièces graphiques' ) && str_contains( $conc, 'class="urbizen-conception"' ) );
-check( 'B · la façade a délégué à StepFormRenderer (structure générique)', str_contains( $conc, 'urbizen-conception__navigation' ) && 45 === substr_count( $conc, 'data-field="' ) );
+check( 'B · la façade a délégué à StepFormRenderer (structure générique)', str_contains( $conc, 'urbizen-conception__navigation' ) && 44 === substr_count( $conc, 'data-field="' ) );
 $reference = (string) file_get_contents( __DIR__ . '/../submissions/fixtures/conception-render.expected.html' );
 check( 'B · sortie FormBlock Conception == fixture de référence (normalisée)', normaliser_bloc( $conc ) === $reference );
 check( 'B · ressources Conception enfilées', in_array( $CONCEPTION_HANDLE, $GLOBALS['wpd_styles'], true ) && in_array( $CONCEPTION_HANDLE, $GLOBALS['wpd_scripts'], true ) );
 check( 'B · les ressources plates urbizen-form NE sont PAS enfilées pour Conception', ! in_array( 'urbizen-form', $GLOBALS['wpd_styles'], true ) && ! in_array( 'urbizen-form', $GLOBALS['wpd_scripts'], true ) );
+
+remove_all_filters( 'urbizen_conception_public_enabled' );
 
 // ======================================================================
 // C · TYPE ABSENT : repli historique sur Localisation
