@@ -44,6 +44,14 @@ final class SubmissionFeedbackToken {
 	public const TTL = 600;
 
 	/**
+	 * Tolérance d'horloge, en secondes, appliquée aux deux bornes de la fenêtre
+	 * d'expiration. Volontairement **faible** : elle absorbe un léger décalage
+	 * entre l'émission et la vérification (charges asymétriques, NTP), sans ouvrir
+	 * de marge exploitable.
+	 */
+	private const TOLERANCE_HORLOGE = 5;
+
+	/**
 	 * Contexte de signature, propre à cette finalité.
 	 */
 	private const CONTEXTE = 'urbizen-feedback-v1';
@@ -177,7 +185,24 @@ final class SubmissionFeedbackToken {
 
 		$expire = $charge['x'] ?? null;
 
-		if ( ! is_int( $expire ) || $expire <= 0 || $now > $expire ) {
+		// Fenêtre d'expiration BORNÉE des deux côtés. Entier strict d'abord : ni
+		// chaîne, ni flottant, ni null, ni tableau ne franchissent `is_int()`.
+		if ( ! is_int( $expire ) ) {
+			return null;
+		}
+
+		// Borne BASSE stricte : un jeton dont l'expiration est atteinte ou passée
+		// est mort (une valeur nulle ou négative l'est a fortiori). Aucune grâce.
+		if ( $now > $expire ) {
+			return null;
+		}
+
+		// Borne HAUTE : le jeton est émis pour exactement {@see self::TTL} secondes,
+		// donc son expiration ne peut dépasser l'instant courant de plus que le TTL
+		// (plus une faible tolérance d'horloge). Une expiration « signée » mais
+		// arbitrairement lointaine — forgée si le secret fuyait, ou issue d'une
+		// émission incohérente — est refusée.
+		if ( $expire > $now + self::TTL + self::TOLERANCE_HORLOGE ) {
 			return null;
 		}
 

@@ -76,6 +76,36 @@ function forger( array $charge ): string {
 	return $b64 . '.' . $sig;
 }
 
+/**
+ * Charge une copie mutée d'une classe du plugin (mutation de code).
+ *
+ * @param string                $relatif       Chemin sous le plugin.
+ * @param string                $classe        Nom de la classe d'origine.
+ * @param array<string, string> $remplacements Motif exact => remplacement.
+ * @return string Nom pleinement qualifié de la classe mutée.
+ */
+function mutant_feedback( string $relatif, string $classe, array $remplacements ): string {
+	static $compteur = 0;
+
+	$source  = (string) file_get_contents( URBIZEN_PLATFORM_DIR . $relatif );
+	$nouveau = $classe . 'MutantFb' . ( ++$compteur );
+	$source  = str_replace( "final class $classe", "final class $nouveau", $source );
+
+	foreach ( $remplacements as $de => $vers ) {
+		if ( ! str_contains( $source, $de ) ) {
+			throw new RuntimeException( "motif introuvable dans $relatif : $de" );
+		}
+		$source = str_replace( $de, $vers, $source );
+	}
+
+	$fichier = sys_get_temp_dir() . '/urbizen-' . $nouveau . '.php';
+	file_put_contents( $fichier, $source );
+	require $fichier;
+	unlink( $fichier );
+
+	return '\\Urbizen\\Platform\\Http\\' . $nouveau;
+}
+
 $T = 1000000000; // Horloge fixe pour les scénarios déterministes.
 
 // ============================ A · SUCCÈS RÉEL ==============================
@@ -230,5 +260,36 @@ foreach ( array( 'Camille', 'camille', '0100000000', 'Bonjour', 'message', 'emai
 
 $fbg = SubmissionFeedbackToken::verify( val_jeton( $urlg ) );
 check( 'G · le jeton ne porte que la référence, aucune saisie', null !== $fbg && $fbg->est_succes() && $rg->reference() === $fbg->reference );
+
+// ======================== H · BORNE HAUTE D'EXPIRATION (H1) ================
+// L'expiration doit rester dans une fenêtre bornée : ni passée, ni arbitrairement
+// lointaine. Le jeton est émis pour TTL secondes ; une tolérance d'horloge faible
+// est admise sur la borne haute uniquement.
+$TTL = SubmissionFeedbackToken::TTL;
+$val = static fn( int $x ) => forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => $x, 'r' => 'URB-2026-0001' ) );
+
+check( 'H · jeton valide (x = now + 100) → accepté', null !== SubmissionFeedbackToken::verify( $val( $T + 100 ), $T ) );
+check( 'H · expiré (x = now - 1) → rejeté', null === SubmissionFeedbackToken::verify( $val( $T - 1 ), $T ) );
+check( 'H · exactement à la borne haute (now + TTL) → accepté', null !== SubmissionFeedbackToken::verify( $val( $T + $TTL ), $T ) );
+check( 'H · borne haute + tolérance (now + TTL + 5) → accepté', null !== SubmissionFeedbackToken::verify( $val( $T + $TTL + 5 ), $T ) );
+check( 'H · une seconde au-delà de la tolérance (now + TTL + 6) → rejeté', null === SubmissionFeedbackToken::verify( $val( $T + $TTL + 6 ), $T ) );
+check( 'H · expiration TRÈS lointaine (now + 10 ans) → rejetée', null === SubmissionFeedbackToken::verify( $val( $T + 315360000 ), $T ) );
+check( 'H · expiration = PHP_INT_MAX → rejetée (aucun overflow)', null === SubmissionFeedbackToken::verify( $val( PHP_INT_MAX ), $T ) );
+
+// Types non entiers, toujours rejetés (jamais de fatale).
+check( 'H · x flottant → rejeté', null === SubmissionFeedbackToken::verify( forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => 1000000100.5, 'r' => 'URB-2026-0001' ) ), $T ) );
+check( 'H · x chaîne numérique → rejeté', null === SubmissionFeedbackToken::verify( forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => '1000000100', 'r' => 'URB-2026-0001' ) ), $T ) );
+check( 'H · x null → rejeté', null === SubmissionFeedbackToken::verify( forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => null, 'r' => 'URB-2026-0001' ) ), $T ) );
+check( 'H · x tableau → rejeté', null === SubmissionFeedbackToken::verify( forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => array( 1 ), 'r' => 'URB-2026-0001' ) ), $T ) );
+check( 'H · x négatif → rejeté', null === SubmissionFeedbackToken::verify( forger( array( 'v' => 1, 't' => 'conception', 's' => 'success', 'x' => -5, 'r' => 'URB-2026-0001' ) ), $T ) );
+
+// Mutant : borne haute RETIRÉE → une expiration arbitrairement lointaine passe.
+$mBorne = mutant_feedback(
+	'src/Http/SubmissionFeedbackToken.php',
+	'SubmissionFeedbackToken',
+	array( 'if ( $expire > $now + self::TTL + self::TOLERANCE_HORLOGE ) {' => 'if ( false ) {' )
+);
+check( 'H · mutant → borne haute retirée : un jeton de 10 ans est ACCEPTÉ', null !== $mBorne::verify( $val( $T + 315360000 ), $T ) );
+check( 'H · le vrai jeton REJETTE toujours l’expiration lointaine', null === SubmissionFeedbackToken::verify( $val( $T + 315360000 ), $T ) );
 
 verdict();

@@ -21,6 +21,7 @@ namespace Urbizen\Platform\Privacy;
 
 use Urbizen\Platform\Files\FileCleaner;
 use Urbizen\Platform\Files\Storage;
+use Urbizen\Platform\Http\SubmissionRecoveryStore;
 use Urbizen\Platform\Security\AntiSpam;
 use Urbizen\Platform\Security\RateLimiter;
 use Urbizen\Platform\Submissions\SubmissionPostType;
@@ -212,7 +213,7 @@ final class Retention {
 	 * s'accumuleraient dans `wp_options` si personne ne les retirait.
 	 *
 	 * @param int|null $now Horodatage courant (tests).
-	 * @return array{demandes:int,abandons:int,corbeille:int,jetons:int,creneaux:int,references:int,staging:int}
+	 * @return array{demandes:int,abandons:int,corbeille:int,courriels:int,jetons:int,creneaux:int,references:int,staging:int,verrous:int}
 	 */
 	public static function run_daily( ?int $now = null ): array {
 		$now = null === $now ? time() : $now;
@@ -236,9 +237,13 @@ final class Retention {
 			// Ne nettoie que le staging. Un document final n'est jamais
 			// supprimé au motif qu'une métadonnée semble manquante.
 			'staging'    => Storage::cleanup_staging( $now ),
+			// Verrous de consommation de reprise abandonnés (processus interrompu
+			// avant libération) : sans donnée personnelle, mais à ne pas laisser
+			// s'accumuler dans wp_options.
+			'verrous'    => SubmissionRecoveryStore::cleanup_expired_locks( $now ),
 		);
 
-		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] || $bilan['courriels'] ) {
+		if ( $bilan['jetons'] || $bilan['creneaux'] || $bilan['references'] || $bilan['staging'] || $bilan['abandons'] || $bilan['corbeille'] || $bilan['courriels'] || $bilan['verrous'] ) {
 			// Des décomptes, jamais un jeton, un condensat ou une référence.
 			Logger::info(
 				sprintf(

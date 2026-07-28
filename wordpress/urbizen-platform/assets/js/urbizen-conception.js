@@ -331,7 +331,15 @@
 		// Toute valeur autre que « preview » — absente, inconnue — vaut opérationnel :
 		// on ne relâche jamais les défenses sur un marqueur douteux.
 		this.apercu = 'preview' === this.racine.getAttribute( 'data-urbizen-render-mode' );
+
+		// Identifiant d'instance produit par le serveur (déterministe, borné), qui
+		// permet de retrouver CE formulaire précis dans la réponse quand plusieurs
+		// instances coexistent. Aucune confiance de sécurité : simple corrélation.
+		this.instance = this.form ? this.form.getAttribute( 'data-urbizen-form-instance' ) : null;
 	}
+
+	// Format attendu d'un identifiant d'instance (produit serveur, jamais client).
+	var FORMAT_INSTANCE = /^urbizen-conception-\d{1,9}$/;
 
 	Parcours.prototype.demarrer = function () {
 		var self = this;
@@ -979,26 +987,41 @@
 					return;
 				}
 
-				// Erreur de validation : réafficher les erreurs SERVEUR sur le
-				// formulaire courant, sans le remplacer — les fichiers déjà
-				// sélectionnés et les valeurs saisies restent en place. Aucune
-				// seconde navigation, aucune seconde consommation de la reprise.
-				if ( resultat.doc && self.appliquerErreursServeur( resultat.doc ) ) {
-					// Renouveler les identifiants techniques (nonce, jeton anti-robot)
-					// depuis le formulaire serveur de la réponse : le prochain envoi
-					// ne réutilise jamais un identifiant à usage unique. Si le
-					// renouvellement échoue, on interdit un nouvel envoi plutôt que de
-					// renvoyer avec des identifiants potentiellement périmés.
-					if ( self.renouvelerChampsTechniques( resultat.doc ) ) {
-						self.apresEchecValidation();
-					} else {
-						self.apresEchecRenouvellement();
-					}
-
+				// Réponse NON analysable (DOMParser indisponible ou analyse échouée) :
+				// on ne peut ni confirmer un succès, ni retrouver notre instance, ni
+				// renouveler des identifiants. Échec FERMÉ : renvoi interdit (jamais de
+				// réutilisation d'un nonce/jeton à usage unique).
+				if ( null === resultat.doc ) {
+					self.apresEchecRenouvellement();
 					return;
 				}
 
-				self.apresEchec( 'Votre demande n’a pas pu être enregistrée. Vérifiez vos réponses et réessayez.' );
+				// On ne travaille QUE sur le formulaire de la réponse correspondant
+				// EXACTEMENT à l'instance courante. Toute association INVALIDE —
+				// identifiant courant absent ou mal formé, aucune instance
+				// correspondante, plusieurs correspondances — est un échec FERMÉ : on
+				// n'applique aucune erreur, on ne renouvelle rien, on interdit le renvoi
+				// (bouton désactivé, message de rechargement). Jamais d'action sur un
+				// formulaire potentiellement étranger, jamais de réutilisation N1/T1.
+				var formReponse = self.instanceReponse( resultat.doc );
+
+				if ( ! formReponse ) {
+					self.apresEchecRenouvellement();
+					return;
+				}
+
+				// Instance appariée : réafficher ses erreurs sur le formulaire courant,
+				// sans le remplacer (FileList et valeurs saisies conservées), puis
+				// renouveler les identifiants techniques depuis CETTE instance. Si le
+				// renouvellement échoue, renvoi interdit plutôt qu'avec des identifiants
+				// incertains.
+				self.appliquerErreursServeur( formReponse );
+
+				if ( self.renouvelerChampsTechniques( formReponse ) ) {
+					self.apresEchecValidation();
+				} else {
+					self.apresEchecRenouvellement();
+				}
 			} )
 			.catch( function () {
 				self.apresEchec( 'L’envoi a échoué. Vos réponses sont conservées : réessayez dans un instant.' );
@@ -1012,33 +1035,24 @@
 	 * avoir VÉRIFIÉ le jeton signé ({@see SubmissionResultNotice}). C'est donc la
 	 * seule marque de confiance : ni l'URL, ni un paramètre libre ne la produisent.
 	 *
-	 * @param {string} corps HTML de la page réellement servie.
+	 * Le statut se lit **exclusivement** par analyse STRUCTURÉE du document
+	 * (`DOMParser`), sur l'élément portant l'attribut — jamais par recherche
+	 * textuelle dans le HTML brut. Une recherche par sous-chaîne pourrait être
+	 * satisfaite par le marqueur apparaissant dans un commentaire, un `<script>`
+	 * ou une valeur saisie, et accorder un faux succès. En l'absence de
+	 * `DOMParser`, on **échoue fermé** : aucun statut n'est déduit.
+	 *
+	 * @param {Document|null} doc Document serveur déjà analysé, ou null.
 	 * @return {string} 'success', 'error', ou '' si aucune notice vérifiée.
 	 */
-	function statutNotice( corps ) {
-		var texte = String( corps || '' );
-
-		try {
-			if ( typeof DOMParser === 'function' ) {
-				var notice = new DOMParser()
-					.parseFromString( texte, 'text/html' )
-					.querySelector( '[data-urbizen-feedback-status]' );
-
-				return notice ? String( notice.getAttribute( 'data-urbizen-feedback-status' ) || '' ) : '';
-			}
-		} catch ( e ) {
-			// Repli ci-dessous.
+	function statutNotice( doc ) {
+		if ( ! doc || typeof doc.querySelector !== 'function' ) {
+			return '';
 		}
 
-		if ( texte.indexOf( 'data-urbizen-feedback-status="success"' ) !== -1 ) {
-			return 'success';
-		}
+		var notice = doc.querySelector( '[data-urbizen-feedback-status]' );
 
-		if ( texte.indexOf( 'data-urbizen-feedback-status="error"' ) !== -1 ) {
-			return 'error';
-		}
-
-		return '';
+		return notice ? String( notice.getAttribute( 'data-urbizen-feedback-status' ) || '' ) : '';
 	}
 
 	/**
@@ -1073,10 +1087,44 @@
 				doc = null;
 			}
 
-			return { statut: statutNotice( corps ), doc: doc };
+			// Sans document structuré (DOMParser absent ou échec) : échec fermé.
+			// Le statut se lit UNIQUEMENT sur le document analysé, jamais dans le
+			// texte brut.
+			return { statut: statutNotice( doc ), doc: doc };
 		} ).catch( function () {
 			return { statut: '', doc: null };
 		} );
+	};
+
+	/**
+	 * Retrouve, dans la réponse serveur, le formulaire correspondant EXACTEMENT à
+	 * l'instance courante. Sert à relier deux rendus du même formulaire quand
+	 * plusieurs instances coexistent — sans jamais « prendre le premier ».
+	 *
+	 * Échoue fermé (renvoie null) si : l'instance courante manque ou est mal
+	 * formée ; aucune instance de la réponse ne correspond ; plusieurs y
+	 * correspondent. Aucune confiance de sécurité n'est accordée à cet
+	 * identifiant : il ne sert qu'à la corrélation.
+	 *
+	 * @param {Document} doc Document serveur analysé.
+	 * @return {Element|null} Le formulaire de réponse apparié, ou null.
+	 */
+	Parcours.prototype.instanceReponse = function ( doc ) {
+		if ( ! doc || ! this.instance || ! FORMAT_INSTANCE.test( this.instance ) ) {
+			return null;
+		}
+
+		var candidats = doc.querySelectorAll( '.' + RACINE + '__form[data-urbizen-form-instance]' );
+		var apparie   = null;
+
+		Array.prototype.forEach.call( candidats, function ( form ) {
+			if ( form.getAttribute( 'data-urbizen-form-instance' ) === this.instance ) {
+				// Deux correspondances = ambiguïté : on marque et on refusera.
+				apparie = null === apparie ? form : false;
+			}
+		}, this );
+
+		return apparie || null;
 	};
 
 	/**
@@ -1087,12 +1135,15 @@
 	 * intactes), n'ajoute aucun message construit côté client, ne lit aucune valeur
 	 * d'URL. Renvoie vrai si des erreurs par champ ont été trouvées et appliquées.
 	 *
-	 * @param {Document} doc Document serveur analysé.
+	 * Les erreurs sont lues dans la portée du **formulaire apparié** de la réponse
+	 * (jamais le document entier), et appliquées au formulaire courant.
+	 *
+	 * @param {Element} formReponse Formulaire de la réponse correspondant à l'instance.
 	 * @return {boolean}
 	 */
-	Parcours.prototype.appliquerErreursServeur = function ( doc ) {
+	Parcours.prototype.appliquerErreursServeur = function ( formReponse ) {
 		var self    = this;
-		var erreurs = doc.querySelectorAll( '[data-urbizen-field-error]' );
+		var erreurs = formReponse.querySelectorAll( '[data-urbizen-field-error]' );
 
 		if ( ! erreurs.length ) {
 			return false;
@@ -1126,25 +1177,26 @@
 			} );
 		} );
 
-		this.copierResume( doc );
+		this.copierResume( formReponse );
 
 		return true;
 	};
 
 	/**
 	 * Recopie le résumé d'erreurs du serveur dans le résumé courant, en
-	 * reconstruisant chaque entrée (aucun innerHTML depuis la réponse).
+	 * reconstruisant chaque entrée (aucun innerHTML depuis la réponse). La source
+	 * est lue dans la portée du formulaire apparié.
 	 *
-	 * @param {Document} doc Document serveur analysé.
+	 * @param {Element} formReponse Formulaire de la réponse correspondant à l'instance.
 	 * @return {void}
 	 */
-	Parcours.prototype.copierResume = function ( doc ) {
+	Parcours.prototype.copierResume = function ( formReponse ) {
 		if ( ! this.resume ) {
 			return;
 		}
 
 		var liste = this.resume.querySelector( '.' + RACINE + '__erreurs-liste' );
-		var src   = doc.querySelector( '[data-urbizen-error-summary] .' + RACINE + '__erreurs-liste' );
+		var src   = formReponse.querySelector( '[data-urbizen-error-summary] .' + RACINE + '__erreurs-liste' );
 
 		if ( liste && src ) {
 			liste.textContent = '';
@@ -1235,12 +1287,13 @@
 	 * renvoie faux : on n'actualise rien à moitié, et l'appelant interdit le
 	 * renvoi. Le pot de miel est vidé.
 	 *
-	 * @param {Document} doc Document serveur analysé.
+	 * La source est le formulaire de la réponse **apparié à l'instance courante**,
+	 * jamais « le premier formulaire de la page ».
+	 *
+	 * @param {Element} formServeur Formulaire de la réponse correspondant à l'instance.
 	 * @return {boolean}
 	 */
-	Parcours.prototype.renouvelerChampsTechniques = function ( doc ) {
-		var formServeur = doc.querySelector( '.' + RACINE + '__form' );
-
+	Parcours.prototype.renouvelerChampsTechniques = function ( formServeur ) {
 		if ( ! formServeur ) {
 			return false;
 		}

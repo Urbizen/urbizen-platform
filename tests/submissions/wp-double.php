@@ -55,6 +55,8 @@ function wpd_reset(): void {
 	$GLOBALS['wpd_logged_in']   = false;
 	$GLOBALS['wpd_redirect_leve'] = false;
 	$GLOBALS['wpd_transients'] = array();
+	$GLOBALS['wpd_delete_transient_fail'] = array();
+	$GLOBALS['wpd_found_rows'] = false;
 	$GLOBALS['wpd_filters']    = array();
 	$GLOBALS['wpd_create_nonce_calls'] = 0;
 	$GLOBALS['wpd_nocache']    = false;
@@ -250,8 +252,17 @@ function get_transient( $cle ) {
 }
 
 function delete_transient( $cle ) {
+	// Simulation d'échec de suppression (fail-closed) : quand la clé courante
+	// figure dans wpd_delete_transient_fail, la charge SURVIT et l'on renvoie
+	// false, comme le cœur WordPress en cas d'échec réel.
+	if ( ! empty( $GLOBALS['wpd_delete_transient_fail'] ) && in_array( $cle, (array) $GLOBALS['wpd_delete_transient_fail'], true ) ) {
+		return false;
+	}
+
+	$existait = array_key_exists( $cle, $GLOBALS['wpd_transients'] );
 	unset( $GLOBALS['wpd_transients'][ $cle ] );
-	return true;
+
+	return $existait;
 }
 
 // ----------------------------------------------------------------- options --
@@ -1148,6 +1159,83 @@ class WPDB_Double {
 		);
 
 		return array_slice( $noms, 0, $limite );
+	}
+
+	/** Déséchappe une valeur SQL quotée par prepare(). */
+	private function deguillemet( string $v ): string {
+		return str_replace( "''", "'", $v );
+	}
+
+	public function get_var( $requete ) {
+		if ( preg_match( "/SELECT option_value FROM \\S+ WHERE option_name = '((?:[^']|'')*)'/", $requete, $m ) ) {
+			$nom = $this->deguillemet( $m[1] );
+			$v   = $GLOBALS['wpd_options'][ $nom ] ?? null;
+
+			return is_string( $v ) ? $v : null;
+		}
+
+		return null;
+	}
+
+	public function query( $requete ) {
+		// INSERT IGNORE : la contrainte d'unicité de option_name tranche.
+		if ( preg_match( "/^INSERT IGNORE INTO \\S+ \\(option_name, option_value, autoload\\) VALUES \\('((?:[^']|'')*)', '((?:[^']|'')*)', '[^']*'\\)/s", $requete, $m ) ) {
+			$nom = $this->deguillemet( $m[1] );
+
+			if ( array_key_exists( $nom, $GLOBALS['wpd_options'] ) ) {
+				return 0; // doublon ignoré : 0 ligne affectée.
+			}
+
+			$GLOBALS['wpd_options'][ $nom ]  = $this->deguillemet( $m[2] );
+			$GLOBALS['wpd_autoload'][ $nom ] = 'no';
+
+			return 1; // insertion : 1 ligne affectée.
+		}
+
+		// INSERT … ON DUPLICATE KEY UPDATE : modélise l'AMBIGUÏTÉ de add_option().
+		// Par défaut (comme WordPress sans CLIENT_FOUND_ROWS) un doublon renvoie 0.
+		// Avec $GLOBALS['wpd_found_rows'] = true (hôte CLIENT_FOUND_ROWS), un
+		// doublon renvoie 1 : DEUX appelants pourraient croire avoir gagné.
+		if ( preg_match( "/^INSERT INTO \\S+ .*ON DUPLICATE KEY UPDATE/s", $requete )
+			&& preg_match( "/VALUES \\('((?:[^']|'')*)', '((?:[^']|'')*)', '[^']*'\\)/s", $requete, $m ) ) {
+			$nom = $this->deguillemet( $m[1] );
+
+			if ( array_key_exists( $nom, $GLOBALS['wpd_options'] ) ) {
+				return empty( $GLOBALS['wpd_found_rows'] ) ? 0 : 1; // no-op : 0, ou 1 sous CLIENT_FOUND_ROWS.
+			}
+
+			$GLOBALS['wpd_options'][ $nom ]  = $this->deguillemet( $m[2] );
+			$GLOBALS['wpd_autoload'][ $nom ] = 'no';
+
+			return 1;
+		}
+
+		// DELETE conditionnel (propriétaire exact).
+		if ( preg_match( "/^DELETE FROM \\S+ WHERE option_name = '((?:[^']|'')*)' AND option_value = '((?:[^']|'')*)'/s", $requete, $m ) ) {
+			$nom = $this->deguillemet( $m[1] );
+			$val = $this->deguillemet( $m[2] );
+
+			if ( array_key_exists( $nom, $GLOBALS['wpd_options'] ) && $GLOBALS['wpd_options'][ $nom ] === $val ) {
+				unset( $GLOBALS['wpd_options'][ $nom ], $GLOBALS['wpd_autoload'][ $nom ] );
+				return 1;
+			}
+
+			return 0;
+		}
+
+		// DELETE inconditionnel par nom.
+		if ( preg_match( "/^DELETE FROM \\S+ WHERE option_name = '((?:[^']|'')*)'\\s*$/s", $requete, $m ) ) {
+			$nom = $this->deguillemet( $m[1] );
+
+			if ( array_key_exists( $nom, $GLOBALS['wpd_options'] ) ) {
+				unset( $GLOBALS['wpd_options'][ $nom ], $GLOBALS['wpd_autoload'][ $nom ] );
+				return 1;
+			}
+
+			return 0;
+		}
+
+		return 0;
 	}
 }
 

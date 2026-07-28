@@ -25,6 +25,7 @@ foreach (
 		'src/Support/Logger.php',
 		'src/Support/Reference.php',
 		'src/Support/OptionsScan.php',
+		'src/Support/OptionMutex.php',
 		'src/Forms/FormDefinition.php',
 		'src/Forms/FormRegistry.php',
 		'src/Forms/Pricing.php',

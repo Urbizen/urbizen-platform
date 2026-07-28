@@ -2576,6 +2576,82 @@ disparaît avec le cumul par pièce), **aucun** courriel demandeur, **aucune** m
 plugin. **Consommation unique, non-cache, aperçu inerte, absence de PII dans l'URL et désactivation
 publique de Conception restent inchangés.**
 
+**Mise à jour — H1 (durcissement avant publication).** Quatre renforcements, **sans** publication ni
+changement de version :
+
+- **Usage unique concurrent (réservation exclusive, sans vol).** `SubmissionRecoveryStore::consume()`
+  ne fait plus un simple *get-puis-delete* : il acquiert d'abord une **réservation exclusive** via
+  `OptionMutex::claim()` — un `INSERT IGNORE` direct (voir la mise à jour H1 ter ci-dessous ; **pas**
+  `add_option()`, dont le retour est ambigu). De deux consommateurs concurrents, **un seul** obtient la
+  charge ; l'autre reçoit `null` **avant toute lecture**. Le verrou
+  est une option dédiée (`urbizen_recl_…`), nommée par **condensat HMAC** (aucune donnée personnelle,
+  aucun identifiant lisible). **Il n'est jamais recyclé ni volé pendant qu'il court** : sa durée de vie
+  est **alignée sur la durée de vie maximale de la reprise** (`TTL_VERROU` = `TTL` = **600 s**), de sorte
+  qu'un ancien propriétaire simplement suspendu ne puisse jamais reprendre pendant qu'un nouveau
+  propriétaire tiendrait le même verrou. **Un processus qui meurt rend la reprise définitivement
+  indisponible** (fail-closed assumé, préférable à une double restitution). Le verrou n'est retiré que
+  par son **propriétaire** (fin de traitement, suppression conditionnée par la confirmation de
+  `delete_transient`) ou, **une fois la reprise devenue inconsommable**, par le ménage quotidien
+  (`Retention::run_daily`, rubrique `verrous`) — jamais tant qu'elle peut encore être lue, et **aucun
+  verrou permanent** ne subsiste dans `wp_options`. **Si la suppression de la charge n'est pas
+  confirmée** (`delete_transient` renvoie faux), rien n'est restitué et le verrou est **conservé** :
+  aucune seconde restitution n'est possible. La libération inconditionnelle du propriétaire est sûre
+  précisément parce qu'aucun vol n'a lieu — il n'existe jamais deux propriétaires du même verrou.
+- **Borne temporelle du feedback signé.** `SubmissionFeedbackToken::verify()` refuse désormais une
+  expiration **arbitrairement lointaine** : l'expiration entière doit tomber dans `now < x ≤
+  now + TTL + tolérance`, avec `TOLERANCE_HORLOGE` = 5 s (borne haute seulement ; la borne basse reste
+  stricte — un jeton expiré est mort). Ni chaîne, ni flottant, ni null, ni tableau, ni valeur négative
+  ne franchissent `is_int()` et les bornes.
+- **Association stricte à l'instance du formulaire.** Chaque instance opérationnelle porte un
+  identifiant **produit par le serveur**, déterministe et borné (`data-urbizen-form-instance`, format
+  `urbizen-conception-<n>`). Le JavaScript retrouve dans la réponse le formulaire portant **exactement**
+  cet identifiant — jamais « le premier formulaire » — et n'y applique erreurs et renouvellement de
+  nonce/jeton que **si une seule instance correspond**. Aucune correspondance ou une ambiguïté :
+  réponse **refusée** (aucune action, réessai possible). **Aucune confiance de sécurité** n'est accordée
+  à cet identifiant (nonce et jeton restent la seule frontière) ; il ne sert qu'à corréler deux rendus
+  du même formulaire. Le parcours **sans JavaScript** reste inchangé.
+- **Fail-closed sans `DOMParser`.** La détection de statut se fait **uniquement** par analyse structurée
+  du document (`DOMParser`), sur l'élément portant `data-urbizen-feedback-status` — **jamais** par
+  recherche de sous-chaîne dans le HTML brut (un marqueur dans un commentaire, un `<script>` ou une
+  valeur saisie ne peut plus accorder de faux succès). En l'absence de `DOMParser`, on **échoue fermé** :
+  aucun succès, aucun effacement de brouillon, aucune copie de nonce/jeton, renvoi **bloqué** (aucune
+  réutilisation d'un identifiant à usage unique).
+
+**Mise à jour — H1 ter (primitive de verrouillage non ambiguë).** L'acquisition ne repose plus sur la
+valeur de retour d'`add_option()`. **Pourquoi.** Le cœur WordPress implémente `add_option()` par un
+`INSERT … ON DUPLICATE KEY UPDATE option_name = VALUES(option_name)`, précédé d'un contrôle d'existence
+non atomique (cache `alloptions`/`notoptions`). Sa valeur de retour dépend alors du nombre de lignes
+affectées : **sans** `MYSQLI_CLIENT_FOUND_ROWS` (défaut WordPress, y compris la production 7.0.2) un
+doublon renvoie 0 ligne → `false`, et le verrou est correct ; **mais** si l'hôte active
+`CLIENT_FOUND_ROWS`, un doublon renvoie 1 ligne « trouvée » → `true`, et **deux appelants concurrents
+peuvent croire avoir gagné**. La garantie est donc *incidente et fragile*, jamais contractuelle. La
+doublure de test le confirme : `add_option()` y est un SETNX propre qui **masque** cette ambiguïté (banc
+de régression `test-recovery.php` H5). **Primitive retenue.** `Support\OptionMutex` : un `INSERT IGNORE`
+direct via `$wpdb` — exactement **une** insertion réussit (1 ligne), les doublons sont ignorés (0), une
+erreur SQL rend `false` (échec fermé) ; contrat **indépendant** de `ON DUPLICATE KEY UPDATE` et de
+`CLIENT_FOUND_ROWS`. Le verrou de reprise est **isolé du cache Options** (acquisition, lecture,
+libération, purge passent toutes par `$wpdb`, jamais `get_option()` ; le cache du nom est invalidé après
+chaque écriture, donc un cache périmé ne peut ni créer un faux gagnant ni masquer un verrou réel). La
+**valeur du verrou** porte un **propriétaire aléatoire** (`random_bytes`) et l'expiration ; la
+**libération est conditionnée à ce propriétaire exact** (`DELETE … WHERE option_name = … AND
+option_value = …`) : un processus ne peut **jamais** supprimer le verrou d'un autre. Le ménage lit en
+base **directement**, borné par préfixe et LIMIT ; un verrou dont la valeur est **corrompue** (non
+datable) est mis en **quarantaine** (conservé, journalisé) plutôt que traité comme expiré.
+
+**Restent obligatoires avant C5 (non traités ici).** (1) Vérifier et **configurer l'exclusion de cache**
+LiteSpeed/CDN de toute réponse portant `urbizen_feedback` (H2). (2) **Exécuter le test d'intégration
+réel** `test-multipart-reel.php` contre un vrai WordPress. (3) **Migrer les autres réservations de
+sécurité vers `OptionMutex`** — `Security\AntiSpam::reserve_token()` (anti-rejeu / soumission en double)
+et `Security\RateLimiter::reserve()` (fréquence) reposent **encore** sur le retour d'`add_option()` :
+**sûres en configuration WordPress par défaut** (le perdant reçoit 0 → `false`), mais **fragiles** sous
+`CLIENT_FOUND_ROWS`. Leur migration exige d'ajouter un `$wpdb` gérant `INSERT IGNORE` à **plusieurs
+doublures de test indépendantes** (submissions, comptes, …), tâche traitée séparément (H1 quater) pour
+ne pas déstabiliser des défenses critiques bien couvertes. Les verrous de **fiabilité** (verrou de cron
+`Retention`, `MailQueue`, `TrashGuard`, réservation de référence `SubmissionRepository`, `MigrationLock`)
+partagent le même motif `add_option` mais protègent des opérations **idempotentes** (double exécution
+sans conséquence de sécurité) ; leur migration est recommandée, non bloquante. Ces points **ne sont pas
+déployés** et Conception **reste désactivé publiquement**.
+
 **Hors de cet incrément (dettes ouvertes).** Reprise des valeurs saisies et des erreurs par champ
 (C2) ; aperçu éditeur sans consommer de jeton (C3) ; centralisation des coordonnées Urbizen (C4) ;
 **publication publique de Conception (C5), toujours désactivée par défaut** ; aucun accusé de

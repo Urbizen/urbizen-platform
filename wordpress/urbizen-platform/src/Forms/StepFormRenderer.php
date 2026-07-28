@@ -71,10 +71,17 @@ final class StepFormRenderer {
 		$html[] = $cfg->trusted_header_html;
 		$html[] = self::progression( $etapes, $cfg );
 		$html[] = sprintf(
-			'<form class="%1$s__form" id="%2$s-form" method="post" enctype="multipart/form-data" action="%3$s" novalidate>',
+			// `data-urbizen-form-instance` : identifiant d'instance **produit par le
+			// serveur**, déterministe et borné (`instance_id`), présent seulement en
+			// opérationnel. Il sert **uniquement** à ce que le JavaScript relie deux
+			// rendus du MÊME formulaire (soumission → réponse) quand plusieurs
+			// instances coexistent ; aucune confiance de sécurité ne lui est accordée
+			// (nonce et jeton restent la seule frontière).
+			'<form class="%1$s__form" id="%2$s-form"%4$s method="post" enctype="multipart/form-data" action="%3$s" novalidate>',
 			esc_attr( $cfg->root ),
 			esc_attr( $cfg->instance_id ),
-			esc_url( $cfg->form_action_url )
+			esc_url( $cfg->form_action_url ),
+			$cfg->est_apercu() ? '' : sprintf( ' data-urbizen-form-instance="%s"', esc_attr( $cfg->instance_id ) )
 		);
 
 		$html[] = self::champs_techniques( $cfg );
