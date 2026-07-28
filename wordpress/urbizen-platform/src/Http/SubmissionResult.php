@@ -154,6 +154,16 @@ final class SubmissionResult {
 	private string $redirect;
 
 	/**
+	 * Identifiant OPAQUE d'une reprise serveur (C2A), pour un rejet corrigeable
+	 * (validation métier) uniquement. Vide sinon. Ne contient aucune donnée : il
+	 * ne sert qu'à retrouver, une seule fois et brièvement, les valeurs nettoyées
+	 * et les erreurs publiques associées.
+	 *
+	 * @var string
+	 */
+	private string $recovery_id;
+
+	/**
 	 * Constructeur privé : on passe par les fabriques.
 	 *
 	 * @param bool                  $ok        Succès.
@@ -169,14 +179,16 @@ final class SubmissionResult {
 		string $reference = '',
 		int $id = 0,
 		array $errors = array(),
-		string $redirect = ''
+		string $redirect = '',
+		string $recovery_id = ''
 	) {
-		$this->ok        = $ok;
-		$this->code      = $code;
-		$this->reference = $reference;
-		$this->id        = $id;
-		$this->errors    = $errors;
-		$this->redirect  = $redirect;
+		$this->ok          = $ok;
+		$this->code        = $code;
+		$this->reference   = $reference;
+		$this->id          = $id;
+		$this->errors      = $errors;
+		$this->redirect    = $redirect;
+		$this->recovery_id = $recovery_id;
 	}
 
 	/**
@@ -208,7 +220,26 @@ final class SubmissionResult {
 	 * @return self
 	 */
 	public function with_redirect( string $url ): self {
-		return new self( $this->ok, $this->code, $this->reference, $this->id, $this->errors, $url );
+		return new self( $this->ok, $this->code, $this->reference, $this->id, $this->errors, $url, $this->recovery_id );
+	}
+
+	/**
+	 * Copie portant l'identifiant opaque d'une reprise serveur (C2A).
+	 *
+	 * @param string $recovery_id Identifiant opaque, ou chaîne vide.
+	 * @return self
+	 */
+	public function with_recovery( string $recovery_id ): self {
+		return new self( $this->ok, $this->code, $this->reference, $this->id, $this->errors, $this->redirect, $recovery_id );
+	}
+
+	/**
+	 * Identifiant opaque de reprise serveur, ou chaîne vide.
+	 *
+	 * @return string
+	 */
+	public function recovery_id(): string {
+		return $this->recovery_id;
 	}
 
 	/**

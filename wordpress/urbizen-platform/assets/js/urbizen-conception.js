@@ -326,6 +326,11 @@
 		this.fichiers = new Collection( schema.uploads );
 		this.consentement = racine.querySelector( '[data-role="consentement-brouillon"]' );
 		this.info = racine.querySelector( '[data-role="info-brouillon"]' );
+
+		// Aperçu : mode décidé PAR LE SERVEUR (marqueur DOM), jamais par l'URL.
+		// Toute valeur autre que « preview » — absente, inconnue — vaut opérationnel :
+		// on ne relâche jamais les défenses sur un marqueur douteux.
+		this.apercu = 'preview' === this.racine.getAttribute( 'data-urbizen-render-mode' );
 	}
 
 	Parcours.prototype.demarrer = function () {
@@ -379,8 +384,16 @@
 		}
 
 		this.brancherFichiers();
-		this.brancherBrouillon();
-		this.restaurer();
+
+		// En aperçu, aucun brouillon réel : ni écriture, ni restauration. On ne
+		// pollue pas le navigateur de l'administration, et rien de persistant
+		// n'est touché. Les interactions purement visuelles (navigation,
+		// conditions, estimation) restent actives.
+		if ( ! this.apercu ) {
+			this.brancherBrouillon();
+			this.restaurer();
+		}
+
 		this.appliquerConditions();
 		this.afficher( this.courante, false );
 		this.rafraichirEstimation();
@@ -925,6 +938,14 @@
 	Parcours.prototype.envoyerFormulaire = function () {
 		var self = this;
 
+		// Aperçu : aucune soumission, aucun fetch, aucun comportement post-succès.
+		// Le serveur a déjà retiré action/nonce/jeton et désactivé le bouton ; ce
+		// verrou client interdit en plus toute tentative (bouton, Entrée, appel
+		// direct). La route réelle conserve de toute façon toutes ses défenses.
+		if ( this.apercu ) {
+			return;
+		}
+
 		if ( this.envoiEnCours ) {
 			return;
 		}
@@ -947,17 +968,37 @@
 		} )
 			.then( function ( reponse ) {
 				// **Un 200 ne prouve rien.** Le contrôleur répond par une
-				// redirection, et une redirection d'erreur mène tout autant à
-				// une page en 200. Le seul verdict est le marqueur posé par le
-				// serveur dans l'URL finale.
-				return self.verdict( reponse );
+				// redirection ; une redirection d'erreur mène tout autant à une page
+				// en 200. Seule fait foi la NOTICE vérifiée par le serveur, lue dans
+				// la page réellement servie (pas dans l'URL).
+				return self.lireReponse( reponse );
 			} )
-			.then( function ( succes ) {
-				if ( succes ) {
+			.then( function ( resultat ) {
+				if ( 'success' === resultat.statut ) {
 					self.apresSucces();
-				} else {
-					self.apresEchec( 'Votre demande n’a pas pu être enregistrée. Vérifiez vos réponses et réessayez.' );
+					return;
 				}
+
+				// Erreur de validation : réafficher les erreurs SERVEUR sur le
+				// formulaire courant, sans le remplacer — les fichiers déjà
+				// sélectionnés et les valeurs saisies restent en place. Aucune
+				// seconde navigation, aucune seconde consommation de la reprise.
+				if ( resultat.doc && self.appliquerErreursServeur( resultat.doc ) ) {
+					// Renouveler les identifiants techniques (nonce, jeton anti-robot)
+					// depuis le formulaire serveur de la réponse : le prochain envoi
+					// ne réutilise jamais un identifiant à usage unique. Si le
+					// renouvellement échoue, on interdit un nouvel envoi plutôt que de
+					// renvoyer avec des identifiants potentiellement périmés.
+					if ( self.renouvelerChampsTechniques( resultat.doc ) ) {
+						self.apresEchecValidation();
+					} else {
+						self.apresEchecRenouvellement();
+					}
+
+					return;
+				}
+
+				self.apresEchec( 'Votre demande n’a pas pu être enregistrée. Vérifiez vos réponses et réessayez.' );
 			} )
 			.catch( function () {
 				self.apresEchec( 'L’envoi a échoué. Vos réponses sont conservées : réessayez dans un instant.' );
@@ -965,21 +1006,301 @@
 	};
 
 	/**
-	 * Lit le marqueur de résultat dans l'URL finale.
+	 * Statut porté par la notice serveur d'une page rendue.
+	 *
+	 * Le serveur ne pose l'attribut `data-urbizen-feedback-status` qu'après
+	 * avoir VÉRIFIÉ le jeton signé ({@see SubmissionResultNotice}). C'est donc la
+	 * seule marque de confiance : ni l'URL, ni un paramètre libre ne la produisent.
+	 *
+	 * @param {string} corps HTML de la page réellement servie.
+	 * @return {string} 'success', 'error', ou '' si aucune notice vérifiée.
 	 */
-	Parcours.prototype.verdict = function ( reponse ) {
-		var url = reponse && reponse.url ? String( reponse.url ) : '';
+	function statutNotice( corps ) {
+		var texte = String( corps || '' );
 
-		if ( url.indexOf( 'urbizen_submission=success' ) !== -1 ) {
-			return true;
+		try {
+			if ( typeof DOMParser === 'function' ) {
+				var notice = new DOMParser()
+					.parseFromString( texte, 'text/html' )
+					.querySelector( '[data-urbizen-feedback-status]' );
+
+				return notice ? String( notice.getAttribute( 'data-urbizen-feedback-status' ) || '' ) : '';
+			}
+		} catch ( e ) {
+			// Repli ci-dessous.
 		}
 
-		if ( url.indexOf( 'urbizen_submission=error' ) !== -1 ) {
+		if ( texte.indexOf( 'data-urbizen-feedback-status="success"' ) !== -1 ) {
+			return 'success';
+		}
+
+		if ( texte.indexOf( 'data-urbizen-feedback-status="error"' ) !== -1 ) {
+			return 'error';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Verdict de soumission — fondé UNIQUEMENT sur la notice vérifiée du serveur.
+	 *
+	 * Le navigateur ne lit plus aucune valeur d'URL (`urbizen_submission`,
+	 * `reference`, `error`) : elles sont falsifiables. Il inspecte la page
+	 * réellement servie après la redirection et n'accorde un succès que si elle
+	 * porte le marqueur serveur `success`. Une erreur, une valeur inconnue,
+	 * l'absence de notice ou l'absence de corps valent « non » — un doute n'est
+	 * jamais un succès.
+	 *
+	 * Lit la réponse UNE seule fois et en tire le statut vérifié et le document
+	 * serveur analysé (pour en extraire, le cas échéant, les erreurs par champ).
+	 * Un corps ne pouvant être lu qu'une fois, ce point centralise sa lecture.
+	 *
+	 * @return {Promise<{statut: string, doc: (Document|null)}>}
+	 */
+	Parcours.prototype.lireReponse = function ( reponse ) {
+		if ( ! reponse || typeof reponse.text !== 'function' ) {
+			return Promise.resolve( { statut: '', doc: null } );
+		}
+
+		return reponse.text().then( function ( corps ) {
+			var doc = null;
+
+			try {
+				if ( typeof DOMParser === 'function' ) {
+					doc = new DOMParser().parseFromString( String( corps || '' ), 'text/html' );
+				}
+			} catch ( e ) {
+				doc = null;
+			}
+
+			return { statut: statutNotice( corps ), doc: doc };
+		} ).catch( function () {
+			return { statut: '', doc: null };
+		} );
+	};
+
+	/**
+	 * Applique au formulaire COURANT les erreurs par champ rendues par le serveur
+	 * dans sa réponse (`data-urbizen-field-error`, `data-urbizen-error-summary`).
+	 *
+	 * Ne remplace aucun contrôle (les `FileList` et les valeurs saisies restent
+	 * intactes), n'ajoute aucun message construit côté client, ne lit aucune valeur
+	 * d'URL. Renvoie vrai si des erreurs par champ ont été trouvées et appliquées.
+	 *
+	 * @param {Document} doc Document serveur analysé.
+	 * @return {boolean}
+	 */
+	Parcours.prototype.appliquerErreursServeur = function ( doc ) {
+		var self    = this;
+		var erreurs = doc.querySelectorAll( '[data-urbizen-field-error]' );
+
+		if ( ! erreurs.length ) {
 			return false;
 		}
 
-		// Aucun marqueur : on ne devine pas. Un doute vaut un échec.
-		return false;
+		this.reinitialiserErreurs();
+
+		Array.prototype.forEach.call( erreurs, function ( src ) {
+			var nom = src.getAttribute( 'data-urbizen-field-error' );
+
+			if ( ! nom || ! /^[A-Za-z0-9_]+$/.test( nom ) ) {
+				return; // Jamais de sélecteur arbitraire à partir d'un nom non validé.
+			}
+
+			var conteneur = self.form.querySelector( '[data-field="' + nom + '"]' );
+
+			if ( ! conteneur ) {
+				return;
+			}
+
+			var cible = conteneur.querySelector( '.' + RACINE + '__erreur' );
+
+			if ( cible ) {
+				// textContent : jamais d'innerHTML depuis la réponse.
+				cible.textContent = src.textContent || '';
+				cible.hidden = false;
+			}
+
+			Array.prototype.forEach.call( conteneur.querySelectorAll( 'input, select, textarea' ), function ( c ) {
+				c.setAttribute( 'aria-invalid', 'true' );
+			} );
+		} );
+
+		this.copierResume( doc );
+
+		return true;
+	};
+
+	/**
+	 * Recopie le résumé d'erreurs du serveur dans le résumé courant, en
+	 * reconstruisant chaque entrée (aucun innerHTML depuis la réponse).
+	 *
+	 * @param {Document} doc Document serveur analysé.
+	 * @return {void}
+	 */
+	Parcours.prototype.copierResume = function ( doc ) {
+		if ( ! this.resume ) {
+			return;
+		}
+
+		var liste = this.resume.querySelector( '.' + RACINE + '__erreurs-liste' );
+		var src   = doc.querySelector( '[data-urbizen-error-summary] .' + RACINE + '__erreurs-liste' );
+
+		if ( liste && src ) {
+			liste.textContent = '';
+
+			Array.prototype.forEach.call( src.children, function ( item ) {
+				var li  = document.createElement( 'li' );
+				li.className = RACINE + '__erreurs-item';
+				var lien = item.querySelector( 'a' );
+
+				if ( lien && lien.getAttribute( 'href' ) && /^#[A-Za-z0-9_-]+$/.test( lien.getAttribute( 'href' ) ) ) {
+					var a = document.createElement( 'a' );
+					a.setAttribute( 'href', lien.getAttribute( 'href' ) );
+					a.textContent = lien.textContent || '';
+					li.appendChild( a );
+				} else {
+					li.textContent = item.textContent || '';
+				}
+
+				liste.appendChild( li );
+			} );
+		}
+
+		this.resume.hidden = false;
+
+		if ( typeof this.resume.focus === 'function' ) {
+			this.resume.focus();
+		}
+	};
+
+	/**
+	 * Efface l'état d'erreur courant avant d'appliquer celui du serveur.
+	 *
+	 * @return {void}
+	 */
+	Parcours.prototype.reinitialiserErreurs = function () {
+		var self = this;
+
+		Array.prototype.forEach.call( this.form.querySelectorAll( '.' + RACINE + '__erreur' ), function ( p ) {
+			p.textContent = '';
+			p.hidden = true;
+		} );
+
+		Array.prototype.forEach.call( this.form.querySelectorAll( '[aria-invalid="true"]' ), function ( c ) {
+			c.removeAttribute( 'aria-invalid' );
+		} );
+
+		if ( self.resume ) {
+			var liste = self.resume.querySelector( '.' + RACINE + '__erreurs-liste' );
+
+			if ( liste ) {
+				liste.textContent = '';
+			}
+
+			self.resume.hidden = true;
+		}
+	};
+
+	/**
+	 * Retour après un rejet de validation dont les erreurs serveur ont été
+	 * réaffichées : le bouton redevient actif, brouillon et fichiers sont
+	 * conservés, aucune deuxième navigation n'est déclenchée.
+	 *
+	 * @return {void}
+	 */
+	Parcours.prototype.apresEchecValidation = function () {
+		this.envoiEnCours = false;
+		this.envoyer.disabled = false;
+		this.envoyer.textContent = 'Envoyer ma demande';
+		this.informer( 'Certaines informations doivent être corrigées. Les points signalés sont indiqués ci-dessus.' );
+	};
+
+	/**
+	 * Liste BLANCHE FIXE des champs techniques renouvelables et de leur format.
+	 * Les noms sont définis ici, JAMAIS reçus librement depuis la réponse.
+	 */
+	var CHAMPS_TECHNIQUES = [
+		{ nom: 'urbizen_conception_nonce', format: /^[A-Za-z0-9]{6,64}$/ },
+		{ nom: 'urbizen_token', format: /^[0-9a-f]{32}\.\d{1,15}\.[0-9a-f]{64}$/ }
+	];
+
+	/**
+	 * Renouvelle, sur le formulaire courant, les identifiants techniques à usage
+	 * unique (nonce, jeton anti-robot) à partir du formulaire SERVEUR de la
+	 * réponse — sans toucher aux champs métier ni aux champs `file`, sans
+	 * remplacer le formulaire, sans reconstruire de `FileList`.
+	 *
+	 * Chaque champ attendu doit être présent ET respecter son format. À défaut,
+	 * renvoie faux : on n'actualise rien à moitié, et l'appelant interdit le
+	 * renvoi. Le pot de miel est vidé.
+	 *
+	 * @param {Document} doc Document serveur analysé.
+	 * @return {boolean}
+	 */
+	Parcours.prototype.renouvelerChampsTechniques = function ( doc ) {
+		var formServeur = doc.querySelector( '.' + RACINE + '__form' );
+
+		if ( ! formServeur ) {
+			return false;
+		}
+
+		var valeurs = {};
+		var i;
+
+		for ( i = 0; i < CHAMPS_TECHNIQUES.length; i++ ) {
+			var attendu = CHAMPS_TECHNIQUES[ i ];
+			var src = formServeur.querySelector( 'input[name="' + attendu.nom + '"]' );
+
+			if ( ! src ) {
+				return false;
+			}
+
+			var valeur = src.getAttribute( 'value' ) || '';
+
+			if ( ! attendu.format.test( valeur ) ) {
+				return false;
+			}
+
+			valeurs[ attendu.nom ] = valeur;
+		}
+
+		// Toutes les valeurs sont valides : on met à jour les champs cachés
+		// EXISTANTS du formulaire courant (jamais de création, jamais un nom reçu).
+		for ( i = 0; i < CHAMPS_TECHNIQUES.length; i++ ) {
+			var nom = CHAMPS_TECHNIQUES[ i ].nom;
+			var cible = this.form.querySelector( 'input[name="' + nom + '"]' );
+
+			if ( ! cible ) {
+				return false;
+			}
+
+			cible.value = valeurs[ nom ];
+		}
+
+		// Pot de miel : toujours vidé pour le prochain envoi.
+		var miel = this.form.querySelector( 'input[name="company_website"]' );
+
+		if ( miel ) {
+			miel.value = '';
+		}
+
+		return true;
+	};
+
+	/**
+	 * Échec de renouvellement des identifiants : on INTERDIT un nouvel envoi
+	 * (des identifiants à usage unique pourraient être périmés), sans révéler de
+	 * détail technique. Les valeurs et les fichiers restent affichés ; aucune
+	 * boucle de soumission.
+	 *
+	 * @return {void}
+	 */
+	Parcours.prototype.apresEchecRenouvellement = function () {
+		this.envoiEnCours = true; // verrou : plus aucun envoi tant que la page n'est pas rechargée.
+		this.envoyer.disabled = true;
+		this.envoyer.textContent = 'Rechargez la page';
+		this.informer( 'Un problème technique empêche de renvoyer le formulaire. Rechargez la page pour recommencer ; vos réponses restent affichées.' );
 	};
 
 	Parcours.prototype.apresSucces = function () {

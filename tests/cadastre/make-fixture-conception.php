@@ -17,6 +17,11 @@ wpd_reset();
 $GLOBALS['wpd_logged_in'] = true;
 $GLOBALS['wpd_can']       = true;
 
+// Fixture OPÉRATIONNELLE : le banc JavaScript travaille sur le formulaire public
+// réel (défenses réelles, formulaire soumissible). L'aperçu inerte (C3) est
+// couvert séparément par le banc, en injectant le marqueur serveur sur cette base.
+add_filter( 'urbizen_conception_public_enabled', static fn() => true );
+
 $def   = FormRegistry::get( 'conception' );
 $html  = ConceptionRenderer::render( $def );
 $schema = ConceptionSchema::build( $def );

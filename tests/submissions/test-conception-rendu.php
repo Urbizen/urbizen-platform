@@ -8,7 +8,7 @@
  * ni schéma, ni nonce, ni jeton, ni ressource. Le garde est serveur : le
  * masquer en CSS reviendrait à le servir quand même.
  *
- * **Ce qui est rendu vient de la définition serveur.** Six étapes, quarante-cinq
+ * **Ce qui est rendu vient de la définition serveur.** Six étapes, quarante-quatre
  * champs, dans l'ordre exact, avec leurs libellés, leurs obligations et leurs
  * conditions — rien de recopié.
  *
@@ -105,17 +105,40 @@ check( '1 · une valeur non booléenne n’ouvre pas', false === ConceptionAvail
 wpd_clear_filter( 'urbizen_conception_public_enabled' );
 
 // ======================================================================
-// 2 · APERÇU ADMINISTRATEUR
+// 2 · APERÇU ADMINISTRATEUR — INERTE (Lot 2, C3)
 // ======================================================================
 neuf();
 administrateur();
-$rendu = ConceptionRenderer::render( $def );
+$apercu = ConceptionRenderer::render( $def );
 
-check( '2 · l’administrateur obtient le formulaire', '' !== $rendu );
-check( '2 · il est signalé comme aperçu', str_contains( $rendu, 'urbizen-conception__apercu' ) );
+check( '2 · l’administrateur obtient le formulaire', '' !== $apercu );
+check( '2 · il est signalé comme aperçu', str_contains( $apercu, 'urbizen-conception__apercu' ) );
+check( '2 · notice d’aperçu non soumissible', str_contains( $apercu, 'ne peut pas être envoyé' ) );
 check( '2 · la feuille de style est chargée', in_array( ConceptionAssets::HANDLE_CSS, $GLOBALS['wpd_styles'], true ) );
 check( '2 · le script est chargé', in_array( ConceptionAssets::HANDLE_JS, $GLOBALS['wpd_scripts'], true ) );
 check( '2 · le schéma est transmis', isset( $GLOBALS['wpd_inline'][ ConceptionAssets::HANDLE_JS ] ) );
+// C3 : l'aperçu est INERTE — marqueur serveur, aucune défense réelle, bouton désactivé.
+check( '2 · marqueur serveur preview', str_contains( $apercu, 'data-urbizen-render-mode="preview"' ) );
+check( '2 · AUCUN nonce en aperçu', ! str_contains( $apercu, 'name="' . SubmissionController::NONCE_FIELD . '"' ) );
+check( '2 · AUCUN jeton anti-spam en aperçu', ! str_contains( $apercu, 'name="' . SubmissionController::TOKEN_FIELD . '"' ) );
+check( '2 · AUCUNE action opérationnelle en aperçu', ! str_contains( $apercu, 'value="' . SubmissionController::ACTION . '"' ) );
+check( '2 · le bouton d’envoi est désactivé', str_contains( $apercu, 'data-action="envoyer" disabled aria-disabled="true"' ) );
+check( '2 · aucune cible admin-post en aperçu', ! str_contains( $apercu, 'admin-post.php' ) );
+
+// ======================================================================
+// 3 à 8 · CONTENU OPÉRATIONNEL (rendu public réel, inchangé par C3)
+// ======================================================================
+// Le mode est forcé côté SERVEUR (filtre de disponibilité). Les défenses réelles
+// et la structure complète sont celles du formulaire opérationnel.
+neuf();
+administrateur();
+add_filter( 'urbizen_conception_public_enabled', static fn() => true );
+ConceptionRenderer::reset();
+ConceptionAssets::register();
+$rendu = ConceptionRenderer::render( $def );
+
+check( '3 · le rendu opérationnel n’a pas la notice d’aperçu', ! str_contains( $rendu, 'urbizen-conception__apercu' ) );
+check( '3 · ni le marqueur preview', ! str_contains( $rendu, 'data-urbizen-render-mode' ) );
 
 // ======================================================================
 // 3 · STRUCTURE : SIX ÉTAPES, QUARANTE-CINQ CHAMPS
@@ -147,9 +170,9 @@ foreach ( $etapes as $etape ) {
 	++$rang;
 }
 
-check( '3 · quarante-cinq champs déclarés', 45 === $total );
+check( '3 · quarante-quatre champs déclarés', 44 === $total );
 check( '3 · les étapes sont dans l’ordre exact', $ordre );
-check( '3 · chaque champ a son bloc', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '3 · chaque champ a son bloc', 44 === substr_count( $rendu, 'data-field="' ) );
 
 // Chaque champ de la définition est présent, nommément.
 $manquants = array();
@@ -258,7 +281,7 @@ $schema = ConceptionSchema::build( $def );
 
 check( '9 · le schéma porte une version', '1' === $schema['version'] );
 check( '9 · six étapes', 6 === count( $schema['steps'] ) );
-check( '9 · quarante-cinq champs', 45 === array_sum( array_map( static fn( $e ) => count( $e['fields'] ), $schema['steps'] ) ) );
+check( '9 · quarante-quatre champs', 44 === array_sum( array_map( static fn( $e ) => count( $e['fields'] ), $schema['steps'] ) ) );
 check( '9 · les tarifs viennent de Pricing', 449 === $schema['pricing']['base'] );
 check( '9 · l’option interne n’est pas exposée', ! isset( $schema['pricing']['options']['modifs_sup'] ) );
 check( '9 · les six options commerciales le sont', 6 === count( $schema['pricing']['options'] ) );
@@ -426,7 +449,7 @@ check( '12 · aucune variable locale employée sans définition', array() === $o
 // 13 · CARTOUCHE D’EN-TÊTE
 //
 // L'ajout est présentationnel : il ne doit RIEN changer à la structure. Les
-// contrôles de la section 3 (six étapes, quarante-cinq champs) tournent déjà
+// contrôles de la section 3 (six étapes, quarante-quatre champs) tournent déjà
 // sur le même rendu — ceux-ci vérifient l'en-tête lui-même.
 // ======================================================================
 neuf();
@@ -463,7 +486,7 @@ check( '13 · aucun aria-hidden nécessaire', ! str_contains( $entete, 'aria-hid
 // Le cartouche est hors du formulaire : il n'ajoute aucune donnée soumise.
 check( '13 · le cartouche précède le formulaire',
 	strpos( $rendu, '__entete' ) < strpos( $rendu, '__form' ) );
-check( '13 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '13 · toujours quarante-quatre champs', 44 === substr_count( $rendu, 'data-field="' ) );
 check( '13 · toujours six étapes', 6 === substr_count( $rendu, 'class="urbizen-conception__etape"' ) );
 check( '13 · aucun champ ajouté par le cartouche',
 	substr_count( $rendu, '<input' ) === substr_count( $rendu, '<input' ) && ! str_contains( $entete, '<input' ) );
@@ -581,7 +604,7 @@ check( '15 · le nom accessible du groupe est séparé',
 	str_contains( $rendu, '</span> <span class="urbizen-conception__etape-intitule">' ) );
 
 // Rien d'autre n'a bougé.
-check( '15 · toujours quarante-cinq champs', 45 === substr_count( $rendu, 'data-field="' ) );
+check( '15 · toujours quarante-quatre champs', 44 === substr_count( $rendu, 'data-field="' ) );
 check( '15 · toujours seize conditions', 16 === substr_count( $rendu, 'data-visible-if="' ) );
 check( '15 · toujours aucun h1', ! preg_match( '/<h1[\s>]/i', $rendu ) );
 

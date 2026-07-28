@@ -57,12 +57,31 @@ function normaliser( string $html ): string {
 }
 
 /**
- * Rend le formulaire Conception dans le contexte administrateur (aperçu),
+ * Rend le formulaire Conception en mode **opérationnel** (formulaire public),
  * de façon déterministe (compteur d'instances remis à zéro).
+ *
+ * La fixture de parité ancre désormais le rendu OPÉRATIONNEL : défenses réelles
+ * (action, nonce, jeton), sans le bandeau d'aperçu (propre au mode preview,
+ * couvert séparément). Le mode est forcé côté SERVEUR par le filtre de
+ * disponibilité, jamais par une valeur du navigateur.
  *
  * @return string
  */
 function rendu_conception(): string {
+	add_filter( 'urbizen_conception_public_enabled', static fn() => true );
+	ConceptionRenderer::reset();
+	ConceptionAssets::register();
+
+	return ConceptionRenderer::render( FormRegistry::get( 'conception' ) );
+}
+
+/**
+ * Rend le formulaire Conception en mode **aperçu** administrateur (non public).
+ *
+ * @return string
+ */
+function rendu_apercu(): string {
+	remove_all_filters( 'urbizen_conception_public_enabled' );
 	$GLOBALS['wpd_logged_in'] = true;
 	$GLOBALS['wpd_can']       = true;
 	ConceptionRenderer::reset();
@@ -93,7 +112,7 @@ $reference = (string) file_get_contents( __DIR__ . '/fixtures/conception-render.
 $apres     = normaliser( rendu_conception() );
 check( 'B · le rendu Conception est inchangé, octet pour octet', $apres === $reference );
 check( 'B · les six étapes sont présentes', 6 === substr_count( $apres, '__etape"' ) );
-check( 'B · les 45 champs sont présents', 45 === substr_count( $apres, 'data-field="' ) );
+check( 'B · les 44 champs sont présents', 44 === substr_count( $apres, 'data-field="' ) );
 check( 'B · les 16 conditions visible_if sont présentes', 16 === substr_count( $apres, 'data-visible-if="' ) );
 
 // ======================================================================
@@ -119,7 +138,7 @@ $direct = StepFormRenderer::render( FormRegistry::get( 'conception' ), $cfg_hist
 
 // Le cœur du formulaire est produit par le renderer générique lui-même.
 check( 'C · rendu direct : six étapes', 6 === substr_count( $direct, '__etape"' ) );
-check( 'C · rendu direct : 45 champs', 45 === substr_count( $direct, 'data-field="' ) );
+check( 'C · rendu direct : 44 champs', 44 === substr_count( $direct, 'data-field="' ) );
 check( 'C · rendu direct : action historique urbizen_conception',
 	str_contains( $direct, 'name="action" value="' . SubmissionController::ACTION . '"' ) );
 check( 'C · rendu direct : champ nonce, jeton, pot de miel, retour',
@@ -214,5 +233,55 @@ $src_generique = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Forms/S
 $interdits_src = array( 'Urbizen\\Platform\\Conception', 'ConceptionRenderer', 'urbizen_conception', 'urbizen-conception', 'UploadPolicy', 'SubmissionController', "=== 'conception'", 'Plans et pièces' );
 $fuites_src    = array_filter( $interdits_src, static fn( $s ) => str_contains( $src_generique, $s ) );
 check( 'E · StepFormRenderer sans dépendance ni chaîne Conception', array() === $fuites_src );
+
+// ======================================================================
+// F · APERÇU INERTE (Lot 2, C3) : représentatif mais NON soumissible
+// ======================================================================
+// Le mode est choisi PAR LE SERVEUR ; une pollution de superglobale « preview »
+// ne l'active ni ne le désactive.
+wpd_reset();
+$_GET  = array( 'preview' => '1' );
+$_POST = array( 'preview' => '1' );
+$GLOBALS['wpd_create_nonce_calls'] = 0;
+$apercu        = rendu_apercu();
+$nonces_apercu = (int) $GLOBALS['wpd_create_nonce_calls'];
+$_GET  = array();
+$_POST = array();
+
+check( 'F · l’aperçu porte le marqueur serveur « preview »', str_contains( $apercu, 'data-urbizen-render-mode="preview"' ) );
+check( 'F · notice d’aperçu accessible et non soumissible', str_contains( $apercu, '__apercu' ) && str_contains( $apercu, 'ne peut pas être envoyé' ) );
+check( 'F · structure visuelle conservée : six étapes', 6 === substr_count( $apercu, '__etape"' ) );
+check( 'F · structure visuelle conservée : 44 champs', 44 === substr_count( $apercu, 'data-field="' ) );
+check( 'F · AUCUN champ nonce en aperçu', ! str_contains( $apercu, SubmissionController::NONCE_FIELD ) );
+check( 'F · AUCUN champ jeton anti-robot en aperçu', ! str_contains( $apercu, 'name="' . SubmissionController::TOKEN_FIELD . '"' ) );
+check( 'F · AUCUNE action opérationnelle en aperçu', ! str_contains( $apercu, 'value="' . SubmissionController::ACTION . '"' ) );
+check( 'F · le bouton d’envoi est désactivé', str_contains( $apercu, '__bouton--envoyer" data-action="envoyer" disabled aria-disabled="true"' ) );
+check( 'F · COMPTAGE DIRECT : zéro nonce généré en aperçu', 0 === $nonces_apercu );
+// AUCUN effet de bord du simple rendu d'aperçu : ni demande, ni courriel, ni
+// réservation (aucun jeton n'est même émis).
+check( 'F · aperçu : aucune demande créée', array() === ( $GLOBALS['wpd_posts'] ?? array() ) );
+check( 'F · aperçu : aucun courriel', array() === ( $GLOBALS['wpd_mails'] ?? array() ) );
+
+// Même un jeton C1 valide dans l'URL n'affiche AUCUN feedback en aperçu.
+wpd_reset();
+$_GET = array(
+	\Urbizen\Platform\Http\SubmissionResultNotice::CHAMP => \Urbizen\Platform\Http\SubmissionFeedbackToken::issue(
+		\Urbizen\Platform\Http\SubmissionFeedback::succes( 'conception', 'URB-2026-0001' )
+	),
+);
+$apercu_fb = rendu_apercu();
+$_GET      = array();
+check( 'F · l’aperçu n’affiche aucun feedback C1', ! str_contains( $apercu_fb, 'data-urbizen-feedback-status' ) && ! str_contains( $apercu_fb, 'URB-2026-0001' ) );
+
+// CONTRE-ÉPREUVE : le rendu OPÉRATIONNEL génère bien nonce et jeton réels.
+wpd_reset();
+$GLOBALS['wpd_create_nonce_calls'] = 0;
+$op        = rendu_conception();
+$nonces_op = (int) $GLOBALS['wpd_create_nonce_calls'];
+
+check( 'F · COMPTAGE DIRECT : le rendu opérationnel génère un nonce', 1 === $nonces_op );
+check( 'F · le rendu opérationnel porte un jeton anti-robot signé', 1 === preg_match( '/name="' . SubmissionController::TOKEN_FIELD . '" value="[0-9a-f]{32}\.[0-9]+\.[0-9a-f]{64}"/', $op ) );
+check( 'F · le rendu opérationnel n’a PAS le marqueur preview', ! str_contains( $op, 'data-urbizen-render-mode' ) );
+check( 'F · le rendu opérationnel n’a PAS la notice d’aperçu', ! str_contains( $op, '__apercu' ) );
 
 verdict();

@@ -127,39 +127,10 @@ $permissive = new $d( 'conception', '', '', $raw['fields'], $raw['steps'] );
 check( '3 · garde retirée → le champ interdit entre', null !== $permissive->field( 'mot_de_passe' ) );
 check( '3 · le dépôt refuse toujours le type inconnu', ! in_array( 'password', FormDefinition::TYPES, true ) );
 
-// =================================== 4 · une clé de surface arbitraire passe
-// Les surfaces sont gardées par deux barrières successives : la liste blanche
-// à la lecture, puis le réordonnancement sur les clés déclarées. On mesure
-// chacune séparément — c'est la seule façon de savoir laquelle protège.
-$attaque = soumission(
-	array(
-		'chambres' => '1',
-		'surfaces' => array( 'chambre_1' => '14', 'Chambre 1' => '99', '<script>' => '99' ),
-	)
-);
-
-$sain = Validator::validate( $ref, $attaque );
-
-$filtre_lecture = 'if ( ! in_array( $cle, $declarees, true ) || ! in_array( $cle, $attendues, true ) ) {';
-$filtre_ordre   = "foreach ( \$declarees as \$cle ) {\n\t\t\tif ( isset( \$values[ \$cle ] ) ) {\n\t\t\t\t\$ordonnees[ \$cle ] = \$values[ \$cle ];\n\t\t\t}\n\t\t}";
-
-$v1 = mutant( 'src/Forms/Validator.php', 'Validator', array( $filtre_ordre => '$ordonnees = $values;' ) );
-$v2 = mutant( 'src/Forms/Validator.php', 'Validator', array( $filtre_lecture => 'if ( false ) {' ) );
-$v3 = mutant(
-	'src/Forms/Validator.php',
-	'Validator',
-	array(
-		$filtre_lecture => 'if ( false ) {',
-		$filtre_ordre   => '$ordonnees = $values;',
-	)
-);
-
-check( '4 · seconde barrière retirée → la liste blanche protège encore', array( 'chambre_1' ) === array_keys( $v1::validate( $ref, $attaque )['clean']['surfaces'] ) );
-check( '4 · première barrière retirée → le réordonnancement protège encore', array( 'chambre_1' ) === array_keys( $v2::validate( $ref, $attaque )['clean']['surfaces'] ) );
-check( '4 · les deux barrières retirées → les clés arbitraires entrent', count( $v3::validate( $ref, $attaque )['clean']['surfaces'] ) > 1 );
-check( '4 · première barrière retirée → les clés ne sont plus nommées', array() === array_filter( $v2::validate( $ref, $attaque )['ignored'], static fn( $c ) => str_starts_with( $c, 'surfaces[' ) ) );
-check( '4 · le dépôt n’accepte que la clé attendue', array( 'chambre_1' ) === array_keys( $sain['clean']['surfaces'] ) );
-check( '4 · le dépôt nomme les clés écartées', 2 === count( array_filter( $sain['ignored'], static fn( $c ) => str_starts_with( $c, 'surfaces[' ) ) ) );
+// Note (C2C) : la ventilation « Surface par pièce » a été descopée ; les mutants
+// des barrières `clean_surfaces` (section 4 historique) sont retirés avec elle.
+// Un `surfaces[clé]` artificiel est désormais un simple champ inconnu (couvert
+// par tests/conception/test-validator.php).
 
 // ============================================== 5 · une valeur hors liste ==
 $v = mutant(

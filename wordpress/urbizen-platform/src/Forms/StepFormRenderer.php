@@ -43,15 +43,25 @@ final class StepFormRenderer {
 	/**
 	 * Rend le formulaire complet.
 	 *
-	 * @param FormDefinition        $def Définition serveur (seule source des étapes et champs).
-	 * @param StepFormRenderConfig  $cfg Configuration technique du rendu.
+	 * @param FormDefinition          $def   Définition serveur (seule source des étapes et champs).
+	 * @param StepFormRenderConfig    $cfg   Configuration technique du rendu.
+	 * @param StepFormRenderState|null $state Valeurs et erreurs à réafficher (reprise), ou aucune.
 	 * @return string
 	 */
-	public static function render( FormDefinition $def, StepFormRenderConfig $cfg ): string {
+	public static function render( FormDefinition $def, StepFormRenderConfig $cfg, ?StepFormRenderState $state = null ): string {
+		// Sans reprise, l'état neutre garantit un rendu STRICTEMENT inchangé.
+		$state  = $state ?? StepFormRenderState::vide();
 		$etapes = $def->steps();
 
 		$html   = array();
-		$html[] = sprintf( '<div class="%s" id="%s">', esc_attr( $cfg->root ), esc_attr( $cfg->instance_id ) );
+		$html[] = sprintf(
+			// Le marqueur de mode n'apparaît qu'en aperçu (liste blanche serveur,
+			// jamais issu de l'URL) ; en opérationnel l'ouverture est inchangée.
+			'<div class="%s" id="%s"%s>',
+			esc_attr( $cfg->root ),
+			esc_attr( $cfg->instance_id ),
+			$cfg->est_apercu() ? ' data-urbizen-render-mode="preview"' : ''
+		);
 
 		if ( '' !== $cfg->trusted_prelude_html ) {
 			$html[] = $cfg->trusted_prelude_html;
@@ -68,12 +78,12 @@ final class StepFormRenderer {
 		);
 
 		$html[] = self::champs_techniques( $cfg );
-		$html[] = self::resume_erreurs( $cfg );
+		$html[] = self::resume_erreurs( $cfg, $def, $state );
 
 		$dernier = count( $etapes ) - 1;
 
 		foreach ( array_values( $etapes ) as $rang => $etape ) {
-			$html[] = self::etape( $def, $etape, $rang, $cfg, $rang === $dernier );
+			$html[] = self::etape( $def, $etape, $rang, $cfg, $rang === $dernier, $state );
 		}
 
 		$html[] = $cfg->trusted_footer_html;
@@ -155,6 +165,14 @@ final class StepFormRenderer {
 	 * @return string
 	 */
 	private static function champs_techniques( StepFormRenderConfig $cfg ): string {
+		// En aperçu : AUCUN champ technique opérationnel. Ni action réelle, ni
+		// nonce, ni jeton anti-robot, ni pot de miel exploitable — rien qui puisse
+		// être posté à la route réelle. Le formulaire n'est structurellement pas
+		// soumissible ; les défenses restent entières côté route serveur.
+		if ( $cfg->est_apercu() ) {
+			return '';
+		}
+
 		$html   = array();
 		$html[] = sprintf( '<input type="hidden" name="%s" value="%s">', esc_attr( $cfg->action_field ), esc_attr( $cfg->action ) );
 		$html[] = wp_nonce_field( $cfg->nonce_action, $cfg->nonce_field, true, false );
@@ -184,12 +202,59 @@ final class StepFormRenderer {
 	 * @param StepFormRenderConfig $cfg Configuration.
 	 * @return string
 	 */
-	private static function resume_erreurs( StepFormRenderConfig $cfg ): string {
+	private static function resume_erreurs( StepFormRenderConfig $cfg, FormDefinition $def, StepFormRenderState $state ): string {
+		$root = $cfg->root;
+		$id   = $cfg->instance_id;
+
+		// Sans erreurs, le résumé reste masqué et vide — sortie inchangée.
+		if ( ! $state->a_des_erreurs() ) {
+			return sprintf(
+				'<div class="%1$s__erreurs" id="%2$s-erreurs" role="alert" aria-live="assertive" tabindex="-1" hidden><h2 class="%1$s__erreurs-titre">%3$s</h2><ul class="%1$s__erreurs-liste"></ul></div>',
+				esc_attr( $root ),
+				esc_attr( $id ),
+				esc_html__( 'Corrigez les points suivants', 'urbizen-platform' )
+			);
+		}
+
+		$items = array();
+
+		// Erreur globale d'abord, sans lien (elle ne cible aucun champ précis).
+		if ( '' !== $state->global_error ) {
+			$items[] = sprintf( '<li class="%1$s__erreurs-item">%2$s</li>', esc_attr( $root ), esc_html( $state->global_error ) );
+		}
+
+		// Puis les erreurs par champ, dans l'ordre de la DÉFINITION (jamais celui
+		// du POST). Les clés de famille « champ[clé] » sont regroupées sous le
+		// contrôle de base. Une clé sans champ déclaré n'est jamais liée.
+		foreach ( $def->fields() as $champ ) {
+			$nom = isset( $champ['name'] ) ? (string) $champ['name'] : '';
+
+			if ( '' === $nom ) {
+				continue;
+			}
+
+			$libelle = (string) ( $champ['label'] ?? $nom );
+			$message = $state->message( $nom );
+
+			if ( '' === $message ) {
+				continue;
+			}
+
+			$items[] = sprintf(
+				'<li class="%1$s__erreurs-item"><a href="#%2$s-%3$s">%4$s</a></li>',
+				esc_attr( $root ),
+				esc_attr( $id ),
+				esc_attr( $nom ),
+				esc_html( $libelle . ' : ' . $message )
+			);
+		}
+
 		return sprintf(
-			'<div class="%1$s__erreurs" id="%2$s-erreurs" role="alert" aria-live="assertive" tabindex="-1" hidden><h2 class="%1$s__erreurs-titre">%3$s</h2><ul class="%1$s__erreurs-liste"></ul></div>',
-			esc_attr( $cfg->root ),
-			esc_attr( $cfg->instance_id ),
-			esc_html__( 'Corrigez les points suivants', 'urbizen-platform' )
+			'<div class="%1$s__erreurs" id="%2$s-erreurs" role="alert" aria-live="assertive" tabindex="-1" data-urbizen-error-summary="1"><h2 class="%1$s__erreurs-titre">%3$s</h2><ul class="%1$s__erreurs-liste">%4$s</ul></div>',
+			esc_attr( $root ),
+			esc_attr( $id ),
+			esc_html__( 'Corrigez les points suivants', 'urbizen-platform' ),
+			implode( '', $items )
 		);
 	}
 
@@ -203,7 +268,7 @@ final class StepFormRenderer {
 	 * @param bool                 $dernier Dernière étape.
 	 * @return string
 	 */
-	private static function etape( FormDefinition $def, $etape, int $rang, StepFormRenderConfig $cfg, bool $dernier ): string {
+	private static function etape( FormDefinition $def, $etape, int $rang, StepFormRenderConfig $cfg, bool $dernier, StepFormRenderState $state ): string {
 		$eid    = self::etape_id( $etape );
 		$champs = $def->fields_for_step( $eid );
 		$total  = count( $def->steps() );
@@ -270,7 +335,7 @@ final class StepFormRenderer {
 		}
 
 		foreach ( $champs as $champ ) {
-			$html[] = self::champ( (array) $champ, $cfg );
+			$html[] = self::champ( (array) $champ, $cfg, $state );
 		}
 
 		$html[] = '</fieldset>';
@@ -285,12 +350,15 @@ final class StepFormRenderer {
 	 * @param StepFormRenderConfig $cfg   Configuration.
 	 * @return string
 	 */
-	private static function champ( array $champ, StepFormRenderConfig $cfg ): string {
+	private static function champ( array $champ, StepFormRenderConfig $cfg, StepFormRenderState $state ): string {
 		$nom = (string) ( $champ['name'] ?? '' );
 
 		if ( '' === $nom ) {
 			return '';
 		}
+
+		// Message d'erreur public à réafficher pour ce champ (vide s'il n'y en a pas).
+		$message = $state->message( $nom );
 
 		$root      = $cfg->root;
 		$id        = $cfg->instance_id;
@@ -328,7 +396,7 @@ final class StepFormRenderer {
 				esc_html( $libelle ),
 				$requis ? self::marque_requis( $root ) : ''
 			);
-			$html[] = self::choix( $champ, $champ_id, $type, $root );
+			$html[] = self::choix( $champ, $champ_id, $type, $root, $state, '' !== $message );
 			$html[] = '</fieldset>';
 		} else {
 			$html[] = sprintf(
@@ -338,14 +406,14 @@ final class StepFormRenderer {
 				esc_html( $libelle ),
 				$requis ? self::marque_requis( $root ) : ''
 			);
-			$html[] = self::controle( $champ, $champ_id, $aide_id, $root, $cfg->file_accept );
+			$html[] = self::controle( $champ, $champ_id, $aide_id, $root, $cfg->file_accept, $state, '' !== $message );
 		}
 
-		$html[] = sprintf(
-			'<p class="%1$s__erreur" id="%2$s" hidden></p>',
-			esc_attr( $root ),
-			esc_attr( $aide_id )
-		);
+		// Message d'erreur par champ : conteneur masqué et vide sans erreur (rendu
+		// inchangé) ; peuplé et signalé au script lorsqu'une erreur est reprise.
+		$html[] = '' === $message
+			? sprintf( '<p class="%1$s__erreur" id="%2$s" hidden></p>', esc_attr( $root ), esc_attr( $aide_id ) )
+			: sprintf( '<p class="%1$s__erreur" id="%2$s" data-urbizen-field-error="%3$s">%4$s</p>', esc_attr( $root ), esc_attr( $aide_id ), esc_attr( $nom ), esc_html( $message ) );
 		$html[] = '</div>';
 
 		return implode( '', $html );
@@ -376,28 +444,49 @@ final class StepFormRenderer {
 	 * @param string               $root     Classe racine.
 	 * @return string
 	 */
-	private static function choix( array $champ, string $champ_id, string $type, string $root ): string {
-		$nom  = (string) $champ['name'];
-		$html = array();
+	private static function choix( array $champ, string $champ_id, string $type, string $root, StepFormRenderState $state, bool $invalide ): string {
+		$nom     = (string) $champ['name'];
+		$reprise = $state->valeur( $nom );
+		$aria    = $invalide ? ' aria-invalid="true"' : '';
+		$html    = array();
 
 		foreach ( (array) ( $champ['options'] ?? array() ) as $rang => $option ) {
 			$valeur  = (string) ( is_array( $option ) ? ( $option['value'] ?? '' ) : $option );
 			$libelle = (string) ( is_array( $option ) ? ( $option['label'] ?? $valeur ) : $option );
 			$oid     = $champ_id . '-' . $rang;
+			$coche   = self::est_choisi( $type, $reprise, $valeur ) ? ' checked' : '';
 
 			$html[] = sprintf(
-				'<div class="%1$s__choix"><input type="%2$s" id="%3$s" name="%4$s%5$s" value="%6$s"><label for="%3$s">%7$s</label></div>',
+				'<div class="%1$s__choix"><input type="%2$s" id="%3$s" name="%4$s%5$s" value="%6$s"%7$s%8$s><label for="%3$s">%9$s</label></div>',
 				esc_attr( $root ),
 				esc_attr( $type ),
 				esc_attr( $oid ),
 				esc_attr( $nom ),
 				'checkbox' === $type ? '[]' : '',
 				esc_attr( $valeur ),
+				$coche,
+				$aria,
 				esc_html( $libelle )
 			);
 		}
 
 		return implode( '', $html );
+	}
+
+	/**
+	 * Une option de choix doit-elle être cochée d'après la valeur reprise ?
+	 *
+	 * @param string $type    « radio » ou « checkbox ».
+	 * @param mixed  $reprise Valeur nettoyée reprise (scalaire ou tableau).
+	 * @param string $valeur  Valeur de l'option.
+	 * @return bool
+	 */
+	private static function est_choisi( string $type, $reprise, string $valeur ): bool {
+		if ( 'checkbox' === $type ) {
+			return is_array( $reprise ) && in_array( $valeur, array_map( 'strval', $reprise ), true );
+		}
+
+		return is_scalar( $reprise ) && ! is_bool( $reprise ) && (string) $reprise === $valeur;
 	}
 
 	/**
@@ -408,11 +497,14 @@ final class StepFormRenderer {
 	 * @param string               $aide_id     Identifiant du message d'erreur.
 	 * @param string               $root        Classe racine.
 	 * @param string               $file_accept Valeur brute de l'attribut `accept` des dépôts.
+	 * @param StepFormRenderState  $state       Valeurs et erreurs à réafficher.
+	 * @param bool                 $invalide    Le champ porte-t-il une erreur ?
 	 * @return string
 	 */
-	private static function controle( array $champ, string $champ_id, string $aide_id, string $root, string $file_accept ): string {
-		$nom  = (string) $champ['name'];
-		$type = (string) ( $champ['type'] ?? 'text' );
+	private static function controle( array $champ, string $champ_id, string $aide_id, string $root, string $file_accept, StepFormRenderState $state, bool $invalide ): string {
+		$nom     = (string) $champ['name'];
+		$type    = (string) ( $champ['type'] ?? 'text' );
+		$reprise = $state->valeur( $nom );
 
 		$commun = sprintf(
 			' id="%s" name="%s" aria-describedby="%s"',
@@ -427,9 +519,15 @@ final class StepFormRenderer {
 			}
 		}
 
+		// aria-invalid n'est posé qu'en présence d'une erreur reprise (sinon, sortie
+		// inchangée). Il reste hors du switch pour valoir pour tous les types.
+		if ( $invalide ) {
+			$commun .= ' aria-invalid="true"';
+		}
+
 		switch ( $type ) {
 			case 'textarea':
-				return sprintf( '<textarea%s rows="4"></textarea>', $commun );
+				return sprintf( '<textarea%s rows="4">%s</textarea>', $commun, esc_html( self::scalaire( $reprise ) ) );
 
 			case 'select':
 				$html  = sprintf( '<select%s>', $commun );
@@ -438,15 +536,18 @@ final class StepFormRenderer {
 				foreach ( (array) ( $champ['options'] ?? array() ) as $option ) {
 					$valeur  = (string) ( is_array( $option ) ? ( $option['value'] ?? '' ) : $option );
 					$libelle = (string) ( is_array( $option ) ? ( $option['label'] ?? $valeur ) : $option );
-					$html   .= sprintf( '<option value="%s">%s</option>', esc_attr( $valeur ), esc_html( $libelle ) );
+					$sel     = ( is_scalar( $reprise ) && ! is_bool( $reprise ) && (string) $reprise === $valeur ) ? ' selected' : '';
+					$html   .= sprintf( '<option value="%s"%s>%s</option>', esc_attr( $valeur ), $sel, esc_html( $libelle ) );
 				}
 
 				return $html . '</select>';
 
 			case 'consent':
+				// JAMAIS pré-coché : le consentement est re-confirmé à chaque envoi.
 				return sprintf( '<input type="checkbox" value="1"%s>', $commun );
 
 			case 'file':
+				// JAMAIS de valeur ni de chemin : un fichier ne se restaure pas.
 				return sprintf(
 					'<input type="file" multiple accept="%s"%s><ul class="%s__fichiers" data-bloc="%s"></ul>',
 					esc_attr( $file_accept ),
@@ -456,11 +557,35 @@ final class StepFormRenderer {
 				);
 
 			case 'number':
-				return sprintf( '<input type="number" inputmode="numeric"%s>', $commun );
+				return sprintf( '<input type="number" inputmode="numeric"%s%s>', $commun, self::attr_valeur( $reprise ) );
 
 			default:
-				return sprintf( '<input type="text"%s>', $commun );
+				return sprintf( '<input type="text"%s%s>', $commun, self::attr_valeur( $reprise ) );
 		}
+	}
+
+	/**
+	 * Valeur scalaire nettoyée, sous forme de chaîne — vide pour tout tableau,
+	 * booléen ou valeur absente. Sert au contenu d'un `textarea`.
+	 *
+	 * @param mixed $reprise Valeur reprise.
+	 * @return string
+	 */
+	private static function scalaire( $reprise ): string {
+		return ( is_scalar( $reprise ) && ! is_bool( $reprise ) ) ? (string) $reprise : '';
+	}
+
+	/**
+	 * Attribut `value="…"` échappé pour une valeur scalaire reprise, ou chaîne
+	 * vide (aucune valeur, un booléen ou un tableau ne produisent aucun attribut).
+	 *
+	 * @param mixed $reprise Valeur reprise.
+	 * @return string
+	 */
+	private static function attr_valeur( $reprise ): string {
+		$scalaire = self::scalaire( $reprise );
+
+		return '' === $scalaire ? '' : sprintf( ' value="%s"', esc_attr( $scalaire ) );
 	}
 
 	/**
@@ -478,17 +603,20 @@ final class StepFormRenderer {
 			// script. Sans JavaScript, aucun bouton n'apparaît : le message
 			// `noscript` dit que l'envoi ne fonctionnera pas, il ne doit pas
 			// être démenti par un bouton « Envoyer » bien visible.
+			// En aperçu, le bouton d'envoi est **désactivé** (`%6$s`) : rien à
+			// soumettre. En opérationnel, `%6$s` est vide → sortie inchangée.
 			'<div class="%1$s__navigation" hidden>'
 				. '<button type="button" class="%1$s__bouton %1$s__bouton--precedent" data-action="precedent">%2$s</button>'
 				. '<div class="%1$s__estimation" id="%3$s-estimation" aria-live="polite"></div>'
 				. '<button type="button" class="%1$s__bouton %1$s__bouton--suivant" data-action="suivant">%4$s</button>'
-				. '<button type="submit" class="%1$s__bouton %1$s__bouton--envoyer" data-action="envoyer">%5$s</button>'
+				. '<button type="submit" class="%1$s__bouton %1$s__bouton--envoyer" data-action="envoyer"%6$s>%5$s</button>'
 				. '</div>',
 			esc_attr( $cfg->root ),
 			esc_html__( 'Précédent', 'urbizen-platform' ),
 			esc_attr( $cfg->instance_id ),
 			esc_html__( 'Suivant', 'urbizen-platform' ),
-			esc_html__( 'Envoyer ma demande', 'urbizen-platform' )
+			esc_html__( 'Envoyer ma demande', 'urbizen-platform' ),
+			$cfg->est_apercu() ? ' disabled aria-disabled="true"' : ''
 		);
 	}
 

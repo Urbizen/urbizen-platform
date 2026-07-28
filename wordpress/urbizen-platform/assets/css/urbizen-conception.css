@@ -871,3 +871,52 @@
 .urbizen-conception__navigation[hidden] {
 	display: none;
 }
+
+/*
+ * Message de résultat après soumission (Lot 2, C1).
+ *
+ * L'information n'est jamais portée par la seule couleur : le titre l'énonce en
+ * toutes lettres (« enregistrée » / « n'a pas pu être envoyée »). Le liséré et le
+ * fond ne font que renforcer une distinction déjà textuelle. Tout reste scopé à
+ * `.urbizen-conception` (D-002).
+ */
+.urbizen-conception__resultat {
+	margin: 0 0 1.5rem;
+	padding: 1rem 1.25rem;
+	border: 1px solid var(--uc-ligne);
+	border-left-width: 4px;
+	border-radius: var(--uc-rayon);
+	background: var(--uc-surface);
+}
+
+.urbizen-conception__resultat--succes {
+	border-left-color: var(--uc-vert);
+	background: var(--uc-vert-pale);
+}
+
+.urbizen-conception__resultat--erreur {
+	border-left-color: var(--uc-erreur);
+}
+
+.urbizen-conception__resultat-titre {
+	margin: 0 0 0.35rem;
+	font-family: var(--uc-titre);
+	font-size: 1.05rem;
+	color: var(--uc-encre);
+}
+
+.urbizen-conception__resultat-texte {
+	margin: 0;
+	color: var(--uc-encre);
+}
+
+.urbizen-conception__resultat-reference {
+	font-family: var(--uc-mono);
+	font-weight: 600;
+}
+
+.urbizen-conception__resultat-note {
+	margin: 0.4rem 0 0;
+	font-size: 0.9rem;
+	color: var(--uc-encre-doux);
+}

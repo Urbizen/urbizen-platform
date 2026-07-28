@@ -175,6 +175,94 @@ conservant les URL existantes.
 
 ---
 
+## Étape 10 — Assistant de préparation au dépôt d'urbanisme (produit d'acquisition futur)
+
+**Statut.** Futur **produit d'acquisition**, non commencé, sans date de livraison engagée.
+À développer **après la stabilisation et la publication du parcours Conception** (Lot 2). Il est
+**distinct** du Lot 2 Conception et **distinct** des formulaires métier DP/PC complets (Étape 5).
+`ProjectContext`, `Orientation`, DP, PC et le Cerfa **ne sont pas implémentés** ; ils sont ici
+décrits comme cibles.
+
+**Objectif produit.** Aider **gratuitement** l'utilisateur à préparer les informations nécessaires à
+sa demande d'urbanisme, qu'il **dépose ensuite lui-même** sur le portail numérique de sa mairie
+(téléprocédure) ou, lorsque c'est nécessaire, au moyen du formulaire officiel correspondant. Ce
+n'est **pas** un générateur de Cerfa : la valeur est l'accompagnement de préparation, pas le PDF.
+
+Formulation produit recommandée : **« Aide gratuite pour préparer votre demande d'urbanisme »**.
+Accroche possible : « *Répondez à quelques questions simples et obtenez les informations à
+renseigner sur le portail de votre mairie, ainsi que la liste des pièces nécessaires.* »
+
+L'assistant devra permettre de :
+
+- comprendre le projet ;
+- identifier la formalité probablement nécessaire ;
+- expliquer les rubriques à compléter avec des mots simples ;
+- préparer les informations à saisir sur le portail de la mairie ;
+- détecter les informations manquantes ou incohérentes ;
+- fournir une liste personnalisée des pièces à joindre ;
+- produire une fiche récapitulative téléchargeable ;
+- proposer éventuellement un Cerfa prérempli lorsque cela reste utile ;
+- orienter vers les prestations payantes Urbizen.
+
+### Frontière gratuit / payant
+
+**Gratuit** (produit d'acquisition) :
+
+- [ ] diagnostic initial du projet ;
+- [ ] orientation probable : aucune formalité, DP, PC ou autre procédure ;
+- [ ] aide rubrique par rubrique, en langage simple ;
+- [ ] informations à préparer pour le dépôt en ligne ;
+- [ ] liste indicative et **personnalisée** des pièces ;
+- [ ] récapitulatif de préparation téléchargeable.
+
+**Payant** (prestations Urbizen) :
+
+- [ ] vérification réglementaire approfondie ;
+- [ ] étude des règles d'urbanisme applicables ;
+- [ ] réalisation des plans et insertion graphique ;
+- [ ] constitution complète du dossier ;
+- [ ] Cerfa final lorsque nécessaire ;
+- [ ] corrections et accompagnement après demande de pièces ;
+- [ ] dépôt en ligne **pour le compte du client**, uniquement lorsqu'il est commandé.
+
+Le module gratuit **ne doit jamais donner l'impression** qu'un dossier complet ou une validation
+réglementaire est offert.
+
+### Parcours envisagé — modules distincts
+
+1. **`ProjectContext`** — collecte structurée : type de bien, localisation, travaux envisagés,
+   surfaces, situation existante.
+2. **`Orientation`** — aucune formalité probable, déclaration préalable, permis de construire, ou
+   autre autorisation / besoin d'analyse humaine.
+3. **`Assistant de préparation au dépôt`** — explication des rubriques, collecte des informations,
+   contrôles de cohérence, liste des pièces, préparation à la saisie sur le portail communal.
+4. **`Récapitulatif`** — fiche téléchargeable, données structurées, Cerfa prérempli **optionnel** si
+   utile et techniquement pertinent.
+5. **`Conversion commerciale`** — proposition de réalisation des plans, dossier complet, vérification,
+   dépôt en ligne, accompagnement.
+
+### Place du Cerfa
+
+- le Cerfa officiel reste une **référence réglementaire** ;
+- les téléprocédures municipales reprennent généralement les informations de la demande dans leurs
+  **propres écrans** ; un PDF Cerfa seul n'est donc **plus le produit d'appel principal** ;
+- le Cerfa peut rester : une **sortie optionnelle**, un **support de contrôle**, un **document
+  d'archive**, un **livrable d'une prestation complète**, ou une solution pour les procédures qui le
+  **demandent encore**.
+
+### Garde-fous
+
+- l'orientation automatisée reste **indicative** tant que les règles locales ne sont pas entièrement
+  vérifiées ; aucune promesse automatique d'acceptation ;
+- aucune qualification juridique définitive sans analyse suffisante ;
+- **aucune génération de plan** dans le parcours gratuit ;
+- **aucune transmission automatique en mairie** sans commande ni consentement ;
+- données personnelles **minimisées** ; **aucune donnée de projet sensible dans l'URL** ;
+- conformité avec les versions officielles des formulaires et téléprocédures **en vigueur au moment
+  du développement**, vérifiées avant chaque mise en production.
+
+---
+
 ## Dette technique suivie
 
 | Sujet | Origine | Étape de traitement |

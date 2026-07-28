@@ -126,15 +126,19 @@ final class SubmissionController {
 
 		// La route est choisie par le HOOK, via une valeur LITTÉRALE liée à
 		// l'action enregistrée ({@see self::register()}) — jamais depuis $_POST.
+		$route  = self::route_for_action( self::ACTION );
 		$result = self::process(
 			is_array( $post ) ? $post : array(),
 			$files,
 			$server,
 			null,
-			self::route_for_action( self::ACTION )
+			$route
 		);
 
-		wp_safe_redirect( self::redirect_url( $result, is_array( $post ) ? $post : array() ) );
+		// Le type porté par le retour provient de la ROUTE serveur, jamais du POST.
+		$type = null === $route ? self::FORM_TYPE : $route['form_type'];
+
+		wp_safe_redirect( self::redirect_url( $result, is_array( $post ) ? $post : array(), $type ) );
 		exit;
 	}
 
@@ -286,7 +290,17 @@ final class SubmissionController {
 		$validation = Validator::validate( $definition, self::strip_technical_fields( $post ) );
 
 		if ( ! $validation['valid'] ) {
-			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] );
+			// Rejet CORRIGEABLE : la route, le nonce, l'anti-robot, la limitation de
+			// débit et la définition ont tous passé, et AUCUNE demande n'est
+			// persistée. On conserve une reprise serveur (valeurs nettoyées + erreurs
+			// publiques, jamais de fichier ni de POST brut) pour que la personne
+			// retrouve sa saisie après correction. Le dépôt est court, opaque et à
+			// usage unique ; s'il échoue, l'identifiant est vide et aucune reprise
+			// n'est proposée — le rejet reste un rejet.
+			$reprise    = SubmissionRecovery::from_validation( $type, $definition, $validation['clean'], $validation['errors'] );
+			$reprise_id = SubmissionRecoveryStore::store( $reprise );
+
+			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] )->with_recovery( $reprise_id );
 		}
 
 		// --- 9 · prix, recalculé côté serveur ---
@@ -674,17 +688,27 @@ final class SubmissionController {
 	/**
 	 * Destination de redirection.
 	 *
-	 * L'adresse ne porte que l'issue et, en cas de succès, la référence. Ni
-	 * nom, ni adresse électronique, ni téléphone, ni message, ni nature du
-	 * projet, ni prix, ni détail d'erreur : une adresse se retrouve dans
-	 * l'historique du navigateur, dans les journaux du serveur et dans le
-	 * `Referer` envoyé au site suivant.
+	 * L'adresse ne porte aucune donnée personnelle : ni nom, ni adresse
+	 * électronique, ni téléphone, ni message, ni nature du projet, ni prix, ni
+	 * erreur par champ — une adresse se retrouve dans l'historique du navigateur,
+	 * dans les journaux du serveur et dans le `Referer` envoyé au site suivant.
 	 *
-	 * @param SubmissionResult     $result Issue.
-	 * @param array<string, mixed> $post   Données postées.
+	 * **Une seule source de résultat, signée.** L'adresse ne porte que
+	 * `urbizen_feedback` : un **jeton signé par le serveur**
+	 * ({@see SubmissionFeedbackToken}), seule source d'une confirmation fiable
+	 * qu'une URL forgée ne peut pas produire. Les paramètres historiques
+	 * falsifiables — `urbizen_submission`, `reference`, `error` — ne sont **plus
+	 * émis**, et sont **retirés** de l'adresse cible s'ils y traînaient : aucune
+	 * ancienne valeur ne survit à une redirection, et le navigateur n'a plus de
+	 * seconde source de vérité fondée sur l'URL. La **référence** n'existe que
+	 * dans le jeton signé.
+	 *
+	 * @param SubmissionResult     $result    Issue.
+	 * @param array<string, mixed> $post      Données postées.
+	 * @param string               $form_type Type serveur de la route (jamais du POST).
 	 * @return string
 	 */
-	public static function redirect_url( SubmissionResult $result, array $post ): string {
+	public static function redirect_url( SubmissionResult $result, array $post, string $form_type = self::FORM_TYPE ): string {
 		$base = '';
 
 		if ( isset( $post[ self::RETURN_FIELD ] ) && is_string( $post[ self::RETURN_FIELD ] )
@@ -704,13 +728,82 @@ final class SubmissionController {
 			$base = home_url( '/' );
 		}
 
-		$args = array( 'urbizen_submission' => $result->is_success() ? 'success' : 'error' );
+		$reprise = self::recovery_pour( $result );
 
-		if ( $result->is_success() ) {
-			$args['reference'] = $result->reference();
+		$feedback = $result->is_success()
+			? SubmissionFeedback::succes( $form_type, $result->reference() )
+			: SubmissionFeedback::erreur( $form_type, self::categorie_publique( $result->code() ), $reprise );
+
+		$jeton = SubmissionFeedbackToken::issue( $feedback );
+
+		// Toujours purger les paramètres historiques falsifiables de la cible : ni
+		// `urbizen_submission`, ni `reference`, ni `error` ne survivent, même
+		// présents dans l'URL de retour.
+		$base = remove_query_arg( array( 'urbizen_submission', 'reference', 'error', SubmissionResultNotice::CHAMP ), $base );
+
+		// Émission au mieux : si l'encodage du jeton échoue, on redirige SANS
+		// jeton (aucune confirmation affichée), jamais avec un jeton malformé. Une
+		// demande déjà persistée n'est jamais transformée en faux échec pour autant.
+		if ( '' === $jeton ) {
+			// Sans jeton signé, l'identifiant de reprise ne pourrait plus être
+			// transporté : on supprime le dépôt pour ne laisser aucun orphelin
+			// évitable. L'identifiant brut n'est jamais placé hors du jeton signé.
+			if ( null !== $reprise ) {
+				SubmissionRecoveryStore::delete( $reprise );
+			}
+
+			return $base;
 		}
 
-		return add_query_arg( $args, remove_query_arg( array( 'urbizen_submission', 'reference' ), $base ) );
+		return add_query_arg( array( SubmissionResultNotice::CHAMP => $jeton ), $base );
+	}
+
+	/**
+	 * Identifiant de reprise à transporter, ou null.
+	 *
+	 * Une reprise n'existe que pour un rejet de **validation corrigeable** : pour
+	 * toute autre issue (succès, erreur de sécurité, erreur interne), aucune
+	 * reprise n'est jamais proposée.
+	 *
+	 * @param SubmissionResult $result Issue.
+	 * @return string|null
+	 */
+	private static function recovery_pour( SubmissionResult $result ): ?string {
+		if ( SubmissionResult::VALIDATION_FAILED !== $result->code() ) {
+			return null;
+		}
+
+		$id = $result->recovery_id();
+
+		return '' === $id ? null : $id;
+	}
+
+	/**
+	 * Traduit un code interne en **catégorie publique** d'erreur.
+	 *
+	 * Trois catégories seulement sortent d'ici ; aucune ne révèle le pipeline ni
+	 * le fonctionnement des défenses. Un problème de saisie ou de contenu soumis
+	 * est corrigible par la personne (`validation`) ; la limitation de débit a sa
+	 * catégorie propre (`rate_limited`) ; tout le reste — défenses anti-robot,
+	 * formulaire, méthode, prix, stockage, persistance, interne — reste opaque
+	 * (`technical`).
+	 *
+	 * @param string $code Code interne du résultat.
+	 * @return string Catégorie publique en liste blanche.
+	 */
+	private static function categorie_publique( string $code ): string {
+		if ( SubmissionResult::RATE_LIMITED === $code ) {
+			return 'rate_limited';
+		}
+
+		if ( SubmissionResult::VALIDATION_FAILED === $code
+			|| SubmissionResult::REQUEST_TOO_LARGE === $code
+			|| SubmissionResult::SERVER_UPLOAD_LIMIT === $code
+			|| str_starts_with( $code, 'upload_' ) ) {
+			return 'validation';
+		}
+
+		return 'technical';
 	}
 
 	/**

@@ -62,7 +62,7 @@ check(
 // Champs attendus, étape par étape.
 $plan = array(
 	'programme'     => array( 'nature', 'situation', 'niveaux', 'surface', 'delai' ),
-	'pieces'        => array( 'chambres', 'sdb', 'wc', 'cuisine', 'pieces', 'surfaces', 'pieces_detail' ),
+	'pieces'        => array( 'chambres', 'sdb', 'wc', 'cuisine', 'pieces', 'pieces_detail' ),
 	'terrain'       => array(
 		'a_terrain',
 		'terrain_adresse',
@@ -198,27 +198,14 @@ foreach ( $longueurs as $champ => $attendu ) {
 	check( "[$champ] longueur maximale de $attendu", $attendu === (int) $def->field( $champ )['maxlength'] );
 }
 
-// -------------------------------------------------- surfaces dynamiques ----
-$surfaces = $def->field( 'surfaces' );
-$cles     = $surfaces['keys'];
-
-check( 'la famille des surfaces est déclarée', 'surfaces' === ( $surfaces['family'] ?? '' ) );
-check( 'exactement 39 clés de surface', 39 === count( $cles ) );
-check( 'aucune clé de surface en double', count( $cles ) === count( array_unique( $cles ) ) );
-check(
-	'toutes les clés de surface sont stables et sans accent',
-	$cles === array_values( array_filter( $cles, static fn( $c ) => (bool) preg_match( FormDefinition::ID_PATTERN, $c ) ) )
-);
-check( 'chambre_1 à chambre_20 sont déclarées', 20 === count( array_filter( $cles, static fn( $c ) => (bool) preg_match( '/^chambre_\d+$/', $c ) ) ) );
-check( 'sdb_1 à sdb_10 sont déclarées', 10 === count( array_filter( $cles, static fn( $c ) => (bool) preg_match( '/^sdb_\d+$/', $c ) ) ) );
-check( 'chambre_21 n’est pas déclarée', ! in_array( 'chambre_21', $cles, true ) );
-check( 'sdb_11 n’est pas déclarée', ! in_array( 'sdb_11', $cles, true ) );
-check(
-	'toutes les autres pièces cochables ont leur surface',
-	array() === array_diff( array_column( $def->field( 'pieces' )['options'], 'value' ), $cles )
-);
-check( 'bornes des surfaces : 1 à 200 m²', array( 1, 200 ) === array( (int) $surfaces['min'], (int) $surfaces['max'] ) );
-check( 'seuil de devis à 1 000 m² cumulés', 1000 === (int) $surfaces['total_max'] );
+// ------------------------ ventilation par pièce DESCOPÉE (C2C) -------------
+// La ventilation facultative « Surface par pièce » a été retirée : le champ
+// `surfaces` (pluriel) n'existe plus. La surface globale et la description libre
+// de la distribution restent les seuls porteurs.
+check( 'le champ « surfaces » (par pièce) n’existe plus', null === $def->field( 'surfaces' ) );
+check( 'la surface GLOBALE « surface » est conservée', null !== $def->field( 'surface' ) && 'number' === $def->field( 'surface' )['type'] );
+check( 'les bornes de la surface globale sont inchangées', array( 10, 1000 ) === array( (int) $def->field( 'surface' )['min'], (int) $def->field( 'surface' )['max'] ) );
+check( 'la description libre « pieces_detail » est conservée', null !== $def->field( 'pieces_detail' ) && 'textarea' === $def->field( 'pieces_detail' )['type'] );
 
 // ------------------------------------------------------------ fichiers -----
 $formats = array( 'pdf', 'jpg', 'jpeg', 'png', 'webp' );

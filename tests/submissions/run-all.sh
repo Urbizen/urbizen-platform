@@ -49,6 +49,18 @@ titre "3 bis/11 — Routage serveur des soumissions (action→type)"
 "$PHP_BIN" test-routage.php
 verdict $? "test-routage.php"
 
+titre "3 ter/11 — Confirmation post-soumission signée (Lot 2, C1)"
+"$PHP_BIN" test-feedback.php
+verdict $? "test-feedback.php"
+
+titre "3 quater/11 — Reprise serveur des valeurs et erreurs (Lot 2, C2A)"
+"$PHP_BIN" test-recovery.php
+verdict $? "test-recovery.php"
+
+titre "3 quinquies/11 — Réaffichage serveur des valeurs et erreurs (Lot 2, C2B)"
+"$PHP_BIN" test-reaffichage.php
+verdict $? "test-reaffichage.php"
+
 titre "4/11 — Rétention à 365 jours"
 "$PHP_BIN" test-retention.php
 verdict $? "test-retention.php"
@@ -109,7 +121,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 20 bancs passent.\033[0m\n'
+	printf '\033[32mLes 23 bancs passent.\033[0m\n'
 	exit 0
 fi
 

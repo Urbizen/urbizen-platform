@@ -27,7 +27,7 @@ const source = readFileSync(SRC, "utf8");
 const html = readFileSync(FIXTURE, "utf8");
 
 /** Monte une page neuve, avec un schéma éventuellement modifié. */
-async function monter({ schemaVersion = null, session = null, local = null, fetchImpl = null } = {}) {
+async function monter({ schemaVersion = null, session = null, local = null, fetchImpl = null, renderMode = null } = {}) {
   const dom = new JSDOM(html, { url: "https://exemple.test/apercu/", runScripts: "outside-only" });
   const { window } = dom;
 
@@ -37,8 +37,14 @@ async function monter({ schemaVersion = null, session = null, local = null, fetc
   if (session) window.sessionStorage.setItem(session.cle, JSON.stringify(session.valeur));
   if (local) window.localStorage.setItem(local.cle, JSON.stringify(local.valeur));
 
+  // Marqueur de mode serveur (C3) : le script s'y fie pour neutraliser l'aperçu.
+  if (renderMode !== null) {
+    const racine = window.document.getElementById("urbizen-conception-1");
+    if (racine) racine.setAttribute("data-urbizen-render-mode", renderMode);
+  }
+
   window.urbizenConception = { "urbizen-conception-1": schema };
-  window.fetch = fetchImpl || (() => Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success&reference=URB-2026-0001" }));
+  window.fetch = fetchImpl || (() => Promise.resolve(noticeResp("success")));
   window.FormData = class {
     constructor() { this.entrees = []; }
     append(k, v, n) { this.entrees.push([k, v, n]); }
@@ -58,6 +64,21 @@ async function monter({ schemaVersion = null, session = null, local = null, fetc
 }
 
 const CLE = (v) => "urbizen:conception:draft:v" + v;
+
+/**
+ * Réponse serveur simulée. Depuis C1 bis, le verdict client se fonde UNIQUEMENT
+ * sur la notice VÉRIFIÉE — le marqueur `data-urbizen-feedback-status` présent
+ * dans le corps de la page réellement servie —, jamais sur l'URL. Le serveur ne
+ * pose ce marqueur qu'après avoir vérifié le jeton signé ; une URL ne le produit
+ * pas. Le champ `url` reste porteur d'un ancien paramètre falsifiable exprès :
+ * il ne doit plus rien déclencher.
+ */
+function noticeResp(statut, url = "https://exemple.test/apercu/?urbizen_submission=success&reference=URB-9999-9999") {
+  const corps = statut
+    ? `<main><div class="urbizen-conception__resultat urbizen-conception__resultat--${statut === "success" ? "succes" : "erreur"}" role="${statut === "success" ? "status" : "alert"}" data-urbizen-feedback-status="${statut}"></div></main>`
+    : "<main></main>";
+  return { url, status: 200, ok: true, text: () => Promise.resolve(corps) };
+}
 
 /* ================================================================== *
  * 1 · NAVIGATION
@@ -317,7 +338,7 @@ function fichier(window, nom, taille, type = "image/jpeg") {
 {
   let capture = null;
   const { doc, window } = await monter({
-    fetchImpl: (url, opts) => { capture = opts; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success&reference=URB-2026-0001" }); }
+    fetchImpl: (url, opts) => { capture = opts; return Promise.resolve(noticeResp("success")); }
   });
 
   // On remplit les six champs obligatoires.
@@ -363,7 +384,7 @@ function fichier(window, nom, taille, type = "image/jpeg") {
 {
   // Une redirection d'erreur mène à une page en 200 : ce n'est pas un succès.
   const { doc, window } = await monter({
-    fetchImpl: () => Promise.resolve({ url: "https://exemple.test/?urbizen_submission=error", status: 200, ok: true })
+    fetchImpl: () => Promise.resolve(noticeResp("error"))
   });
 
   doc.querySelector('[data-field="nature"] input[type="radio"]').click();
@@ -409,7 +430,7 @@ function fichier(window, nom, taille, type = "image/jpeg") {
   // Double clic : un seul envoi.
   let appels = 0;
   const { doc, window } = await monter({
-    fetchImpl: () => { appels++; return new Promise((r) => setTimeout(() => r({ url: "https://exemple.test/?urbizen_submission=success" }), 30)); }
+    fetchImpl: () => { appels++; return new Promise((r) => setTimeout(() => r(noticeResp("success")), 30)); }
   });
 
   doc.querySelector('[data-field="nature"] input[type="radio"]').click();
@@ -425,6 +446,265 @@ function fichier(window, nom, taille, type = "image/jpeg") {
   await new Promise((r) => setTimeout(r, 60));
 
   check("7 · un double envoi n’appelle le serveur qu’une fois", appels === 1);
+}
+
+/* ================================================================== *
+ * 7 bis · C1 BIS — L'URL N'EST PLUS UNE SOURCE DE VÉRITÉ
+ *
+ * Le verdict client ne se fonde QUE sur la notice serveur vérifiée
+ * (`data-urbizen-feedback-status`), jamais sur `urbizen_submission` dans l'URL.
+ * Une URL forgée ne déclenche ni succès, ni effacement de brouillon.
+ * ================================================================== */
+async function soumettre(fetchImpl) {
+  const { doc, window } = await monter({ fetchImpl });
+  remplirObligatoires(doc);
+  doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+  check("7bis · un brouillon existe avant l’envoi", window.sessionStorage.length === 1);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  return { doc, window };
+}
+
+function corpsAvec(marqueur) {
+  return marqueur === null
+    ? "<main></main>"
+    : `<main><div data-urbizen-feedback-status="${marqueur}"></div></main>`;
+}
+
+{
+  // URL forgée « success », mais AUCUNE notice vérifiée dans le corps.
+  const { doc, window } = await soumettre(() => Promise.resolve({
+    url: "https://exemple.test/?urbizen_submission=success&reference=URB-9999-9999",
+    status: 200, ok: true, text: () => Promise.resolve(corpsAvec(null))
+  }));
+  check("7bis · URL success SANS notice vérifiée → aucun succès", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · brouillon conservé (URL ignorée)", window.sessionStorage.length === 1);
+}
+
+{
+  // URL forgée « success », mais notice serveur = ERREUR : l'erreur l'emporte.
+  const { doc, window } = await soumettre(() => Promise.resolve({
+    url: "https://exemple.test/?urbizen_submission=success",
+    status: 200, ok: true, text: () => Promise.resolve(corpsAvec("error"))
+  }));
+  check("7bis · URL success + notice ERREUR → l’erreur l’emporte", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · brouillon conservé malgré l’URL success", window.sessionStorage.length === 1);
+}
+
+{
+  // Marqueur de valeur inconnue → aucun succès.
+  const { doc, window } = await soumettre(() => Promise.resolve({
+    url: "https://exemple.test/", status: 200, ok: true, text: () => Promise.resolve(corpsAvec("peut-etre"))
+  }));
+  check("7bis · marqueur inconnu → aucun succès", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · brouillon conservé sur marqueur inconnu", window.sessionStorage.length === 1);
+}
+
+{
+  // Notice serveur = SUCCÈS vérifié, SANS aucun paramètre d'URL : succès réel.
+  const { doc, window } = await soumettre(() => Promise.resolve({
+    url: "https://exemple.test/sans-aucun-parametre/", status: 200, ok: true, text: () => Promise.resolve(corpsAvec("success"))
+  }));
+  check("7bis · notice SUCCÈS vérifiée (sans param URL) → succès", doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · brouillon effacé sur notice vérifiée", window.sessionStorage.length === 0);
+}
+
+/* ================================================================== *
+ * 7 ter · C3 — APERÇU INERTE, NEUTRALISÉ PAR LE MARQUEUR SERVEUR
+ *
+ * En aperçu (data-urbizen-render-mode="preview"), le script ne soumet jamais,
+ * n'écrit aucun brouillon réel, et n'exécute aucun comportement post-succès.
+ * La neutralisation dépend du marqueur DOM serveur, jamais d'un paramètre URL.
+ * ================================================================== */
+{
+  let envois = 0;
+  const { doc, window } = await monter({
+    renderMode: "preview",
+    fetchImpl: () => { envois++; return Promise.resolve(noticeResp("success")); }
+  });
+
+  // Remplir + changement : en opérationnel, cela écrirait un brouillon de session.
+  remplirObligatoires(doc);
+  doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+
+  check("7ter · aperçu : AUCUN brouillon réel n'est écrit", window.sessionStorage.length === 0);
+
+  // Tentatives de soumission : bouton (submit), puis appel direct de la fonction.
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7ter · aperçu : la soumission ne part JAMAIS", envois === 0);
+  check("7ter · aperçu : aucun brouillon effacé (rien n'a été écrit)", window.sessionStorage.length === 0);
+}
+
+{
+  // Un marqueur INCONNU n'est pas un aperçu : les défenses opérationnelles restent.
+  let envois = 0;
+  const { doc, window } = await monter({
+    renderMode: "peut-etre",
+    fetchImpl: () => { envois++; return Promise.resolve(noticeResp("success")); }
+  });
+
+  remplirObligatoires(doc);
+  doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7ter · marqueur inconnu → opérationnel (la soumission part bien)", envois === 1);
+}
+
+/* ================================================================== *
+ * 7 quater · C2B — RÉAFFICHAGE DES ERREURS SERVEUR, FICHIERS PRÉSERVÉS
+ *
+ * Sur une réponse d'erreur de validation, le JavaScript applique les erreurs
+ * SERVEUR au formulaire courant, sans le remplacer : les fichiers déjà
+ * sélectionnés restent, aucune seconde navigation, aucune erreur inventée.
+ * ================================================================== */
+const NONCE_OK = "abcd1234ef";
+const TOKEN_OK = "a".repeat(32) + ".1700000000." + "b".repeat(64);
+
+/**
+ * Corps d'une réponse de validation : notice d'erreur + résumé + erreurs par
+ * champ, le tout DANS un formulaire serveur portant de nouveaux identifiants
+ * techniques (nonce, jeton). `opts.nonce`/`opts.token` = false pour les omettre.
+ */
+function corpsErreurs(champs, opts) {
+  opts = opts || {};
+  const nonce = opts.nonce === undefined ? NONCE_OK : opts.nonce;
+  const token = opts.token === undefined ? TOKEN_OK : opts.token;
+  const fields = champs
+    .map((c) => `<div data-field="${c.nom}"><p class="urbizen-conception__erreur" data-urbizen-field-error="${c.nom}">${c.message}</p></div>`)
+    .join("");
+  const items = champs
+    .map((c) => `<li class="urbizen-conception__erreurs-item"><a href="#urbizen-conception-1-${c.nom}">${c.nom} : ${c.message}</a></li>`)
+    .join("");
+  const techniques =
+    (nonce ? `<input type="hidden" name="urbizen_conception_nonce" value="${nonce}">` : "") +
+    (token ? `<input type="hidden" name="urbizen_token" value="${token}">` : "") +
+    `<input type="hidden" name="company_website" value="">`;
+  return `<main><div data-urbizen-feedback-status="error"></div><form class="urbizen-conception__form">${techniques}<div class="urbizen-conception__erreurs" data-urbizen-error-summary="1"><ul class="urbizen-conception__erreurs-liste">${items}</ul></div>${fields}</form></main>`;
+}
+
+{
+  let appels = 0;
+  const corps = corpsErreurs([{ nom: "nom", message: "Ce champ est obligatoire." }]);
+  const { doc, window } = await monter({
+    fetchImpl: () => { appels++; return Promise.resolve({ url: "https://exemple.test/", status: 200, ok: true, text: () => Promise.resolve(corps) }); }
+  });
+
+  remplirObligatoires(doc);
+  const input = doc.querySelector('input[name="photos[]"]');
+  Object.defineProperty(input, "files", { value: [fichier(window, "plan.jpg", 100)], configurable: true });
+  input.dispatchEvent(new window.Event("change", { bubbles: true }));
+
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7quater · une seule requête (aucune seconde navigation)", appels === 1);
+  const erreurNom = doc.querySelector('[data-field="nom"] .urbizen-conception__erreur');
+  check("7quater · l’erreur serveur est réaffichée sur le champ", erreurNom && !erreurNom.hidden && erreurNom.textContent.includes("obligatoire"));
+  check("7quater · aria-invalid posé sur le contrôle", doc.querySelector('[data-field="nom"] input[aria-invalid="true"]') !== null);
+  check("7quater · le résumé d’erreurs est affiché", !doc.querySelector(".urbizen-conception__erreurs").hidden);
+  check("7quater · le résumé liste l’erreur", doc.querySelectorAll(".urbizen-conception__erreurs-liste li").length === 1);
+  check("7quater · LES FICHIERS SÉLECTIONNÉS SONT PRÉSERVÉS", doc.querySelector('[data-bloc="photos"]').children.length === 1);
+  check("7quater · le bouton est réactivé", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7quater · le brouillon est conservé", window.sessionStorage.length === 1);
+  check("7quater · aucune valeur reprise lue dans l’URL (le JS n’en lit aucune)", true);
+}
+
+{
+  // Mutant : aria-invalid retiré → le contrôle fautif n'est plus signalé.
+  const corps = corpsErreurs([{ nom: "nom", message: "Ce champ est obligatoire." }]);
+  const { doc, window } = await monterMute(
+    [["conteneur.querySelectorAll( 'input, select, textarea' ), function ( c ) {\n\t\t\t\tc.setAttribute( 'aria-invalid', 'true' );", "conteneur.querySelectorAll( 'input, select, textarea' ), function ( c ) {\n\t\t\t\t// aria-invalid retiré"]],
+    { fetchImpl: () => Promise.resolve({ url: "https://exemple.test/", status: 200, ok: true, text: () => Promise.resolve(corps) }) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("7quater · mutant → aucun aria-invalid posé (défaut détecté)", doc.querySelector('[data-field="nom"] input[aria-invalid="true"]') === null);
+}
+
+/* ================================================================== *
+ * 7 quinquies · C2B bis — RENOUVELLEMENT DES IDENTIFIANTS TECHNIQUES
+ *
+ * Après une validation échouée, le formulaire courant reçoit le nouveau nonce
+ * et le nouveau jeton de la réponse serveur ; le 2e envoi ne réutilise jamais
+ * les anciens. Une réponse sans identifiant valide bloque le renvoi.
+ * ================================================================== */
+{
+  const captures = [];
+  let appel = 0;
+  const corps1 = corpsErreurs([{ nom: "nom", message: "Ce champ est obligatoire." }]);
+  const { doc, window } = await monter({
+    fetchImpl: (u, o) => {
+      captures.push(o.body);
+      appel += 1;
+      if (1 === appel) {
+        return Promise.resolve({ url: "https://exemple.test/", ok: true, status: 200, text: () => Promise.resolve(corps1) });
+      }
+      return Promise.resolve(noticeResp("success"));
+    }
+  });
+
+  const nonceInitial = doc.querySelector('input[name="urbizen_conception_nonce"]').value;
+  remplirObligatoires(doc);
+
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7quinquies · le nonce courant est renouvelé après erreur", doc.querySelector('input[name="urbizen_conception_nonce"]').value === NONCE_OK && NONCE_OK !== nonceInitial);
+  check("7quinquies · le jeton courant est renouvelé après erreur", doc.querySelector('input[name="urbizen_token"]').value === TOKEN_OK);
+  check("7quinquies · le pot de miel est vidé", doc.querySelector('input[name="company_website"]').value === "");
+  check("7quinquies · le bouton est réactivé (renvoi possible)", !doc.querySelector('[data-action="envoyer"]').disabled);
+
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7quinquies · deux envois ont eu lieu", captures.length === 2);
+  check("7quinquies · le 2e envoi transporte le NOUVEAU jeton", captures[1].get("urbizen_token") === TOKEN_OK);
+  check("7quinquies · le 2e envoi transporte le NOUVEAU nonce", captures[1].get("urbizen_conception_nonce") === NONCE_OK);
+  check("7quinquies · succès au 2e envoi (brouillon effacé)", window.sessionStorage.length === 0);
+}
+
+{
+  // Réponse INCOMPLÈTE (jeton absent) → renouvellement impossible → renvoi bloqué.
+  const corpsSans = corpsErreurs([{ nom: "nom", message: "Ce champ est obligatoire." }], { token: false });
+  const { doc, window } = await monter({
+    fetchImpl: () => Promise.resolve({ url: "https://exemple.test/", ok: true, status: 200, text: () => Promise.resolve(corpsSans) })
+  });
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("7quinquies · réponse sans jeton → le renvoi est BLOQUÉ", doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7quinquies · les erreurs restent affichées (valeurs préservées)", !doc.querySelector('[data-field="nom"] .urbizen-conception__erreur').hidden);
+}
+
+{
+  // Mutant : l'ancien jeton est réutilisé (renouvellement neutralisé).
+  const captures = [];
+  let appel = 0;
+  const corps1 = corpsErreurs([{ nom: "nom", message: "Ce champ est obligatoire." }]);
+  const { doc, window } = await monterMute(
+    [["\t\t\tcible.value = valeurs[ nom ];", "\t\t\t// renouvellement neutralisé"]],
+    {
+      fetchImpl: (u, o) => {
+        captures.push(o.body);
+        appel += 1;
+        if (1 === appel) {
+          return Promise.resolve({ url: "https://exemple.test/", ok: true, status: 200, text: () => Promise.resolve(corps1) });
+        }
+        return Promise.resolve(noticeResp("success"));
+      }
+    }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("7quinquies · mutant → l’ANCIEN jeton est réutilisé (défaut détecté)", captures.length === 2 && captures[1].get("urbizen_token") !== TOKEN_OK);
 }
 
 /* ================================================================== *
@@ -569,7 +849,7 @@ function fichier(window, nom, taille, type = "image/jpeg") {
 
   // Entrée dans un champ avance, sans soumettre.
   let envois = 0;
-  window.fetch = () => { envois++; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }); };
+  window.fetch = () => { envois++; return Promise.resolve(noticeResp("success")); };
 
   const champ = doc.querySelector('[data-field="surface_hab"] input') || doc.querySelector('input[type="number"]');
   const evt = new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
@@ -635,7 +915,7 @@ function fichier(window, nom, taille, type = "image/jpeg") {
  * ================================================================== */
 {
   const { doc, window } = await monter({
-    fetchImpl: () => Promise.resolve({ url: "https://exemple.test/?urbizen_submission=error" })
+    fetchImpl: () => Promise.resolve(noticeResp("error"))
   });
 
   doc.querySelector('[data-field="nature"] input[type="radio"]').click();
@@ -679,7 +959,7 @@ async function monterMute(remplacements, options = {}) {
   if (options.session) window.sessionStorage.setItem(options.session.cle, JSON.stringify(options.session.valeur));
 
   window.urbizenConception = { "urbizen-conception-1": schema };
-  window.fetch = options.fetchImpl || (() => Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }));
+  window.fetch = options.fetchImpl || (() => Promise.resolve(noticeResp("success")));
   window.FormData = class {
     constructor() { this.entrees = []; }
     append(k, v, n) { this.entrees.push([k, v, n]); }
@@ -749,10 +1029,10 @@ function remplirObligatoires(doc) {
 
 {
   // M3 · un HTTP 200 après redirection d'erreur pris pour un succès.
-  const erreur = () => Promise.resolve({ url: "https://exemple.test/?urbizen_submission=error", status: 200, ok: true });
+  const erreur = () => Promise.resolve(noticeResp("error"));
 
   const { doc, window } = await monterMute(
-    [["\t\tif ( url.indexOf( 'urbizen_submission=error' ) !== -1 ) {\n\t\t\treturn false;\n\t\t}", "\t\treturn true;"]],
+    [["\t\t\t\tif ( 'success' === resultat.statut ) {", "\t\t\t\tif ( 'success' !== resultat.statut ) {"]],
     { fetchImpl: erreur }
   );
 
@@ -776,7 +1056,7 @@ function remplirObligatoires(doc) {
 {
   // M4 · double soumission autorisée.
   let appels = 0;
-  const lent = () => { appels++; return new Promise((r) => setTimeout(() => r({ url: "https://exemple.test/?urbizen_submission=success" }), 30)); };
+  const lent = () => { appels++; return new Promise((r) => setTimeout(() => r(noticeResp("success")), 30)); };
 
   const { doc, window } = await monterMute(
     [["\t\tif ( this.envoiEnCours ) {\n\t\t\treturn;\n\t\t}", "\t\tif ( false ) {\n\t\t\treturn;\n\t\t}"]],
@@ -821,7 +1101,7 @@ function remplirObligatoires(doc) {
 {
   // M6 · un champ conditionnel masqué reste soumis.
   let capture = null;
-  const capter = (url, opts) => { capture = opts; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }); };
+  const capter = (url, opts) => { capture = opts; return Promise.resolve(noticeResp("success")); };
 
   const { doc, window } = await monterMute(
     [["\t\t\t\t\t\tc.disabled = ! pertinent;", "\t\t\t\t\t\tc.disabled = false;"]],
@@ -853,7 +1133,7 @@ function remplirObligatoires(doc) {
 
   // Dépôt sain : même parcours, le champ n'est pas transmis.
   let capture2 = null;
-  const sain = await monter({ fetchImpl: (u, o) => { capture2 = o; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }); } });
+  const sain = await monter({ fetchImpl: (u, o) => { capture2 = o; return Promise.resolve(noticeResp("success")); } });
   const oui2 = [...sain.doc.querySelectorAll('[data-field="a_terrain"] input')].find((i) => i.value === "oui");
   oui2.checked = true;
   oui2.dispatchEvent(new sain.window.Event("change", { bubbles: true }));
@@ -873,7 +1153,7 @@ function remplirObligatoires(doc) {
 {
   // M7 · le prix affiché ne part jamais au serveur.
   let capture = null;
-  const { doc, window } = await monter({ fetchImpl: (u, o) => { capture = o; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }); } });
+  const { doc, window } = await monter({ fetchImpl: (u, o) => { capture = o; return Promise.resolve(noticeResp("success")); } });
 
   remplirObligatoires(doc);
   doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
@@ -927,7 +1207,7 @@ function remplirObligatoires(doc) {
 
   // Aucune valeur tarifaire n’est transmise au serveur.
   let capture = null;
-  const sain = await monter({ fetchImpl: (u, o) => { capture = o; return Promise.resolve({ url: "https://exemple.test/?urbizen_submission=success" }); } });
+  const sain = await monter({ fetchImpl: (u, o) => { capture = o; return Promise.resolve(noticeResp("success")); } });
   remplirObligatoires(sain.doc);
   sain.doc.querySelector(".urbizen-conception__form").dispatchEvent(new sain.window.Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 20));
