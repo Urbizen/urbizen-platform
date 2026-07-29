@@ -284,4 +284,31 @@ check( 'F · le rendu opérationnel porte un jeton anti-robot signé', 1 === pre
 check( 'F · le rendu opérationnel n’a PAS le marqueur preview', ! str_contains( $op, 'data-urbizen-render-mode' ) );
 check( 'F · le rendu opérationnel n’a PAS la notice d’aperçu', ! str_contains( $op, '__apercu' ) );
 
+// ======================================================================
+// G · IDENTIFIANT D'INSTANCE (H1) : produit serveur, déterministe, borné
+// ======================================================================
+$idInstance = static function ( string $html ): string {
+	return 1 === preg_match( '/data-urbizen-form-instance="([^"]+)"/', $html, $m ) ? $m[1] : '';
+};
+
+add_filter( 'urbizen_conception_public_enabled', static fn() => true );
+
+// Une même « requête » : deux instances rendues à la suite → 1 puis 2, ordonnées.
+ConceptionRenderer::reset();
+$g1 = ConceptionRenderer::render( FormRegistry::get( 'conception' ) );
+$g2 = ConceptionRenderer::render( FormRegistry::get( 'conception' ) );
+check( 'G · première instance : identifiant borné urbizen-conception-1', 'urbizen-conception-1' === $idInstance( $g1 ) );
+check( 'G · seconde instance : urbizen-conception-2 (ordre déterministe)', 'urbizen-conception-2' === $idInstance( $g2 ) );
+check( 'G · le format est borné (aucune valeur libre)', 1 === preg_match( '/^urbizen-conception-\d+$/', $idInstance( $g1 ) ) );
+
+// Une nouvelle « requête » (reset) sur une page de MÊME composition : la première
+// instance retrouve EXACTEMENT le même identifiant → stable soumission ↔ réponse.
+ConceptionRenderer::reset();
+$g3 = ConceptionRenderer::render( FormRegistry::get( 'conception' ) );
+check( 'G · reset : la 1re instance retrouve le même identifiant (stable)', $idInstance( $g1 ) === $idInstance( $g3 ) );
+
+// L'aperçu inerte NE porte PAS l'attribut (non soumissible → pas de corrélation).
+$apercuG = rendu_apercu();
+check( 'G · aperçu inerte : aucun identifiant d’instance (non soumissible)', '' === $idInstance( $apercuG ) );
+
 verdict();

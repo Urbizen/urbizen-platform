@@ -400,11 +400,12 @@ function fichier(window, nom, taille, type = "image/jpeg") {
   doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
   await new Promise((r) => setTimeout(r, 20));
 
-  check("7 · UN 200 APRÈS REDIRECTION D’ERREUR N’EST PAS UN SUCCÈS",
-    !doc.querySelector('[data-action="envoyer"]').disabled);
+  // Réponse sans instance appariée (notice d'erreur seule) → fail-closed dur.
+  check("7 · UN 200 APRÈS REDIRECTION D’ERREUR N’EST PAS UN SUCCÈS (renvoi bloqué)",
+    doc.querySelector('[data-action="envoyer"]').disabled);
   check("7 · le brouillon est conservé", window.sessionStorage.length === 1);
-  check("7 · un message générique est affiché",
-    doc.querySelector('[data-role="info-brouillon"]').textContent.includes("pas pu"));
+  check("7 · un message de rechargement est affiché",
+    doc.querySelector('[data-role="info-brouillon"]').textContent.includes("Rechargez"));
 }
 
 {
@@ -477,7 +478,7 @@ function corpsAvec(marqueur) {
     url: "https://exemple.test/?urbizen_submission=success&reference=URB-9999-9999",
     status: 200, ok: true, text: () => Promise.resolve(corpsAvec(null))
   }));
-  check("7bis · URL success SANS notice vérifiée → aucun succès", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · URL success SANS notice vérifiée → aucun succès (fail-closed)", doc.querySelector('[data-action="envoyer"]').disabled);
   check("7bis · brouillon conservé (URL ignorée)", window.sessionStorage.length === 1);
 }
 
@@ -487,7 +488,7 @@ function corpsAvec(marqueur) {
     url: "https://exemple.test/?urbizen_submission=success",
     status: 200, ok: true, text: () => Promise.resolve(corpsAvec("error"))
   }));
-  check("7bis · URL success + notice ERREUR → l’erreur l’emporte", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · URL success + notice ERREUR → l’erreur l’emporte (fail-closed)", doc.querySelector('[data-action="envoyer"]').disabled);
   check("7bis · brouillon conservé malgré l’URL success", window.sessionStorage.length === 1);
 }
 
@@ -496,7 +497,7 @@ function corpsAvec(marqueur) {
   const { doc, window } = await soumettre(() => Promise.resolve({
     url: "https://exemple.test/", status: 200, ok: true, text: () => Promise.resolve(corpsAvec("peut-etre"))
   }));
-  check("7bis · marqueur inconnu → aucun succès", !doc.querySelector('[data-action="envoyer"]').disabled);
+  check("7bis · marqueur inconnu → aucun succès (fail-closed)", doc.querySelector('[data-action="envoyer"]').disabled);
   check("7bis · brouillon conservé sur marqueur inconnu", window.sessionStorage.length === 1);
 }
 
@@ -568,10 +569,14 @@ const TOKEN_OK = "a".repeat(32) + ".1700000000." + "b".repeat(64);
  * champ, le tout DANS un formulaire serveur portant de nouveaux identifiants
  * techniques (nonce, jeton). `opts.nonce`/`opts.token` = false pour les omettre.
  */
-function corpsErreurs(champs, opts) {
+// Construit UNE instance de formulaire d'erreur, portant son identifiant
+// d'instance (comme le serveur). `instance` peut valoir null (attribut absent).
+function formErreur(champs, opts) {
   opts = opts || {};
   const nonce = opts.nonce === undefined ? NONCE_OK : opts.nonce;
   const token = opts.token === undefined ? TOKEN_OK : opts.token;
+  const instance = opts.instance === undefined ? "urbizen-conception-1" : opts.instance;
+  const attrInstance = null === instance ? "" : ` data-urbizen-form-instance="${instance}"`;
   const fields = champs
     .map((c) => `<div data-field="${c.nom}"><p class="urbizen-conception__erreur" data-urbizen-field-error="${c.nom}">${c.message}</p></div>`)
     .join("");
@@ -582,7 +587,11 @@ function corpsErreurs(champs, opts) {
     (nonce ? `<input type="hidden" name="urbizen_conception_nonce" value="${nonce}">` : "") +
     (token ? `<input type="hidden" name="urbizen_token" value="${token}">` : "") +
     `<input type="hidden" name="company_website" value="">`;
-  return `<main><div data-urbizen-feedback-status="error"></div><form class="urbizen-conception__form">${techniques}<div class="urbizen-conception__erreurs" data-urbizen-error-summary="1"><ul class="urbizen-conception__erreurs-liste">${items}</ul></div>${fields}</form></main>`;
+  return `<form class="urbizen-conception__form"${attrInstance}>${techniques}<div class="urbizen-conception__erreurs" data-urbizen-error-summary="1"><ul class="urbizen-conception__erreurs-liste">${items}</ul></div>${fields}</form>`;
+}
+
+function corpsErreurs(champs, opts) {
+  return `<main><div data-urbizen-feedback-status="error"></div>${formErreur(champs, opts)}</main>`;
 }
 
 {
@@ -1050,7 +1059,7 @@ function remplirObligatoires(doc) {
   await new Promise((r) => setTimeout(r, 20));
 
   check("M3 · le dépôt conserve le brouillon", sain.window.sessionStorage.length === 1);
-  check("M3 · et réactive le bouton", !sain.doc.querySelector('[data-action="envoyer"]').disabled);
+  check("M3 · et bloque le renvoi (fail-closed, pas de succès)", sain.doc.querySelector('[data-action="envoyer"]').disabled);
 }
 
 {
@@ -1232,6 +1241,224 @@ function remplirObligatoires(doc) {
   check("15 · AUCUN BOUTON NE LAISSE CROIRE QUE L’ENVOI MARCHERA",
     d.querySelector(".urbizen-conception__navigation").hidden === true);
   check("15 · le script révèle la navigation", source.includes("nav.hidden = false"));
+}
+
+/* ================================================================== *
+ * 16 · H1 — IDENTIFICATION STRICTE DE L'INSTANCE
+ *
+ * Quand plusieurs formulaires Conception coexistent, la réponse est reliée à
+ * l'instance EXACTE qui a soumis (jamais « le premier formulaire »). Une
+ * absence de correspondance, une ambiguïté ou un identifiant mal formé sont
+ * refusés.
+ * ================================================================== */
+const NONCE_1 = "aaaa1111bb";
+const NONCE_2 = "cccc2222dd";
+
+// Réponse à DEUX instances : instance-1 (erreur nom, NONCE_1) et instance-2
+// (vide, NONCE_2). `inverse` place l'instance-2 en premier dans le DOM.
+function deuxInstances(opts) {
+  opts = opts || {};
+  const f1 = formErreur([{ nom: "nom", message: "Ce champ est obligatoire." }], { instance: "urbizen-conception-1", nonce: opts.n1 || NONCE_1 });
+  const f2 = formErreur([], { instance: "urbizen-conception-2", nonce: opts.n2 || NONCE_2 });
+  const corpsForms = opts.inverse ? f2 + f1 : f1 + f2;
+  return `<main><div data-urbizen-feedback-status="error"></div>${corpsForms}</main>`;
+}
+
+const repErreur = (corps) => () => Promise.resolve({ url: "https://exemple.test/", ok: true, status: 200, text: () => Promise.resolve(corps) });
+
+{
+  // 16a · la bonne instance (1) est appariée : erreur + nonce de l'instance 1.
+  const { doc, window } = await monter({ fetchImpl: repErreur(deuxInstances()) });
+  remplirObligatoires(doc);
+  const fichier = { name: "plan.pdf", size: 10, type: "application/pdf" };
+  const bloc = doc.querySelector('[data-bloc="photos"]');
+  if (bloc) { const li = doc.createElement("li"); bloc.appendChild(li); } // témoin FileList
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check("16 · erreur de MON instance réaffichée", (() => { const e = doc.querySelector('[data-field="nom"] .urbizen-conception__erreur'); return e && !e.hidden; })());
+  check("16 · nonce renouvelé depuis MON instance (1), pas l'instance 2", doc.querySelector('input[name="urbizen_conception_nonce"]').value === NONCE_1);
+  check("16 · le nonce de l'instance 2 n'est jamais adopté", doc.querySelector('input[name="urbizen_conception_nonce"]').value !== NONCE_2);
+  check("16 · FileList préservée (aucun remplacement)", doc.querySelector('[data-bloc="photos"]').children.length === 1);
+}
+
+{
+  // 16b · ordre INVERSÉ dans la réponse → toujours appariée par identifiant.
+  const { doc, window } = await monter({ fetchImpl: repErreur(deuxInstances({ inverse: true })) });
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("16 · ordre inversé : toujours le nonce de l'instance 1", doc.querySelector('input[name="urbizen_conception_nonce"]').value === NONCE_1);
+}
+
+// Association INVALIDE ⇒ fail-closed DUR : nonce inchangé, aucune erreur
+// appliquée, bouton bloqué, message de rechargement, brouillon et FileList
+// conservés, et surtout AUCUN second envoi réutilisant N1/T1.
+async function attendreEchecAssociation(libelle, corps) {
+  const captures = [];
+  const { doc, window } = await monter({
+    fetchImpl: (u, o) => { captures.push(o.body); return repErreur(corps)(); }
+  });
+  const nonceInit = doc.querySelector('input[name="urbizen_conception_nonce"]').value;
+  const bloc = doc.querySelector('[data-bloc="photos"]');
+  if (bloc) { bloc.appendChild(doc.createElement("li")); } // témoin FileList
+  remplirObligatoires(doc);
+  doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+  const brouillon = window.sessionStorage.length;
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+
+  check(`16 · ${libelle} → aucune erreur appliquée`, !doc.querySelector('[data-field="nom"] input[aria-invalid="true"]'));
+  check(`16 · ${libelle} → nonce inchangé (jamais d'instance étrangère)`, doc.querySelector('input[name="urbizen_conception_nonce"]').value === nonceInit);
+  check(`16 · ${libelle} → renvoi BLOQUÉ (fail-closed)`, doc.querySelector('[data-action="envoyer"]').disabled);
+  check(`16 · ${libelle} → message de rechargement`, doc.querySelector('[data-role="info-brouillon"]').textContent.includes("Rechargez"));
+  check(`16 · ${libelle} → brouillon et FileList conservés`, window.sessionStorage.length === brouillon && doc.querySelector('[data-bloc="photos"]').children.length === 1);
+
+  // Tentative de second envoi : impossible (bouton bloqué) → N1/T1 jamais renvoyés.
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check(`16 · ${libelle} → aucun second envoi (N1/T1 non réutilisés)`, captures.length === 1);
+}
+
+// 16c · MON instance ABSENTE (seule l'instance 2) → fail-closed.
+await attendreEchecAssociation(
+  "aucune correspondance",
+  `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "Ce champ est obligatoire." }], { instance: "urbizen-conception-2", nonce: NONCE_2 })}</main>`
+);
+
+// 16d · DEUX formulaires réclamant l'instance-1 (ambiguïté) → fail-closed.
+await attendreEchecAssociation(
+  "deux correspondances (ambiguïté)",
+  `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "x" }], { instance: "urbizen-conception-1", nonce: NONCE_1 })}${formErreur([], { instance: "urbizen-conception-1", nonce: "9999999999" })}</main>`
+);
+
+// 16d-bis · réponse SANS aucun formulaire → fail-closed.
+await attendreEchecAssociation(
+  "réponse sans formulaire",
+  `<main><div data-urbizen-feedback-status="error"></div></main>`
+);
+
+// 16d-ter · identifiant d'instance de la réponse MALFORMÉ → fail-closed.
+await attendreEchecAssociation(
+  "identifiant de réponse malformé",
+  `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "x" }], { instance: "pirate!!" })}</main>`
+);
+
+{
+  // 16e · MUTANT « prend le premier formulaire » (ignore l'identifiant) : avec
+  // l'ordre inversé, il adopterait le nonce de l'instance 2. Les deux instances
+  // portent une erreur (sinon le renouvellement ne partirait pas), avec des
+  // nonces distincts, pour que le choix soit observable.
+  const f2Err = formErreur([{ nom: "nom", message: "Ce champ est obligatoire." }], { instance: "urbizen-conception-2", nonce: NONCE_2 });
+  const f1Err = formErreur([{ nom: "nom", message: "Ce champ est obligatoire." }], { instance: "urbizen-conception-1", nonce: NONCE_1 });
+  const corpsMut = `<main><div data-urbizen-feedback-status="error"></div>${f2Err}${f1Err}</main>`;
+  const { doc, window } = await monterMute(
+    [
+      ["form.getAttribute( 'data-urbizen-form-instance' ) === this.instance", "null !== form.getAttribute( 'data-urbizen-form-instance' )"],
+      ["apparie = null === apparie ? form : false;", "apparie = null === apparie ? form : apparie;"]
+    ],
+    { fetchImpl: repErreur(corpsMut) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("16 · mutant « premier formulaire » → adopte le nonce de l'instance 2 (défaut détecté)", doc.querySelector('input[name="urbizen_conception_nonce"]').value === NONCE_2);
+}
+
+{
+  // 16f · MUTANT « doublon accepté » (ambiguïté neutralisée) : adopterait le
+  // premier des deux formulaires d'instance-1 au lieu de refuser.
+  const corps = `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "Ce champ est obligatoire." }], { instance: "urbizen-conception-1", nonce: NONCE_1 })}${formErreur([], { instance: "urbizen-conception-1", nonce: "9999999999" })}</main>`;
+  const { doc, window } = await monterMute(
+    [["apparie = null === apparie ? form : false;", "apparie = null === apparie ? form : apparie;"]],
+    { fetchImpl: repErreur(corps) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("16 · mutant « doublon accepté » → adopte le 1er malgré l'ambiguïté (défaut détecté)", doc.querySelector('input[name="urbizen_conception_nonce"]').value === NONCE_1);
+}
+
+{
+  // 16g · MUTANT « fail-closed transformé en simple return » : sans instance
+  // appariée, le bouton n'est plus bloqué (le renvoi resterait possible).
+  const corps = `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "x" }], { instance: "urbizen-conception-2", nonce: NONCE_2 })}</main>`;
+  const { doc, window } = await monterMute(
+    [["if ( ! formReponse ) {\n\t\t\t\t\tself.apresEchecRenouvellement();\n\t\t\t\t\treturn;", "if ( ! formReponse ) {\n\t\t\t\t\treturn;"]],
+    { fetchImpl: repErreur(corps) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  // Le mutant retourne sans rien faire : aucun message de rechargement, le bouton
+  // reste figé sur « Envoi en cours… » (le vrai code affiche « Rechargez la page »).
+  check("16 · mutant « fail-closed → return » → aucun message de rechargement (défaut détecté)",
+    !doc.querySelector('[data-role="info-brouillon"]').textContent.includes("Rechargez")
+    && doc.querySelector('[data-action="envoyer"]').textContent !== "Rechargez la page");
+}
+
+{
+  // 16h · MUTANT « réactive le bouton malgré l'absence d'instance » : le blocage
+  // dur devient un renvoi possible (apresEchecValidation réactive).
+  const corps = `<main><div data-urbizen-feedback-status="error"></div>${formErreur([{ nom: "nom", message: "x" }], { instance: "urbizen-conception-2", nonce: NONCE_2 })}</main>`;
+  const { doc, window } = await monterMute(
+    [["if ( ! formReponse ) {\n\t\t\t\t\tself.apresEchecRenouvellement();", "if ( ! formReponse ) {\n\t\t\t\t\tself.apresEchecValidation();"]],
+    { fetchImpl: repErreur(corps) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("16 · mutant « réactive le bouton » → bouton actif sans instance (défaut détecté)", !doc.querySelector('[data-action="envoyer"]').disabled);
+}
+
+/* ================================================================== *
+ * 17 · H1 — ABSENCE DE DOMPARSER : ÉCHEC FERMÉ
+ *
+ * Sans DOMParser, aucune analyse structurée n'est possible : aucun statut n'est
+ * déduit (jamais par sous-chaîne), aucun succès, aucun effacement de brouillon,
+ * aucune copie de nonce/jeton, et le renvoi est bloqué.
+ * ================================================================== */
+{
+  const casDom = [
+    ["un HTML de succès", corpsAvec("success")],
+    ["un commentaire contenant le marqueur", `<main><!-- data-urbizen-feedback-status="success" --></main>`],
+    ["un script contenant le marqueur", `<main><script>var x = 'data-urbizen-feedback-status="success"';</script></main>`],
+    ["une valeur saisie contenant le marqueur", `<main><form class="urbizen-conception__form"><input value='data-urbizen-feedback-status=&quot;success&quot;'></form></main>`]
+  ];
+
+  for (const [libelle, corps] of casDom) {
+    const { doc, window } = await monter({ fetchImpl: repErreur(corps) });
+    remplirObligatoires(doc);
+    doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+    const nonceInit = doc.querySelector('input[name="urbizen_conception_nonce"]').value;
+    const brouillonAvant = window.sessionStorage.length;
+
+    delete window.DOMParser; // Absence de DOMParser simulée avant la réponse.
+
+    doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    check(`17 · sans DOMParser + ${libelle} → AUCUN succès (brouillon conservé)`, window.sessionStorage.length === brouillonAvant && brouillonAvant >= 1);
+    check(`17 · sans DOMParser + ${libelle} → nonce inchangé (N1/T1 non réutilisés)`, doc.querySelector('input[name="urbizen_conception_nonce"]').value === nonceInit);
+    check(`17 · sans DOMParser + ${libelle} → renvoi bloqué (fail-closed lisible)`, doc.querySelector('[data-action="envoyer"]').disabled);
+  }
+}
+
+{
+  // 17b · MUTANT « sans DOMParser traité comme succès » : le fail-closed est
+  // retiré (retour 'success' au lieu de '') → un faux succès passerait.
+  const corps = corpsAvec("success");
+  const { doc, window } = await monterMute(
+    [["if ( ! doc || typeof doc.querySelector !== 'function' ) {\n\t\t\treturn '';", "if ( ! doc || typeof doc.querySelector !== 'function' ) {\n\t\t\treturn 'success';"]],
+    { fetchImpl: repErreur(corps) }
+  );
+  remplirObligatoires(doc);
+  doc.querySelector('[data-field="nature"] input[type="radio"]').dispatchEvent(new window.Event("change", { bubbles: true }));
+  const avant = window.sessionStorage.length;
+  delete window.DOMParser;
+  doc.querySelector(".urbizen-conception__form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true }));
+  await new Promise((r) => setTimeout(r, 20));
+  check("17 · mutant → sans DOMParser accordé comme succès (brouillon effacé, défaut détecté)", avant >= 1 && window.sessionStorage.length === 0);
 }
 
 console.log("");
