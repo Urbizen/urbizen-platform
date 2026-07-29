@@ -332,7 +332,10 @@ function urbizen_child_enqueue_accueil() {
 		$conception_css = '/assets/css/urbizen-conception.css';
 
 		if ( file_exists( $dir . $conception_css ) ) {
-			wp_enqueue_style( 'urbizen-conception', $uri . $conception_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $conception_css ) );
+			// Handle distinct du plugin : ConceptionAssets enregistre déjà
+			// « urbizen-conception » (CSS du formulaire). Réutiliser ce handle
+			// ferait écraser silencieusement notre feuille de page.
+			wp_enqueue_style( 'urbizen-conception-page', $uri . $conception_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $conception_css ) );
 		}
 
 		$conception_js = '/assets/js/urbizen-conception-gallery.js';
