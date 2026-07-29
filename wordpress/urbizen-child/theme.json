@@ -85,6 +85,13 @@
       "postTypes": [
         "page"
       ]
+    },
+    {
+      "name": "page-conception",
+      "title": "Conception de plans",
+      "postTypes": [
+        "page"
+      ]
     }
   ],
   "templateParts": [

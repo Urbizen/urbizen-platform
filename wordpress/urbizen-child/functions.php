@@ -191,6 +191,7 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
 	'page-permis-de-construire',
+	'page-conception',
 );
 
 /**
@@ -217,6 +218,28 @@ function urbizen_child_est_page_urbizen() {
 	}
 
 	return in_array( get_page_template_slug( $id ), URBIZEN_CHILD_TEMPLATES_PAGES, true );
+}
+
+/**
+ * La page affichée utilise-t-elle le gabarit commercial « Conception » ?
+ *
+ * Sert à ne charger la feuille de galerie et le script de protection des
+ * visuels que sur cette page, et nulle part ailleurs.
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_conception() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return 'page-conception' === get_page_template_slug( $id );
 }
 
 /**
@@ -299,6 +322,23 @@ function urbizen_child_enqueue_accueil() {
 
 		if ( file_exists( $dir . $pages_css ) ) {
 			wp_enqueue_style( 'urbizen-pages', $uri . $pages_css, array( 'urbizen-homepage' ), (string) filemtime( $dir . $pages_css ) );
+		}
+	}
+
+	// Page commerciale « Conception » : feuille dédiée (galerie de rendus,
+	// hero illustré) et script de protection des visuels. Chargés uniquement
+	// sur cette page ; scopés `.urbizen-page-conception`.
+	if ( urbizen_child_est_page_conception() ) {
+		$conception_css = '/assets/css/urbizen-conception.css';
+
+		if ( file_exists( $dir . $conception_css ) ) {
+			wp_enqueue_style( 'urbizen-conception', $uri . $conception_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $conception_css ) );
+		}
+
+		$conception_js = '/assets/js/urbizen-conception-gallery.js';
+
+		if ( file_exists( $dir . $conception_js ) ) {
+			wp_enqueue_script( 'urbizen-conception-gallery', $uri . $conception_js, array(), (string) filemtime( $dir . $conception_js ), true );
 		}
 	}
 
