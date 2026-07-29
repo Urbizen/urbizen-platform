@@ -99,6 +99,10 @@ check( 'Détecteur urbizen_child_est_page_conception présent',
 	str_contains( $fns, 'function urbizen_child_est_page_conception' ) );
 check( 'Feuille et script Conception mis en file conditionnellement',
 	str_contains( $fns, 'urbizen-conception.css' ) && str_contains( $fns, 'urbizen-conception-gallery.js' ) );
+// Handle de style distinct du plugin (qui enregistre déjà « urbizen-conception »).
+check( 'Handle de la feuille de page = urbizen-conception-page (pas de collision plugin)',
+	str_contains( $fns, "wp_enqueue_style( 'urbizen-conception-page'" )
+	&& ! preg_match( "/wp_enqueue_style\(\s*'urbizen-conception'/", $fns ) );
 
 // --- Les sources ne sont pas versionnées ---
 $tracked = shell_exec( "cd " . escapeshellarg( $repo ) . " && git ls-files | grep -iE '(BALI|HOLLYWOOD|MIAMI|MONACO|SEATTLE|TOKYO)\\.' 2>/dev/null" );
