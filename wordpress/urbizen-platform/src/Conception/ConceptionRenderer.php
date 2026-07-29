@@ -89,6 +89,17 @@ final class ConceptionRenderer {
 			return '';
 		}
 
+		// **Rendu opérationnel** (public) : la page porte un **nonce** et un **jeton
+		// anti-robot à usage unique**, PROPRES à ce rendu. Servie depuis un cache
+		// public partagé, elle donnerait le MÊME jeton à plusieurs visiteurs — le
+		// premier le réserverait, les suivants seraient rejetés. La réponse est donc
+		// marquée **non cacheable AVANT** toute génération d'identifiant technique.
+		// L'aperçu inerte (admin, sans nonce ni jeton réels — C3) reste hors de cette
+		// règle : son contrat de sécurité est inchangé.
+		if ( ConceptionAvailability::is_public() ) {
+			self::non_cacheable();
+		}
+
 		++self::$instance;
 		$id = self::RACINE . '-' . self::$instance;
 
@@ -103,8 +114,9 @@ final class ConceptionRenderer {
 	 * En **aperçu**, aucune reprise n'est lue ni consommée. En **opérationnel**,
 	 * la reprise associée au feedback signé est **consommée une seule fois**
 	 * (usage unique du store) ; les codes d'erreur y sont traduits en messages
-	 * publics. Dès qu'une reprise est réellement rendue, la réponse est marquée
-	 * **non mise en cache publiquement** (elle contient des valeurs saisies).
+	 * publics. La réponse est déjà marquée **non cacheable** par {@see self::render()}
+	 * pour tout rendu opérationnel (nonce/jeton propres à chaque visiteur) ; a
+	 * fortiori lorsqu'elle porte des valeurs saisies reprises.
 	 *
 	 * @return StepFormRenderState
 	 */
@@ -120,8 +132,6 @@ final class ConceptionRenderer {
 			return StepFormRenderState::vide();
 		}
 
-		self::non_cacheable();
-
 		$erreurs = array();
 
 		foreach ( $recovery->errors as $cle => $code ) {
@@ -136,9 +146,16 @@ final class ConceptionRenderer {
 	}
 
 	/**
-	 * Marque la réponse courante comme **privée et non stockable** : un cache
-	 * public partagé ne doit jamais restituer à un autre visiteur l'HTML portant
-	 * des valeurs saisies. N'affecte que la réponse portant une reprise valide.
+	 * Marque la réponse courante comme **privée et non stockable** par un cache
+	 * partagé (LiteSpeed compris) : un visiteur ne doit jamais recevoir l'HTML —
+	 * nonce, jeton anti-robot ou valeurs reprises — destiné à un autre.
+	 *
+	 * Trois garanties **génériques WordPress**, sans dépendance obligatoire à un
+	 * plugin de cache : `DONOTCACHEPAGE` (respecté par LiteSpeed, WP Super Cache,
+	 * W3TC…), `nocache_headers()` (en-têtes du cœur), et un `Cache-Control` explicite
+	 * renforcé (`no-store, private`) pour garantir la directive quelle que soit la
+	 * version de WordPress. Idempotente : appelée une seule fois par requête a le
+	 * même effet que plusieurs.
 	 *
 	 * @return void
 	 */
@@ -149,6 +166,14 @@ final class ConceptionRenderer {
 
 		if ( function_exists( 'nocache_headers' ) ) {
 			nocache_headers();
+		}
+
+		// Renfort explicite : garantit `no-store, private` même sur une version de
+		// WordPress dont `nocache_headers()` ne les émet pas. Sans effet si l'entête
+		// est déjà parti (le rendu se fait dans un tampon de sortie ; DONOTCACHEPAGE
+		// suffit alors à exclure LiteSpeed).
+		if ( function_exists( 'headers_sent' ) && ! headers_sent() ) {
+			header( 'Cache-Control: no-cache, no-store, private, must-revalidate, max-age=0' );
 		}
 	}
 

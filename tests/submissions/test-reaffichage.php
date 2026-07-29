@@ -142,11 +142,14 @@ $rendu2 = ConceptionRenderer::render( $def );
 check( 'E-2 · le second rendu (même requête) n’a plus la reprise', ! str_contains( $rendu2, 'value="Camille Fictif"' ) && ! str_contains( $rendu2, 'data-urbizen-field-error' ) );
 $_GET = array();
 
-// E-3 · sans reprise : réponse NON marquée, rendu inchangé.
+// E-3 · sans reprise : la page opérationnelle est ELLE-MÊME non cacheable
+// (elle porte un nonce et un jeton anti-robot à usage unique, propres au
+// visiteur — jamais partageables via un cache). Rendu par ailleurs inchangé.
 operationnel();
 $_GET = array();
 $rendu_sans = ConceptionRenderer::render( $def );
-check( 'E-3 · sans reprise : réponse non marquée nocache', false === ( $GLOBALS['wpd_nocache'] ?? false ) );
+check( 'E-3 · page opérationnelle SANS reprise : réponse marquée NON cacheable', true === ( $GLOBALS['wpd_nocache'] ?? false ) );
+check( 'E-3 · sans reprise : nonce et jeton présents (identifiants par visiteur)', str_contains( $rendu_sans, 'urbizen_conception_nonce' ) && str_contains( $rendu_sans, 'urbizen_token' ) );
 check( 'E-3 · sans reprise : aucun aria-invalid', ! str_contains( $rendu_sans, 'aria-invalid' ) );
 
 // E-4 · APERÇU : aucune reprise consommée, aucun nocache, aucune valeur.
@@ -223,5 +226,45 @@ $hF = StepFormRenderer::render( $def, cfg(), $stateF );
 check( 'G · aucun contrôle par pièce (surfaces[…]) rendu', ! str_contains( $hF, 'name="surfaces[' ) );
 check( 'G · aucun contrôle « surfaces » (pluriel) rendu', ! str_contains( $hF, 'name="surfaces"' ) );
 check( 'G · la surface GLOBALE reste réaffichée', str_contains( $hF, 'value="95"' ) );
+
+// ======================== H · CACHE OPÉRATIONNEL (C5 bis) ==================
+// H-B · NON public, visiteur ANONYME : aucun formulaire, aucun nonce, aucun
+// jeton → aucun marquage non-cache inutile (rien de privé n'est rendu).
+wpd_reset();
+remove_all_filters( 'urbizen_conception_public_enabled' );
+$GLOBALS['wpd_logged_in'] = false;
+$GLOBALS['wpd_can']       = false;
+ConceptionRenderer::reset();
+ConceptionAssets::register();
+$hB = ConceptionRenderer::render( $def );
+check( 'H-B · anonyme non-public : rendu vide', '' === $hB );
+check( 'H-B · anonyme non-public : aucun nonce ni jeton', ! str_contains( $hB, 'urbizen_conception_nonce' ) && ! str_contains( $hB, 'urbizen_token' ) );
+check( 'H-B · anonyme non-public : AUCUN marquage non-cache inutile', false === ( $GLOBALS['wpd_nocache'] ?? false ) );
+
+// H-E · PLUSIEURS formulaires opérationnels sur la même requête : la page
+// entière est non cacheable, chaque instance a ses propres champs techniques.
+operationnel();
+$_GET = array();
+$hE1 = ConceptionRenderer::render( $def );
+$hE2 = ConceptionRenderer::render( $def );
+check( 'H-E · deux instances → réponse non cacheable', true === ( $GLOBALS['wpd_nocache'] ?? false ) );
+check( 'H-E · instances distinctes (data-urbizen-form-instance 1 puis 2)', str_contains( $hE1, 'data-urbizen-form-instance="urbizen-conception-1"' ) && str_contains( $hE2, 'data-urbizen-form-instance="urbizen-conception-2"' ) );
+check( 'H-E · chaque instance porte ses champs techniques', str_contains( $hE1, 'urbizen_token' ) && str_contains( $hE2, 'urbizen_token' ) );
+
+// H-Mutant · le marquage non-cache du formulaire opérationnel est neutralisé →
+// la page redevient cacheable (jeton partageable). Le test doit mordre.
+$mCache = mutant(
+	'src/Conception/ConceptionRenderer.php',
+	'ConceptionRenderer',
+	array( "if ( ConceptionAvailability::is_public() ) {\n\t\t\tself::non_cacheable();\n\t\t}" => "if ( ConceptionAvailability::is_public() ) {\n\t\t\t// non_cacheable neutralisé\n\t\t}" )
+);
+operationnel();
+$_GET = array();
+$mCache::render( $def );
+check( 'H · mutant → marquage non-cache retiré : page redevient cacheable (défaut détecté)', false === ( $GLOBALS['wpd_nocache'] ?? false ) );
+operationnel();
+$_GET = array();
+ConceptionRenderer::render( $def );
+check( 'H · le vrai renderer : la page opérationnelle est non cacheable', true === ( $GLOBALS['wpd_nocache'] ?? false ) );
 
 verdict();

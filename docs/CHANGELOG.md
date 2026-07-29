@@ -5,6 +5,25 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.13.1] - 2026-07-29
+
+### Corrigé (cache) — avant publication de Conception
+
+- **La page d'un formulaire Conception opérationnel est désormais elle-même non
+  cacheable.** Le test direct C5 avait montré qu'un cache partagé (LiteSpeed)
+  servait la page initiale du formulaire en HIT avec le **même jeton anti-robot
+  à usage unique** à plusieurs visiteurs (le premier le réservait, les suivants
+  étaient rejetés). `ConceptionRenderer::render()` marque maintenant **tout rendu
+  opérationnel** (public) `DONOTCACHEPAGE` + `nocache_headers()` + `Cache-Control:
+  no-cache, no-store, private, must-revalidate, max-age=0`, **avant** de générer
+  le nonce et le jeton — chaque visiteur reçoit ses propres identifiants. Le
+  marquage n'est **pas** limité aux réponses portant `urbizen_feedback`.
+- **Non affectés** : les pages sans Conception, l'**aperçu administrateur inerte**
+  (aucun nonce/jeton réel — contrat C3 inchangé), et le rendu vide d'un visiteur
+  anonyme lorsque Conception n'est pas public.
+
+---
+
 ## [0.13.0] - 2026-07-29
 
 ### Sécurité / Durcissement (avant publication de Conception)
