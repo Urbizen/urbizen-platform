@@ -203,7 +203,7 @@ foreach ( $lignes as $i => $ligne ) {
 check( 'Maquette : les bornes de <main> sont repérées', $debut_main > 0 && $fin_main > $debut_main );
 
 $corps_ref = maquette( $lignes, $debut_main, $fin_main );
-check( 'Corps : les 12 sections identiques à la maquette', $corps_rendu === $corps_ref );
+check( 'Corps : les 13 sections identiques à la maquette', $corps_rendu === $corps_ref );
 
 check( 'Corps : SVG du hero inline et inchangé',
 	substr_count( $gabarit, '<svg' ) === substr_count( $corps_ref, '<svg' )

@@ -5,9 +5,10 @@
  * Les quatre cartes reçoivent une illustration décorative. Ce banc vérifie
  * que l'ajout est complet, homogène, purement décoratif, et surtout qu'il
  * n'a **rien** emporté d'autre au passage : les fichiers de référence d'où
- * viennent les dessins mêlaient plusieurs chantiers, dont une carte
- * « Conception de plans sur mesure » non validée et des textes antérieurs à
- * la PR #12.
+ * viennent les dessins mêlaient plusieurs chantiers et des textes antérieurs
+ * à la PR #12. La carte « Conception de plans sur mesure », d'abord écartée,
+ * est désormais validée (LOT 2C BIS) et vérifiée plus bas comme une section
+ * distincte — elle n'appartient pas à la section #exemples contrôlée ici.
  *
  * Hors WordPress : aucun accès réseau, aucune base de données.
  */
@@ -90,10 +91,21 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] 4 badges « Démonstration »", 4 === substr_count( $sec, '>Démonstration<' ) );
 }
 
-// ------------------------------------- la carte non validée est écartée ---
+// ---------------------------- la carte Conception est désormais validée ---
+// Depuis LOT 2C BIS, l'accueil présente une carte « Conception de plans sur
+// mesure » menant à la page commerciale /conception/. Elle vit dans les deux
+// gabarits WordPress ET dans la maquette de référence (fidélité). La carte
+// « prestation » de la section #exemples n'est pas concernée.
 foreach ( $sources as $nom => $chemin ) {
-	check( "[$nom] aucune carte « Conception de plans sur mesure »",
-		! str_contains( file_get_contents( $chemin ), 'Conception de plans sur mesure' ) );
+	$h = file_get_contents( $chemin );
+	check( "[$nom] carte « Conception de plans sur mesure » présente",
+		str_contains( $h, 'class="accueil-conception"' )
+		&& str_contains( $h, '<h2>Conception de plans sur mesure</h2>' ) );
+	check( "[$nom] la carte Conception mène à /conception/ via « Démarrer mon projet »",
+		(bool) preg_match( '#<a class="btn btn-primary" href="/conception/">Démarrer mon projet</a>#', $h ) );
+	check( "[$nom] la carte n'expose qu'un dérivé filigrané, aucun fichier maître",
+		str_contains( $h, 'conception-maison-contemporaine-parement-pierre-card.webp' )
+		&& ! preg_match( '/(BALI|HOLLYWOOD|MIAMI|MONACO|SEATTLE|TOKYO)\./', $h ) );
 }
 
 // ------------------------------- textes de réassurance et d'avantages validés ---
