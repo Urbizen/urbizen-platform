@@ -5,6 +5,40 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.13.0] - 2026-07-29
+
+### Sécurité / Durcissement (avant publication de Conception)
+
+- **Reprise à usage unique réellement exclusive** : `SubmissionRecoveryStore`
+  consomme derrière une réservation `Support\OptionMutex` — un `INSERT IGNORE`
+  non écrasant (1 = gagné, 0 = perdu, false = échec fermé), **propriétaire
+  aléatoire**, **libération conditionnée au propriétaire exact**, lecture SQL
+  directe (jamais `get_option`). Aucun verdict ne dépend du retour ambigu
+  d'`add_option()`.
+- **Échec fermé** si la suppression de la reprise (`delete_transient`) n'est pas
+  confirmée ; verrou jamais recyclé ni volé pendant la durée de vie de la
+  reprise ; purge différée bornée, valeurs corrompues en quarantaine.
+- **Borne haute** d'expiration du feedback signé.
+- **Association stricte de la réponse à l'instance** du formulaire
+  (`data-urbizen-form-instance`) ; toute association invalide échoue fermé.
+- **Détection de succès uniquement par `DOMParser`** ; sans lui, échec fermé.
+
+### Publication
+
+- **Version 0.13.0** — les assets JS/CSS de Conception sont versionnés par
+  `URBIZEN_PLATFORM_VERSION`, la montée de version invalide donc les caches
+  navigateur.
+- **Activation publique de Conception réversible**, par réglage serveur
+  explicite hors dépôt (constante `URBIZEN_CONCEPTION_PUBLIC`), jamais par le
+  code ni par le visiteur ; `is_public()` reste **faux par défaut**.
+
+### Portée honnête
+
+- Seul le verrou de reprise est migré vers `OptionMutex`. Les autres
+  réservations (`AntiSpam`, `RateLimiter`, référence, `MailQueue`) restent sur
+  `add_option()` — **un seul gagnant confirmé sur l'environnement réel sans
+  `CLIENT_FOUND_ROWS`** (H2), migration ultérieure non bloquante.
+
 ## [Non publié]
 
 ### Ajouté
