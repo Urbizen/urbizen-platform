@@ -293,10 +293,8 @@
   #dp-app .dp-done-kicker { margin: 0 0 8px; color: var(--cadastre); font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
   #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: clamp(25px, 3vw, 34px); line-height: 1.15; margin: 0 0 12px; }
   #dp-app .dp-done > p { color: var(--ink-soft); max-width: 62ch; margin: 0; }
-  #dp-app .dp-estimate { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 24px; align-items: center; margin: 28px 0; padding: 22px 24px; border: 1px solid #9EDBBC; border-radius: var(--radius); background: var(--mint); }
-  #dp-app .dp-estimate span { color: var(--ink-soft); font-size: 13px; }
-  #dp-app .dp-estimate strong { grid-column: 2; grid-row: 1 / span 2; color: var(--ink); font-family: "Space Grotesk", sans-serif; font-size: clamp(25px, 3vw, 34px); white-space: nowrap; }
-  #dp-app .dp-estimate small { color: var(--ink); font-size: 13px; }
+  /* Le bloc tarifaire (répéteur de projets, options, récapitulatif) est stylé
+     par assets/css/urbizen-form-tarifs.css, partagé par les formulaires DP et PCMI. */
   #dp-app .dp-next-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: confirmation; }
   #dp-app .dp-next-steps li { position: relative; min-height: 98px; padding: 18px 16px 16px 48px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-weight: 600; }
   #dp-app .dp-next-steps li::before { counter-increment: confirmation; content: counter(confirmation); position: absolute; left: 16px; top: 17px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
@@ -314,8 +312,6 @@
     #dp-app .dp-legend li { flex-direction: column; text-align: center; gap: 5px; padding: 4px 6px; font-size: 11px; min-width: 62px; }
     #dp-app .dp-legend li::before { display: none; }
     #dp-app .dp-grid { grid-template-columns: 1fr; }
-    #dp-app .dp-estimate { grid-template-columns: 1fr; }
-    #dp-app .dp-estimate strong { grid-column: 1; grid-row: auto; }
     #dp-app .dp-next-steps { grid-template-columns: 1fr; }
     #dp-app .dp-seg { display: flex; width: 100%; }
     #dp-app .dp-seg label { flex: 1 1 0; text-align: center; padding-left: 10px; padding-right: 10px; }
@@ -358,6 +354,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -440,12 +438,15 @@
               <div class="dp-field col-2"><label for="t_adr">Adresse du terrain <span class="req">*</span></label><input type="text" id="t_adr" name="terrain_adresse"></div>
               <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric"></div>
               <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville"></div>
-              <div class="dp-field"><label for="t_sec">Section cadastrale <span class="req">*</span></label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. AB"></div>
-              <div class="dp-field"><label for="t_num">N° de parcelle <span class="req">*</span></label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 0142"></div>
+              <div class="dp-field"><label for="t_sec">Section cadastrale</label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. AB"></div>
+              <div class="dp-field"><label for="t_num">N° de parcelle</label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 0142"></div>
               <div class="dp-field col-2">
-                <label for="t_sup">Superficie totale du terrain <span class="req">*</span></label>
+                <label for="t_sup">Superficie totale du terrain</label>
                 <div class="dp-suffix"><input type="number" id="t_sup" name="terrain_superficie" class="measure" min="0" step="1"><span class="unit">m²</span></div>
                 <span class="dp-note">Surface de la parcelle, pas de la construction.</span>
+              </div>
+              <div class="dp-field col-2">
+                <label class="dp-cadastre-inconnu"><input type="checkbox" id="cad_inconnu" name="cad_inconnu" value="oui"> Je ne connais pas ces informations cadastrales.</label>
               </div>
             </div>
                         <div class="dp-field col-2">
@@ -470,20 +471,22 @@
           <section class="dp-step" data-step="2">
             <p class="dp-step-kicker">Cadre 4</p>
             <h2 class="dp-step-title">En quoi consistent les travaux&nbsp;?</h2>
-            <p class="dp-step-hint">Cochez tout ce qui s’applique, puis décrivez le projet le plus précisément possible.</p>
+            <p class="dp-step-hint">Sélectionnez le projet principal, puis décrivez-le le plus précisément possible. Vous pourrez ajouter d’autres projets au même dossier à l’avant-dernière étape.</p>
             <div class="dp-field col-2" style="margin-bottom:16px">
               <label>Nature des travaux <span class="req">*</span></label>
               <div class="dp-checks" id="nature">
-                <label class="dp-check"><input type="checkbox" name="nature" value="Extension"> Extension</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Abri / annexe"> Abri, annexe</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Piscine"> Piscine</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Clôture / mur"> Clôture, mur</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Modification de façade"> Façade / ouverture</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Ravalement"> Ravalement</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Toiture"> Toiture</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Panneaux solaires"> Panneaux solaires</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Changement de destination"> Changement de destination</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Autre"> Autre</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Extension"> Extension</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Abri / annexe"> Abri, annexe</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Garage"> Garage</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Carport / abri de voiture"> Carport, abri de voiture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Piscine"> Piscine</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Clôture / mur"> Clôture, mur</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Modification de façade"> Façade / ouverture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Ravalement"> Ravalement</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Toiture"> Toiture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Panneaux solaires"> Panneaux solaires</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Changement de destination"> Changement de destination</label>
+                <label class="dp-check"><input type="radio" name="nature" value="Autre"> Autre</label>
               </div>
             </div>
             <div class="dp-grid">
@@ -563,9 +566,29 @@
             <div id="pieces"></div>
           </section>
 
-          <!-- 7 — Envoi -->
+          <!-- 7 — Projets supplémentaires -->
           <section class="dp-step" data-step="6">
-            <p class="dp-step-kicker">Cadre 8 · Engagement</p>
+            <p class="dp-step-kicker">Cadre 8 · Projets supplémentaires</p>
+            <h2 class="dp-step-title">Souhaitez-vous ajouter d’autres projets à ce dossier&nbsp;?</h2>
+            <p class="dp-tarifs-principal" data-tarifs-principal></p>
+            <p class="dp-regroupement">Les projets supplémentaires doivent concerner le même demandeur, la même adresse et la même parcelle, et pouvoir être regroupés dans un même dossier administratif. Urbizen vérifiera leur compatibilité après réception de la demande.</p>
+
+            <div class="dp-travaux" data-tarifs-travaux></div>
+            <button type="button" class="dp-travail-ajouter" data-tarifs-ajouter>+ Ajouter un projet</button>
+
+            <label class="dp-option" for="depot_guichet">
+              <input type="checkbox" id="depot_guichet" name="depot_guichet" value="oui">
+              <span class="dp-option-texte">Je souhaite qu’Urbizen dépose mon dossier sur le guichet numérique de la commune : <span class="dp-option-prix">+30 €</span></span>
+            </label>
+
+            <div data-tarifs-recap></div>
+            <div data-pieces-recap></div>
+            <div class="dp-err" id="dp-travaux-err" role="alert"></div>
+          </section>
+
+          <!-- 8 — Envoi -->
+          <section class="dp-step" data-step="7">
+            <p class="dp-step-kicker">Cadre 9 · Engagement</p>
             <h2 class="dp-step-title">Vérification et envoi</h2>
             <p class="dp-step-hint">Un récapitulatif vous sera envoyé par e-mail. Le dépôt en mairie se fait après votre validation du dossier.</p>
             <div class="dp-attest">
@@ -580,7 +603,7 @@
           </section>
 
           <footer class="dp-foot">
-            <span class="dp-count" id="dp-count">Rubrique 1 / 7</span>
+            <span class="dp-count" id="dp-count">Rubrique 1 / 8</span>
             <div class="dp-btns">
               <button type="button" class="dp-btn dp-back" id="dp-back" hidden>Précédent</button>
               <button type="button" class="dp-btn dp-next" id="dp-next">Continuer</button>
@@ -594,11 +617,8 @@
           <p class="dp-done-kicker">Votre demande d’urbanisme</p>
           <h3>Votre projet est prêt à être étudié</h3>
           <p>Un interlocuteur Urbizen vérifie les informations et les documents transmis avant toute commande.</p>
-          <div class="dp-estimate" aria-label="Estimation tarifaire">
-            <span id="dp-price-category">Estimation de la prestation</span>
-            <strong id="dp-price">À confirmer</strong>
-            <small id="dp-price-detail">Le tarif définitif est confirmé après vérification de votre demande.</small>
-          </div>
+          <div data-tarifs-recap-final aria-label="Estimation tarifaire"></div>
+          <div data-pieces-recap-final></div>
           <ol class="dp-next-steps" aria-label="Prochaines étapes">
             <li>Vérification de la demande<span>Urbizen contrôle la nature du projet et les informations reçues.</span></li>
             <li>Confirmation du tarif<span>Vous recevez le montant définitif avant tout engagement.</span></li>
@@ -611,6 +631,8 @@
   </div>
 </div>
 
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js"></script>
 <script>
 (function () {
   "use strict";
@@ -626,7 +648,7 @@
   var form  = document.getElementById("dp-form");
   var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
   var legendData = [
-    "Déclarant", "Terrain", "Projet", "Surfaces", "Contexte", "Documents", "Envoi"
+    "Déclarant", "Terrain", "Projet", "Surfaces", "Contexte", "Documents", "Autres projets", "Envoi"
   ];
   var PIECES = [
     ["PHOTO", "Photos du terrain et de la maison existante"],
@@ -638,6 +660,36 @@
     ["AUTRES", "Autres documents utiles : devis, matériaux, étude de sol…"]
   ];
   var current = 0;
+
+  /* =========================================================
+     Tarification — configuration propre à la DP.
+     Le calcul, le répéteur de projets et le récapitulatif vivent dans
+     urbizen-form-tarifs.js : seuls le barème et les montants de supplément
+     sont déclarés ici. Aucun autre endroit du dépôt ne porte ces valeurs.
+     ========================================================= */
+  var tarifs = UrbizenTarifs.init({
+    form: form,
+    libelleType: "Déclaration préalable",
+    bareme: {
+      "Extension": 549,
+      "Clôture / mur": 189,
+      "Panneaux solaires": 189,
+      // Déclarés explicitement bien que « __defaut » vaille aussi 249 : leur tarif
+      // est une décision produit, pas un repli. Si « __defaut » évolue, Garage et
+      // Carport ne doivent pas suivre en silence.
+      "Garage": 249,
+      "Carport / abri de voiture": 249,
+      "__defaut": 249
+    },
+    categories: {
+      "Extension": "Projet important",
+      "Clôture / mur": "Projet simple",
+      "Panneaux solaires": "Projet simple",
+      "__defaut": "Projet standard"
+    },
+    surEtude: [],
+    supplements: { abf: 80, depot: 30, travail: 100 }
+  });
 
   /* ----- reprise du tunnel d'orientation de l'accueil ----- */
   function prefillFromHomepage() {
@@ -669,7 +721,8 @@
     var projectNature = {
       piscine: "Piscine",
       extension: "Extension",
-      garage: "Abri / annexe",
+      garage: "Garage",
+      carport: "Carport / abri de voiture",
       abri: "Abri / annexe",
       pergola: "Autre",
       facade: "Modification de façade",
@@ -697,27 +750,13 @@
     legendEl.appendChild(li);
   });
 
-  /* ----- construire les lignes de pièces ----- */
-  var piecesEl = document.getElementById("pieces");
-  PIECES.forEach(function (p) {
-    var row = document.createElement("div");
-    row.className = "dp-piece";
-    var id = "file_" + p[0];
-    row.innerHTML =
-      '<span class="lab"><b>' + p[0] + "</b>" + p[1] + "</span>" +
-      '<span style="display:flex;align-items:center;gap:10px">' +
-        '<span class="picked" data-picked></span>' +
-        '<label class="dp-file-btn" for="' + id + '">Choisir un fichier</label>' +
-      "</span>" +
-      '<input type="file" id="' + id + '" name="piece_' + p[0] + '" accept=".pdf,.jpg,.jpeg,.png" multiple>';
-    piecesEl.appendChild(row);
-    var input = row.querySelector("input[type=file]");
-    var picked = row.querySelector("[data-picked]");
-    input.addEventListener("change", function () {
-      picked.textContent = input.files.length
-        ? input.files.length + " fichier" + (input.files.length > 1 ? "s" : "") + " ✓"
-        : "";
-    });
+  /* ----- pièces du projet : module partagé -----
+     Le rendu, le message rassurant, l'option de report et le récapitulatif
+     des pièces différées vivent dans urbizen-form-pieces.js. */
+  var pieces = UrbizenPieces.init({
+    form: form,
+    conteneur: document.getElementById("pieces"),
+    pieces: PIECES
   });
 
   /* ----- conditionnels (data-when="name=value") ----- */
@@ -777,10 +816,20 @@
         el.style.borderColor = "";
       }
     });
-    // nature : au moins une case au pas 3
+    // nature : le projet principal est requis au pas 3
     if (current === 2) {
       var anyNature = form.querySelector('input[name="nature"]:checked');
       if (!anyNature) { ok = false; }
+    }
+    // projets supplémentaires : aucune ligne laissée sans nature choisie
+    if (current === 6) {
+      var errTravaux = document.getElementById("dp-travaux-err");
+      if (!tarifs.estValide()) {
+        ok = false;
+        errTravaux.textContent = "Choisissez la nature de chaque projet ajouté, ou supprimez la ligne inutile.";
+      } else {
+        errTravaux.textContent = "";
+      }
     }
     if (firstBad) firstBad.focus();
     return ok;
@@ -806,10 +855,11 @@
     sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
 
     var fd = new FormData(form);
-    // sérialiser les cases "nature" (multiples) en liste lisible
-    fd.set("nature", Array.prototype.map.call(
-      form.querySelectorAll('input[name="nature"]:checked'), function (n) { return n.value; }
-    ).join(", "));
+    // « nature » est désormais un choix unique : FormData porte déjà la bonne
+    // valeur. Le moteur y ajoute les projets supplémentaires et l'option de
+    // dépôt ; il n'y met aucun montant, que le serveur devra recalculer.
+    tarifs.serialiser(fd);
+    pieces.serialiser(fd);
 
     if (!ENDPOINT) {
       showDone(true);
@@ -825,40 +875,20 @@
       });
   });
 
-  function estimatePrice() {
-    var selected = Array.prototype.map.call(
-      form.querySelectorAll('input[name="nature"]:checked'),
-      function (input) { return input.value; }
-    );
-    var simple = ["Clôture / mur", "Panneaux solaires"];
-    var category = "Projet standard", base = 249;
-
-    if (selected.indexOf("Extension") !== -1) {
-      category = "Projet important"; base = 549;
-    } else if (selected.length && selected.every(function (value) { return simple.indexOf(value) !== -1; })) {
-      category = "Projet simple"; base = 189;
-    }
-
-    var abf = form.querySelector('input[name="abf"]:checked');
-    var supplement = abf && abf.value === "oui" ? 80 : 0;
-    return { category: category, total: base + supplement, abf: supplement };
-  }
-
   function showDone(preview) {
     form.style.display = "none";
     var done = document.getElementById("dp-done");
-    var estimate = estimatePrice();
-    document.getElementById("dp-price-category").textContent = "Déclaration préalable · " + estimate.category;
-    document.getElementById("dp-price").textContent = "À partir de " + estimate.total + " €";
-    document.getElementById("dp-price-detail").textContent = estimate.abf
-      ? "Estimation incluant le supplément Secteur Bâtiments de France de 80 €. Tarif confirmé après vérification."
-      : "Le tarif définitif est confirmé après vérification de votre demande.";
+    tarifs.rendreRecapFinal();
+    pieces.rafraichirRecap();
     document.getElementById("dp-preview-note").hidden = !preview;
     done.classList.add("show");
   }
 
   prefillFromHomepage();
   refreshConditionals();
+  // Le tunnel d'accueil a pu présélectionner la nature : le récapitulatif doit
+  // en tenir compte avant le premier affichage.
+  tarifs.rafraichir();
   render();
 })();
 </script>

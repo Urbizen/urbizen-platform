@@ -93,6 +93,19 @@ titre "Parcours de conception — DOM simulé"
 node test-conception.mjs
 verdict $? "test-conception.mjs"
 
+# Le moteur tarifaire partagé des formulaires DP et PCMI, éprouvé sur le HTML
+# réel des quatre documents (thème et maquettes) : barème, travaux
+# supplémentaires, suppléments, récapitulatif et parité des sources.
+titre "Tarification DP / PCMI — DOM simulé"
+node test-tarifs.mjs
+verdict $? "test-tarifs.mjs"
+
+# Les pièces du projet : message rassurant, report à plus tard, récapitulatif
+# « À transmettre ultérieurement » et absence de blocage à l'envoi.
+titre "Pièces du projet DP / PCMI — DOM simulé"
+node test-pieces.mjs
+verdict $? "test-pieces.mjs"
+
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php
 verdict $? "test-render.php"
@@ -104,7 +117,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 5 bancs passent.\033[0m\n'
+	printf '\033[32mLes 7 bancs passent.\033[0m\n'
 	exit 0
 fi
 

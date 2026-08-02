@@ -23,6 +23,39 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
   produites par Urbizen et ne sont pas demandées au client.
 - Feuille `assets/css/urbizen-form-page.css` et script
   `assets/js/urbizen-form-page.js` pour la coque des deux pages.
+- **Estimation tarifaire pendant la saisie** (D-053) : barème du projet
+  principal, supplément Secteur Bâtiments de France à +80 €, option de dépôt
+  sur le guichet numérique à +30 € décochée par défaut, et récapitulatif
+  détaillé poste par poste. Une ligne à zéro n’est pas affichée. La mention
+  « Estimation indicative. Le tarif définitif sera confirmé par Urbizen après
+  vérification de votre projet, avant toute commande. » accompagne le total.
+- **Étape « Projets supplémentaires »** : plusieurs projets peuvent être
+  regroupés dans un même dossier, à +100 € chacun, avec ajout, description,
+  modification et suppression. Un même type ne peut pas être ajouté deux fois.
+  Le regroupement suppose le même demandeur, la même adresse et la même
+  parcelle, et reste vérifié par Urbizen après réception.
+- **DP : Garage et Carport comme natures propres**, à 249 € chacune.
+  « Abri, annexe » demeure pour les annexes qui ne sont ni l’un ni l’autre.
+- **Documents transmissibles ultérieurement** (D-054) : l’étape s’ouvre sur un
+  message explicite et chaque pièce porte une case « Je transmettrai ce
+  document ultérieurement ». Les pièces ainsi déclarées sont reprises sous
+  « À transmettre ultérieurement ». Aucune pièce ne bloque l’envoi.
+- **Références cadastrales facultatives** : section, parcelle et superficie ne
+  sont plus obligatoires ; une case « Je ne connais pas ces informations
+  cadastrales. » les neutralise et le récapitulatif porte « Informations
+  cadastrales : à compléter ultérieurement ». Adresse, code postal et commune
+  restent obligatoires.
+- **Modules partagés** `assets/js/urbizen-form-tarifs.js` et
+  `urbizen-form-pieces.js`, avec leurs feuilles : le calcul, le répéteur et le
+  rendu des pièces n’existent qu’en un exemplaire pour les quatre documents.
+
+### Modifié
+
+- **La nature du projet devient un choix unique.** En sélection multiple, le
+  tarif de base dépendait de l’ordre de clic.
+- **Accessibilité mobile** : la case de dépôt est imbriquée dans son libellé —
+  toute la ligne est cliquable sur 44 px — et le bouton « Supprimer » offre une
+  cible de 44 × 44 px avec un `aria-label` nommant le projet visé.
 
 ## [0.13.1] - 2026-07-29
 

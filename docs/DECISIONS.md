@@ -2664,3 +2664,167 @@ réception par courriel au demandeur.
 - Banc dédié `tests/submissions/test-feedback.php` : succès réel, erreur réelle, absence de feedback,
   URL forgée, jeton altéré/expiré/d'un autre formulaire, échappement, et **aucune PII dans l'URL**.
 - Rendu Conception **inchangé** en l'absence de feedback (parité octet pour octet préservée).
+
+## D-053 — Estimation tarifaire affichée dans les formulaires DP et PCMI
+
+**Statut.** Adoptée — prototype d'interface réalisé, non publié. Ne concerne **que** les parcours
+DP et PCMI ; le formulaire Conception, déjà en production, garde son estimation propre.
+
+**Contexte.** Les formulaires DP et PCMI affichaient déjà un tarif de base calculé côté navigateur.
+Deux besoins s'y ajoutent : un client regroupe souvent plusieurs travaux dans un même dossier, et
+il demande parfois à Urbizen de déposer le dossier à sa place sur le guichet numérique de la
+commune. Aucun des deux n'était chiffré, alors que l'un et l'autre changent le prix. Par ailleurs
+le barème vivait en **quatre exemplaires** inline — deux maquettes, deux copies servies par le
+thème — sans source de vérité : la dérive n'était qu'une question de temps.
+
+**Décision.**
+
+- **Le prix reste affiché pendant la saisie et sur l'écran de confirmation.** Le visiteur qui
+  remplit un formulaire est en phase de décision : lui cacher l'ordre de grandeur ne le protège de
+  rien et le pousse à abandonner. Ce qui est affiché est une **estimation**, jamais un engagement.
+- **Formule unique.**
+  `total = tarif du projet principal + 100 € × travaux supplémentaires + 80 € si ABF + 30 € si dépôt`.
+  Les barèmes existants ne changent pas : DP 189 / 249 / 549 €, PCMI 449 / 649 / 849 €.
+- **Le projet principal est un choix unique.** L'étape « Projet » passe des cases à cocher aux
+  boutons radio. Une nature multiple rendait le tarif de base dépendant de l'ordre de sélection —
+  le même dossier pouvait coûter 300 € de moins selon la case cochée en premier. Le choix unique
+  supprime l'ambiguïté à la racine plutôt que de l'arbitrer.
+- **Les travaux supplémentaires ont leur propre étape**, placée avant l'envoi. Chacun coûte 100 €.
+  Le projet principal n'est **jamais** compté comme travail supplémentaire.
+- **Le doublon est rendu impossible, pas signalé.** Une nature déjà retenue — par le projet
+  principal ou par une autre ligne — n'est tout simplement pas proposée dans les listes. Si le
+  client change de projet principal pour une nature déjà en ligne, cette ligne est **vidée**, non
+  supprimée en silence : il doit voir qu'il a un choix à refaire.
+- **Le regroupement reste soumis à vérification humaine.** Le formulaire l'énonce : mêmes
+  demandeur, adresse et parcelle, et compatibilité dans un dossier administratif unique. Urbizen
+  vérifie après réception. Le formulaire ne prétend pas trancher une question juridique.
+- **Option de dépôt, décochée par défaut.** « Je souhaite qu'Urbizen dépose mon dossier sur le
+  guichet numérique de la commune : +30 € ». Une option payante ne se pré-coche pas.
+- **Le récapitulatif détaille chaque poste** — principal, travaux, ABF, dépôt, total. Une ligne à
+  zéro est **absente**, jamais affichée à « 0 € » : le client ne lit que ce qu'il a choisi.
+- **Mention imposée sous le total**, reproduite au caractère près : « Estimation indicative. Le
+  tarif définitif sera confirmé par Urbizen après vérification de votre projet, avant toute
+  commande. »
+- **« Autre » en PCMI n'est pas chiffré.** Le total affiche « Tarif sur étude ». Les suppléments
+  restent détaillés ligne à ligne, mais on n'additionne pas des suppléments à un socle inconnu
+  pour en tirer un chiffre qui aurait l'air d'un prix.
+
+**Réserve d'architecture — le calcul est client, il n'engage rien.** `PricingStrategyRegistry`
+n'expose **aucune** stratégie pour DP ni PCMI, et n'en invente pas : un type sans stratégie vaut
+`null`, sans repli sur Conception (D-050). Les formulaires ne postent nulle part
+(`ENDPOINT = ""`). Le montant affiché n'est donc, à ce stade, qu'une commodité d'interface — et il
+n'est **volontairement pas sérialisé** dans la charge envoyée. Le jour où DP et PCMI passeront par
+`SubmissionController`, le barème devra exister **côté serveur**, comme `Forms\Pricing` pour la
+conception, et le montant reçu du navigateur ne devra jamais être cru.
+
+**Hors de cette décision.** Le sort de l'estimation du formulaire Conception, qui suit ses propres
+règles et son propre catalogue serveur ; l'enregistrement réel des demandes DP/PCMI ; le
+rattachement d'une demande à un compte.
+
+**Conséquences.**
+- Source unique : `wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js` porte **tout** le
+  calcul, le répéteur, l'anti-doublon et le rendu du récapitulatif ; `assets/css/urbizen-form-tarifs.css`
+  porte la présentation. Les quatre documents de formulaire chargent **ces mêmes fichiers** et ne
+  déclarent plus qu'un barème d'une dizaine de lignes. Les natures sont lues **dans le formulaire**,
+  pas configurées en double.
+- Aucune mise en file WordPress n'a été nécessaire : les formulaires sont servis en `iframe` depuis
+  un document autonome, les chemins relatifs suffisent.
+- Banc `tests/cadastre/test-tarifs.mjs`, exécuté sur le **HTML réel** des quatre documents :
+  barèmes, choix unique, suppléments et cumuls, répéteur, doublon impossible, cas « sur étude »,
+  masquage des lignes à zéro, mention au caractère près, écran final, sérialisation sans montant,
+  et **parité maquette ≡ thème**.
+- La duplication `frontend/formulaires/` ↔ `wordpress/urbizen-child/assets/forms/` subsiste pour le
+  balisage, mais elle est désormais **testée** : elle rejoint la dette documentée en D-048 au lieu
+  de rester tacite.
+
+**Mise à jour — Garage et Carport, natures propres en DP.** « Abri, annexe » servait de fourre-tout
+à trois projets que le client distingue parfaitement : l'abri de jardin, le garage et le carport.
+Un demandeur qui cherche « garage » et ne trouve qu'« annexe » doute d'être au bon endroit. Deux
+natures sont donc ajoutées au formulaire DP — `Garage` et `Carport / abri de voiture`, **249 €**
+chacune — et « Abri, annexe » demeure pour les annexes qui ne sont ni l'un ni l'autre. Leur tarif
+est déclaré **explicitement** au barème alors que `__defaut` vaut déjà 249 : c'est une décision
+produit, pas un repli, et un futur changement de `__defaut` ne doit pas les emporter en silence.
+Le tunnel d'accueil route désormais `garage` vers la nature `Garage` (et `carport`, prévu) au lieu
+de `Abri / annexe`. Aucun autre tarif n'est modifié.
+
+**Mise à jour — « projets supplémentaires », et des cibles tactiles utilisables.** Le parcours
+disait « travaux supplémentaires » ; le client, lui, raisonne en projets — c'est le mot employé
+partout ailleurs dans le formulaire (« projet principal », « Votre projet est prêt à être étudié »).
+L'interface est donc harmonisée : étape « Projets supplémentaires », bouton « + Ajouter un projet »,
+en-tête « Projet supplémentaire 1 », récapitulatif « Projets supplémentaires (n) » avec un détail
+« Projet supplémentaire — [nature] : +100 € ». La légende du rail devient « Autres projets » plutôt
+que « Projets », qui aurait voisiné avec l'étape « Projet ». Le mot « travaux » reste réservé à
+l'objet même de la déclaration — « déclaration préalable de travaux », « nature des travaux » — où
+il est juridiquement exact. Les identifiants internes (`dp-travail-*`, `this.travaux`) ne sont pas
+renommés : invisibles du client, leur renommage n'apporterait qu'un risque.
+
+Deux cibles tactiles étaient trop petites au doigt. La case « dépôt sur le guichet numérique »
+mesurait 13 px : l'`<input>` n'était pas imbriqué dans son `<label>`, seule la case était cliquable.
+Le `<label>` enveloppe désormais la case et le texte, et porte une hauteur minimale de 44 px — toute
+la ligne, montant compris, est cliquable. Le lien « Supprimer », déjà un `<button type="button">`,
+mesurait 19 px de haut : il offre maintenant 44 × 44 px, absorbés par des marges négatives pour que
+la rangée ne grandisse pas, le soulignement portant sur le mot et non sur la zone. Son `aria-label`
+nomme la ligne visée : « Supprimer le projet supplémentaire 1 ».
+
+## D-054 — Une pièce manquante ne bloque pas l'envoi d'une demande
+
+**Statut.** Adoptée — appliquée aux formulaires DP et PCMI, thème et maquettes.
+
+**Contexte.** L'étape « Documents » demande sept familles de pièces : photos du terrain, vues depuis
+la rue, façades, croquis, plans possédés, relevés, autres documents. Aucune n'était techniquement
+obligatoire, mais rien ne le disait. Un client qui n'a pas encore photographié sa façade lit une
+liste de sept demandes et en conclut qu'il doit tout réunir avant d'écrire — donc il repousse, et
+souvent il ne revient pas. Le formulaire perdait des demandes sur un malentendu, pas sur un refus.
+
+**Décision.**
+
+- **Aucune pièce de cette étape ne conditionne l'envoi.** Ce sont des aides à l'étude, pas les
+  pièces réglementaires du dossier. Le message d'ouverture le dit explicitement, et précise que
+  seuls les champs marqués d'un astérisque aux étapes précédentes sont obligatoires.
+- **Les informations réellement indispensables restent obligatoires** — identité du demandeur,
+  terrain, nature du projet principal. Le report ne s'applique qu'aux documents.
+- **Le report est déclaré, pas subi.** Chaque pièce porte une case « Je transmettrai ce document
+  ultérieurement ». Cocher cette case vaut engagement explicite et fait apparaître la pièce dans le
+  récapitulatif sous « À transmettre ultérieurement » — une information utile à Urbizen, là où un
+  champ resté vide n'en est pas une.
+- **L'explication vit dans l'encadré d'ouverture, et nulle part ailleurs.** Une première version
+  répétait « Vous pourrez nous transmettre cet élément plus tard. » sous chacune des sept pièces :
+  à l'écran, ces sept lignes concurrençaient l'encadré au lieu de le renforcer, et alourdissaient
+  une étape que l'on veut légère. Chaque rangée se limite donc au **document demandé**, au
+  **bouton de dépôt** et à la **case de report**.
+- **Aucun vocabulaire d'erreur.** Un report n'est ni un manque, ni un défaut, ni une alerte : ni
+  rouge, ni « obligatoire », ni « incomplet ». Un banc le vérifie sur le texte rendu.
+- **Aucune promesse de dispense.** Le texte rassure sur le *moment* de la transmission, jamais sur
+  la nécessité. Un dossier déposé en mairie exige ses pièces réglementaires, et rien ici ne laisse
+  entendre le contraire — un banc contrôle l'absence de formulations de ce type.
+- **Un fichier déposé prime sur le report.** Déposer un document décoche automatiquement la case :
+  « fourni » et « à transmettre » ne peuvent pas coexister sur la même pièce.
+
+**Mise à jour — les références cadastrales deviennent facultatives.** Section cadastrale, numéro de
+parcelle et superficie étaient obligatoires. Or ces trois valeurs ne figurent que sur l'acte de
+propriété : le client qui ne l'a pas sous la main se heurtait à un mur au deuxième écran, alors même
+que la localisation cartographique sait les renseigner et qu'Urbizen peut les vérifier après
+réception. Elles perdent donc leur astérisque — c'est ce marqueur, et lui seul, que `validateStep()`
+inspecte — et le groupe reçoit une case « Je ne connais pas ces informations. », décochée par
+défaut. Cocher vide et neutralise les trois champs, sans les présenter comme en erreur ; décocher
+les rend. Le client peut aussi n'en renseigner qu'un : les trois ne forment pas un tout indivisible.
+Une valeur déjà détectée par la localisation cadastrale est **conservée**, et la case n'est jamais
+cochée d'office ; à l'inverse, saisir une valeur alors qu'elle est cochée lève la déclaration, car
+les deux ne peuvent pas être vraies en même temps. Le récapitulatif porte alors « Informations
+cadastrales : à compléter ultérieurement », et la charge envoyée gagne `informations_differees` —
+sans quoi Urbizen ne distinguerait pas « le client ne sait pas » de « le client n'a rien saisi »,
+les champs désactivés ne voyageant pas dans le `FormData`. Adresse, code postal et commune restent
+obligatoires : identifier le terrain demeure indispensable.
+
+**Conséquences.**
+- `wordpress/urbizen-child/assets/js/urbizen-form-pieces.js` et
+  `assets/css/urbizen-form-pieces.css` : source unique du rendu de l'étape. Les quatre documents
+  chargent ces fichiers ; le rendu inline des pièces, jusqu'ici dupliqué quatre fois, est supprimé.
+  Le module porte aussi les groupes d'informations déclarables inconnus, afin que le récapitulatif
+  « À transmettre ultérieurement » reste tenu par un seul endroit.
+- La charge envoyée gagne `pieces_differees` — la liste lisible des codes reportés — en plus des
+  cases `piece_later_*`.
+- Banc `tests/cadastre/test-pieces.mjs` sur le HTML réel : présence et conformité du message,
+  mention contextuelle, récapitulatif, absence de champ obligatoire dans l'étape, atteinte de
+  l'écran final sans aucun fichier, sérialisation, priorité du fichier sur le report, parité
+  maquette ≡ thème.

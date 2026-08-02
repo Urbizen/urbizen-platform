@@ -1,0 +1,173 @@
+/**
+ * Styles partagés de l'étape « Documents » des formulaires DP et PCMI.
+ *
+ * Chargée par les quatre documents de formulaire, en complément de la feuille
+ * inline qui porte déjà `.dp-piece`. On ne redéfinit pas ici la rangée
+ * elle-même : uniquement le message rassurant, la mention de report et le
+ * récapitulatif des pièces différées. Les jetons (`--ink`, `--cadastre`…) sont
+ * ceux déclarés par `#dp-app` dans chaque document.
+ */
+
+/* -------- Message rassurant, en tête de l'étape -------- */
+#dp-app .dp-pieces-intro {
+  margin: 0 0 22px;
+  padding: 16px 18px;
+  border-left: 3px solid var(--cadastre);
+  background: var(--cadastre-sf);
+  border-radius: var(--radius);
+}
+
+#dp-app .dp-pieces-intro-texte {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+#dp-app .dp-pieces-intro-note {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* -------- Rangée : mention courte et report --------
+   La rangée `.dp-piece` est un `flex` déclaré dans la feuille inline de chaque
+   document. On l'autorise ici à passer à la ligne, afin que l'option de report
+   occupe sa propre ligne au lieu de comprimer le libellé. Cette feuille est
+   chargée **après** le `<style>` inline : à spécificité égale, elle l'emporte. */
+#dp-app .dp-piece {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: 4px;
+}
+
+#dp-app .dp-piece .lab {
+  flex: 1 1 240px;
+}
+
+#dp-app .dp-piece-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#dp-app .dp-piece-report {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dotted var(--line);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+#dp-app .dp-piece-report input {
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--cadastre);
+}
+
+/* Une pièce reportée est signalée sans dramatiser : teinte neutre, pas de
+   rouge. Ce n'est pas une erreur, c'est une intention déclarée. */
+#dp-app .dp-piece.is-reportee {
+  border-color: var(--line-strong);
+  background: var(--surface-2, #F2F5F8);
+}
+
+#dp-app .dp-piece.is-reportee .picked {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+#dp-app .dp-piece.is-fournie .picked {
+  color: var(--ok);
+}
+
+/* -------- Récapitulatif des pièces différées -------- */
+#dp-app .dp-pieces-differees {
+  margin: 18px 0 0;
+  padding: 16px 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+#dp-app .dp-pieces-differees-titre {
+  margin: 0 0 8px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+}
+
+#dp-app .dp-pieces-differees-liste {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+#dp-app .dp-pieces-differees-note {
+  margin: 10px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+#dp-app .dp-done .dp-pieces-differees {
+  text-align: left;
+}
+
+@media (max-width: 720px) {
+  #dp-app .dp-piece-action {
+    justify-content: flex-start;
+  }
+}
+
+/* -------- Informations que le client déclare ne pas connaître -------- */
+#dp-app .dp-cadastre-inconnu {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+#dp-app .dp-cadastre-inconnu input {
+  flex: none;
+  margin-top: 2px;
+  accent-color: var(--cadastre);
+}
+
+/* Un champ neutralisé s'estompe : il n'est ni en erreur, ni en attente. */
+#dp-app .dp-field.is-desactive label,
+#dp-app .dp-field.is-desactive .dp-note {
+  opacity: .5;
+}
+
+#dp-app .dp-field.is-desactive input:disabled {
+  background: #EEF2F6;
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+#dp-app .dp-pieces-differees-info {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
