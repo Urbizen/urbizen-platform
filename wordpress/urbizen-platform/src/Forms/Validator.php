@@ -394,6 +394,13 @@ final class Validator {
 			return null;
 		}
 
+		// Une stratégie dont le socle dépend des réponses reçoit celles-ci —
+		// déjà nettoyées et bornées par les passes précédentes. Les autres
+		// gardent le contrat historique, inchangé.
+		if ( $strategie instanceof PricingStrategyContextuelle ) {
+			return $strategie->calculate_with_context( $selection, $clean );
+		}
+
 		$pricing = $strategie->calculate( $selection );
 
 		foreach ( $pricing['ignores'] as $ignore ) {

@@ -27,6 +27,7 @@ use Urbizen\Platform\Files\UploadManifest;
 use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
+use Urbizen\Platform\Forms\PricingStrategyContextuelle;
 use Urbizen\Platform\Forms\PricingStrategyRegistry;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Security\AntiSpam;
@@ -317,7 +318,15 @@ final class SubmissionController {
 		// un type sans stratégie, ou un socle divergent, est refusé.
 		$strategie_prix = PricingStrategyRegistry::for_type( $type );
 
-		if ( null === $strategie_prix || (int) $pricing['base'] !== $strategie_prix->base() ) {
+		// Un socle unique ne vaut que pour les stratégies à tarif fixe. Celles
+		// dont le socle dépend des réponses répondent elles-mêmes de la valeur
+		// calculée : la garde reste entière, elle change d'interlocuteur.
+		$socle_incoherent = null === $strategie_prix
+			|| ( $strategie_prix instanceof PricingStrategyContextuelle
+				? ! $strategie_prix->accepts_base( (int) $pricing['base'] )
+				: (int) $pricing['base'] !== $strategie_prix->base() );
+
+		if ( $socle_incoherent ) {
 			Logger::error( 'soumission : prix de base incohérent avec la stratégie du type' );
 
 			return $renoncer( SubmissionResult::PRICING_FAILED );
