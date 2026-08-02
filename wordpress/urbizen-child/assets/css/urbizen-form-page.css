@@ -1,0 +1,23 @@
+.urbizen-accueil .urbizen-form-page {
+  min-height: 70vh;
+  padding: clamp(18px, 3vw, 36px) 0;
+  background: var(--paper, #eaeef2);
+}
+
+.urbizen-accueil .urbizen-form-frame {
+  display: block;
+  width: 100%;
+  min-height: 1180px;
+  border: 0;
+  background: var(--paper, #eaeef2);
+}
+
+@media (max-width: 720px) {
+  .urbizen-accueil .urbizen-form-page {
+    padding-top: 10px;
+  }
+
+  .urbizen-accueil .urbizen-form-frame {
+    min-height: 1500px;
+  }
+}

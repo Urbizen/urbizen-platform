@@ -5,6 +5,25 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [Non publié — formulaires Déclaration préalable et Permis de construire]
+
+### Ajouté
+
+- **Deux pages de formulaire dédiées** : « Déclaration préalable » et « Permis
+  de construire », déclarées comme gabarits du thème enfant et servies dans une
+  iframe de même origine, redimensionnée à son contenu. L’en-tête et le pied de
+  page du site restent en place autour du parcours.
+- **Formulaires DP et PCMI multi-étapes** : déclarant, terrain avec
+  localisation cadastrale, projet, surfaces, contexte, documents et envoi.
+  La cartographie s’appuie sur la Géoplateforme ; le cartouche de confirmation
+  reste masqué tant qu’aucune parcelle réelle n’a été sélectionnée.
+- **Documents demandés au client clarifiés** : photos du terrain et de
+  l’existant, vues depuis la rue, façades, croquis, plans possédés, mesures et
+  autres documents utiles. Les pièces réglementaires du dossier restent
+  produites par Urbizen et ne sont pas demandées au client.
+- Feuille `assets/css/urbizen-form-page.css` et script
+  `assets/js/urbizen-form-page.js` pour la coque des deux pages.
+
 ## [0.13.1] - 2026-07-29
 
 ### Corrigé (cache) — avant publication de Conception

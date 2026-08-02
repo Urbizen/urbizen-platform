@@ -284,20 +284,24 @@
   #dp-app .dp-err { color: var(--error); font-size: 12.5px; margin-top: 8px; min-height: 1em; }
 
   /* -------- écran de confirmation -------- */
-  #dp-app .dp-done { text-align: center; padding: 40px 20px; display: none; }
+  #dp-app .dp-done { text-align: left; padding: clamp(34px, 5vw, 58px); display: none; }
   #dp-app .dp-done.show { display: block; }
   #dp-app .dp-done .mark {
-    width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%;
-    background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 26px;
+    width: 48px; height: 48px; margin: 0 0 18px; border-radius: 50%;
+    background: var(--mint); color: var(--ink); display: grid; place-items: center; font-size: 23px; font-weight: 700;
   }
-  #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: 22px; margin: 0 0 8px; }
-  #dp-app .dp-done p { color: var(--ink-soft); max-width: 44ch; margin: 0 auto; }
-  #dp-app .dp-debug {
-    text-align: left; margin: 22px auto 0; max-width: 640px;
-    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-soft);
-    background: #0F1620; color: #C9D3DD; border-radius: var(--radius); padding: 14px; overflow: auto;
-    white-space: pre-wrap; word-break: break-word;
-  }
+  #dp-app .dp-done-kicker { margin: 0 0 8px; color: var(--cadastre); font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: clamp(25px, 3vw, 34px); line-height: 1.15; margin: 0 0 12px; }
+  #dp-app .dp-done > p { color: var(--ink-soft); max-width: 62ch; margin: 0; }
+  #dp-app .dp-estimate { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 24px; align-items: center; margin: 28px 0; padding: 22px 24px; border: 1px solid #9EDBBC; border-radius: var(--radius); background: var(--mint); }
+  #dp-app .dp-estimate span { color: var(--ink-soft); font-size: 13px; }
+  #dp-app .dp-estimate strong { grid-column: 2; grid-row: 1 / span 2; color: var(--ink); font-family: "Space Grotesk", sans-serif; font-size: clamp(25px, 3vw, 34px); white-space: nowrap; }
+  #dp-app .dp-estimate small { color: var(--ink); font-size: 13px; }
+  #dp-app .dp-next-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: confirmation; }
+  #dp-app .dp-next-steps li { position: relative; min-height: 98px; padding: 18px 16px 16px 48px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-weight: 600; }
+  #dp-app .dp-next-steps li::before { counter-increment: confirmation; content: counter(confirmation); position: absolute; left: 16px; top: 17px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  #dp-app .dp-next-steps span { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 12.5px; font-weight: 400; line-height: 1.45; }
+  #dp-app .dp-preview-note { margin-top: 20px !important; padding: 12px 14px; border-left: 3px solid var(--cadastre); background: var(--surface-2); font-size: 12.5px; }
 
   /* -------- responsive -------- */
   @media (max-width: 720px) {
@@ -310,6 +314,9 @@
     #dp-app .dp-legend li { flex-direction: column; text-align: center; gap: 5px; padding: 4px 6px; font-size: 11px; min-width: 62px; }
     #dp-app .dp-legend li::before { display: none; }
     #dp-app .dp-grid { grid-template-columns: 1fr; }
+    #dp-app .dp-estimate { grid-template-columns: 1fr; }
+    #dp-app .dp-estimate strong { grid-column: 1; grid-row: auto; }
+    #dp-app .dp-next-steps { grid-template-columns: 1fr; }
     #dp-app .dp-seg { display: flex; width: 100%; }
     #dp-app .dp-seg label { flex: 1 1 0; text-align: center; padding-left: 10px; padding-right: 10px; }
   }
@@ -325,6 +332,8 @@
   #dp-app .dp-locate:hover { background: var(--cadastre-sf); }
   #dp-app .dp-locate.loading { opacity: .6; pointer-events: none; }
   #dp-app .dp-map-wrap { margin-top: 12px; }
+  #dp-app .dp-map-wrap[hidden],
+  #dp-app .dp-parcel[hidden] { display: none !important; }
   #dp-app .dp-map-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   #dp-app .dp-map-hint { font-size: 12.5px; color: var(--ink-soft); }
   #dp-app .dp-map-toggle {
@@ -532,11 +541,11 @@
             </div>
           </section>
 
-          <!-- 7 — Pièces -->
+          <!-- 7 — Documents utiles -->
           <section class="dp-step" data-step="6">
-            <p class="dp-step-kicker">Pièces graphiques · PCMI</p>
-            <h2 class="dp-step-title">Vos plans et photos</h2>
-            <p class="dp-step-hint">La notice (PCMI4) est rédigée automatiquement. Joignez le reste ; ce qui manque, je le réalise. PDF, JPG ou PNG.</p>
+            <p class="dp-step-kicker">Documents utiles à votre projet</p>
+            <h2 class="dp-step-title">Photos, croquis et plans disponibles</h2>
+            <p class="dp-step-hint">Joignez uniquement ce que vous avez déjà. Les pièces administratives et graphiques du dossier seront réalisées par Urbizen. Formats acceptés : PDF, JPG, PNG.</p>
             <div id="pieces"></div>
           </section>
 
@@ -562,9 +571,20 @@
 
         <div class="dp-done" id="dp-done" aria-live="polite">
           <div class="mark">✓</div>
-          <h3>Demande envoyée</h3>
-          <p>Merci. Votre dossier de permis est en cours de constitution — vous recevrez un récapitulatif par e-mail.</p>
-          <pre class="dp-debug" id="dp-debug" hidden></pre>
+          <p class="dp-done-kicker">Votre demande d’urbanisme</p>
+          <h3>Votre projet est prêt à être étudié</h3>
+          <p>Un interlocuteur Urbizen vérifie les informations et les documents transmis avant toute commande.</p>
+          <div class="dp-estimate" aria-label="Estimation tarifaire">
+            <span id="dp-price-category">Estimation de la prestation</span>
+            <strong id="dp-price">À confirmer</strong>
+            <small id="dp-price-detail">Le tarif définitif est confirmé après vérification de votre demande.</small>
+          </div>
+          <ol class="dp-next-steps" aria-label="Prochaines étapes">
+            <li>Vérification de la demande<span>Urbizen contrôle la nature du projet et les informations reçues.</span></li>
+            <li>Confirmation du tarif<span>Vous recevez le montant définitif avant tout engagement.</span></li>
+            <li>Ouverture de votre espace client<span>Votre dossier, son avancement et vos échanges seront centralisés.</span></li>
+          </ol>
+          <p class="dp-preview-note" id="dp-preview-note" hidden>Aperçu du parcours : aucune donnée n’a été transmise.</p>
         </div>
       </div>
     </div>
@@ -579,19 +599,61 @@
   var app = document.getElementById("dp-app");
   var form = document.getElementById("dp-form");
   var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
-  var legendData = ["Demandeur","Terrain","Projet","Surfaces","Réseaux","Fiscalité","Pièces","Envoi"];
+  var legendData = ["Demandeur","Terrain","Projet","Surfaces","Réseaux","Fiscalité","Documents","Envoi"];
   var PIECES = [
-    ["PCMI1","Plan de situation du terrain"],
-    ["PCMI2","Plan de masse coté (3D)"],
-    ["PCMI3","Plan en coupe"],
-    ["PCMI5","Plan des façades et toitures"],
-    ["PCMI6","Insertion (3D / perspective)"],
-    ["PCMI7","Photo environnement proche"],
-    ["PCMI8","Photo environnement lointain"],
-    ["PCMI14-1","Attestation RE2020 (si construction neuve)"],
-    ["PCMI-SOL","Étude de sol (si zone argileuse)"]
+    ["PHOTO", "Photos du terrain et de la maison existante"],
+    ["RUE", "Photos prises depuis la rue et de l’accès"],
+    ["FACADES", "Photos des façades concernées"],
+    ["CROQUIS", "Croquis du projet, même à main levée"],
+    ["PLANS", "Plans existants en votre possession"],
+    ["MESURES", "Relevés de dimensions ou mesures utiles"],
+    ["AUTRES", "Autres documents utiles : devis, matériaux, étude de sol…"]
   ];
   var current = 0;
+
+  /* ----- reprise du tunnel d'orientation de l'accueil ----- */
+  function prefillFromHomepage() {
+    var contract = null, project = "";
+
+    try {
+      var raw = sessionStorage.getItem("urbizen:accueil");
+      contract = raw ? JSON.parse(raw) : null;
+      project = sessionStorage.getItem("urbizen:projet") || "";
+    } catch (e) {
+      return;
+    }
+
+    function setIfEmpty(id, value) {
+      var field = document.getElementById(id);
+      if (!field || field.value || value === null || value === undefined || value === "") return;
+      field.value = String(value);
+    }
+
+    if (contract && contract.address && contract.parcel) {
+      setIfEmpty("t_adr", contract.address.label);
+      setIfEmpty("t_cp", contract.address.postcode);
+      setIfEmpty("t_ville", contract.address.city);
+      setIfEmpty("t_sec", contract.parcel.section);
+      setIfEmpty("t_num", contract.parcel.number);
+      setIfEmpty("t_sup", contract.parcel.surfaceM2);
+    }
+
+    var projectNature = {
+      maison: "Construction d’une maison individuelle",
+      extension: "Extension",
+      garage: "Annexe (garage, dépendance)"
+    };
+    var expected = projectNature[project];
+    if (!expected) return;
+
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="nature"]'), function (input) {
+      if (input.value === expected) {
+        input.checked = true;
+        var card = input.closest(".dp-check");
+        if (card) card.classList.add("on");
+      }
+    });
+  }
 
   var legendEl = document.getElementById("dp-legend");
   legendData.forEach(function (label, i) {
@@ -680,23 +742,48 @@
     err.textContent = ""; sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
     var fd = new FormData(form);
     fd.set("nature", Array.prototype.map.call(form.querySelectorAll('input[name="nature"]:checked'), function (n) { return n.value; }).join(", "));
-    if (!ENDPOINT) {
-      var obj = {}; fd.forEach(function (v, k) { if (v instanceof File) { if (v.name) obj[k] = "[fichier] " + v.name; } else obj[k] = v; });
-      showDone(JSON.stringify(obj, null, 2)); return;
-    }
+    if (!ENDPOINT) { showDone(true); return; }
     fetch(ENDPOINT, { method: "POST", body: fd })
       .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
-      .then(function () { showDone(null); })
+      .then(function () { showDone(false); })
       .catch(function () { sendBtn.disabled = false; sendBtn.textContent = "Envoyer ma demande"; err.textContent = "L’envoi a échoué. Réessayez ou contactez-moi directement."; });
   });
 
-  function showDone(debug) {
-    form.style.display = "none";
-    document.getElementById("dp-done").classList.add("show");
-    if (debug) { var d = document.getElementById("dp-debug"); d.hidden = false; d.textContent = "Données collectées (mode démo) :\n\n" + debug; }
+  function estimatePrice() {
+    var selected = Array.prototype.map.call(
+      form.querySelectorAll('input[name="nature"]:checked'),
+      function (input) { return input.value; }
+    );
+    var category = "Projet simple", base = 449, custom = selected.indexOf("Autre") !== -1;
+
+    if (selected.indexOf("Construction d’une maison individuelle") !== -1) {
+      category = "Projet important"; base = 849;
+    } else if (selected.some(function (value) {
+      return ["Extension", "Surélévation", "Changement de destination"].indexOf(value) !== -1;
+    })) {
+      category = "Projet standard"; base = 649;
+    }
+
+    var abf = form.querySelector('input[name="abf"]:checked');
+    var supplement = abf && abf.value === "oui" ? 80 : 0;
+    return { category: custom ? "Projet à étudier" : category, total: custom ? null : base + supplement, abf: supplement };
   }
 
-  refreshConditionals(); render();
+  function showDone(preview) {
+    form.style.display = "none";
+    var estimate = estimatePrice();
+    document.getElementById("dp-price-category").textContent = "Permis de construire · " + estimate.category;
+    document.getElementById("dp-price").textContent = estimate.total === null ? "Tarif sur étude" : "À partir de " + estimate.total + " €";
+    document.getElementById("dp-price-detail").textContent = estimate.abf
+      ? "Le supplément Secteur Bâtiments de France de 80 € sera intégré au tarif confirmé."
+      : "Le tarif définitif est confirmé après vérification de votre demande.";
+    document.getElementById("dp-preview-note").hidden = !preview;
+    document.getElementById("dp-done").classList.add("show");
+  }
+
+  prefillFromHomepage();
+  refreshConditionals();
+  render();
 })();
 </script>
 <script>
@@ -714,8 +801,8 @@
   function fieldVal(id){ var e = $(id); return e ? e.value.trim() : ""; }
   function buildQuery(){ return [fieldVal("t_adr"), fieldVal("t_cp"), fieldVal("t_ville")].filter(Boolean).join(" "); }
 
-  function initMap(lon, lat){
-    map = L.map("cad-map").setView([lat, lon], 18);
+  function initMap(lon, lat, zoom){
+    map = L.map("cad-map").setView([lat, lon], zoom || 18);
     ortho = L.tileLayer(tile("ORTHOIMAGERY.ORTHOPHOTOS","image/jpeg"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" }).addTo(map);
     plan  = L.tileLayer(tile("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2","image/png"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" });
     cadastre = L.tileLayer(tile("CADASTRALPARCELS.PARCELLAIRE_EXPRESS","image/png"), { maxZoom: 20, opacity: 0.9 }).addTo(map);
@@ -730,7 +817,7 @@
   function geocodeAndLocate(){
     if (!fieldVal("t_adr") || !fieldVal("t_ville")) { wrap.hidden = false; hint.textContent = "Renseignez d\u2019abord l\u2019adresse et la commune ci-dessus."; return; }
     locateBtn.classList.add("loading");
-    fetch("https://api-adresse.data.gouv.fr/search/?limit=1&q=" + encodeURIComponent(buildQuery()))
+    fetch("https://data.geopf.fr/geocodage/search?q=" + encodeURIComponent(buildQuery()) + "&limit=1&index=address")
       .then(function(r){ return r.json(); })
       .then(function(d){
         locateBtn.classList.remove("loading");
@@ -747,7 +834,13 @@
         marker = L.circleMarker([c[1], c[0]], { radius: 7, color: "#14233B", weight: 2, fillColor: "#54CF99", fillOpacity: 1 }).addTo(map);
         queryParcel(c[0], c[1]);
       })
-      .catch(function(){ locateBtn.classList.remove("loading"); wrap.hidden = false; hint.textContent = "La localisation a \u00E9chou\u00E9. Cliquez sur votre parcelle."; });
+      .catch(function(){
+        locateBtn.classList.remove("loading");
+        wrap.hidden = false;
+        hint.textContent = "La recherche automatique est momentan\u00E9ment indisponible. Zoomez vers votre terrain ou v\u00E9rifiez l\u2019adresse puis r\u00E9essayez.";
+        if (!map) initMap(1.9, 46.8, 6);
+        setTimeout(function(){ map.invalidateSize(); }, 60);
+      });
   }
   function queryParcel(lon, lat){
     var geom = encodeURIComponent(JSON.stringify({ type: "Point", coordinates: [lon, lat] }));

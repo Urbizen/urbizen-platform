@@ -192,7 +192,32 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
 	'page-permis-de-construire',
 	'page-conception',
+	'page-formulaire-declaration-prealable',
+	'page-formulaire-permis-de-construire',
 );
+
+/**
+ * La page affichée est-elle l'un des deux formulaires d'autorisation ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_formulaire_autorisation() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return in_array(
+		get_page_template_slug( $id ),
+		array( 'page-formulaire-declaration-prealable', 'page-formulaire-permis-de-construire' ),
+		true
+	);
+}
 
 /**
  * La page affichée utilise-t-elle un gabarit Urbizen — accueil ou page interne ?
@@ -342,6 +367,22 @@ function urbizen_child_enqueue_accueil() {
 
 		if ( file_exists( $dir . $conception_js ) ) {
 			wp_enqueue_script( 'urbizen-conception-gallery', $uri . $conception_js, array(), (string) filemtime( $dir . $conception_js ), true );
+		}
+	}
+
+	// Formulaires DP et PC : la coque WordPress garde l'en-tête et le pied de
+	// page du site ; l'iframe, de même origine, est redimensionnée à son contenu.
+	if ( urbizen_child_est_page_formulaire_autorisation() ) {
+		$form_page_css = '/assets/css/urbizen-form-page.css';
+
+		if ( file_exists( $dir . $form_page_css ) ) {
+			wp_enqueue_style( 'urbizen-form-page', $uri . $form_page_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $form_page_css ) );
+		}
+
+		$form_page_js = '/assets/js/urbizen-form-page.js';
+
+		if ( file_exists( $dir . $form_page_js ) ) {
+			wp_enqueue_script( 'urbizen-form-page', $uri . $form_page_js, array(), (string) filemtime( $dir . $form_page_js ), true );
 		}
 	}
 
