@@ -454,12 +454,18 @@ $definition = array(
 			'increment' => 0.01,
 			'unit'      => 'm²',
 		),
+		// Aucune surface n'est exigée. Une clôture, des panneaux solaires, un
+		// ravalement ou une réfection de toiture ne créent aucune surface : les
+		// réclamer bloquerait des demandes parfaitement recevables. Et pour une
+		// extension, un client qui n'a pas encore mesuré doit pouvoir envoyer sa
+		// demande — Urbizen réclamera les cotes après étude. Une absence reste
+		// une absence : on ne la remplace jamais par un 0 qui se lirait comme
+		// une mesure prise.
 		array(
 			'name'      => 'sp_creee',
 			'type'      => 'number',
 			'step'      => 'surfaces',
 			'label'     => __( 'Surface de plancher créée', 'urbizen-platform' ),
-			'required'  => true,
 			'min'       => 0,
 			'increment' => 0.01,
 			'unit'      => 'm²',

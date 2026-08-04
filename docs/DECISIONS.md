@@ -2766,6 +2766,38 @@ mesurait 19 px de haut : il offre maintenant 44 × 44 px, absorbés par des marg
 la rangée ne grandisse pas, le soulignement portant sur le mot et non sur la zone. Son `aria-label`
 nomme la ligne visée : « Supprimer le projet supplémentaire 1 ».
 
+**Mise à jour — les surfaces ne conditionnent pas la demande initiale.** Six champs de surface
+étaient déclarés, dont un obligatoire. Or cinq des douze natures DP — clôture, panneaux solaires,
+modification de façade, ravalement, toiture — ne créent **aucune** surface : exiger des mètres
+carrés y rejetait des dossiers parfaitement recevables. Et pour une extension, un garage ou une
+piscine, un demandeur qui n'a pas encore mesuré doit pouvoir envoyer sa demande ; Urbizen réclame
+les cotes après étude. Aucune surface n'est donc obligatoire au stade de la demande initiale. Une
+absence reste une **absence** : elle n'est jamais remplacée par un `0`, qui se lirait comme une
+mesure prise et fausserait l'instruction. Une matrice de banc éprouve les douze natures, chacune
+sans aucun champ de surface.
+
+**Mise à jour — la cohérence entre champs est une étape, pas un effet de bord.** Une définition
+juge chaque champ isolément : type, longueur, appartenance à une liste fermée. Elle ne peut rien
+dire de ce qui lie deux champs. Un projet supplémentaire répétant le projet principal, un doublon
+ou une liste forgée passaient donc la validation de forme, et le catalogue tarifaire se contentait
+de ne pas les facturer — la demande était **acceptée** avec un contenu incohérent. Un calcul
+prudent ne vaut pas acceptation.
+
+`Forms\ValidationMetier` et son registre introduisent donc une étape dédiée, résolue depuis le
+**type serveur** comme les registres tarifaire et d'upload, et intercalée dans
+`SubmissionController` **avant** le calcul du prix et avant toute écriture. Elle refuse la nature
+principale inconnue, le projet supplémentaire inconnu, celui qui répète le principal, le doublon,
+la liste malformée et la liste trop longue — avec des messages destinés à une personne, jamais un
+code interne. Le refus est corrigeable : ni jeton, ni créneau de débit, ni référence ne sont
+consommés. Le catalogue tarifaire reste défensif de son côté, mais cette défense n'est plus la
+seule ligne.
+
+**La limite de projets supplémentaires n'est pas un chiffre choisi**, elle découle du catalogue :
+`count(NATURES) - 1`, soit **11**. Les doublons étant interdits et le projet principal exclu des
+suppléments, un dossier ne peut pas réunir plus de natures distinctes qu'il n'en existe. Toute
+liste plus longue est nécessairement forgée. La dériver plutôt que l'écrire évite qu'une nature
+ajoutée un jour laisse derrière elle un plafond devenu faux — et un banc vérifie cette dérivation.
+
 ## D-054 — Une pièce manquante ne bloque pas l'envoi d'une demande
 
 **Statut.** Adoptée — appliquée aux formulaires DP et PCMI, thème et maquettes.

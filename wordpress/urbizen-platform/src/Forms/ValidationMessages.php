@@ -52,6 +52,21 @@ final class ValidationMessages {
 			case 'hors_liste':
 				return __( 'Cette valeur ne fait pas partie des choix proposés.', 'urbizen-platform' );
 
+			case 'projet_inconnu':
+				return __( 'Ce projet ne fait pas partie de ceux que nous pouvons traiter.', 'urbizen-platform' );
+
+			case 'projet_identique_au_principal':
+				return __( 'Ce projet est déjà votre projet principal. Choisissez-en un autre.', 'urbizen-platform' );
+
+			case 'projet_en_double':
+				return __( 'Ce projet figure deux fois. Chaque projet ne peut être ajouté qu’une seule fois.', 'urbizen-platform' );
+
+			case 'projets_trop_nombreux':
+				return __( 'Vous avez ajouté trop de projets pour un même dossier. Contactez-nous pour les répartir.', 'urbizen-platform' );
+
+			case 'projet_malforme':
+				return __( 'La liste des projets n’a pas pu être lue. Actualisez la page et réessayez.', 'urbizen-platform' );
+
 			case 'hors_bornes':
 				return __( 'La valeur est en dehors des limites autorisées.', 'urbizen-platform' );
 

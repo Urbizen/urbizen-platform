@@ -28,6 +28,7 @@ use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\PricingStrategyContextuelle;
+use Urbizen\Platform\Forms\ValidationMetierRegistry;
 use Urbizen\Platform\Forms\PricingStrategyRegistry;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Security\AntiSpam;
@@ -302,6 +303,26 @@ final class SubmissionController {
 			$reprise_id = SubmissionRecoveryStore::store( $reprise );
 
 			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] )->with_recovery( $reprise_id );
+		}
+
+		// --- 8 bis · cohérence métier ---
+		// La définition a jugé chaque champ isolément ; elle ne peut rien dire de
+		// ce qui les lie. Un doublon de projet, un supplément identique au projet
+		// principal ou une liste forgée passeraient la validation de forme, et le
+		// catalogue tarifaire se contenterait de ne pas les facturer — la demande
+		// serait acceptée avec un contenu incohérent. Le refus intervient donc ici,
+		// AVANT tout calcul et toute écriture, et reste corrigeable.
+		$metier = ValidationMetierRegistry::for_type( $type );
+
+		if ( null !== $metier ) {
+			$erreurs_metier = $metier->valider( $validation['clean'] );
+
+			if ( array() !== $erreurs_metier ) {
+				$reprise    = SubmissionRecovery::from_validation( $type, $definition, $validation['clean'], $erreurs_metier );
+				$reprise_id = SubmissionRecoveryStore::store( $reprise );
+
+				return $renoncer( SubmissionResult::VALIDATION_FAILED, $erreurs_metier )->with_recovery( $reprise_id );
+			}
 		}
 
 		// --- 9 · prix, recalculé côté serveur ---

@@ -78,13 +78,20 @@ final class PricingDeclarationPrealable {
 	/**
 	 * Plafond de projets supplémentaires acceptés.
 	 *
-	 * Un dossier réunissant plus de projets que le catalogue ne compte de
-	 * natures est nécessairement forgé : les doublons étant écartés, on ne peut
-	 * pas dépasser le nombre de natures moins le projet principal. Le plafond
-	 * est explicite pour que le refus soit lisible, plutôt que de laisser un
-	 * total absurde se construire.
+	 * La limite n'est pas un chiffre choisi : elle **découle** du catalogue.
+	 * Les doublons étant interdits et le projet principal exclu des
+	 * suppléments, un dossier ne peut pas réunir plus de natures distinctes
+	 * qu'il n'en existe, moins celle du projet principal. Toute liste plus
+	 * longue est nécessairement forgée.
+	 *
+	 * La dériver plutôt que l'écrire évite qu'une nature ajoutée un jour au
+	 * catalogue laisse derrière elle un plafond devenu faux.
+	 *
+	 * @return int
 	 */
-	public const MAX_PROJETS_SUPPLEMENTAIRES = 11;
+	public static function max_projets_supplementaires(): int {
+		return count( self::NATURES ) - 1;
+	}
 
 	/**
 	 * Socles distincts que ce catalogue peut légitimement produire.
@@ -199,7 +206,7 @@ final class PricingDeclarationPrealable {
 			return array();
 		}
 
-		if ( count( $brut ) > self::MAX_PROJETS_SUPPLEMENTAIRES ) {
+		if ( count( $brut ) > self::max_projets_supplementaires() ) {
 			$ignores[] = 'projets_supplementaires:trop_nombreux';
 
 			return array();
