@@ -29,7 +29,7 @@
 
 namespace Urbizen\Platform\Mail;
 
-use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
+use Urbizen\Platform\Forms\CatalogueRegistry;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -131,6 +131,7 @@ final class CustomerAcknowledgementRenderer {
 	 */
 	public static function body( array $demande ): string {
 		$reference = (string) $demande['reference'];
+		$type      = (string) ( $demande['form_type'] ?? '' );
 		$charge    = is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
 		$html      = array();
 
@@ -138,10 +139,11 @@ final class CustomerAcknowledgementRenderer {
 		$html[] = '<p style="margin:0 0 16px">Bonjour' . self::salutation( $charge ) . ',</p>';
 		$html[] = '<p style="margin:0 0 16px">Nous avons bien reçu votre demande. Elle est enregistrée sous la référence suivante :</p>';
 		$html[] = '<p style="margin:0 0 20px;font-size:18px"><strong>' . esc_html( $reference ) . '</strong></p>';
+		$html[] = self::demarche( $type );
 
-		$html[] = self::projet( $charge );
+		$html[] = self::projet( $type, $charge );
 		$html[] = self::estimation( is_array( $demande['pricing'] ?? null ) ? $demande['pricing'] : array() );
-		$html[] = self::a_transmettre( $charge );
+		$html[] = self::a_transmettre( $type, $charge );
 
 		$html[] = '<p style="margin:20px 0 0">Notre équipe vérifie votre dossier et revient vers vous. ';
 		$html[] = 'Vous pouvez répondre à ce message en indiquant la référence ci-dessus.</p>';
@@ -182,14 +184,39 @@ final class CustomerAcknowledgementRenderer {
 	}
 
 	/**
+	 * Nature administrative de la démarche, nommée telle qu'elle se dit.
+	 *
+	 * Le client a rempli un formulaire, pas choisi un type serveur : il doit
+	 * lire « Permis de construire », jamais `permis_construire`. Un type sans
+	 * intitulé public n'en invente pas un — la ligne disparaît.
+	 *
+	 * @param string $type Type de formulaire.
+	 * @return string
+	 */
+	private static function demarche( string $type ): string {
+		$intitules = array(
+			'declaration_prealable' => 'Déclaration préalable de travaux',
+			'permis_construire'     => 'Permis de construire',
+		);
+
+		if ( ! isset( $intitules[ $type ] ) ) {
+			return '';
+		}
+
+		return '<p style="margin:0 0 20px;color:#5b6b80">Type de démarche : '
+			. esc_html( $intitules[ $type ] ) . '</p>';
+	}
+
+	/**
 	 * Rappel du projet, sous les libellés que le client a vus.
 	 *
+	 * @param string               $type   Type de formulaire.
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return string
 	 */
-	private static function projet( array $charge ): string {
+	private static function projet( string $type, array $charge ): string {
 		$nature  = isset( $charge['nature'] ) ? (string) $charge['nature'] : '';
-		$libelle = CatalogueDeclarationPrealable::libelle_nature( $nature );
+		$libelle = CatalogueRegistry::libelle_nature( $type, $nature );
 
 		if ( null === $libelle ) {
 			return '';
@@ -202,7 +229,7 @@ final class CustomerAcknowledgementRenderer {
 		$supplementaires = array();
 
 		foreach ( (array) ( $charge['projets_supplementaires'] ?? array() ) as $projet ) {
-			$autre = CatalogueDeclarationPrealable::libelle_nature( (string) $projet );
+			$autre = CatalogueRegistry::libelle_nature( $type, (string) $projet );
 
 			if ( null !== $autre ) {
 				$supplementaires[] = $autre;
@@ -233,7 +260,7 @@ final class CustomerAcknowledgementRenderer {
 			return '';
 		}
 
-		$total  = array_key_exists( 'total', $tarif ) ? $tarif['total'] : null;
+		$total   = array_key_exists( 'total', $tarif ) ? $tarif['total'] : null;
 		$montant = null === $total ? 'Tarif sur étude' : (int) $total . ' €';
 
 		$html   = array();
@@ -251,14 +278,15 @@ final class CustomerAcknowledgementRenderer {
 	 * formulaire l'a déjà dit. Le taire ici laisserait croire que le dossier est
 	 * complet.
 	 *
+	 * @param string               $type   Type de formulaire.
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return string
 	 */
-	private static function a_transmettre( array $charge ): string {
+	private static function a_transmettre( string $type, array $charge ): string {
 		$elements = array();
 
 		foreach ( (array) ( $charge['pieces_differees'] ?? array() ) as $piece ) {
-			$libelle = CatalogueDeclarationPrealable::libelle_piece( (string) $piece );
+			$libelle = CatalogueRegistry::libelle_piece( $type, (string) $piece );
 
 			if ( null !== $libelle ) {
 				$elements[] = $libelle;

@@ -28,12 +28,16 @@ $conc = FormRegistry::get( 'conception' );
 check( 'A · la définition localisation se charge', $loc instanceof FormDefinition && array() === $loc->errors() );
 check( 'A · la définition conception se charge', $conc instanceof FormDefinition && array() === $conc->errors() );
 check( 'A · default_type() reste « localisation »', 'localisation' === FormRegistry::default_type() );
-// La liste blanche s'étend avec la déclaration préalable. L'assertion reste
+// La liste blanche s'étend avec chaque parcours livré. L'assertion reste
 // exacte — et non « contient » — pour qu'un type ajouté par mégarde se voie.
-check( 'A · all() = exactement les trois formulaires livrés', array( 'localisation', 'conception', 'declaration_prealable' ) === FormRegistry::all() );
-check( 'A · KNOWN = inventaire déclaré', array( 'localisation', 'conception', 'declaration_prealable' ) === FormRegistry::KNOWN );
+$livres = array( 'localisation', 'conception', 'declaration_prealable', 'permis_construire' );
+
+check( 'A · all() = exactement les quatre formulaires livrés', $livres === FormRegistry::all() );
+check( 'A · KNOWN = inventaire déclaré', $livres === FormRegistry::KNOWN );
 check( 'A · la définition declaration_prealable se charge', null !== FormRegistry::get( 'declaration_prealable' ) );
 check( 'A · et elle est valide', FormRegistry::get( 'declaration_prealable' )->is_valid() );
+check( 'A · la définition permis_construire se charge', null !== FormRegistry::get( 'permis_construire' ) );
+check( 'A · et elle est valide', FormRegistry::get( 'permis_construire' )->is_valid() );
 
 // ======================================================================
 // B · TYPE INCONNU
@@ -82,13 +86,13 @@ foreach ( $invalides as $nom => $id ) {
 check( 'C · tout identifiant invalide est absent de la liste blanche', array() === $echec_has );
 check( 'C · get() sur identifiant invalide renvoie null (aucune inclusion)', array() === $echec_get );
 check( 'C · register() refuse tout identifiant invalide', array() === $echec_register );
-check( 'C · la liste blanche est intacte après les tentatives', array( 'localisation', 'conception', 'declaration_prealable' ) === FormRegistry::all() );
+check( 'C · la liste blanche est intacte après les tentatives', $livres === FormRegistry::all() );
 
 // ======================================================================
 // D · DOUBLONS (aucun écrasement silencieux)
 // ======================================================================
 check( 'D · réenregistrer « conception » est refusé', false === FormRegistry::register( 'conception' ) );
-check( 'D · la liste reste inchangée après le doublon', array( 'localisation', 'conception', 'declaration_prealable' ) === FormRegistry::all() );
+check( 'D · la liste reste inchangée après le doublon', $livres === FormRegistry::all() );
 
 check( 'D · enregistrer un nouveau type valide réussit', true === FormRegistry::register( 'devis_test' ) );
 check( 'D · le nouveau type est désormais connu', FormRegistry::has( 'devis_test' ) );
@@ -127,7 +131,7 @@ check(
 FormRegistry::reset_for_tests();
 check( 'F · localisation reste résolue comme avant', FormRegistry::get( 'localisation' ) instanceof FormDefinition );
 check( 'F · conception reste résolue comme avant', FormRegistry::get( 'conception' ) instanceof FormDefinition );
-check( 'F · all() de nouveau = les trois formulaires livrés', array( 'localisation', 'conception', 'declaration_prealable' ) === FormRegistry::all() );
+check( 'F · all() de nouveau = les quatre formulaires livrés', $livres === FormRegistry::all() );
 check( 'F · default_type() = localisation', 'localisation' === FormRegistry::default_type() );
 
 verdict();

@@ -737,17 +737,48 @@ final class SubmissionRepository {
 	 * Une clé inattendue dans le résultat de Pricing ne doit pas se retrouver
 	 * stockée par inadvertance.
 	 *
+	 * Le socle et le total valent `null` quand la nature du projet ne peut pas
+	 * être chiffrée sans examen. Les transtyper en `0` inventerait un montant :
+	 * un dossier sur étude serait persisté à zéro euro, et tout ce qui lit le
+	 * tarif — réponse JSON, écran d'administration, accusé client — annoncerait
+	 * la gratuité. La distinction repose sur `array_key_exists()` : une clé
+	 * absente reste une anomalie, une clé nulle est une décision.
+	 *
 	 * @param array<string, mixed> $pricing Résultat de Pricing.
 	 * @return array<string, mixed>
 	 */
 	private static function normalize_pricing( array $pricing ): array {
+		$statut = isset( $pricing['pricing_status'] ) && is_string( $pricing['pricing_status'] )
+			? $pricing['pricing_status']
+			: null;
+
 		return array(
-			'base'         => isset( $pricing['base'] ) ? (int) $pricing['base'] : 0,
-			'options'      => isset( $pricing['options'] ) && is_array( $pricing['options'] ) ? $pricing['options'] : array(),
-			'sur_devis'    => isset( $pricing['sur_devis'] ) && is_array( $pricing['sur_devis'] ) ? $pricing['sur_devis'] : array(),
-			'total'        => isset( $pricing['total'] ) ? (int) $pricing['total'] : 0,
-			'devis_requis' => ! empty( $pricing['devis_requis'] ),
+			'base'           => self::montant( $pricing, 'base' ),
+			'options'        => isset( $pricing['options'] ) && is_array( $pricing['options'] ) ? $pricing['options'] : array(),
+			'sur_devis'      => isset( $pricing['sur_devis'] ) && is_array( $pricing['sur_devis'] ) ? $pricing['sur_devis'] : array(),
+			'total'          => self::montant( $pricing, 'total' ),
+			// Le statut est celui que le barème a rendu ; à défaut, il se déduit
+			// du total, pour qu'un calcul plus ancien reste lisible.
+			'pricing_status' => in_array( $statut, array( 'estime', 'sur_etude' ), true )
+				? $statut
+				: ( null === self::montant( $pricing, 'total' ) ? 'sur_etude' : 'estime' ),
+			'devis_requis'   => ! empty( $pricing['devis_requis'] ),
 		);
+	}
+
+	/**
+	 * Montant persistable : entier, ou `null` s'il est volontairement non chiffré.
+	 *
+	 * @param array<string, mixed> $pricing Résultat de Pricing.
+	 * @param string               $cle     Clé lue.
+	 * @return int|null
+	 */
+	private static function montant( array $pricing, string $cle ): ?int {
+		if ( ! array_key_exists( $cle, $pricing ) ) {
+			return 0;
+		}
+
+		return null === $pricing[ $cle ] ? null : (int) $pricing[ $cle ];
 	}
 
 	/**

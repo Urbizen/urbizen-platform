@@ -100,11 +100,32 @@ final class SubmissionController {
 	public const FORM_TYPE_DP = 'declaration_prealable';
 
 	/**
+	 * Action `admin-post` du permis de construire.
+	 */
+	public const ACTION_PC = 'urbizen_permis_construire';
+
+	/**
+	 * Action du nonce du permis de construire.
+	 *
+	 * **Distincte de celle de la DP**, et pas par symétrie : un nonce est lié à
+	 * son action. Les partager laisserait un nonce émis pour une DP autoriser
+	 * l'envoi d'un permis de construire — deux parcours, deux barèmes, deux
+	 * profils de dépôt.
+	 */
+	public const NONCE_ACTION_PC = 'urbizen_permis_construire_submit';
+
+	/**
+	 * Identifiant serveur du formulaire de permis de construire.
+	 */
+	public const FORM_TYPE_PC = 'permis_construire';
+
+	/**
 	 * Configuration serveur des routes : action → { type de formulaire, action de
 	 * nonce }. Résolue EXCLUSIVEMENT côté serveur (la clé est l'action du hook) ;
 	 * le navigateur ne choisit jamais la route. Un champ POST ne sert qu'à un
 	 * contrôle de cohérence, après que la route serveur a déjà été choisie. Une
-	 * seule route réelle aujourd'hui ; DP/PC/CERFA ne sont pas anticipés.
+	 * route par parcours livré — Conception, déclaration préalable, permis de
+	 * construire. Le CERFA n'est pas anticipé.
 	 * Décision : docs/DECISIONS.md D-050 (B).
 	 *
 	 * @var array<string, array{form_type: string, nonce_action: string}>
@@ -118,10 +139,14 @@ final class SubmissionController {
 			'form_type'    => self::FORM_TYPE_DP,
 			'nonce_action' => self::NONCE_ACTION_DP,
 		),
+		self::ACTION_PC => array(
+			'form_type'    => self::FORM_TYPE_PC,
+			'nonce_action' => self::NONCE_ACTION_PC,
+		),
 	);
 
 	/**
-	 * Accroche les deux points d'entrée.
+	 * Accroche les points d'entrée de chaque route.
 	 *
 	 * `nopriv` sert les visiteurs, l'autre les personnes connectées : un client
 	 * qui a un compte doit pouvoir soumettre comme les autres.
@@ -389,7 +414,10 @@ final class SubmissionController {
 		// --- 9 · prix, recalculé côté serveur ---
 		$pricing = $validation['pricing'];
 
-		if ( ! is_array( $pricing ) || ! isset( $pricing['total'], $pricing['base'] ) ) {
+		// `array_key_exists` et non `isset` : un socle et un total volontairement
+		// non chiffrés valent `null`, et doivent se distinguer d'un calcul qui
+		// n'a rien produit. Confondre les deux refuserait tout dossier sur étude.
+		if ( ! is_array( $pricing ) || ! array_key_exists( 'total', $pricing ) || ! array_key_exists( 'base', $pricing ) ) {
 			Logger::error( 'soumission : calcul tarifaire indisponible' );
 
 			return $renoncer( SubmissionResult::PRICING_FAILED );
@@ -403,10 +431,16 @@ final class SubmissionController {
 		// Un socle unique ne vaut que pour les stratégies à tarif fixe. Celles
 		// dont le socle dépend des réponses répondent elles-mêmes de la valeur
 		// calculée : la garde reste entière, elle change d'interlocuteur.
+		// `null` est transmis tel quel à la stratégie : c'est un socle sur étude,
+		// et seule une stratégie qui en produit réellement doit l'accepter. Le
+		// convertir en `0` par un transtypage ferait passer un tarif absent pour
+		// un tarif nul, que le catalogue Conception accepterait à tort.
+		$socle = null === $pricing['base'] ? null : (int) $pricing['base'];
+
 		$socle_incoherent = null === $strategie_prix
 			|| ( $strategie_prix instanceof PricingStrategyContextuelle
-				? ! $strategie_prix->accepts_base( (int) $pricing['base'] )
-				: (int) $pricing['base'] !== $strategie_prix->base() );
+				? ! $strategie_prix->accepts_base( $socle )
+				: null === $socle || $socle !== $strategie_prix->base() );
 
 		if ( $socle_incoherent ) {
 			Logger::error( 'soumission : prix de base incohérent avec la stratégie du type' );

@@ -1,6 +1,6 @@
 <?php
 /**
- * Règles métier de la déclaration préalable.
+ * Règles métier du permis de construire.
  *
  * Aucune règle propre : les contrôles de cohérence inter-champs sont les mêmes
  * pour tous les parcours et vivent dans {@see ValidationMetierProjets}. Cette
@@ -14,17 +14,17 @@ namespace Urbizen\Platform\Forms;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Cohérence inter-champs de la déclaration préalable.
+ * Cohérence inter-champs du permis de construire.
  */
-final class ValidationMetierDeclarationPrealable extends ValidationMetierProjets {
+final class ValidationMetierPermisConstruire extends ValidationMetierProjets {
 
 	/**
 	 * @var class-string<CatalogueProjets>
 	 */
-	protected const CATALOGUE = CatalogueDeclarationPrealable::class;
+	protected const CATALOGUE = CataloguePermisConstruire::class;
 
 	/**
 	 * @var class-string<PricingProjets>
 	 */
-	protected const BAREME = PricingDeclarationPrealable::class;
+	protected const BAREME = PricingPermisConstruire::class;
 }

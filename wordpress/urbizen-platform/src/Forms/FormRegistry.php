@@ -34,7 +34,7 @@ final class FormRegistry {
 	 * Reste public et strictement égal à ces deux identifiants : d'autres
 	 * composants et bancs s'appuient dessus comme sur l'inventaire minimal.
 	 */
-	public const KNOWN = array( 'localisation', 'conception', 'declaration_prealable' );
+	public const KNOWN = array( 'localisation', 'conception', 'declaration_prealable', 'permis_construire' );
 
 	/**
 	 * Règle des identifiants : minuscule initiale, puis minuscules, chiffres,

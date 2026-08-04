@@ -21,7 +21,8 @@
 
 namespace Urbizen\Platform\Http;
 
-use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
+use Urbizen\Platform\Forms\CatalogueProjets;
+use Urbizen\Platform\Forms\CatalogueRegistry;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -57,6 +58,11 @@ final class SubmissionJsonResponse {
 		$charge  = is_array( $demande ) ? ( $demande['payload'] ?? array() ) : array();
 		$tarif   = is_array( $demande ) ? ( $demande['pricing'] ?? array() ) : array();
 
+		// Les libellés viennent du catalogue **du type de la demande**. Le nommer
+		// en dur ferait disparaître du récapitulatif tout projet d'un autre
+		// parcours, sans rien signaler : `libelle_nature()` rend `null` hors
+		// catalogue, et l'entrée serait silencieusement écartée.
+		$type      = is_array( $demande ) ? (string) ( $demande['form_type'] ?? '' ) : '';
 		$principal = isset( $charge['nature'] ) ? (string) $charge['nature'] : '';
 
 		return array(
@@ -65,10 +71,10 @@ final class SubmissionJsonResponse {
 			'status'                         => is_array( $demande ) ? (string) ( $demande['status'] ?? '' ) : '',
 			// Le tarif est relu depuis ce qui a été persisté, donc recalculé par
 			// le serveur : aucun montant du navigateur n'y survit.
-			'pricing'                        => self::tarif( $tarif ),
-			'project'                        => self::projet( $principal ),
-			'additional_projects'            => self::projets_supplementaires( $charge ),
-			'deferred_documents'             => self::pieces_differees( $charge ),
+			'pricing'                        => self::tarif( $tarif, $type ),
+			'project'                        => self::projet( $type, $principal ),
+			'additional_projects'            => self::projets_supplementaires( $type, $charge ),
+			'deferred_documents'             => self::pieces_differees( $type, $charge ),
 			'deferred_cadastral_information' => self::option_active( $charge, 'informations_cadastrales_differees' ),
 		);
 	}
@@ -150,9 +156,10 @@ final class SubmissionJsonResponse {
 	 * Détail tarifaire, réduit à ce qui s'affiche.
 	 *
 	 * @param array<string, mixed> $tarif Tarif persisté.
+	 * @param string               $type  Type de formulaire.
 	 * @return array<string, mixed>
 	 */
-	private static function tarif( array $tarif ): array {
+	private static function tarif( array $tarif, string $type ): array {
 		$options = array();
 
 		foreach ( (array) ( $tarif['options'] ?? array() ) as $option ) {
@@ -161,32 +168,48 @@ final class SubmissionJsonResponse {
 			}
 
 			$options[] = array(
-				'label'  => self::libelle_option( (string) ( $option['id'] ?? '' ) ),
+				'label'  => self::libelle_option( $type, (string) ( $option['id'] ?? '' ) ),
 				'amount' => (int) ( $option['price'] ?? 0 ),
 			);
 		}
 
 		return array(
-			'base'    => (int) ( $tarif['base'] ?? 0 ),
+			// Le socle suit la même règle que le total : `null` quand il n'est
+			// pas chiffrable, jamais `0`, qui se lirait comme la gratuité.
+			'base'    => array_key_exists( 'base', $tarif ) ? self::montant( $tarif['base'] ) : 0,
 			'options' => $options,
 			// `array_key_exists` et non `isset` : un total volontairement non
 			// chiffré vaut `null`, et doit se distinguer d'un total absent.
-			'total'   => array_key_exists( 'total', $tarif ) ? $tarif['total'] : null,
-			'status'  => null === ( $tarif['total'] ?? null ) ? 'sur_etude' : 'estime',
+			'total'   => array_key_exists( 'total', $tarif ) ? self::montant( $tarif['total'] ) : null,
+			// Le statut persisté fait foi ; à défaut, il se déduit du total.
+			'status'  => isset( $tarif['pricing_status'] ) && in_array( $tarif['pricing_status'], array( 'estime', 'sur_etude' ), true )
+				? (string) $tarif['pricing_status']
+				: ( null === ( $tarif['total'] ?? null ) ? 'sur_etude' : 'estime' ),
 		);
+	}
+
+	/**
+	 * Montant public : entier, ou `null` s'il est volontairement non chiffré.
+	 *
+	 * @param mixed $valeur Valeur persistée.
+	 * @return int|null
+	 */
+	private static function montant( $valeur ): ?int {
+		return null === $valeur ? null : (int) $valeur;
 	}
 
 	/**
 	 * Libellé client d'une ligne de tarif.
 	 *
-	 * @param string $id Identifiant de l'option.
+	 * @param string $type Type de formulaire.
+	 * @param string $id   Identifiant de l'option.
 	 * @return string
 	 */
-	private static function libelle_option( string $id ): string {
+	private static function libelle_option( string $type, string $id ): string {
 		if ( str_starts_with( $id, 'projet_supplementaire:' ) ) {
 			$nature = substr( $id, strlen( 'projet_supplementaire:' ) );
 
-			return (string) ( CatalogueDeclarationPrealable::libelle_nature( $nature ) ?? '' );
+			return (string) ( CatalogueRegistry::libelle_nature( $type, $nature ) ?? '' );
 		}
 
 		switch ( $id ) {
@@ -206,28 +229,30 @@ final class SubmissionJsonResponse {
 	/**
 	 * Projet principal, sous son libellé client.
 	 *
+	 * @param string $type   Type de formulaire.
 	 * @param string $nature Identifiant canonique.
 	 * @return array<string, string>
 	 */
-	private static function projet( string $nature ): array {
+	private static function projet( string $type, string $nature ): array {
 		return array(
 			'id'    => $nature,
-			'label' => (string) ( CatalogueDeclarationPrealable::libelle_nature( $nature ) ?? '' ),
+			'label' => (string) ( CatalogueRegistry::libelle_nature( $type, $nature ) ?? '' ),
 		);
 	}
 
 	/**
 	 * Projets supplémentaires retenus, avec leur description éventuelle.
 	 *
+	 * @param string               $type   Type de formulaire.
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return array<int, array<string, string>>
 	 */
-	private static function projets_supplementaires( array $charge ): array {
+	private static function projets_supplementaires( string $type, array $charge ): array {
 		$liste = array();
 
 		foreach ( (array) ( $charge['projets_supplementaires'] ?? array() ) as $nature ) {
 			$nature  = (string) $nature;
-			$libelle = CatalogueDeclarationPrealable::libelle_nature( $nature );
+			$libelle = CatalogueRegistry::libelle_nature( $type, $nature );
 
 			if ( null === $libelle ) {
 				continue;
@@ -238,7 +263,7 @@ final class SubmissionJsonResponse {
 				'label' => $libelle,
 			);
 
-			$cle = CatalogueDeclarationPrealable::PREFIXE_DESCRIPTION . $nature;
+			$cle = CatalogueProjets::PREFIXE_DESCRIPTION . $nature;
 
 			if ( isset( $charge[ $cle ] ) && '' !== (string) $charge[ $cle ] ) {
 				$entree['description'] = (string) $charge[ $cle ];
@@ -253,15 +278,16 @@ final class SubmissionJsonResponse {
 	/**
 	 * Pièces annoncées comme transmises plus tard.
 	 *
+	 * @param string               $type   Type de formulaire.
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return array<int, array<string, string>>
 	 */
-	private static function pieces_differees( array $charge ): array {
+	private static function pieces_differees( string $type, array $charge ): array {
 		$liste = array();
 
 		foreach ( (array) ( $charge['pieces_differees'] ?? array() ) as $piece ) {
 			$piece   = (string) $piece;
-			$libelle = CatalogueDeclarationPrealable::libelle_piece( $piece );
+			$libelle = CatalogueRegistry::libelle_piece( $type, $piece );
 
 			if ( null === $libelle ) {
 				continue;

@@ -53,8 +53,13 @@ interface PricingStrategyContextuelle extends PricingStrategy {
 	 * Permet au contrôleur de vérifier la cohérence du prix persisté sans
 	 * exiger un socle unique. Une valeur hors catalogue reste refusée.
 	 *
-	 * @param int $base Socle calculé.
+	 * `null` est un socle à part entière : celui d'une nature volontairement
+	 * non chiffrée. Il n'est légitime que d'une stratégie qui en produit
+	 * réellement — sans quoi un tarif absent passerait pour accepté là où il
+	 * trahirait un calcul défaillant.
+	 *
+	 * @param int|null $base Socle calculé.
 	 * @return bool
 	 */
-	public function accepts_base( int $base ): bool;
+	public function accepts_base( ?int $base ): bool;
 }

@@ -36,7 +36,7 @@ final class NotificationStrategyRegistry {
 	 *
 	 * @var array<int, string>
 	 */
-	private const ACCUSE_CLIENT = array( 'declaration_prealable' );
+	private const ACCUSE_CLIENT = array( 'declaration_prealable', 'permis_construire' );
 
 	/**
 	 * Stratégie autorisée pour un couple (type, créneau).
@@ -86,6 +86,9 @@ final class NotificationStrategyRegistry {
 
 			case 'declaration_prealable':
 				return new DeclarationPrealableNotificationStrategy();
+
+			case 'permis_construire':
+				return new PermisConstruireNotificationStrategy();
 
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de stratégie.

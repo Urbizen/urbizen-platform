@@ -31,6 +31,9 @@ final class ValidationMetierRegistry {
 			case 'declaration_prealable':
 				return new ValidationMetierDeclarationPrealable();
 
+			case 'permis_construire':
+				return new ValidationMetierPermisConstruire();
+
 			default:
 				// Conception et localisation n'ont pas de règle inter-champs :
 				// leur cohérence tient entièrement dans la définition.

@@ -405,7 +405,7 @@
                   <option value="">— sélectionner —</option>
                   <option value="proprietaire">Propriétaire</option>
                   <option value="mandataire">Mandataire du propriétaire</option>
-                  <option>Futur acquéreur (avec accord)</option>
+                  <option value="futur_acquereur">Futur acquéreur (avec accord)</option>
                   <option value="autre">Autre</option>
                 </select>
               </div>
@@ -508,11 +508,11 @@
             <p class="dp-step-hint">Raccordements du projet et, le cas échéant, l’architecte.</p>
             <div class="dp-grid">
               <div class="dp-field"><label for="r_eau">Eau potable</label>
-                <select id="r_eau" name="raccord_eau"><option value="">— non précisé —</option><option>Réseau public</option><option>Captage privé</option></select></div>
+                <select id="r_eau" name="raccord_eau"><option value="">— non précisé —</option><option value="reseau_public">Réseau public</option><option value="captage_prive">Captage privé</option></select></div>
               <div class="dp-field"><label for="r_ass">Assainissement</label>
-                <select id="r_ass" name="raccord_assainissement"><option value="">— non précisé —</option><option>Collectif (tout-à-l’égout)</option><option>Individuel (ANC)</option></select></div>
+                <select id="r_ass" name="raccord_assainissement"><option value="">— non précisé —</option><option value="collectif">Collectif (tout-à-l’égout)</option><option value="individuel">Individuel (ANC)</option></select></div>
               <div class="dp-field col-2"><label for="r_elec">Électricité</label>
-                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option>Réseau public</option><option value="autre">Autre</option></select></div>
+                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option value="reseau_public">Réseau public</option><option value="autre">Autre</option></select></div>
               <div class="dp-field"><label for="a_nom">Architecte — nom</label><input type="text" id="a_nom" name="architecte_nom"></div>
               <div class="dp-field"><label for="a_ord">N° au Conseil de l’Ordre</label><input type="text" id="a_ord" name="architecte_ordre" class="measure"></div>
             </div>

@@ -1,8 +1,8 @@
 <?php
 /**
- * Formulaire « déclaration préalable » — définition serveur.
+ * Formulaire « permis de construire » — définition serveur.
  *
- * Cette définition ne rend pas l'interface : le parcours DP est un document
+ * Cette définition ne rend pas l'interface : le parcours PC est un document
  * autonome, servi en iframe, dont le dessin a été validé séparément. Elle est
  * en revanche la **source de vérité** de tout ce qui engage le serveur : quels
  * champs existent, lesquels sont réellement exigés, quelles valeurs sont
@@ -18,12 +18,13 @@
  *    faite à l'écran serait démentie au moment de l'envoi.
  * 2. **Les listes sont fermées.** Nature du projet, projets supplémentaires et
  *    pièces différées ne prennent leurs valeurs que dans
- *    {@see CatalogueDeclarationPrealable}. Une valeur hors catalogue est
+ *    {@see CataloguePermisConstruire}. Une valeur hors catalogue est
  *    rejetée, jamais traduite ni tolérée.
  * 3. **Aucun montant n'est déclaré ici.** Les options portent un `price_id`
  *    qui n'est qu'un identifiant : les euros vivent dans
- *    {@see PricingDeclarationPrealable}, et le total est recalculé côté serveur
- *    à partir des seules réponses retenues.
+ *    {@see PricingPermisConstruire}, et le total est recalculé côté serveur
+ *    à partir des seules réponses retenues. La nature « Autre » n'y porte
+ *    aucun socle : le tarif reste sur étude, et aucun montant n'est inventé.
  *
  * Les descriptions de projet supplémentaire portent une clé déterministe,
  * `description_projet_<nature>`. Les doublons de nature étant interdits, une
@@ -33,16 +34,16 @@
  * @package Urbizen\Platform
  */
 
-use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
+use Urbizen\Platform\Forms\CataloguePermisConstruire;
 
 defined( 'ABSPATH' ) || exit;
 
-// Première définition à s'appuyer sur une classe. L'autochargeur du greffon la
-// fournit en production ; ce garde-fou rend le fichier autoportant pour les
-// bancs, qui chargent une définition sans démarrer le greffon.
-if ( ! class_exists( CatalogueDeclarationPrealable::class ) ) {
+// L'autochargeur du greffon fournit ces classes en production ; ce garde-fou
+// rend le fichier autoportant pour les bancs, qui chargent une définition sans
+// démarrer le greffon.
+if ( ! class_exists( CataloguePermisConstruire::class ) ) {
 	require_once __DIR__ . '/../CatalogueProjets.php';
-	require_once __DIR__ . '/../CatalogueDeclarationPrealable.php';
+	require_once __DIR__ . '/../CataloguePermisConstruire.php';
 }
 
 /**
@@ -53,13 +54,13 @@ if ( ! class_exists( CatalogueDeclarationPrealable::class ) ) {
 $descriptions_projets = array_map(
 	static function ( string $nature ): array {
 		return array(
-			'name'      => CatalogueDeclarationPrealable::PREFIXE_DESCRIPTION . $nature,
+			'name'      => CataloguePermisConstruire::PREFIXE_DESCRIPTION . $nature,
 			'type'      => 'text',
 			'step'      => 'projets_supplementaires',
 			'label'     => sprintf(
 				/* translators: %s : libellé de la nature de projet. */
 				__( 'Précisions — %s', 'urbizen-platform' ),
-				(string) CatalogueDeclarationPrealable::libelle_nature( $nature )
+				(string) CataloguePermisConstruire::libelle_nature( $nature )
 			),
 			'maxlength' => 200,
 			// Facultative par construction, et sans effet tarifaire : une
@@ -70,7 +71,7 @@ $descriptions_projets = array_map(
 			),
 		);
 	},
-	CatalogueDeclarationPrealable::natures()
+	CataloguePermisConstruire::natures()
 );
 
 /**
@@ -81,29 +82,29 @@ $descriptions_projets = array_map(
 $champs_pieces = array_map(
 	static function ( string $piece ): array {
 		return array(
-			'name'      => CatalogueDeclarationPrealable::PREFIXE_PIECE . $piece,
+			'name'      => CataloguePermisConstruire::PREFIXE_PIECE . $piece,
 			'type'      => 'file',
 			'step'      => 'documents',
-			'label'     => (string) CatalogueDeclarationPrealable::libelle_piece( $piece ),
+			'label'     => (string) CataloguePermisConstruire::libelle_piece( $piece ),
 			'multiple'  => true,
 			'accept'    => array( 'pdf', 'jpg', 'jpeg', 'png', 'webp' ),
 			'max_files' => 10,
 			'max_size'  => 10485760,
 		);
 	},
-	CatalogueDeclarationPrealable::pieces()
+	CataloguePermisConstruire::pieces()
 );
 
 $definition = array(
-	'type'         => 'declaration_prealable',
-	'title'        => __( 'Déclaration préalable de travaux', 'urbizen-platform' ),
+	'type'         => 'permis_construire',
+	'title'        => __( 'Permis de construire', 'urbizen-platform' ),
 	'submit_label' => __( 'Envoyer ma demande', 'urbizen-platform' ),
 
 	'steps'        => array(
 		array(
 			'id'          => 'declarant',
 			'label'       => __( 'Déclarant', 'urbizen-platform' ),
-			'title'       => __( 'Qui déclare les travaux ?', 'urbizen-platform' ),
+			'title'       => __( 'Qui demande le permis ?', 'urbizen-platform' ),
 			'description' => __( 'Identité et coordonnées de la personne qui dépose la demande.', 'urbizen-platform' ),
 		),
 		array(
@@ -115,7 +116,7 @@ $definition = array(
 		array(
 			'id'          => 'projet',
 			'label'       => __( 'Projet', 'urbizen-platform' ),
-			'title'       => __( 'En quoi consistent les travaux ?', 'urbizen-platform' ),
+			'title'       => __( 'En quoi consiste le projet ?', 'urbizen-platform' ),
 			'description' => __( 'Nature du projet principal et description.', 'urbizen-platform' ),
 		),
 		array(
@@ -129,6 +130,12 @@ $definition = array(
 			'label'       => __( 'Contexte', 'urbizen-platform' ),
 			'title'       => __( 'Contexte réglementaire', 'urbizen-platform' ),
 			'description' => __( 'Secteur protégé, démolition et précisions utiles.', 'urbizen-platform' ),
+		),
+		array(
+			'id'          => 'equipements',
+			'label'       => __( 'Équipements', 'urbizen-platform' ),
+			'title'       => __( 'Raccordements et maîtrise d’œuvre', 'urbizen-platform' ),
+			'description' => __( 'Réseaux desservant le terrain et architecte éventuel.', 'urbizen-platform' ),
 		),
 		array(
 			'id'          => 'documents',
@@ -151,6 +158,31 @@ $definition = array(
 	),
 
 	'fields'       => array(
+
+		/* ---------------------------------------------------------- *
+		 *  Nature administrative du dossier
+		 * ---------------------------------------------------------- */
+
+		// L'interface le porte dans un champ caché. Un champ caché n'est pas une
+		// donnée sûre — il se modifie comme n'importe quel autre — d'où la liste
+		// fermée : `pcmi` pour une maison individuelle et ses annexes, `pc` pour
+		// les autres. Toute autre valeur est refusée, pas normalisée.
+		array(
+			'name'    => 'dossier_type',
+			'type'    => 'radio',
+			'step'    => 'declarant',
+			'label'   => __( 'Type de dossier', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'pcmi',
+					'label' => __( 'Maison individuelle et annexes', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'pc',
+					'label' => __( 'Autre construction', 'urbizen-platform' ),
+				),
+			),
+		),
 
 		/* ---------------------------------------------------------- *
 		 *  Déclarant
@@ -254,12 +286,8 @@ $definition = array(
 					'label' => __( 'Mandataire du propriétaire', 'urbizen-platform' ),
 				),
 				array(
-					'value' => 'locataire',
-					'label' => __( 'Locataire avec accord du propriétaire', 'urbizen-platform' ),
-				),
-				array(
-					'value' => 'copropriete',
-					'label' => __( 'Copropriété (syndic)', 'urbizen-platform' ),
+					'value' => 'futur_acquereur',
+					'label' => __( 'Futur acquéreur (avec accord)', 'urbizen-platform' ),
 				),
 				array(
 					'value' => 'autre',
@@ -373,6 +401,15 @@ $definition = array(
 			'unit'      => 'm²',
 		),
 
+		array(
+			'name'      => 'terrain_etat',
+			'type'      => 'textarea',
+			'step'      => 'terrain',
+			'label'     => __( 'État actuel du terrain', 'urbizen-platform' ),
+			'maxlength' => 2000,
+			'rows'      => 3,
+		),
+
 		// Déclaration explicite, jamais déduite. Trois états doivent rester
 		// distinguables : valeur fournie, valeur absente sans explication, et
 		// report annoncé par le client. Une absence n'a jamais valeur de report.
@@ -406,7 +443,7 @@ $definition = array(
 			'step'     => 'projet',
 			'label'    => __( 'Nature des travaux', 'urbizen-platform' ),
 			'required' => true,
-			'options'  => CatalogueDeclarationPrealable::options_natures( true ),
+			'options'  => CataloguePermisConstruire::options_natures( true ),
 		),
 		array(
 			'name'     => 'intervention',
@@ -440,6 +477,25 @@ $definition = array(
 			'step'      => 'projet',
 			'label'     => __( 'Matériaux et couleurs', 'urbizen-platform' ),
 			'maxlength' => 500,
+		),
+		array(
+			'name'      => 'insertion',
+			'type'      => 'textarea',
+			'step'      => 'projet',
+			'label'     => __( 'Insertion et parti architectural', 'urbizen-platform' ),
+			'maxlength' => 2000,
+			'rows'      => 3,
+		),
+		// Facultatif : au stade de la demande initiale, un particulier ne sait
+		// pas toujours combien de logements son projet créera au sens du code de
+		// l'urbanisme. Un zéro imposé se lirait comme une réponse.
+		array(
+			'name'      => 'nb_logements',
+			'type'      => 'number',
+			'step'      => 'projet',
+			'label'     => __( 'Nombre de logements créés', 'urbizen-platform' ),
+			'min'       => 0,
+			'increment' => 1,
 		),
 
 		/* ---------------------------------------------------------- *
@@ -508,6 +564,96 @@ $definition = array(
 			'unit'      => 'm²',
 		),
 
+		array(
+			'name'      => 'nb_stationnement',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Places de stationnement extérieures', 'urbizen-platform' ),
+			'min'       => 0,
+			'increment' => 1,
+		),
+		array(
+			'name'      => 'piscine_m2',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Bassin de piscine', 'urbizen-platform' ),
+			'min'       => 0,
+			'increment' => 0.01,
+			'unit'      => 'm²',
+		),
+
+		/* ---------------------------------------------------------- *
+		 *  Équipements et maîtrise d'œuvre
+		 * ---------------------------------------------------------- */
+
+		// Trois listes fermées, toutes facultatives : le raccordement d'un
+		// terrain est une information d'instruction, pas une condition de
+		// recevabilité de la demande. « Non précisé » n'est pas une valeur — un
+		// champ vide dit déjà cela, et l'ajouter à la liste ferait exister deux
+		// façons de ne rien répondre.
+		array(
+			'name'    => 'raccord_eau',
+			'type'    => 'select',
+			'step'    => 'equipements',
+			'label'   => __( 'Alimentation en eau', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'reseau_public',
+					'label' => __( 'Réseau public', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'captage_prive',
+					'label' => __( 'Captage privé', 'urbizen-platform' ),
+				),
+			),
+		),
+		array(
+			'name'    => 'raccord_assainissement',
+			'type'    => 'select',
+			'step'    => 'equipements',
+			'label'   => __( 'Assainissement', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'collectif',
+					'label' => __( 'Collectif (tout-à-l’égout)', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'individuel',
+					'label' => __( 'Individuel (ANC)', 'urbizen-platform' ),
+				),
+			),
+		),
+		array(
+			'name'    => 'raccord_elec',
+			'type'    => 'select',
+			'step'    => 'equipements',
+			'label'   => __( 'Électricité', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'reseau_public',
+					'label' => __( 'Réseau public', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'autre',
+					'label' => __( 'Autre', 'urbizen-platform' ),
+				),
+			),
+		),
+		array(
+			'name'      => 'architecte_nom',
+			'type'      => 'text',
+			'step'      => 'equipements',
+			'label'     => __( 'Architecte — nom', 'urbizen-platform' ),
+			'maxlength' => 200,
+		),
+		array(
+			'name'      => 'architecte_ordre',
+			'type'      => 'text',
+			'step'      => 'equipements',
+			'label'     => __( 'N° au Conseil de l’Ordre', 'urbizen-platform' ),
+			'maxlength' => 40,
+		),
+
 		/* ---------------------------------------------------------- *
 		 *  Contexte
 		 * ---------------------------------------------------------- */
@@ -548,13 +694,6 @@ $definition = array(
 			),
 		),
 		array(
-			'name'      => 'changement_destination',
-			'type'      => 'text',
-			'step'      => 'contexte',
-			'label'     => __( 'Changement de destination envisagé', 'urbizen-platform' ),
-			'maxlength' => 300,
-		),
-		array(
 			'name'      => 'remarques',
 			'type'      => 'textarea',
 			'step'      => 'contexte',
@@ -577,7 +716,7 @@ $definition = array(
 			'step'     => 'projets_supplementaires',
 			'label'    => __( 'Autres projets réunis dans ce dossier', 'urbizen-platform' ),
 			'multiple' => true,
-			'options'  => CatalogueDeclarationPrealable::options_natures(),
+			'options'  => CataloguePermisConstruire::options_natures(),
 			'help'     => __( 'Chaque projet supplémentaire est facturé 100 €.', 'urbizen-platform' ),
 		),
 
@@ -613,7 +752,7 @@ $definition = array(
 			'step'     => 'documents',
 			'label'    => __( 'Pièces annoncées comme transmises ultérieurement', 'urbizen-platform' ),
 			'multiple' => true,
-			'options'  => CatalogueDeclarationPrealable::options_pieces(),
+			'options'  => CataloguePermisConstruire::options_pieces(),
 		),
 
 		/* ---------------------------------------------------------- *
