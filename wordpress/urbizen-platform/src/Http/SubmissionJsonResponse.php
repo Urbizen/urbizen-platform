@@ -69,7 +69,7 @@ final class SubmissionJsonResponse {
 			'project'                        => self::projet( $principal ),
 			'additional_projects'            => self::projets_supplementaires( $charge ),
 			'deferred_documents'             => self::pieces_differees( $charge ),
-			'deferred_cadastral_information' => 'oui' === ( $charge['informations_cadastrales_differees'] ?? '' ),
+			'deferred_cadastral_information' => self::option_active( $charge, 'informations_cadastrales_differees' ),
 		);
 	}
 
@@ -123,6 +123,27 @@ final class SubmissionJsonResponse {
 			default:
 				return 500;
 		}
+	}
+
+	/**
+	 * Une option à liste fermée est-elle active ?
+	 *
+	 * Le validateur normalise une case à options en **tableau** de valeurs
+	 * retenues. Comparer à une chaîne rendrait donc toujours faux — le drapeau
+	 * cadastral remontait à « non » alors que le client l'avait coché.
+	 *
+	 * @param array<string, mixed> $charge Charge persistée.
+	 * @param string               $champ  Nom du champ.
+	 * @return bool
+	 */
+	private static function option_active( array $charge, string $champ ): bool {
+		$valeur = $charge[ $champ ] ?? null;
+
+		if ( is_array( $valeur ) ) {
+			return in_array( 'oui', array_map( 'strval', $valeur ), true );
+		}
+
+		return is_scalar( $valeur ) && 'oui' === (string) $valeur;
 	}
 
 	/**

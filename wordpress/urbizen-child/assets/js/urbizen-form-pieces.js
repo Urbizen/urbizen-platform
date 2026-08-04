@@ -309,7 +309,59 @@
    * `piece_later_*` voyagent déjà dans le FormData ; cette clé donne à Urbizen
    * la liste lisible, sans avoir à recomposer les noms de champs.
    */
+  /**
+   * Déclare ce que le navigateur croit envoyer.
+   *
+   * PHP plafonne le nombre de fichiers d'une requête (`max_file_uploads`) et
+   * tronque au-delà **sans rien signaler**. Le serveur ne peut pas connaître un
+   * fichier qui ne lui est jamais parvenu ; seule cette déclaration préalable
+   * lui permet de constater l'écart et de refuser plutôt que d'enregistrer un
+   * dossier amputé. Le manifeste n'est pas une commodité : sans lui, le socle
+   * rejette tout envoi comportant des fichiers.
+   *
+   * @param {FormData} fd Charge en construction.
+   * @return {void}
+   */
+  Pieces.prototype._manifeste = function ( fd ) {
+    var blocs = {};
+    var total = 0;
+    var octets = 0;
+
+    this.pieces.forEach( function ( piece ) {
+      var code = piece[ 0 ];
+      var input = document.getElementById( "file_" + code );
+
+      if ( ! input || ! input.files || ! input.files.length ) {
+        return;
+      }
+
+      var taille = 0;
+
+      for ( var i = 0; i < input.files.length; i++ ) {
+        taille += input.files[ i ].size;
+      }
+
+      blocs[ "piece_" + code ] = { count: input.files.length, size: taille };
+      total += input.files.length;
+      octets += taille;
+    } );
+
+    // Aucun fichier : pas de manifeste. C'est le seul cas où le socle tolère
+    // son absence, et il ne peut rien cacher — une troncature de zéro fichier
+    // n'existe pas.
+    if ( 0 === total ) {
+      return;
+    }
+
+    fd.set(
+      "urbizen_manifest",
+      JSON.stringify( { version: 1, total_count: total, total_size: octets, blocks: blocs } )
+    );
+  };
+
   Pieces.prototype.serialiser = function ( fd ) {
+    this._manifeste( fd );
+
     // `pieces_differees[]` voyage nativement : les cases cochées sont dans le
     // formulaire, rien à recomposer ici.
     //
