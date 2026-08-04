@@ -64,6 +64,7 @@ foreach (
 		'src/Mail/MailProcessLock.php',
 		'src/Mail/MailQueue.php',
 		'src/Mail/MailRenderer.php',
+		'src/Mail/NotificationSlot.php',
 		'src/Mail/NotificationStrategy.php',
 		'src/Mail/ConceptionNotificationStrategy.php',
 		'src/Mail/DeclarationPrealableNotificationStrategy.php',
