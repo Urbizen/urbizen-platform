@@ -24,6 +24,8 @@
 
 namespace Urbizen\Platform\Files;
 
+use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -43,6 +45,22 @@ final class UploadProfileRegistry {
 				// Profil Conception, assemblé depuis les constantes historiques :
 				// mêmes blocs, formats, quantités et tailles, à l'octet près.
 				return UploadPolicy::conception_profile();
+
+			case 'declaration_prealable':
+				// Mêmes formats et mêmes tailles que Conception, sur les sept
+				// blocs de la DP. Les blocs viennent du catalogue : un type de
+				// pièce ajouté à l'interface devient déposable sans seconde
+				// déclaration, et un champ fichier hors catalogue est refusé.
+				return new UploadProfile(
+					'declaration_prealable',
+					CatalogueDeclarationPrealable::blocs(),
+					UploadPolicy::TYPES,
+					UploadPolicy::max_per_block(),
+					UploadPolicy::max_total(),
+					UploadPolicy::max_file_size(),
+					UploadPolicy::max_total_size(),
+					true,
+				);
 
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de profil.

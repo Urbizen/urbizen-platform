@@ -51,7 +51,7 @@
    */
   var INFORMATIONS = [
     {
-      case: "cad_inconnu",
+      case: "informations_cadastrales_differees",
       champs: ["t_sec", "t_num", "t_sup"],
       libelle: "Informations cadastrales : à compléter ultérieurement"
     }
@@ -210,8 +210,10 @@
     var report = el("label", "dp-piece-report");
     var caseReport = el("input");
     caseReport.type = "checkbox";
-    caseReport.name = "piece_later_" + code;
-    caseReport.value = "oui";
+    // Valeur répétée à liste fermée : le serveur juge chaque identifiant, au
+    // lieu d'avoir à ouvrir une chaîne JSON.
+    caseReport.name = "pieces_differees[]";
+    caseReport.value = code;
     report.appendChild(caseReport);
     report.appendChild(document.createTextNode(LIBELLE_REPORT));
     rangee.appendChild(report);
@@ -307,31 +309,17 @@
    * `piece_later_*` voyagent déjà dans le FormData ; cette clé donne à Urbizen
    * la liste lisible, sans avoir à recomposer les noms de champs.
    */
-  Pieces.prototype.serialiser = function (fd) {
-    fd.set(
-      "pieces_differees",
-      JSON.stringify(
-        this.differees().map(function (piece) {
-          return piece.code;
-        })
-      )
-    );
-
-    // Les champs désactivés ne voyagent pas dans le FormData : sans cette clé,
-    // Urbizen ne saurait pas distinguer « le client ne sait pas » de « le
-    // client n'a rien saisi ».
-    fd.set(
-      "informations_differees",
-      JSON.stringify(
-        (this.informations || [])
-          .filter(function (entree) {
-            return entree.caseGroupe.checked;
-          })
-          .map(function (entree) {
-            return entree.groupe.case;
-          })
-      )
-    );
+  Pieces.prototype.serialiser = function ( fd ) {
+    // `pieces_differees[]` voyage nativement : les cases cochées sont dans le
+    // formulaire, rien à recomposer ici.
+    //
+    // La déclaration cadastrale, elle, est rendue **explicite**. Les champs
+    // désactivés ne voyagent pas dans un FormData : sans valeur affirmée, le
+    // serveur ne pourrait pas distinguer « le client déclare ne pas savoir »
+    // d'« il n'a simplement rien saisi ». Une absence ne vaut jamais report.
+    ( this.informations || [] ).forEach( function ( entree ) {
+      fd.set( entree.groupe.case, entree.caseGroupe.checked ? "oui" : "non" );
+    } );
   };
 
   global.UrbizenPieces = {

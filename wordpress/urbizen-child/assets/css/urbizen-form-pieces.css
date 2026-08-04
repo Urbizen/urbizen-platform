@@ -31,6 +31,12 @@
   line-height: 1.5;
 }
 
+/* Le code de pièce est canonique et minuscule côté données ; le badge reste
+   affiché en majuscules, à l'identique de ce que le client lisait. */
+#dp-app .dp-piece .lab b {
+  text-transform: uppercase;
+}
+
 /* -------- Rangée : mention courte et report --------
    La rangée `.dp-piece` est un `flex` déclaré dans la feuille inline de chaque
    document. On l'autorise ici à passer à la ligne, afin que l'option de report

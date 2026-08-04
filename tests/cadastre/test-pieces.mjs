@@ -55,13 +55,13 @@ const titre = (t) => console.log(`\n── ${t}`);
 /* ------------------------------------------------------------------ */
 
 const PIECES = [
-  ["PHOTO", "Photos du terrain et de la maison existante"],
-  ["RUE", "Photos prises depuis la rue et de l’accès"],
-  ["FACADES", "Photos des façades concernées"],
-  ["CROQUIS", "Croquis du projet, même à main levée"],
-  ["PLANS", "Plans existants en votre possession"],
-  ["MESURES", "Relevés de dimensions ou mesures utiles"],
-  ["AUTRES", "Autres documents utiles : devis, matériaux, étude de sol…"],
+  ["photo", "Photos du terrain et de la maison existante"],
+  ["rue", "Photos prises depuis la rue et de l’accès"],
+  ["facades", "Photos des façades concernées"],
+  ["croquis", "Croquis du projet, même à main levée"],
+  ["plans", "Plans existants en votre possession"],
+  ["mesures", "Relevés de dimensions ou mesures utiles"],
+  ["autres", "Autres documents utiles : devis, matériaux, étude de sol…"],
 ];
 
 async function monter(type) {
@@ -172,13 +172,13 @@ for (const type of ["dp", "pc"]) {
 
 {
   const ctx = await monter("dp");
-  const rangee = reporter(ctx, "PHOTO", true);
+  const rangee = reporter(ctx, "photo", true);
 
   check("pièce reportée → la rangée est marquée", rangee.classList.contains("is-reportee"));
   check("pièce reportée → l'état affiché est « À transmettre ultérieurement »",
     TITRE_REPORT === rangee.querySelector(".picked").textContent);
 
-  reporter(ctx, "PHOTO", false);
+  reporter(ctx, "photo", false);
   check("report annulé → l'état affiché redevient vide",
     "" === rangee.querySelector(".picked").textContent);
   check("report annulé → la rangée n'est plus marquée",
@@ -199,8 +199,8 @@ titre("3 — « À transmettre ultérieurement » dans le récapitulatif");
 
   check("aucun bloc tant qu'aucune pièce n'est reportée", 0 === recap().children.length);
 
-  reporter(ctx, "FACADES", true);
-  reporter(ctx, "MESURES", true);
+  reporter(ctx, "facades", true);
+  reporter(ctx, "mesures", true);
 
   const bloc = recap().querySelector(".dp-pieces-differees");
   check("le bloc apparaît dès la première pièce reportée", null !== bloc);
@@ -222,7 +222,7 @@ titre("3 — « À transmettre ultérieurement » dans le récapitulatif");
   check("aucun vocabulaire alarmant dans le bloc",
     !t.includes("erreur") && !t.includes("manquant") && !t.includes("obligatoire") && !t.includes("incomplet"));
 
-  reporter(ctx, "FACADES", false);
+  reporter(ctx, "facades", false);
   check("décocher retire la pièce du récapitulatif",
     1 === recap().querySelectorAll("li").length);
 
@@ -239,8 +239,8 @@ for (const type of ["dp", "pc"]) {
   const ctx = await monter(type);
 
   // Aucun fichier déposé, deux pièces déclarées « à transmettre ».
-  reporter(ctx, "PHOTO", true);
-  reporter(ctx, "PLANS", true);
+  reporter(ctx, "photo", true);
+  reporter(ctx, "plans", true);
 
   // Les documents ne sont jamais requis : aucune entrée de l'étape ne porte
   // le marqueur d'obligation que la validation d'étape inspecte.
@@ -271,8 +271,8 @@ for (const type of ["dp", "pc"]) {
   // Sérialisation : Urbizen reçoit la liste, pas seulement des cases cochées.
   const fd = new ctx.window.FormData(ctx.form);
   ctx.pieces.serialiser(fd);
-  check(`${type.toUpperCase()} · les pièces reportées sont sérialisées`,
-    JSON.stringify(["PHOTO", "PLANS"]) === fd.get("pieces_differees"));
+  check(`${type.toUpperCase()} · les pièces reportées voyagent en valeurs répétées`,
+    JSON.stringify(["photo", "plans"]) === JSON.stringify(fd.getAll("pieces_differees[]")));
 
   ctx.dom.window.close();
 }
@@ -285,7 +285,7 @@ titre("5 — Fournir un document annule le report");
 
 {
   const ctx = await monter("dp");
-  const rangee = reporter(ctx, "CROQUIS", true);
+  const rangee = reporter(ctx, "croquis", true);
   check("la pièce est d'abord reportée", 1 === ctx.pieces.differees().length);
 
   // On simule un dépôt de fichier : jsdom ne permet pas d'alimenter `files`
@@ -325,7 +325,7 @@ for (const type of ["dp", "pc"]) {
   check(`${type.toUpperCase()} · les trois champs sont vides et actifs au départ`,
     champs.every((c) => "" === c.value && !c.disabled));
 
-  const caseInconnu = ctx.form.querySelector('input[name="cad_inconnu"]');
+  const caseInconnu = ctx.form.querySelector('input[name="informations_cadastrales_differees"]');
   check(`${type.toUpperCase()} · la case de déclaration d'ignorance existe`, null !== caseInconnu);
   check(`${type.toUpperCase()} · son libellé est conforme au caractère près`,
     LIBELLE_CADASTRE_INCONNU === caseInconnu.closest("label").textContent.trim());
@@ -349,7 +349,7 @@ titre("5 ter — La case vide, désactive, puis rend la main");
 {
   const ctx = await monter("dp");
   const champs = CADASTRE.map((id) => ctx.document.getElementById(id));
-  const caseInconnu = ctx.form.querySelector('input[name="cad_inconnu"]');
+  const caseInconnu = ctx.form.querySelector('input[name="informations_cadastrales_differees"]');
 
   // Valeurs déjà détectées par la localisation cadastrale.
   champs[0].value = "AB";
@@ -407,8 +407,8 @@ titre("5 ter — La case vide, désactive, puis rend la main");
   caseInconnu.dispatchEvent(new ctx.window.Event("change", { bubbles: true }));
   const fd = new ctx.window.FormData(ctx.form);
   ctx.pieces.serialiser(fd);
-  check("la déclaration est sérialisée",
-    JSON.stringify(["cad_inconnu"]) === fd.get("informations_differees"));
+  check("la déclaration cadastrale est affirmée, jamais déduite",
+    "oui" === fd.get("informations_cadastrales_differees"));
 
   ctx.dom.window.close();
 }

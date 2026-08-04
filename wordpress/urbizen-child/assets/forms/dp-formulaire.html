@@ -415,11 +415,11 @@
                 <label>Qualité du déclarant <span class="req">*</span></label>
                 <select name="qualite">
                   <option value="">— sélectionner —</option>
-                  <option>Propriétaire</option>
-                  <option>Mandataire du propriétaire</option>
-                  <option>Locataire avec accord du propriétaire</option>
-                  <option>Copropriété (syndic)</option>
-                  <option>Autre</option>
+                  <option value="proprietaire">Propriétaire</option>
+                  <option value="mandataire">Mandataire du propriétaire</option>
+                  <option value="locataire">Locataire avec accord du propriétaire</option>
+                  <option value="copropriete">Copropriété (syndic)</option>
+                  <option value="autre">Autre</option>
                 </select>
               </div>
               <div class="dp-field"><label for="f_email">E-mail <span class="req">*</span></label><input type="email" id="f_email" name="email" autocomplete="email"></div>
@@ -447,7 +447,7 @@
                 <span class="dp-note">Surface de la parcelle, pas de la construction.</span>
               </div>
               <div class="dp-field col-2">
-                <label class="dp-cadastre-inconnu"><input type="checkbox" id="cad_inconnu" name="cad_inconnu" value="oui"> Je ne connais pas ces informations cadastrales.</label>
+                <label class="dp-cadastre-inconnu"><input type="checkbox" id="informations_cadastrales_differees" name="informations_cadastrales_differees" value="oui"> Je ne connais pas ces informations cadastrales.</label>
               </div>
             </div>
                         <div class="dp-field col-2">
@@ -476,18 +476,18 @@
             <div class="dp-field col-2" style="margin-bottom:16px">
               <label>Nature des travaux <span class="req">*</span></label>
               <div class="dp-checks" id="nature">
-                <label class="dp-check"><input type="radio" name="nature" value="Extension"> Extension</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Abri / annexe"> Abri, annexe</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Garage"> Garage</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Carport / abri de voiture"> Carport, abri de voiture</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Piscine"> Piscine</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Clôture / mur"> Clôture, mur</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Modification de façade"> Façade / ouverture</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Ravalement"> Ravalement</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Toiture"> Toiture</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Panneaux solaires"> Panneaux solaires</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Changement de destination"> Changement de destination</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Autre"> Autre</label>
+                <label class="dp-check"><input type="radio" name="nature" value="extension"> Extension</label>
+                <label class="dp-check"><input type="radio" name="nature" value="abri_annexe"> Abri, annexe</label>
+                <label class="dp-check"><input type="radio" name="nature" value="garage"> Garage</label>
+                <label class="dp-check"><input type="radio" name="nature" value="carport"> Carport, abri de voiture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="piscine"> Piscine</label>
+                <label class="dp-check"><input type="radio" name="nature" value="cloture_mur"> Clôture, mur</label>
+                <label class="dp-check"><input type="radio" name="nature" value="modification_facade"> Façade / ouverture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="ravalement"> Ravalement</label>
+                <label class="dp-check"><input type="radio" name="nature" value="toiture"> Toiture</label>
+                <label class="dp-check"><input type="radio" name="nature" value="panneaux_solaires"> Panneaux solaires</label>
+                <label class="dp-check"><input type="radio" name="nature" value="changement_destination"> Changement de destination</label>
+                <label class="dp-check"><input type="radio" name="nature" value="autre"> Autre</label>
               </div>
             </div>
             <div class="dp-grid">
@@ -652,13 +652,13 @@
     "Déclarant", "Terrain", "Projet", "Surfaces", "Contexte", "Documents", "Autres projets", "Envoi"
   ];
   var PIECES = [
-    ["PHOTO", "Photos du terrain et de la maison existante"],
-    ["RUE", "Photos prises depuis la rue et de l’accès"],
-    ["FACADES", "Photos des façades concernées"],
-    ["CROQUIS", "Croquis du projet, même à main levée"],
-    ["PLANS", "Plans existants en votre possession"],
-    ["MESURES", "Relevés de dimensions ou mesures utiles"],
-    ["AUTRES", "Autres documents utiles : devis, matériaux, étude de sol…"]
+    ["photo", "Photos du terrain et de la maison existante"],
+    ["rue", "Photos prises depuis la rue et de l’accès"],
+    ["facades", "Photos des façades concernées"],
+    ["croquis", "Croquis du projet, même à main levée"],
+    ["plans", "Plans existants en votre possession"],
+    ["mesures", "Relevés de dimensions ou mesures utiles"],
+    ["autres", "Autres documents utiles : devis, matériaux, étude de sol…"]
   ];
   var current = 0;
 
@@ -672,20 +672,20 @@
     form: form,
     libelleType: "Déclaration préalable",
     bareme: {
-      "Extension": 549,
-      "Clôture / mur": 189,
-      "Panneaux solaires": 189,
+      "extension": 549,
+      "cloture_mur": 189,
+      "panneaux_solaires": 189,
       // Déclarés explicitement bien que « __defaut » vaille aussi 249 : leur tarif
       // est une décision produit, pas un repli. Si « __defaut » évolue, Garage et
       // Carport ne doivent pas suivre en silence.
-      "Garage": 249,
-      "Carport / abri de voiture": 249,
+      "garage": 249,
+      "carport": 249,
       "__defaut": 249
     },
     categories: {
-      "Extension": "Projet important",
-      "Clôture / mur": "Projet simple",
-      "Panneaux solaires": "Projet simple",
+      "extension": "Projet important",
+      "cloture_mur": "Projet simple",
+      "panneaux_solaires": "Projet simple",
       "__defaut": "Projet standard"
     },
     surEtude: [],
@@ -720,15 +720,15 @@
     }
 
     var projectNature = {
-      piscine: "Piscine",
-      extension: "Extension",
-      garage: "Garage",
-      carport: "Carport / abri de voiture",
-      abri: "Abri / annexe",
-      pergola: "Autre",
-      facade: "Modification de façade",
-      toiture: "Toiture",
-      solaire: "Panneaux solaires"
+      piscine: "piscine",
+      extension: "extension",
+      garage: "garage",
+      carport: "carport",
+      abri: "abri_annexe",
+      pergola: "autre",
+      facade: "modification_facade",
+      toiture: "toiture",
+      solaire: "panneaux_solaires"
     };
     var expected = projectNature[project];
     if (!expected) return;

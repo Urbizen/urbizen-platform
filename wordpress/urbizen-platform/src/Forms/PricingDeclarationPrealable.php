@@ -46,18 +46,18 @@ final class PricingDeclarationPrealable {
 	 * plutôt que de produire un tarif silencieusement faux.
 	 */
 	public const NATURES = array(
-		'dp_extension'   => 549,
-		'dp_cloture'     => 189,
-		'dp_solaire'     => 189,
-		'dp_abri'        => 249,
-		'dp_garage'      => 249,
-		'dp_carport'     => 249,
-		'dp_piscine'     => 249,
-		'dp_facade'      => 249,
-		'dp_ravalement'  => 249,
-		'dp_toiture'     => 249,
-		'dp_destination' => 249,
-		'dp_autre'       => 249,
+		'extension'              => 549,
+		'abri_annexe'            => 249,
+		'garage'                 => 249,
+		'carport'                => 249,
+		'piscine'                => 249,
+		'cloture_mur'            => 189,
+		'modification_facade'    => 249,
+		'ravalement'             => 249,
+		'toiture'                => 249,
+		'panneaux_solaires'      => 189,
+		'changement_destination' => 249,
+		'autre'                  => 249,
 	);
 
 	/**
@@ -136,9 +136,9 @@ final class PricingDeclarationPrealable {
 		}
 
 		// Aucune nature reconnue : le socle vaut le tarif standard. Le validateur
-		// exige déjà la nature ; cette branche n'est atteinte que si la définition
-		// et le catalogue divergent, auquel cas le banc de contrat a échoué avant.
-		$base    = null === $nature ? self::NATURES['dp_autre'] : self::NATURES[ $nature ];
+		// exige déjà la nature, et un banc de contrat compare le catalogue à la
+		// définition ; cette branche n'est atteinte que si les deux ont divergé.
+		$base    = null === $nature ? self::NATURES['autre'] : self::NATURES[ $nature ];
 		$options = array();
 		$total   = $base;
 

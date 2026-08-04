@@ -54,7 +54,7 @@ final class DeclarationPrealablePricingStrategy implements PricingStrategyContex
 	 * @return int
 	 */
 	public function base(): int {
-		return PricingDeclarationPrealable::NATURES['dp_autre'];
+		return PricingDeclarationPrealable::NATURES['autre'];
 	}
 
 	/**

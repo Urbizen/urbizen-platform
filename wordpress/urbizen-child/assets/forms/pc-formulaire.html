@@ -401,10 +401,10 @@
                 <label>Qualité du demandeur <span class="req">*</span></label>
                 <select name="qualite">
                   <option value="">— sélectionner —</option>
-                  <option>Propriétaire</option>
-                  <option>Mandataire du propriétaire</option>
+                  <option value="proprietaire">Propriétaire</option>
+                  <option value="mandataire">Mandataire du propriétaire</option>
                   <option>Futur acquéreur (avec accord)</option>
-                  <option>Autre</option>
+                  <option value="autre">Autre</option>
                 </select>
               </div>
               <div class="dp-field"><label for="f_email">E-mail <span class="req">*</span></label><input type="email" id="f_email" name="email" autocomplete="email"></div>
@@ -428,7 +428,7 @@
               <div class="dp-field"><label for="t_num">N° de parcelle</label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 88"></div>
               <div class="dp-field col-2"><label for="t_sup">Superficie totale du terrain</label><div class="dp-suffix"><input type="number" id="t_sup" name="terrain_superficie" class="measure" min="0" step="1"><span class="unit">m²</span></div></div>
               <div class="dp-field col-2">
-                <label class="dp-cadastre-inconnu"><input type="checkbox" id="cad_inconnu" name="cad_inconnu" value="oui"> Je ne connais pas ces informations cadastrales.</label>
+                <label class="dp-cadastre-inconnu"><input type="checkbox" id="informations_cadastrales_differees" name="informations_cadastrales_differees" value="oui"> Je ne connais pas ces informations cadastrales.</label>
               </div>
               <div class="dp-field col-2"><label for="t_etat">État actuel du terrain</label><textarea id="t_etat" name="terrain_etat" style="min-height:70px" placeholder="Ex. : terrain nu en légère pente, exposé sud, accès par la voie communale ; quelques arbres en limite est."></textarea></div>
             </div>
@@ -458,12 +458,12 @@
             <div class="dp-field col-2" style="margin-bottom:16px">
               <label>Nature <span class="req">*</span></label>
               <div class="dp-checks" id="nature">
-                <label class="dp-check"><input type="radio" name="nature" value="Construction d’une maison individuelle"> Maison neuve</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Extension"> Extension</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Annexe (garage, dépendance)"> Annexe / garage</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Surélévation"> Surélévation</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Changement de destination"> Changement de destination</label>
-                <label class="dp-check"><input type="radio" name="nature" value="Autre"> Autre</label>
+                <label class="dp-check"><input type="radio" name="nature" value="maison_individuelle"> Maison neuve</label>
+                <label class="dp-check"><input type="radio" name="nature" value="extension"> Extension</label>
+                <label class="dp-check"><input type="radio" name="nature" value="annexe_garage"> Annexe / garage</label>
+                <label class="dp-check"><input type="radio" name="nature" value="surelevation"> Surélévation</label>
+                <label class="dp-check"><input type="radio" name="nature" value="changement_destination"> Changement de destination</label>
+                <label class="dp-check"><input type="radio" name="nature" value="autre"> Autre</label>
               </div>
             </div>
             <div class="dp-grid">
@@ -510,7 +510,7 @@
               <div class="dp-field"><label for="r_ass">Assainissement</label>
                 <select id="r_ass" name="raccord_assainissement"><option value="">— non précisé —</option><option>Collectif (tout-à-l’égout)</option><option>Individuel (ANC)</option></select></div>
               <div class="dp-field col-2"><label for="r_elec">Électricité</label>
-                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option>Réseau public</option><option>Autre</option></select></div>
+                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option>Réseau public</option><option value="autre">Autre</option></select></div>
               <div class="dp-field"><label for="a_nom">Architecte — nom</label><input type="text" id="a_nom" name="architecte_nom"></div>
               <div class="dp-field"><label for="a_ord">N° au Conseil de l’Ordre</label><input type="text" id="a_ord" name="architecte_ordre" class="measure"></div>
             </div>
@@ -622,13 +622,13 @@
   var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
   var legendData = ["Demandeur","Terrain","Projet","Surfaces","Réseaux","Fiscalité","Documents","Autres projets","Envoi"];
   var PIECES = [
-    ["PHOTO", "Photos du terrain et de la maison existante"],
-    ["RUE", "Photos prises depuis la rue et de l’accès"],
-    ["FACADES", "Photos des façades concernées"],
-    ["CROQUIS", "Croquis du projet, même à main levée"],
-    ["PLANS", "Plans existants en votre possession"],
-    ["MESURES", "Relevés de dimensions ou mesures utiles"],
-    ["AUTRES", "Autres documents utiles : devis, matériaux, étude de sol…"]
+    ["photo", "Photos du terrain et de la maison existante"],
+    ["rue", "Photos prises depuis la rue et de l’accès"],
+    ["facades", "Photos des façades concernées"],
+    ["croquis", "Croquis du projet, même à main levée"],
+    ["plans", "Plans existants en votre possession"],
+    ["mesures", "Relevés de dimensions ou mesures utiles"],
+    ["autres", "Autres documents utiles : devis, matériaux, étude de sol…"]
   ];
   var current = 0;
 
@@ -642,24 +642,24 @@
     form: form,
     libelleType: "Permis de construire",
     bareme: {
-      "Construction d’une maison individuelle": 849,
-      "Extension": 649,
-      "Surélévation": 649,
-      "Changement de destination": 649,
-      "Annexe (garage, dépendance)": 449,
+      "maison_individuelle": 849,
+      "extension": 649,
+      "surelevation": 649,
+      "changement_destination": 649,
+      "annexe_garage": 449,
       "__defaut": 449
     },
     categories: {
-      "Construction d’une maison individuelle": "Projet important",
-      "Extension": "Projet standard",
-      "Surélévation": "Projet standard",
-      "Changement de destination": "Projet standard",
-      "Autre": "Projet à étudier",
+      "maison_individuelle": "Projet important",
+      "extension": "Projet standard",
+      "surelevation": "Projet standard",
+      "changement_destination": "Projet standard",
+      "autre": "Projet à étudier",
       "__defaut": "Projet simple"
     },
     // « Autre » n'est pas chiffrable : on n'annonce pas de total sur un projet
     // qui n'a précisément pas été qualifié. Les suppléments restent détaillés.
-    surEtude: ["Autre"],
+    surEtude: ["autre"],
     supplements: { abf: 80, depot: 30, travail: 100 }
   });
 
@@ -691,9 +691,9 @@
     }
 
     var projectNature = {
-      maison: "Construction d’une maison individuelle",
-      extension: "Extension",
-      garage: "Annexe (garage, dépendance)"
+      maison: "maison_individuelle",
+      extension: "extension",
+      garage: "annexe_garage"
     };
     var expected = projectNature[project];
     if (!expected) return;

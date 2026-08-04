@@ -122,24 +122,24 @@ echo "\n── 5. Barème déclaré et modules partagés\n";
 
 verifier(
 	'DP · barème déclaré dans le formulaire',
-	str_contains( $dp, '"Clôture / mur": 189' )
+	str_contains( $dp, '"cloture_mur": 189' )
 		&& str_contains( $dp, '"__defaut": 249' )
-		&& str_contains( $dp, '"Extension": 549' )
+		&& str_contains( $dp, '"extension": 549' )
 );
 verifier(
 	'DP · Garage et Carport sont des natures propres à 249 €',
-	str_contains( $dp, 'value="Garage"' )
-		&& str_contains( $dp, 'value="Carport / abri de voiture"' )
-		&& str_contains( $dp, 'value="Abri / annexe"' )
-		&& str_contains( $dp, '"Garage": 249' )
-		&& str_contains( $dp, '"Carport / abri de voiture": 249' )
+	str_contains( $dp, 'value="garage"' )
+		&& str_contains( $dp, 'value="carport"' )
+		&& str_contains( $dp, 'value="abri_annexe"' )
+		&& str_contains( $dp, '"garage": 249' )
+		&& str_contains( $dp, '"carport": 249' )
 );
 verifier(
 	'PC · barème déclaré dans le formulaire',
-	str_contains( $pc, '"Annexe (garage, dépendance)": 449' )
-		&& str_contains( $pc, '"Extension": 649' )
-		&& str_contains( $pc, '"Construction d’une maison individuelle": 849' )
-		&& str_contains( $pc, 'surEtude: ["Autre"]' )
+	str_contains( $pc, '"annexe_garage": 449' )
+		&& str_contains( $pc, '"extension": 649' )
+		&& str_contains( $pc, '"maison_individuelle": 849' )
+		&& str_contains( $pc, 'surEtude: ["autre"]' )
 );
 verifier(
 	'les suppléments sont identiques des deux côtés',

@@ -235,7 +235,15 @@ final class Validator {
 		$valeur = str_replace( array( "\r", "\n" ), '', $valeur );
 		$valeur = strtolower( $valeur );
 
-		if ( ! filter_var( $valeur, FILTER_VALIDATE_EMAIL ) ) {
+		// `is_email()` est la référence de WordPress : elle refuse des adresses
+		// que `filter_var` accepte (TLD absent, point final, label vide). On
+		// l'utilise dès qu'elle est chargée, et on retombe sur le filtre PHP
+		// dans les bancs, qui s'exécutent sans WordPress.
+		$valide = function_exists( 'is_email' )
+			? (bool) is_email( $valeur )
+			: (bool) filter_var( $valeur, FILTER_VALIDATE_EMAIL );
+
+		if ( ! $valide ) {
 			$errors['email'] = 'email_invalide';
 		}
 

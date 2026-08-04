@@ -99,19 +99,19 @@ function configDe(type) {
     return {
       libelleType: "Déclaration préalable",
       bareme: {
-        "Extension": 549,
-        "Clôture / mur": 189,
-        "Panneaux solaires": 189,
+        "extension": 549,
+        "cloture_mur": 189,
+        "panneaux_solaires": 189,
         // Déclarés explicitement côté formulaire : leur tarif est une décision
         // produit, pas un repli sur « __defaut ».
-        "Garage": 249,
-        "Carport / abri de voiture": 249,
+        "garage": 249,
+        "carport": 249,
         "__defaut": 249,
       },
       categories: {
-        "Extension": "Projet important",
-        "Clôture / mur": "Projet simple",
-        "Panneaux solaires": "Projet simple",
+        "extension": "Projet important",
+        "cloture_mur": "Projet simple",
+        "panneaux_solaires": "Projet simple",
         "__defaut": "Projet standard",
       },
       surEtude: [],
@@ -122,22 +122,22 @@ function configDe(type) {
   return {
     libelleType: "Permis de construire",
     bareme: {
-      "Construction d’une maison individuelle": 849,
-      "Extension": 649,
-      "Surélévation": 649,
-      "Changement de destination": 649,
-      "Annexe (garage, dépendance)": 449,
+      "maison_individuelle": 849,
+      "extension": 649,
+      "surelevation": 649,
+      "changement_destination": 649,
+      "annexe_garage": 449,
       "__defaut": 449,
     },
     categories: {
-      "Construction d’une maison individuelle": "Projet important",
-      "Extension": "Projet standard",
-      "Surélévation": "Projet standard",
-      "Changement de destination": "Projet standard",
-      "Autre": "Projet à étudier",
+      "maison_individuelle": "Projet important",
+      "extension": "Projet standard",
+      "surelevation": "Projet standard",
+      "changement_destination": "Projet standard",
+      "autre": "Projet à étudier",
       "__defaut": "Projet simple",
     },
-    surEtude: ["Autre"],
+    surEtude: ["autre"],
     supplements: { abf: 80, depot: 30, travail: 100 },
   };
 }
@@ -193,20 +193,20 @@ titre("1 — Projet principal seul, barème par nature");
 {
   const ctx = await monterAvecMoteur("dp");
   const attendus = {
-    "Extension": 549,
-    "Clôture / mur": 189,
-    "Panneaux solaires": 189,
-    "Abri / annexe": 249,
+    "extension": 549,
+    "cloture_mur": 189,
+    "panneaux_solaires": 189,
+    "abri_annexe": 249,
     // Garage et Carport sont des natures à part entière : le client ne doit pas
     // avoir à les deviner sous « Abri, annexe ».
-    "Garage": 249,
-    "Carport / abri de voiture": 249,
-    "Piscine": 249,
-    "Modification de façade": 249,
-    "Ravalement": 249,
-    "Toiture": 249,
-    "Changement de destination": 249,
-    "Autre": 249,
+    "garage": 249,
+    "carport": 249,
+    "piscine": 249,
+    "modification_facade": 249,
+    "ravalement": 249,
+    "toiture": 249,
+    "changement_destination": 249,
+    "autre": 249,
   };
 
   for (const [nature, montant] of Object.entries(attendus)) {
@@ -222,11 +222,11 @@ titre("1 — Projet principal seul, barème par nature");
 {
   const ctx = await monterAvecMoteur("pc");
   const attendus = {
-    "Construction d’une maison individuelle": 849,
-    "Extension": 649,
-    "Surélévation": 649,
-    "Changement de destination": 649,
-    "Annexe (garage, dépendance)": 449,
+    "maison_individuelle": 849,
+    "extension": 649,
+    "surelevation": 649,
+    "changement_destination": 649,
+    "annexe_garage": 449,
   };
 
   for (const [nature, montant] of Object.entries(attendus)) {
@@ -252,11 +252,11 @@ titre("2 — Le projet principal est un choix unique");
     Array.from(ctx.form.querySelectorAll('input[name="nature"]')).every((i) => "radio" === i.type)
   );
 
-  choisirNature(ctx, "Piscine");
-  choisirNature(ctx, "Extension");
+  choisirNature(ctx, "piscine");
+  choisirNature(ctx, "extension");
 
   const cochees = ctx.form.querySelectorAll('input[name="nature"]:checked');
-  check("une seule nature reste cochée", 1 === cochees.length && "Extension" === cochees[0].value);
+  check("une seule nature reste cochée", 1 === cochees.length && "extension" === cochees[0].value);
 
   const allumees = ctx.form.querySelectorAll(".dp-check.on");
   check("une seule carte porte l'état visuel « on »", 1 === allumees.length);
@@ -273,7 +273,7 @@ titre("3 — Suppléments ABF et dépôt numérique");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
+  choisirNature(ctx, "extension");
 
   check("dépôt numérique décoché par défaut", !ctx.form.querySelector('input[name="depot_guichet"]').checked);
   check("base seule = 549 €", 549 === ctx.tarifs.detail().total);
@@ -303,15 +303,15 @@ titre("4 — Projets supplémentaires");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
+  choisirNature(ctx, "extension");
 
   check("aucun travail au départ → 549 €", 549 === ctx.tarifs.detail().total);
 
-  ajouterTravail(ctx, "Piscine");
+  ajouterTravail(ctx, "piscine");
   check("un travail → 549 + 100 = 649 €", 649 === ctx.tarifs.detail().total);
 
-  ajouterTravail(ctx, "Toiture");
-  ajouterTravail(ctx, "Ravalement");
+  ajouterTravail(ctx, "toiture");
+  ajouterTravail(ctx, "ravalement");
   check("trois travaux → 549 + 300 = 849 €", 849 === ctx.tarifs.detail().total);
 
   check("trois lignes affichées", 3 === ctx.form.querySelectorAll(".dp-travail").length);
@@ -326,7 +326,7 @@ titre("4 — Projets supplémentaires");
   );
   check(
     "la ligne supprimée a bien disparu du détail",
-    !ctx.tarifs.detail().travaux.some((t) => "Toiture" === t.nature)
+    !ctx.tarifs.detail().travaux.some((t) => "toiture" === t.nature)
   );
 
   ctx.dom.window.close();
@@ -336,25 +336,25 @@ titre("5 — Le doublon est impossible");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
-  ajouterTravail(ctx, "Piscine");
+  choisirNature(ctx, "extension");
+  ajouterTravail(ctx, "piscine");
   ajouterTravail(ctx);
 
   const options = Array.from(
     ctx.form.querySelectorAll(".dp-travail")[1].querySelectorAll("option")
   ).map((o) => o.value);
 
-  check("le projet principal n'est pas proposé comme travail", !options.includes("Extension"));
-  check("une nature déjà ajoutée n'est pas reproposée", !options.includes("Piscine"));
-  check("les autres natures restent proposées", options.includes("Toiture"));
+  check("le projet principal n'est pas proposé comme travail", !options.includes("extension"));
+  check("une nature déjà ajoutée n'est pas reproposée", !options.includes("piscine"));
+  check("les autres natures restent proposées", options.includes("toiture"));
 
   // Le principal bascule sur une nature déjà en ligne : la ligne est vidée,
   // jamais supprimée en silence.
-  choisirNature(ctx, "Piscine");
+  choisirNature(ctx, "piscine");
   check("changer de principal vide la ligne devenue identique", "" === ctx.tarifs.travaux[0].nature);
   check("la ligne vide invalide l'étape", !ctx.tarifs.estValide());
   check("le projet principal n'est jamais compté comme projet supplémentaire",
-    !ctx.tarifs.detail().travaux.some((t) => "Piscine" === t.nature));
+    !ctx.tarifs.detail().travaux.some((t) => "piscine" === t.nature));
 
   ctx.dom.window.close();
 }
@@ -365,10 +365,10 @@ titre("5 bis — Garage et Carport, natures distinctes de « Abri, annexe »");
   const ctx = await monterAvecMoteur("dp");
 
   const valeurs = Array.from(ctx.form.querySelectorAll('input[name="nature"]')).map((i) => i.value);
-  check("« Garage » est proposé comme projet principal", valeurs.includes("Garage"));
+  check("« Garage » est proposé comme projet principal", valeurs.includes("garage"));
   check("« Carport / abri de voiture » est proposé comme projet principal",
-    valeurs.includes("Carport / abri de voiture"));
-  check("« Abri / annexe » subsiste pour les autres annexes", valeurs.includes("Abri / annexe"));
+    valeurs.includes("carport"));
+  check("« Abri / annexe » subsiste pour les autres annexes", valeurs.includes("abri_annexe"));
 
   const libelle = (v) =>
     Array.from(ctx.form.querySelectorAll('input[name="nature"]'))
@@ -376,23 +376,23 @@ titre("5 bis — Garage et Carport, natures distinctes de « Abri, annexe »");
       .closest(".dp-check")
       .textContent.trim();
 
-  check("le client lit « Garage »", "Garage" === libelle("Garage"));
+  check("le client lit « Garage »", "Garage" === libelle("garage"));
   check("le client lit « Carport, abri de voiture »",
-    "Carport, abri de voiture" === libelle("Carport / abri de voiture"));
+    "Carport, abri de voiture" === libelle("carport"));
 
   // Chacune, seule, au barème de base.
-  choisirNature(ctx, "Garage");
+  choisirNature(ctx, "garage");
   check("Garage en projet principal → 249 €", 249 === ctx.tarifs.detail().total);
 
-  choisirNature(ctx, "Carport / abri de voiture");
+  choisirNature(ctx, "carport");
   check("Carport en projet principal → 249 €", 249 === ctx.tarifs.detail().total);
 
   // Ajoutées comme projets supplémentaires : +100 €, jamais leur barème.
-  choisirNature(ctx, "Extension");
-  ajouterTravail(ctx, "Garage");
+  choisirNature(ctx, "extension");
+  ajouterTravail(ctx, "garage");
   check("Garage en projet supplémentaire → 549 + 100 = 649 €", 649 === ctx.tarifs.detail().total);
 
-  ajouterTravail(ctx, "Carport / abri de voiture");
+  ajouterTravail(ctx, "carport");
   check("Carport en projet supplémentaire → 549 + 200 = 749 €", 749 === ctx.tarifs.detail().total);
   check("les deux valent 100 € chacune, pas leur barème",
     ctx.tarifs.detail().travaux.every((t) => 100 === t.montant));
@@ -405,14 +405,14 @@ titre("5 bis — Garage et Carport, natures distinctes de « Abri, annexe »");
     .map((o) => o.value)
     .filter(Boolean);
 
-  check("Garage déjà ajouté n'est pas reproposé", !libres.includes("Garage"));
-  check("Carport déjà ajouté n'est pas reproposé", !libres.includes("Carport / abri de voiture"));
+  check("Garage déjà ajouté n'est pas reproposé", !libres.includes("garage"));
+  check("Carport déjà ajouté n'est pas reproposé", !libres.includes("carport"));
 
   // En projet principal, elles disparaissent de la liste des travaux.
   ctx.tarifs.supprimer(2);
   ctx.tarifs.supprimer(1);
   ctx.tarifs.supprimer(0);
-  choisirNature(ctx, "Garage");
+  choisirNature(ctx, "garage");
   ajouterTravail(ctx);
   const apresPrincipal = Array.from(
     ctx.form.querySelector(".dp-travail").querySelectorAll("option")
@@ -421,13 +421,13 @@ titre("5 bis — Garage et Carport, natures distinctes de « Abri, annexe »");
     .filter(Boolean);
 
   check("Garage projet principal → absent des projets supplémentaires",
-    !apresPrincipal.includes("Garage"));
+    !apresPrincipal.includes("garage"));
   check("Carport reste proposable tant qu'il n'est pas le principal",
-    apresPrincipal.includes("Carport / abri de voiture"));
+    apresPrincipal.includes("carport"));
 
   // Lisibles dans le récapitulatif, sous leur libellé client.
   const selectRestant = ctx.form.querySelector(".dp-travail-nature");
-  selectRestant.value = "Carport / abri de voiture";
+  selectRestant.value = "carport";
   selectRestant.dispatchEvent(new ctx.window.Event("change", { bubbles: true }));
 
   const lignes = lignesRecap(ctx);
@@ -438,7 +438,7 @@ titre("5 bis — Garage et Carport, natures distinctes de « Abri, annexe »");
 
   ctx.tarifs.rendreRecapFinal();
   const texteFinal = ctx.document.querySelector("[data-tarifs-recap-final]").textContent;
-  check("l'écran final nomme Garage", texteFinal.includes("Garage"));
+  check("l'écran final nomme Garage sous son libellé client", texteFinal.includes("Garage"));
   check("l'écran final porte le total 349 €", texteFinal.includes("349 €"));
 
   ctx.dom.window.close();
@@ -452,8 +452,8 @@ titre("6 — PC « Autre » : tarif sur étude");
 
 {
   const ctx = await monterAvecMoteur("pc");
-  choisirNature(ctx, "Autre");
-  ajouterTravail(ctx, "Extension");
+  choisirNature(ctx, "autre");
+  ajouterTravail(ctx, "extension");
   basculerAbf(ctx, true);
 
   const d = ctx.tarifs.detail();
@@ -487,10 +487,10 @@ titre("7 — Récapitulatif détaillé");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
-  ajouterTravail(ctx, "Piscine");
-  ajouterTravail(ctx, "Toiture");
-  ajouterTravail(ctx, "Ravalement");
+  choisirNature(ctx, "extension");
+  ajouterTravail(ctx, "piscine");
+  ajouterTravail(ctx, "toiture");
+  ajouterTravail(ctx, "ravalement");
   basculerAbf(ctx, true);
   basculerDepot(ctx, true);
 
@@ -526,8 +526,8 @@ titre("8 — Écran de confirmation");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
-  ajouterTravail(ctx, "Piscine");
+  choisirNature(ctx, "extension");
+  ajouterTravail(ctx, "piscine");
   basculerAbf(ctx, true);
 
   ctx.tarifs.rendreRecapFinal();
@@ -552,16 +552,17 @@ titre("9 — Sérialisation de la demande");
 
 {
   const ctx = await monterAvecMoteur("dp");
-  choisirNature(ctx, "Extension");
-  ajouterTravail(ctx, "Piscine");
+  choisirNature(ctx, "extension");
+  ajouterTravail(ctx, "piscine");
   basculerDepot(ctx, true);
 
   const fd = new ctx.window.FormData(ctx.form);
   ctx.tarifs.serialiser(fd);
 
-  check("« nature » porte une valeur unique", "Extension" === fd.get("nature"));
-  check("les projets supplémentaires sont sérialisés",
-    JSON.stringify([{ nature: "Piscine", precisions: "" }]) === fd.get("travaux_supplementaires"));
+  check("« nature » porte une valeur unique", "extension" === fd.get("nature"));
+  check("les projets supplémentaires voyagent en valeurs répétées",
+    JSON.stringify(["piscine"]) === JSON.stringify(fd.getAll("projets_supplementaires[]")));
+  check("aucune chaîne JSON de projets n'est émise", null === fd.get("travaux_supplementaires"));
   check("l'option de dépôt est sérialisée", "oui" === fd.get("depot_guichet"));
   check("aucun montant n'est envoyé au serveur",
     null === fd.get("total") && null === fd.get("estimation"));
@@ -584,8 +585,8 @@ const INTERDITS = ["travail supplémentaire", "Travail supplémentaire",
 
 for (const type of ["dp", "pc"]) {
   const ctx = await monterAvecMoteur(type);
-  choisirNature(ctx, "dp" === type ? "Extension" : "Construction d’une maison individuelle");
-  ajouterTravail(ctx, "dp" === type ? "Piscine" : "Surélévation");
+  choisirNature(ctx, "dp" === type ? "extension" : "maison_individuelle");
+  ajouterTravail(ctx, "dp" === type ? "piscine" : "surelevation");
   basculerAbf(ctx, true);
   basculerDepot(ctx, true);
 

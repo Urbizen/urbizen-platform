@@ -492,15 +492,25 @@
    * lecture. Un montant venu du navigateur n'a aucune valeur probante.
    */
   Tarifs.prototype.serialiser = function (fd) {
-    var travaux = this.travaux
-      .filter(function (travail) {
-        return "" !== travail.nature;
-      })
-      .map(function (travail) {
-        return { nature: travail.nature, precisions: travail.precisions };
-      });
+    // Valeurs répétées à liste fermée, jamais une chaîne JSON : c'est la
+    // définition serveur qui doit pouvoir juger chaque valeur, ce qu'elle ne
+    // peut pas faire sur une chaîne opaque.
+    fd.delete("projets_supplementaires[]");
 
-    fd.set("travaux_supplementaires", JSON.stringify(travaux));
+    this.travaux.forEach(function (travail) {
+      if ("" === travail.nature) {
+        return;
+      }
+
+      fd.append("projets_supplementaires[]", travail.nature);
+
+      // La description porte une clé déterministe, dérivée de la nature. Les
+      // doublons étant impossibles, la correspondance est sans ambiguïté ; une
+      // description dont la nature n'est pas retenue n'est jamais émise.
+      if ("" !== travail.precisions) {
+        fd.set("description_projet_" + travail.nature, travail.precisions);
+      }
+    });
 
     var depot = this.form.querySelector('input[name="depot_guichet"]');
     fd.set("depot_guichet", depot && depot.checked ? "oui" : "non");
