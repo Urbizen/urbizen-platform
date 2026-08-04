@@ -85,6 +85,21 @@ final class SubmissionController {
 	public const FORM_TYPE = 'conception';
 
 	/**
+	 * Action `admin-post` de la déclaration préalable.
+	 */
+	public const ACTION_DP = 'urbizen_declaration_prealable';
+
+	/**
+	 * Action du nonce de la déclaration préalable.
+	 */
+	public const NONCE_ACTION_DP = 'urbizen_declaration_prealable_submit';
+
+	/**
+	 * Identifiant serveur du formulaire de déclaration préalable.
+	 */
+	public const FORM_TYPE_DP = 'declaration_prealable';
+
+	/**
 	 * Configuration serveur des routes : action → { type de formulaire, action de
 	 * nonce }. Résolue EXCLUSIVEMENT côté serveur (la clé est l'action du hook) ;
 	 * le navigateur ne choisit jamais la route. Un champ POST ne sert qu'à un
@@ -95,9 +110,13 @@ final class SubmissionController {
 	 * @var array<string, array{form_type: string, nonce_action: string}>
 	 */
 	private const ROUTES = array(
-		self::ACTION => array(
+		self::ACTION    => array(
 			'form_type'    => self::FORM_TYPE,
 			'nonce_action' => self::NONCE_ACTION,
+		),
+		self::ACTION_DP => array(
+			'form_type'    => self::FORM_TYPE_DP,
+			'nonce_action' => self::NONCE_ACTION_DP,
 		),
 	);
 
@@ -110,8 +129,17 @@ final class SubmissionController {
 	 * @return void
 	 */
 	public static function register(): void {
-		add_action( 'admin_post_nopriv_' . self::ACTION, array( self::class, 'handle' ) );
-		add_action( 'admin_post_' . self::ACTION, array( self::class, 'handle' ) );
+		foreach ( array_keys( self::ROUTES ) as $action ) {
+			// Le gestionnaire est lié à l'action : c'est le HOOK qui portera la
+			// route, jamais une valeur de requête. Une closure par action évite
+			// de relire $_POST pour savoir quel formulaire répond.
+			$gestionnaire = static function () use ( $action ): void {
+				self::handle( (string) $action );
+			};
+
+			add_action( 'admin_post_nopriv_' . $action, $gestionnaire );
+			add_action( 'admin_post_' . $action, $gestionnaire );
+		}
 	}
 
 	/**
@@ -119,7 +147,7 @@ final class SubmissionController {
 	 *
 	 * @return void
 	 */
-	public static function handle(): void {
+	public static function handle( string $action = self::ACTION ): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- le nonce est vérifié dans process().
 		$post   = wp_unslash( $_POST );
 		$files  = isset( $_FILES ) ? (array) $_FILES : array();
@@ -128,7 +156,7 @@ final class SubmissionController {
 
 		// La route est choisie par le HOOK, via une valeur LITTÉRALE liée à
 		// l'action enregistrée ({@see self::register()}) — jamais depuis $_POST.
-		$route  = self::route_for_action( self::ACTION );
+		$route  = self::route_for_action( $action );
 		$result = self::process(
 			is_array( $post ) ? $post : array(),
 			$files,

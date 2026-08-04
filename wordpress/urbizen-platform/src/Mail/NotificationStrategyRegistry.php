@@ -37,6 +37,9 @@ final class NotificationStrategyRegistry {
 			case 'conception':
 				return new ConceptionNotificationStrategy();
 
+			case 'declaration_prealable':
+				return new DeclarationPrealableNotificationStrategy();
+
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de stratégie.
 				return null;

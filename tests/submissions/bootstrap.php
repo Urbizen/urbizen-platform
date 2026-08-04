@@ -66,6 +66,7 @@ foreach (
 		'src/Mail/MailRenderer.php',
 		'src/Mail/NotificationStrategy.php',
 		'src/Mail/ConceptionNotificationStrategy.php',
+		'src/Mail/DeclarationPrealableNotificationStrategy.php',
 		'src/Mail/NotificationStrategyRegistry.php',
 		'src/Mail/MailTransport.php',
 		'src/Mail/WordPressMailTransport.php',
