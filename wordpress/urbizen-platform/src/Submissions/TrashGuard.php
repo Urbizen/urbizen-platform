@@ -258,6 +258,12 @@ final class TrashGuard {
 		// par-dessus l'annulation, et un courriel partirait pour un dossier
 		// retiré. Un envoi déjà accepté n'est jamais annulé : le message est
 		// parti, le nier serait faux.
+		//
+		// **Portée : le créneau de la notification interne.** Tout créneau
+		// supplémentaire devra être annulé ici aussi — un accusé de réception
+		// laissé en file partirait vers une personne réelle alors que son
+		// dossier a été retiré. Le jour où un second créneau existe, cette
+		// annulation doit les balayer tous.
 		MailQueue::with_lock(
 			$id,
 			static function ( MailLockHandle $poignee ) use ( $id ) {
@@ -599,6 +605,9 @@ final class TrashGuard {
 		// La notification annulée par la mise à la Corbeille reprend son cours,
 		// avec le même identifiant. Une notification déjà `sent` n'est jamais
 		// réémise automatiquement.
+		//
+		// Portée : le créneau de la notification interne, en symétrie exacte de
+		// l'annulation ci-dessus. Les deux doivent être étendues ensemble.
 		MailQueue::with_lock(
 			$id,
 			static function ( MailLockHandle $poignee ) use ( $id ) {

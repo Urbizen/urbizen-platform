@@ -341,7 +341,7 @@ $mq_bail = mutant(
 	'MailQueue',
 	array( "		// **Le mutex fait autorité.** Un bail périmé ne prouve pas que son
 		// propriétaire est mort ; un mutex détenu prouve qu'il est vivant.
-		if ( MailProcessLock::is_held( \$id ) ) {
+		if ( MailProcessLock::is_held( \$id, \$slot ) ) {
 			return true;
 		}
 
@@ -382,7 +382,7 @@ $ms3 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array( "		if ( ! empty( \$resultat['ok'] ) ) {
-			MailQueue::mark_sent( \$id, \$now );" => "		if ( ! empty( \$resultat['ok'] ) ) {" )
+			MailQueue::mark_sent( \$id, \$now, \$slot );" => "		if ( ! empty( \$resultat['ok'] ) ) {" )
 );
 
 neuf();
@@ -404,8 +404,8 @@ $ms4 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array( "		if ( ! empty( \$resultat['ok'] ) ) {
-			MailQueue::mark_sent( \$id, \$now );" => "		if ( true ) {
-			MailQueue::mark_sent( \$id, \$now );" )
+			MailQueue::mark_sent( \$id, \$now, \$slot );" => "		if ( true ) {
+			MailQueue::mark_sent( \$id, \$now, \$slot );" )
 );
 
 neuf();
@@ -1011,12 +1011,13 @@ $ms32 = mutant(
 	'MailScheduler',
 	array( "		\$resultat = MailQueue::with_lock(
 			\$id,
-			static fn( MailLockHandle \$poignee ) => self::poser_evenement( \$id, \$now ),
-			\$now
+			static fn( MailLockHandle \$poignee ) => self::poser_evenement( \$now, \$slot ),
+			\$now,
+			\$slot
 		);
 
 		return ! empty( \$resultat['ok'] ) && true === \$resultat['valeur'];" =>
-		"		return self::poser_evenement( \$id, \$now );" )
+		"		return self::poser_evenement( \$now, \$slot );" )
 );
 
 neuf();
@@ -1138,7 +1139,7 @@ check( '35 · le code ne référence aucune clé générique',
 
 
 // ====== 36 · FileCleaner ne consulte plus le mutex =======================
-$mq36 = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( "		if ( MailProcessLock::is_held( \$id ) ) {
+$mq36 = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( "		if ( MailProcessLock::is_held( \$id, \$slot ) ) {
 			return true;
 		}
 
@@ -1174,14 +1175,14 @@ $mq37 = mutant(
 	array( "			try {
 				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
 			} finally {
-				self::release_lock( \$id, \$jeton );
+				self::release_lock( \$id, \$jeton, \$slot );
 			}" =>
 		"			MailProcessLock::release( \$poignee );
 
 			try {
 				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
 			} finally {
-				self::release_lock( \$id, \$jeton );
+				self::release_lock( \$id, \$jeton, \$slot );
 			}" )
 );
 

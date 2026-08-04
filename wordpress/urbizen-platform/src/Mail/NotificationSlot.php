@@ -107,6 +107,63 @@ final class NotificationSlot {
 	}
 
 	/**
+	 * Suffixe des clés de stockage global, verrous compris.
+	 *
+	 * Les métadonnées sont déjà portées par la demande : le type suffit à les
+	 * distinguer. Un verrou, lui, est une option **globale** — il doit donc
+	 * porter l'identifiant interne en plus du type, sans quoi deux demandes
+	 * partageraient le même verrou. L'identifiant interne, et non la référence :
+	 * le verrou existe avant que la référence ne soit confirmée.
+	 *
+	 * Le créneau administratif rend l'identifiant seul, à l'identique de ce que
+	 * la file écrivait jusqu'ici.
+	 *
+	 * @return string
+	 */
+	public function cle_verrou(): string {
+		return self::ADMIN === $this->type
+			? (string) $this->demande
+			: $this->demande . '__' . $this->type;
+	}
+
+	/**
+	 * Arguments de l'événement cron de ce créneau.
+	 *
+	 * Le créneau administratif rend **un seul** argument, comme le planificateur
+	 * en posait jusqu'ici. Ce n'est pas de la nostalgie : WordPress identifie un
+	 * événement par son couple (hook, arguments). Ajouter un second argument au
+	 * créneau historique rendrait invisibles tous les événements déjà inscrits,
+	 * et `wp_next_scheduled()` conclurait à tort qu'il n'y en a pas — donc en
+	 * poserait un second, et la notification partirait deux fois.
+	 *
+	 * @return array<int, mixed>
+	 */
+	public function args_cron(): array {
+		return self::ADMIN === $this->type
+			? array( $this->demande )
+			: array( $this->demande, $this->type );
+	}
+
+	/**
+	 * Créneau d'un événement cron reçu, quelle que soit sa génération.
+	 *
+	 * Un événement inscrit avant l'introduction des créneaux ne porte pas de
+	 * type : il désigne la notification interne, et rien d'autre. Un type
+	 * inconnu — arguments corrompus, extension tierce — est traité de même,
+	 * plutôt que d'abandonner un événement qui a une chance d'être légitime.
+	 *
+	 * @param mixed $demande Identifiant transmis par le planificateur.
+	 * @param mixed $type    Type transmis, absent sur les événements anciens.
+	 * @return self
+	 */
+	public static function depuis_cron( $demande, $type = '' ): self {
+		$demande = (int) $demande;
+		$type    = is_string( $type ) ? $type : '';
+
+		return self::pour( $demande, $type ) ?? self::admin( $demande );
+	}
+
+	/**
 	 * Clé d'idempotence, déterministe et lisible.
 	 *
 	 * Elle repose sur la **référence** de la demande, pas sur son identifiant

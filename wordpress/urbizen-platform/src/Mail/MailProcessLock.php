@@ -49,15 +49,16 @@ final class MailProcessLock {
 	 * refusée — rend `null`, et l'appelant doit renoncer plutôt que se rabattre
 	 * sur le bail d'option.
 	 *
-	 * @param int $submission Demande.
+	 * @param int                  $submission Demande.
+	 * @param NotificationSlot|null $slot      Créneau visé ; à défaut, la notification interne.
 	 * @return MailLockHandle|null Poignée détenue, ou `null`.
 	 */
-	public static function acquire( int $submission ): ?MailLockHandle {
+	public static function acquire( int $submission, ?NotificationSlot $slot = null ): ?MailLockHandle {
 		if ( $submission <= 0 ) {
 			return null;
 		}
 
-		$chemin = self::chemin( $submission );
+		$chemin = self::chemin( $submission, $slot );
 
 		if ( null === $chemin ) {
 			return null;
@@ -112,11 +113,12 @@ final class MailProcessLock {
 	 * Rend `true` également lorsque le mutex ne peut pas être évalué : dans le
 	 * doute, on considère qu'une opération est en cours et on ne touche à rien.
 	 *
-	 * @param int $submission Demande.
+	 * @param int                  $submission Demande.
+	 * @param NotificationSlot|null $slot      Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function is_held( int $submission ): bool {
-		$chemin = self::chemin( $submission );
+	public static function is_held( int $submission, ?NotificationSlot $slot = null ): bool {
+		$chemin = self::chemin( $submission, $slot );
 
 		if ( null === $chemin ) {
 			// Impossible de se prononcer : fermé par défaut.
@@ -187,10 +189,18 @@ final class MailProcessLock {
 	/**
 	 * Chemin technique d'une demande.
 	 *
-	 * @param int $submission Demande.
+	 * Chaque créneau a son propre fichier : l'accusé client et la notification
+	 * interne d'une même demande peuvent être traités en parallèle sans jamais
+	 * s'attendre. Le créneau administratif rend l'identifiant nu, donc le nom
+	 * dérivé est **exactement** celui écrit jusqu'ici — aucun verrou en place
+	 * n'est orphelin par ce changement.
+	 *
+	 * @param int                  $submission Demande.
+	 * @param NotificationSlot|null $slot      Créneau visé ; à défaut, la notification interne.
 	 * @return string|null
 	 */
-	public static function chemin( int $submission ): ?string {
+	public static function chemin( int $submission, ?NotificationSlot $slot = null ): ?string {
+		$slot = $slot ?? NotificationSlot::admin( $submission );
 		$dossier = self::dossier();
 
 		if ( null === $dossier ) {
@@ -199,7 +209,7 @@ final class MailProcessLock {
 
 		// Nom dérivé : ni identifiant de notification en clair, ni référence,
 		// ni rien qui puisse être rapproché d'une personne.
-		$nom = hash_hmac( 'sha256', 'mail-lock|' . $submission, wp_salt( 'auth' ) );
+		$nom = hash_hmac( 'sha256', 'mail-lock|' . $slot->cle_verrou(), wp_salt( 'auth' ) );
 
 		return $dossier . '/' . $nom . '.lock';
 	}

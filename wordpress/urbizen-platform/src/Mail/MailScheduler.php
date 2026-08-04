@@ -53,7 +53,10 @@ final class MailScheduler {
 	 * @return void
 	 */
 	public static function register(): void {
-		add_action( MailPolicy::EVENT, array( self::class, 'handle_event' ), 10, 1 );
+		// Deux arguments : l'identifiant, et le type de notification. Les
+		// événements anciens n'en portent qu'un — WordPress passe alors la
+		// valeur par défaut, et le créneau administratif est retenu.
+		add_action( MailPolicy::EVENT, array( self::class, 'handle_event' ), 10, 2 );
 	}
 
 	/**
@@ -90,21 +93,24 @@ final class MailScheduler {
 	 * @param int         $id    Demande.
 	 * @param int|null    $now   Horodatage courant.
 	 * @param MailLockHandle|null $poignee Poignée, si le mutex est déjà tenu.
+	 * @param NotificationSlot|null $slot  Créneau visé ; à défaut, la notification interne.
 	 * @return bool Vrai si un événement est programmé après cet appel.
 	 */
-	public static function schedule_unique( int $id, ?int $now = null, ?MailLockHandle $poignee = null ): bool {
-		$now = null === $now ? time() : $now;
+	public static function schedule_unique( int $id, ?int $now = null, ?MailLockHandle $poignee = null, ?NotificationSlot $slot = null ): bool {
+		$now  = null === $now ? time() : $now;
+		$slot = $slot ?? NotificationSlot::admin( $id );
 
 		// Mutex déjà tenu par l'appelant : on travaille directement, sans
 		// chercher à le reprendre — ce serait un interblocage.
 		if ( null !== $poignee && $poignee->est_detenu() ) {
-			return self::poser_evenement( $id, $now );
+			return self::poser_evenement( $now, $slot );
 		}
 
 		$resultat = MailQueue::with_lock(
 			$id,
-			static fn( MailLockHandle $poignee ) => self::poser_evenement( $id, $now ),
-			$now
+			static fn( MailLockHandle $poignee ) => self::poser_evenement( $now, $slot ),
+			$now,
+			$slot
 		);
 
 		return ! empty( $resultat['ok'] ) && true === $resultat['valeur'];
@@ -114,22 +120,23 @@ final class MailScheduler {
 	 * Alias historique.
 	 *
 	 * @param int      $id  Demande.
-	 * @param int|null $now Horodatage courant.
+	 * @param int|null              $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function schedule( int $id, ?int $now = null ): bool {
-		return self::schedule_unique( $id, $now );
+	public static function schedule( int $id, ?int $now = null, ?NotificationSlot $slot = null ): bool {
+		return self::schedule_unique( $id, $now, null, $slot );
 	}
 
 	/**
 	 * Pose l'événement s'il n'existe pas déjà. À n'appeler que sous verrou.
 	 *
-	 * @param int $id  Demande.
-	 * @param int $now Horodatage courant.
+	 * @param int              $now  Horodatage courant.
+	 * @param NotificationSlot $slot Créneau visé.
 	 * @return bool
 	 */
-	private static function poser_evenement( int $id, int $now ): bool {
-		$args = array( $id );
+	private static function poser_evenement( int $now, NotificationSlot $slot ): bool {
+		$args = $slot->args_cron();
 
 		if ( false !== wp_next_scheduled( MailPolicy::EVENT, $args ) ) {
 			return true;
@@ -150,11 +157,12 @@ final class MailScheduler {
 	 * Une seule suppression ne suffit pas : un doublon créé avant que la
 	 * planification ne devienne atomique doit pouvoir être retiré lui aussi.
 	 *
-	 * @param int $id Demande.
+	 * @param int                   $id   Demande.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return int Nombre d'événements retirés.
 	 */
-	public static function unschedule_all( int $id ): int {
-		$args    = array( $id );
+	public static function unschedule_all( int $id, ?NotificationSlot $slot = null ): int {
+		$args    = ( $slot ?? NotificationSlot::admin( $id ) )->args_cron();
 		$retires = 0;
 
 		// Boucle bornée : `wp_next_scheduled()` ne rend qu'une occurrence à la
@@ -176,21 +184,23 @@ final class MailScheduler {
 	/**
 	 * Alias historique.
 	 *
-	 * @param int $id Demande.
+	 * @param int                   $id   Demande.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return void
 	 */
-	public static function unschedule( int $id ): void {
-		self::unschedule_all( $id );
+	public static function unschedule( int $id, ?NotificationSlot $slot = null ): void {
+		self::unschedule_all( $id, $slot );
 	}
 
 	/**
 	 * Traite l'événement d'une demande.
 	 *
-	 * @param mixed $id Identifiant transmis par le planificateur.
+	 * @param mixed $id   Identifiant transmis par le planificateur.
+	 * @param mixed $type  Type de notification ; absent des événements anciens.
 	 * @return string Code technique du résultat.
 	 */
-	public static function handle_event( $id = 0 ): string {
-		return self::process( (int) $id );
+	public static function handle_event( $id = 0, $type = '' ): string {
+		return self::process( (int) $id, null, NotificationSlot::depuis_cron( $id, $type ) );
 	}
 
 	/**
@@ -202,12 +212,14 @@ final class MailScheduler {
 	 * au transport : si une mise à la Corbeille a gagné la course entre-temps,
 	 * aucun courriel ne part.
 	 *
-	 * @param int      $id  Demande.
-	 * @param int|null $now Horodatage courant.
+	 * @param int                   $id   Demande.
+	 * @param int|null              $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string Code technique.
 	 */
-	public static function process( int $id, ?int $now = null ): string {
-		$now = null === $now ? time() : $now;
+	public static function process( int $id, ?int $now = null, ?NotificationSlot $slot = null ): string {
+		$now  = null === $now ? time() : $now;
+		$slot = $slot ?? NotificationSlot::admin( $id );
 
 		if ( $id <= 0 ) {
 			return 'identifiant_invalide';
@@ -230,10 +242,11 @@ final class MailScheduler {
 
 		$resultat = MailQueue::with_lock(
 			$id,
-			static function ( MailLockHandle $poignee ) use ( $id, $now ) {
-				return self::envoyer_sous_verrou( $id, $poignee, $now );
+			static function ( MailLockHandle $poignee ) use ( $id, $now, $slot ) {
+				return self::envoyer_sous_verrou( $id, $poignee, $now, $slot );
 			},
-			$now
+			$now,
+			$slot
 		);
 
 		if ( empty( $resultat['ok'] ) ) {
@@ -249,9 +262,10 @@ final class MailScheduler {
 	 * @param int    $id    Demande.
 	 * @param MailLockHandle $poignee Poignée détenue.
 	 * @param int    $now   Horodatage courant.
+	 * @param NotificationSlot $slot Créneau visé.
 	 * @return string Code technique.
 	 */
-	private static function envoyer_sous_verrou( int $id, MailLockHandle $poignee, int $now ): string {
+	private static function envoyer_sous_verrou( int $id, MailLockHandle $poignee, int $now, NotificationSlot $slot ): string {
 		// Relecture sous verrou : l'état a pu changer entre le contrôle
 		// préalable et l'obtention du verrou.
 		$motif = MailPolicy::blocker( $id, $now );
@@ -260,15 +274,15 @@ final class MailScheduler {
 			return $motif;
 		}
 
-		$rang = ( (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true ) ) + 1;
+		$rang = ( (int) get_post_meta( $id, $slot->cle( MailPolicy::META_ATTEMPTS ), true ) ) + 1;
 
 		if ( $rang > MailPolicy::MAX_ATTEMPTS ) {
-			MailQueue::mark_failure( $id, $rang, 'attempts_exhausted', $now );
+			MailQueue::mark_failure( $id, $rang, 'attempts_exhausted', $now, $slot );
 
 			return 'tentatives_epuisees';
 		}
 
-		if ( ! MailQueue::mark_sending( $id, $rang, $now ) ) {
+		if ( ! MailQueue::mark_sending( $id, $rang, $now, $slot ) ) {
 			return 'etat_non_ecrit';
 		}
 
@@ -281,7 +295,7 @@ final class MailScheduler {
 
 		if ( null === $strategie ) {
 			Logger::error( sprintf( 'notification #%d : aucune stratégie pour le type « %s »', $id, $type ) );
-			MailQueue::mark_failure( $id, $rang, 'no_strategy', $now );
+			MailQueue::mark_failure( $id, $rang, 'no_strategy', $now, $slot );
 
 			return 'strategie_absente';
 		}
@@ -289,7 +303,7 @@ final class MailScheduler {
 		$message = $strategie->build( $id, $now );
 
 		if ( null === $message ) {
-			MailQueue::mark_failure( $id, $rang, 'render_failed', $now );
+			MailQueue::mark_failure( $id, $rang, 'render_failed', $now, $slot );
 
 			return 'rendu_impossible';
 		}
@@ -298,7 +312,7 @@ final class MailScheduler {
 		// prendre du temps ; une mise à la Corbeille a pu aboutir. On relit
 		// l'état réel, cache vidé, et on renonce plutôt que d'envoyer la
 		// notification d'un dossier retiré.
-		if ( ! $poignee->est_detenu() || ! MailQueue::owns_lock( $id, $poignee->jeton(), $now ) ) {
+		if ( ! $poignee->est_detenu() || ! MailQueue::owns_lock( $id, $poignee->jeton(), $now, $slot ) ) {
 			return 'verrou_perdu';
 		}
 
@@ -335,7 +349,7 @@ final class MailScheduler {
 		}
 
 		// Le bail, lui, se réconcilie sous le mutex.
-		MailQueue::refresh_lease( $poignee, $now );
+		MailQueue::refresh_lease( $poignee, $now, $slot );
 
 		// Dernière garantie avant d'écrire : la demande ne doit pas s'être
 		// fermée pendant l'appel. Si elle l'a fait, l'envoi a bien eu lieu — la
@@ -350,13 +364,13 @@ final class MailScheduler {
 		}
 
 		if ( ! empty( $resultat['ok'] ) ) {
-			MailQueue::mark_sent( $id, $now );
+			MailQueue::mark_sent( $id, $now, $slot );
 
 			Logger::info(
 				sprintf(
 					'notification #%d [%s] acceptée par le transport (tentative %d)',
 					$id,
-					MailPolicy::short_id( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ),
+					MailPolicy::short_id( (string) get_post_meta( $id, $slot->cle( MailPolicy::META_ID ), true ) ),
 					$rang
 				)
 			);
@@ -364,7 +378,7 @@ final class MailScheduler {
 			return 'sent';
 		}
 
-		MailQueue::mark_failure( $id, $rang, (string) ( $resultat['code'] ?? 'transport_refused' ), $now );
+		MailQueue::mark_failure( $id, $rang, (string) ( $resultat['code'] ?? 'transport_refused' ), $now, $slot );
 
 		return 'echec';
 	}
@@ -391,6 +405,12 @@ final class MailScheduler {
 	 * trace d'une panne survenue entre la finalisation et la planification ;
 	 * une reprise dont l'échéance est atteinte ; un `sending` abandonné ; un
 	 * événement programmé pour une demande qui n'existe plus.
+	 *
+	 * **Portée : le créneau de la notification interne.** La réconciliation
+	 * balaie les demandes par la clé d'état historique, qui est celle de ce
+	 * créneau seul. Tout créneau supplémentaire devra recevoir sa propre passe ;
+	 * la présente n'en rattraperait aucun, et le laisser croire serait pire que
+	 * de l'écrire.
 	 *
 	 * @param int|null $now Horodatage courant.
 	 * @return array{planifiees:int,reprises:int,abandonnees:int,orphelins:int}
@@ -478,7 +498,7 @@ final class MailScheduler {
 			}
 
 			// `pending` sans événement programmé.
-			if ( false === wp_next_scheduled( MailPolicy::EVENT, array( $id ) ) && self::schedule_unique( $id, $now ) ) {
+			if ( false === wp_next_scheduled( MailPolicy::EVENT, NotificationSlot::admin( $id )->args_cron() ) && self::schedule_unique( $id, $now ) ) {
 				++$bilan['planifiees'];
 			}
 		}

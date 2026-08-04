@@ -2860,3 +2860,77 @@ obligatoires : identifier le terrain demeure indispensable.
   mention contextuelle, récapitulatif, absence de champ obligatoire dans l'étape, atteinte de
   l'écran final sans aucun fichier, sérialisation, priorité du fichier sur le report, parité
   maquette ≡ thème.
+
+---
+
+## D-055 — La file de courriels s'adresse par créneau de notification
+
+**Contexte.** La file ne connaissait qu'un message par demande : la notification interne à Urbizen.
+Ses états — statut, identifiant, tentatives, dernière tentative, prochaine tentative, envoi,
+dernière erreur — vivaient dans sept clés de méta fixes, son bail dans une option nommée d'après
+l'identifiant de la demande, son mutex dans un fichier dérivé du même identifiant, et son événement
+cron portait ce seul identifiant en argument. Tout cela suppose **un** message, et ne le dit nulle
+part parce que la question ne se posait pas.
+
+L'accusé de réception adressé au demandeur est un second message. Il a son propre destinataire, son
+propre contenu et son propre sort : il peut échouer quand l'autre réussit, il doit pouvoir être
+retenté seul, et son annulation ne doit pas emporter celle de l'autre.
+
+**Décision.** La file est paramétrée par un **créneau** — le couple (demande, type de notification)
+— porté par `Mail\NotificationSlot`. Toute la mécanique d'états, de verrous, de tentatives et de
+réconciliation reste unique ; seules les clés d'adressage changent. Deux types existent :
+`admin_notification` et `customer_acknowledgement`. Un type hors liste ne produit aucun créneau, et
+`pour()` rend `null` plutôt que de retomber sur l'administratif : un type inconnu doit se voir, pas
+écrire dans le créneau d'un autre.
+
+**Le créneau administratif conserve exactement les clés historiques.** Clés de méta sans suffixe,
+option de verrou nommée par le seul identifiant, chemin de mutex dérivé du seul identifiant,
+événement cron à un seul argument. Ce n'est pas une coquetterie de compatibilité, c'est ce qui
+permet de livrer **sans reprise de données** : les demandes déjà enregistrées restent lisibles,
+l'écran d'administration, la garde de corbeille et le rendu du courriel continuent de fonctionner
+sans être touchés, et les verrous comme les événements en cours au moment du déploiement restent
+reconnus. Les migrer n'apporterait qu'une symétrie de façade, au prix d'un risque de régression sur
+du code qui marche.
+
+Le point le plus coûteux à manquer est l'événement cron. WordPress identifie un événement par son
+couple (hook, arguments) : ajouter un second argument au créneau historique rendrait invisibles tous
+les événements déjà inscrits, `wp_next_scheduled()` conclurait à tort qu'il n'y en a pas, en
+poserait un second, et la notification partirait **deux fois**. Les créneaux non administratifs, eux,
+portent leur type en second argument. Symétriquement, un événement reçu sans type — ou avec un type
+corrompu — est traité comme administratif plutôt qu'abandonné.
+
+**Les verrous sont indépendants, aux deux couches.** Le bail d'option est une option globale : sa
+clé porte l'identifiant **et** le type, sans quoi deux demandes partageraient le même verrou. Le
+mutex de processus reçoit lui aussi son propre fichier par créneau. Sans cela, l'accusé client et la
+notification interne d'une même demande s'attendraient l'un l'autre alors qu'ils n'écrivent nulle
+part au même endroit — une sérialisation gratuite, et une source d'échecs `mutex_indisponible` que
+rien ne justifierait.
+
+**L'idempotence est adressée par référence, pas par identifiant de post** : `<référence>:<type>`.
+La référence est ce qui identifie la demande pour un humain, et elle ne change jamais ; deux
+exécutions du même travail produisent donc la même clé, et un second accusé ne peut pas naître d'une
+reprise. Les clés de stockage, elles, restent adressées par identifiant interne — le verrou existe
+avant que la référence ne soit confirmée.
+
+**Ce qui n'est volontairement pas fait dans cette passe.** `MailScheduler::reconcile()` balaie les
+demandes par la clé d'état historique, donc par le seul créneau administratif. Un créneau
+supplémentaire devra recevoir sa propre passe ; le laisser croire couvert serait pire que de
+l'écrire, et c'est écrit dans son docblock. De même, la mise à la Corbeille n'annule aujourd'hui que
+le créneau administratif : le jour où un second créneau existe, cette annulation doit les balayer
+tous — un accusé de réception laissé en file partirait vers une personne réelle alors que son
+dossier a été retiré.
+
+**Conséquences.**
+- `src/Mail/NotificationSlot.php` : `cle()`, `cle_verrou()`, `args_cron()`, `idempotence()`,
+  `depuis_cron()`, `pour()`. Source unique du suffixe.
+- `src/Mail/MailQueue.php` : les treize méthodes publiques prennent un créneau facultatif en dernier
+  paramètre ; sans lui, la file agit sur la notification interne. Aucune clé n'y est plus composée
+  en direct — le banc l'éprouve sur la source.
+- `src/Mail/MailProcessLock.php` : `acquire()`, `is_held()` et `chemin()` acceptent un créneau. Le
+  nom dérivé reste un HMAC, et celui du créneau administratif est inchangé au caractère près.
+- `src/Mail/MailScheduler.php` : `schedule()`, `schedule_unique()`, `unschedule()`,
+  `unschedule_all()`, `process()` et la séquence d'envoi acceptent un créneau ; `handle_event()`
+  reçoit deux arguments et résout le créneau depuis ce que le cron lui transmet.
+- Banc `tests/submissions/test-creneaux.php`, 63 contrôles : adressage historique préservé, liste
+  blanche des types, événements anciens traitables, états indépendants, baux indépendants, mutex
+  indépendants, sections critiques imbriquées sans interblocage, source unique des clés.

@@ -78,6 +78,8 @@ final class MailRenderer {
 			return null;
 		}
 
+		// L'identifiant technique lu ici est celui du créneau de la notification
+		// interne — le seul message que ce rendu compose.
 		$reference    = (string) $demande['reference'];
 		$notification = (string) get_post_meta( $id, MailPolicy::META_ID, true );
 

@@ -282,6 +282,11 @@ final class SubmissionsAdmin {
 				// Un état, un décompte, une date d'envoi. Jamais le
 				// destinataire, jamais le corps, jamais un lien signé, jamais
 				// le détail d'une erreur technique.
+				//
+				// La colonne rend l'état du créneau de la notification interne :
+				// c'est celui qui intéresse l'administration. Un second créneau
+				// aura sa propre lecture, plutôt qu'un état agrégé qui ne dirait
+				// plus lequel des deux messages a échoué.
 				$etat        = MailQueue::state( $post_id );
 				$affichage   = self::mail_label( $etat['status'] );
 				$tentatives  = (int) $etat['attempts'];
