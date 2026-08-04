@@ -68,6 +68,8 @@ foreach (
 		'src/Mail/NotificationStrategy.php',
 		'src/Mail/ConceptionNotificationStrategy.php',
 		'src/Mail/DeclarationPrealableNotificationStrategy.php',
+		'src/Mail/CustomerAcknowledgementRenderer.php',
+		'src/Mail/CustomerAcknowledgementStrategy.php',
 		'src/Mail/NotificationStrategyRegistry.php',
 		'src/Mail/MailTransport.php',
 		'src/Mail/WordPressMailTransport.php',

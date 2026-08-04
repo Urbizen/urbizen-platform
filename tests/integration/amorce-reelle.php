@@ -48,6 +48,7 @@ foreach (
 		'src/Mail/MailPolicy.php',
 		'src/Mail/MailLockHandle.php',
 		'src/Mail/MailProcessLock.php',
+		'src/Mail/NotificationSlot.php',
 		'src/Mail/MailQueue.php',
 		'src/Mail/MailRenderer.php',
 		'src/Mail/MailTransport.php',

@@ -2934,3 +2934,80 @@ dossier a été retiré.
 - Banc `tests/submissions/test-creneaux.php`, 63 contrôles : adressage historique préservé, liste
   blanche des types, événements anciens traitables, états indépendants, baux indépendants, mutex
   indépendants, sections critiques imbriquées sans interblocage, source unique des clés.
+
+---
+
+## D-056 — Accusé de réception adressé au demandeur
+
+**Contexte.** Jusqu'ici, une soumission produisait un seul message, interne à Urbizen. Le client
+voyait sa confirmation à l'écran, et rien d'autre : aucune trace écrite, aucune référence qu'il
+puisse retrouver le lendemain. C'est le second créneau de notification ouvert par [D-055].
+
+**Décision.** Un accusé de réception part vers le demandeur, dans son propre créneau
+(`customer_acknowledgement`), avec son propre état, son propre verrou, son propre événement et sa
+propre reprise. Il est **le premier message qu'Urbizen adresse à une personne extérieure**, et tout
+ce qui suit découle de là.
+
+**Le destinataire ne vient que de l'adresse validée puis persistée.** Une seule clé est lue —
+`email` — et elle est revalidée à la lecture, retours chariot retirés d'abord. Ni `$_POST`, ni un
+`recipient`, `notification_email`, `to`, `cc`, `bcc`, `from` ou `reply_to` glissé dans la requête
+n'a de chemin jusqu'à cette décision. Sans cette règle, un tiers ferait envoyer par Urbizen, depuis
+le domaine d'Urbizen, un message de confirmation à l'adresse de son choix. Sans adresse exploitable,
+il n'y a pas d'accusé — et surtout pas de repli sur l'adresse administrative, qui recevrait un
+message écrit pour quelqu'un d'autre.
+
+**Le contenu est pauvre, délibérément.** Aucun lien signé : les liens de téléchargement sont
+temporaires mais réels, et les envoyer dans un message qui traverse des boîtes tierces, est archivé,
+transféré et indexé reviendrait à publier les pièces du dossier. Aucune réponse recopiée : le
+demandeur sait ce qu'il a écrit, le lui renvoyer multiplie les endroits où ses données existent.
+Aucun état technique : ni identifiant de post, ni statut interne, ni code d'erreur, ni nom de
+fichier. Restent la référence, le projet sous ses libellés client, l'estimation, ce qui reste à
+transmettre, et une phrase pour dire la suite.
+
+**Le tarif est repris tel que le serveur l'a calculé et persisté**, jamais recalculé, jamais repris
+du navigateur. Un total absent n'est pas un zéro : c'est un tarif sur étude, et il se dit ainsi —
+afficher « 0 € » serait un engagement, et un engagement faux. La mention imposée est reproduite au
+caractère près : « Estimation indicative. Le tarif définitif sera confirmé par Urbizen après
+vérification de votre projet, avant toute commande. » Elle seule empêche une estimation d'être lue
+comme un devis, et un banc en vérifie l'exactitude littérale.
+
+**Sujet** : `Votre demande Urbizen a bien été reçue — {RÉFÉRENCE}`. Il porte la référence et rien
+d'autre — un sujet est visible dans une liste de messages, parfois sur un écran verrouillé.
+
+**Liste blanche par type de formulaire.** `NotificationStrategyRegistry::for_slot()` résout le
+couple (type, créneau). Seule la déclaration préalable prévoit un accusé ; tout autre type n'envoie
+rien à qui que ce soit. Écrire à une personne doit être une décision explicite, prise type par type,
+pas un drapeau qu'on oublie d'éteindre.
+
+**Le créneau est ouvert après le point de non-retour, et son échec ne remonte pas.** La demande est
+reçue ; qu'un message de courtoisie ne parte pas est fâcheux, mais annuler pour autant un dossier
+déjà enregistré serait absurde — et le client a bien vu sa confirmation à l'écran. C'est l'exact
+inverse de la notification interne, dont l'absence signifierait qu'un dossier est arrivé sans que
+personne ne le sache, et dont l'échec fait donc échouer la finalisation.
+
+**L'idempotence est adressée par `<référence>:<type>`.** Une reprise ne peut pas faire naître un
+second accusé.
+
+**Conséquences sur l'existant.** Un second créneau existant désormais, les traitements qui
+supposaient un message unique ont été étendus à tous les créneaux, chacun sous son propre verrou :
+- `MailScheduler::reconcile()` fait une passe par créneau — une passe unique n'aurait rattrapé que
+  la notification interne, laissant un accusé coincé indéfiniment.
+- `TrashGuard` annule **tous** les créneaux à la mise à la Corbeille, et les fait tous reprendre à
+  la restauration. Un accusé laissé en file partirait vers une personne réelle alors que son dossier
+  vient d'être retiré : c'est le message le plus embarrassant que la plateforme puisse produire.
+- `TrashGuard::guard_trash()` et `FileCleaner` diffèrent leur travail si **n'importe lequel** des
+  créneaux est en cours d'envoi, et `FileCleaner` nettoie le fichier technique de chaque créneau.
+- `MailPolicy::blocker()`, `closed_blocker()` et `sending_is_stale()` prennent un créneau. En
+  particulier, le contrôle de destinataire porte sur celui du créneau : une adresse administrative
+  absente ne bloque plus un accusé, et un demandeur sans courriel exploitable ne bloque plus la
+  notification interne.
+
+**Conséquences.**
+- `src/Mail/CustomerAcknowledgementRenderer.php` : sujet, corps, en-têtes, mention.
+- `src/Mail/CustomerAcknowledgementStrategy.php` : adaptateur mince sur le contrat existant.
+- `src/Mail/MailPolicy.php` : `recipient_for()`, `customer_recipient()`.
+- `src/Mail/NotificationStrategyRegistry.php` : `for_slot()`, `has_customer_acknowledgement()`.
+- `src/Submissions/SubmissionRepository.php` : ouverture du créneau après persistance.
+- Banc `tests/submissions/test-accuse-client.php`, 52 contrôles : destinataire incorruptible,
+  sujet exact, contenu présent, contenu interdit, échappement, tarif sur étude, en-têtes, résolution
+  par créneau, idempotence, indépendance des deux messages.

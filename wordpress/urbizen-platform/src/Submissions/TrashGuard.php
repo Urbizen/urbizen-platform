@@ -31,6 +31,7 @@ use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Mail\NotificationSlot;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -141,10 +142,17 @@ final class TrashGuard {
 		// à l'intérieur du transport. Modifier la notification maintenant
 		// reviendrait à écrire par-dessus lui. On refuse, proprement — la mise
 		// à la Corbeille reste rejouable dès que le verrou est rendu.
-		if ( MailQueue::is_locked( $id ) ) {
-			Logger::error( sprintf( 'corbeille différée pour #%d : notification en cours d’envoi', $id ) );
+		// **N'importe lequel** des créneaux suffit à différer : l'annulation qui
+		// suivra doit tous les atteindre, et elle ne le peut pas tant qu'un
+		// propriétaire en tient un.
+		foreach ( NotificationSlot::TYPES as $type ) {
+			$slot = NotificationSlot::pour( $id, $type );
 
-			return false;
+			if ( null !== $slot && MailQueue::is_locked( $id, null, $slot ) ) {
+				Logger::error( sprintf( 'corbeille différée pour #%d : notification [%s] en cours d’envoi', $id, $type ) );
+
+				return false;
+			}
 		}
 		$courant = (string) get_post_meta( $id, '_urbizen_status', true );
 
@@ -259,20 +267,29 @@ final class TrashGuard {
 		// retiré. Un envoi déjà accepté n'est jamais annulé : le message est
 		// parti, le nier serait faux.
 		//
-		// **Portée : le créneau de la notification interne.** Tout créneau
-		// supplémentaire devra être annulé ici aussi — un accusé de réception
-		// laissé en file partirait vers une personne réelle alors que son
-		// dossier a été retiré. Le jour où un second créneau existe, cette
-		// annulation doit les balayer tous.
-		MailQueue::with_lock(
-			$id,
-			static function ( MailLockHandle $poignee ) use ( $id ) {
-				MailQueue::cancel( $id, 'demande_en_corbeille' );
-				MailScheduler::unschedule_all( $id );
+		// **Tous les créneaux sont annulés**, chacun sous son propre verrou. Un
+		// accusé de réception laissé en file partirait vers une personne réelle
+		// alors que son dossier vient d'être retiré : c'est le message le plus
+		// embarrassant que la plateforme puisse produire.
+		foreach ( NotificationSlot::TYPES as $type ) {
+			$slot = NotificationSlot::pour( $id, $type );
 
-				return true;
+			if ( null === $slot ) {
+				continue;
 			}
-		);
+
+			MailQueue::with_lock(
+				$id,
+				static function ( MailLockHandle $poignee ) use ( $id, $slot ) {
+					MailQueue::cancel( $id, 'demande_en_corbeille', $slot );
+					MailScheduler::unschedule_all( $id, $slot );
+
+					return true;
+				},
+				null,
+				$slot
+			);
+		}
 
 		Logger::info( sprintf( 'demande #%d : mise à la Corbeille confirmée', $id ) );
 	}
@@ -606,27 +623,40 @@ final class TrashGuard {
 		// avec le même identifiant. Une notification déjà `sent` n'est jamais
 		// réémise automatiquement.
 		//
-		// Portée : le créneau de la notification interne, en symétrie exacte de
-		// l'annulation ci-dessus. Les deux doivent être étendues ensemble.
-		MailQueue::with_lock(
-			$id,
-			static function ( MailLockHandle $poignee ) use ( $id ) {
-				// Relecture **sous verrou** : un envoi a pu aboutir entre-temps.
-				if ( MailPolicy::CANCELLED !== (string) get_post_meta( $id, MailPolicy::META_STATUS, true ) ) {
-					return false;
-				}
+		// Symétrie exacte de l'annulation : tous les créneaux annulés par la mise
+		// à la Corbeille reprennent, chacun sous son propre verrou. Un créneau
+		// que la mise à la Corbeille n'avait pas annulé — parce qu'il était déjà
+		// envoyé, ou parce qu'il n'a jamais existé — n'est pas ressuscité ici :
+		// la relecture sous verrou l'écarte.
+		foreach ( NotificationSlot::TYPES as $type ) {
+			$slot = NotificationSlot::pour( $id, $type );
 
-				if ( '' !== (string) get_post_meta( $id, MailPolicy::META_SENT_AT, true ) ) {
-					return false;
-				}
-
-				if ( ! MailQueue::requeue( $id ) ) {
-					return false;
-				}
-
-				return MailScheduler::schedule_unique( $id, null, $poignee );
+			if ( null === $slot ) {
+				continue;
 			}
-		);
+
+			MailQueue::with_lock(
+				$id,
+				static function ( MailLockHandle $poignee ) use ( $id, $slot ) {
+					// Relecture **sous verrou** : un envoi a pu aboutir entre-temps.
+					if ( MailPolicy::CANCELLED !== (string) get_post_meta( $id, $slot->cle( MailPolicy::META_STATUS ), true ) ) {
+						return false;
+					}
+
+					if ( '' !== (string) get_post_meta( $id, $slot->cle( MailPolicy::META_SENT_AT ), true ) ) {
+						return false;
+					}
+
+					if ( ! MailQueue::requeue( $id, null, $slot ) ) {
+						return false;
+					}
+
+					return MailScheduler::schedule_unique( $id, null, $poignee, $slot );
+				},
+				null,
+				$slot
+			);
+		}
 
 		Logger::info( sprintf( 'demande #%d restaurée en %s', $id, $memoire ) );
 	}

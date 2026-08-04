@@ -21,8 +21,11 @@
 
 namespace Urbizen\Platform\Submissions;
 
+use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Mail\NotificationSlot;
+use Urbizen\Platform\Mail\NotificationStrategyRegistry;
 use Urbizen\Platform\Support\Logger;
 use Urbizen\Platform\Support\OptionsScan;
 use Urbizen\Platform\Support\Reference;
@@ -216,6 +219,43 @@ final class SubmissionRepository {
 	}
 
 	/**
+	 * Ouvre le créneau d'accusé de réception, si le type en prévoit un.
+	 *
+	 * Trois conditions, et toutes doivent tenir : le type de formulaire figure
+	 * dans la liste blanche des accusés, une adresse exploitable a été validée
+	 * puis persistée, et l'ouverture du créneau réussit. Aucune n'interrompt la
+	 * finalisation si elle manque — mais chacune est journalisée, faute de quoi
+	 * un accusé jamais parti serait indiscernable d'un accusé jamais prévu.
+	 *
+	 * @param int $id  Demande.
+	 * @param int $now Horodatage courant.
+	 * @return bool Vrai si le créneau a été ouvert et planifié.
+	 */
+	private static function ouvrir_accuse_client( int $id, int $now ): bool {
+		$type = (string) get_post_meta( $id, '_urbizen_form_type', true );
+
+		if ( ! NotificationStrategyRegistry::has_customer_acknowledgement( $type ) ) {
+			return false;
+		}
+
+		if ( '' === MailPolicy::customer_recipient( $id ) ) {
+			Logger::info( sprintf( 'demande #%d : pas d’accusé client, aucune adresse exploitable', $id ) );
+
+			return false;
+		}
+
+		$slot = NotificationSlot::client( $id );
+
+		if ( ! MailQueue::create_pending( $id, $now, $slot ) ) {
+			Logger::error( sprintf( 'demande #%d : accusé client non enregistré', $id ) );
+
+			return false;
+		}
+
+		return MailScheduler::schedule( $id, $now, $slot );
+	}
+
+	/**
 	 * Achève une demande : documents en place, référence attribuée pour de bon.
 	 *
 	 * @param int    $id           Identifiant de la demande.
@@ -261,6 +301,15 @@ final class SubmissionRepository {
 		// entre les deux laisse une notification « pending » non planifiée, que
 		// la réconciliation retrouvera.
 		MailScheduler::schedule( $id, $now );
+
+		// L'accusé de réception client vient **après** le point de non-retour, et
+		// son échec ne remonte pas. La demande est reçue ; qu'un message de
+		// courtoisie ne parte pas est fâcheux, mais annuler pour autant un
+		// dossier déjà enregistré serait absurde — et le client, lui, a bien vu
+		// sa confirmation à l'écran. C'est exactement l'inverse de la
+		// notification interne, dont l'absence signifierait qu'un dossier est
+		// arrivé sans que personne ne le sache.
+		self::ouvrir_accuse_client( $id, $now );
 
 		Logger::info(
 			sprintf(
