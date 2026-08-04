@@ -106,6 +106,12 @@ titre "Pièces du projet DP / PCMI — DOM simulé"
 node test-pieces.mjs
 verdict $? "test-pieces.mjs"
 
+# Pont sécurisé entre la page WordPress et l'iframe DP : ce qui protège le
+# nonce, et ce qui empêche qu'une erreur devienne un faux succès.
+titre "Pont DP — DOM simulé"
+node test-pont-dp.mjs
+verdict $? "test-pont-dp.mjs"
+
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php
 verdict $? "test-render.php"
@@ -117,7 +123,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 7 bancs passent.\033[0m\n'
+	printf '\033[32mLes 8 bancs passent.\033[0m\n'
 	exit 0
 fi
 

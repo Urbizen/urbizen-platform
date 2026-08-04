@@ -220,6 +220,54 @@ function urbizen_child_est_page_formulaire_autorisation() {
 }
 
 /**
+ * Configuration de soumission du formulaire affiché.
+ *
+ * Le nonce est émis ici, dans la page parente, et non dans le document servi en
+ * iframe : ce dernier est un fichier statique du thème, qu'aucun PHP ne rend.
+ * C'est précisément pour cela que le pont `postMessage` existe.
+ *
+ * Rien de ce tableau n'est décidé par le navigateur. L'action et le type sont
+ * dérivés du **gabarit de la page**, donc d'une valeur serveur ; l'origine
+ * autorisée vient de `home_url()`, jamais d'un en-tête de requête.
+ *
+ * @return array<string, string>
+ */
+function urbizen_child_configuration_formulaire() {
+	$gabarits = array(
+		'page-formulaire-declaration-prealable' => array(
+			'action' => 'urbizen_declaration_prealable',
+			'nonce'  => 'urbizen_declaration_prealable_submit',
+			'type'   => 'declaration_prealable',
+		),
+	);
+
+	if ( ! is_singular() ) {
+		return array();
+	}
+
+	$slug = get_page_template_slug( get_queried_object_id() );
+
+	if ( ! isset( $gabarits[ $slug ] ) ) {
+		// Le permis de construire n'est pas encore raccordé : sans entrée ici,
+		// sa page ne reçoit aucune configuration et son formulaire reste
+		// inerte, plutôt que d'hériter d'une route qui n'est pas la sienne.
+		return array();
+	}
+
+	$route = $gabarits[ $slug ];
+
+	return array(
+		'action'      => $route['action'],
+		'formType'    => $route['type'],
+		'nonceField'  => 'urbizen_conception_nonce',
+		'nonce'       => wp_create_nonce( $route['nonce'] ),
+		'submitUrl'   => admin_url( 'admin-post.php' ),
+		'origin'      => (string) wp_parse_url( home_url(), PHP_URL_SCHEME ) . '://' . (string) wp_parse_url( home_url(), PHP_URL_HOST ),
+		'frameSource' => '/wp-content/themes/urbizen-child/assets/forms/dp-formulaire.html',
+	);
+}
+
+/**
  * La page affichée utilise-t-elle un gabarit Urbizen — accueil ou page interne ?
  *
  * Étend `urbizen_child_est_accueil_urbizen()` aux pages internes qui empruntent
@@ -383,6 +431,21 @@ function urbizen_child_enqueue_accueil() {
 
 		if ( file_exists( $dir . $form_page_js ) ) {
 			wp_enqueue_script( 'urbizen-form-page', $uri . $form_page_js, array(), (string) filemtime( $dir . $form_page_js ), true );
+
+			// La configuration de soumission est émise **côté serveur**, sur la
+			// page parente, et transmise à l'iframe par `postMessage`. Elle ne
+			// passe jamais par l'URL du cadre : un nonce dans une query string
+			// se retrouverait dans l'historique, les journaux d'accès et tout
+			// en-tête `Referer` sortant.
+			$config = urbizen_child_configuration_formulaire();
+
+			if ( array() !== $config ) {
+				wp_add_inline_script(
+					'urbizen-form-page',
+					'window.urbizenFormConfig = ' . wp_json_encode( $config ) . ';',
+					'before'
+				);
+			}
 		}
 	}
 

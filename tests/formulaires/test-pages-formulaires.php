@@ -190,11 +190,31 @@ foreach ( array( 'DP' => array( $dp, $dp_maq ), 'PC' => array( $pc, $pc_maq ) ) 
  *  7. Rien n'est encore envoyé
  * ---------------------------------------------------------------- */
 
-echo "\n── 7. Aucune soumission réelle à ce stade\n";
+echo "\n── 7. État du raccordement\n";
 
+// La DP poste réellement, via le pont sécurisé ; le PC ne le fait pas encore.
+// L'asymétrie est voulue et datée : ce contrôle la rend visible plutôt que de
+// laisser croire que les deux parcours sont au même stade.
 verifier(
-	'ENDPOINT reste vide dans les quatre documents',
-	4 === substr_count( $dp . $pc . $dp_maq . $pc_maq, 'var ENDPOINT = ""' )
+	'DP · le mode aperçu a disparu des deux copies',
+	! str_contains( $dp, 'var ENDPOINT = ""' ) && ! str_contains( $dp_maq, 'var ENDPOINT = ""' )
+);
+verifier(
+	'DP · le pont sécurisé est chargé',
+	str_contains( $dp, 'urbizen-form-bridge.js' ) && str_contains( $dp_maq, 'urbizen-form-bridge.js' )
+);
+verifier(
+	'DP · la référence réelle a sa place à l’écran final',
+	str_contains( $dp, 'id="dp-reference"' ) && str_contains( $dp_maq, 'id="dp-reference"' )
+);
+verifier(
+	'DP · aucune mention d’aperçu ne subsiste',
+	! str_contains( $dp, 'aucune donnée n’a été transmise' )
+		&& ! str_contains( $dp_maq, 'aucune donnée n’a été transmise' )
+);
+verifier(
+	'PC · pas encore raccordé, ENDPOINT toujours vide',
+	str_contains( $pc, 'var ENDPOINT = ""' ) && str_contains( $pc_maq, 'var ENDPOINT = ""' )
 );
 
 echo "\n";

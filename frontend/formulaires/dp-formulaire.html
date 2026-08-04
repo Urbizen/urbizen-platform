@@ -300,6 +300,8 @@
   #dp-app .dp-next-steps li::before { counter-increment: confirmation; content: counter(confirmation); position: absolute; left: 16px; top: 17px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
   #dp-app .dp-next-steps span { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 12.5px; font-weight: 400; line-height: 1.45; }
   #dp-app .dp-preview-note { margin-top: 20px !important; padding: 12px 14px; border-left: 3px solid var(--cadastre); background: var(--surface-2); font-size: 12.5px; }
+  #dp-app .dp-reference { margin: 18px 0 0; font-size: 14px; }
+  #dp-app .dp-reference strong { font-family: "IBM Plex Mono", monospace; font-size: 16px; letter-spacing: .04em; }
 
   /* -------- responsive -------- */
   @media (max-width: 720px) {
@@ -617,6 +619,7 @@
           <p class="dp-done-kicker">Votre demande d’urbanisme</p>
           <h3>Votre projet est prêt à être étudié</h3>
           <p>Un interlocuteur Urbizen vérifie les informations et les documents transmis avant toute commande.</p>
+          <p class="dp-reference">Référence de votre demande : <strong id="dp-reference"></strong></p>
           <div data-tarifs-recap-final aria-label="Estimation tarifaire"></div>
           <div data-pieces-recap-final></div>
           <ol class="dp-next-steps" aria-label="Prochaines étapes">
@@ -624,7 +627,6 @@
             <li>Confirmation du tarif<span>Vous recevez le montant définitif avant tout engagement.</span></li>
             <li>Ouverture de votre espace client<span>Votre dossier, son avancement et vos échanges seront centralisés.</span></li>
           </ol>
-          <p class="dp-preview-note" id="dp-preview-note" hidden>Aperçu du parcours : aucune donnée n’a été transmise.</p>
         </div>
       </div>
     </div>
@@ -633,6 +635,7 @@
 
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js"></script>
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js"></script>
 <script>
 (function () {
   "use strict";
@@ -642,8 +645,6 @@
      Laissez vide pour tester : le formulaire affiche alors
      les données collectées (JSON) au lieu de les envoyer.
      ========================================================= */
-  var ENDPOINT = ""; // ex. "https://api.votresite.fr/api/dp"
-
   var app   = document.getElementById("dp-app");
   var form  = document.getElementById("dp-form");
   var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
@@ -844,44 +845,58 @@
   });
 
   /* ----- soumission ----- */
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var err = document.getElementById("dp-final-err");
-    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
-      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi.";
-      return;
-    }
-    err.textContent = "";
-    sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
-
-    var fd = new FormData(form);
-    // « nature » est désormais un choix unique : FormData porte déjà la bonne
-    // valeur. Le moteur y ajoute les projets supplémentaires et l'option de
-    // dépôt ; il n'y met aucun montant, que le serveur devra recalculer.
-    tarifs.serialiser(fd);
-    pieces.serialiser(fd);
-
-    if (!ENDPOINT) {
-      showDone(true);
-      return;
-    }
-
-    fetch(ENDPOINT, { method: "POST", body: fd })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
-      .then(function () { showDone(false); })
-      .catch(function () {
-        sendBtn.disabled = false; sendBtn.textContent = "Envoyer ma demande";
-        err.textContent = "L’envoi a échoué. Réessayez ou contactez-moi directement.";
-      });
+  // Le pont détient le nonce, l'URL et l'action : sans lui, rien ne part et
+  // le bouton reste désactivé. Aucun mode de repli — un formulaire qui ne peut
+  // pas poster ne doit pas laisser croire qu'il a envoyé quelque chose.
+  var pont = UrbizenPont.init({
+    form: form,
+    bouton: sendBtn,
+    erreur: document.getElementById("dp-final-err"),
+    serialiser: function (fd) {
+      // « nature » est un choix unique : FormData porte déjà la bonne valeur.
+      // Les modules y ajoutent les projets répétés, leurs descriptions, les
+      // pièces différées et le report cadastral. Aucun montant n'est émis.
+      tarifs.serialiser(fd);
+      pieces.serialiser(fd);
+    },
+    afficherSucces: showDone
   });
 
-  function showDone(preview) {
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    var err = document.getElementById("dp-final-err");
+
+    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
+      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi.";
+      err.setAttribute("tabindex", "-1");
+      err.focus();
+      return;
+    }
+
+    pont.envoyer();
+  });
+
+  /**
+   * Écran final, bâti exclusivement à partir de la réponse du serveur.
+   *
+   * Aucune valeur n'est reprise de l'estimation affichée pendant la saisie :
+   * la référence, le tarif et les libellés viennent de ce qui a été
+   * effectivement enregistré.
+   */
+  function showDone(reponse) {
     form.style.display = "none";
+
     var done = document.getElementById("dp-done");
-    tarifs.rendreRecapFinal();
-    pieces.rafraichirRecap();
-    document.getElementById("dp-preview-note").hidden = !preview;
+
+    document.getElementById("dp-reference").textContent = reponse.reference;
+
+    UrbizenPont.rendreConfirmation(document.querySelector("[data-tarifs-recap-final]"), reponse);
+    UrbizenPont.rendreDifferes(document.querySelector("[data-pieces-recap-final]"), reponse);
+
     done.classList.add("show");
+    done.setAttribute("tabindex", "-1");
+    done.focus();
   }
 
   prefillFromHomepage();
