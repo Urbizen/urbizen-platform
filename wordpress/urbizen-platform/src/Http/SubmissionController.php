@@ -168,8 +168,41 @@ final class SubmissionController {
 		// Le type porté par le retour provient de la ROUTE serveur, jamais du POST.
 		$type = null === $route ? self::FORM_TYPE : $route['form_type'];
 
+		// Négociation de contenu : le MÊME traitement vient de s'exécuter, avec
+		// les mêmes contrôles. Seule la forme de la réponse change. L'en-tête ne
+		// prouve rien et n'autorise rien — un client qui le forge obtient du JSON,
+		// pas un passe-droit.
+		if ( AcceptNegotiation::veut_json( $server ) ) {
+			self::repondre_json( $result );
+
+			return;
+		}
+
 		wp_safe_redirect( self::redirect_url( $result, is_array( $post ) ? $post : array(), $type ) );
 		exit;
+	}
+
+	/**
+	 * Émet la réponse JSON d'une soumission déjà traitée.
+	 *
+	 * Ne décide de rien : elle met en forme une issue produite par le pipeline.
+	 *
+	 * @param SubmissionResult $result Issue du traitement.
+	 * @return void
+	 */
+	private static function repondre_json( SubmissionResult $result ): void {
+		if ( $result->is_success() ) {
+			wp_send_json( SubmissionJsonResponse::succes( $result ), 201 );
+
+			return;
+		}
+
+		$categorie = self::categorie_publique( $result->code() );
+
+		wp_send_json(
+			SubmissionJsonResponse::echec( $categorie, $result->errors() ),
+			SubmissionJsonResponse::statut_http( $categorie )
+		);
 	}
 
 	/**

@@ -41,6 +41,10 @@ titre "2/11 — Conservation : type de contenu privé et repository"
 "$PHP_BIN" test-storage.php
 verdict $? "test-storage.php"
 
+# Réponse JSON et négociation de contenu : la forme change, le pipeline non.
+"$PHP_BIN" test-reponse-json.php
+verdict $? "test-reponse-json.php"
+
 titre "3/11 — Contrôleur de soumission"
 "$PHP_BIN" test-controller.php
 verdict $? "test-controller.php"

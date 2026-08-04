@@ -74,6 +74,8 @@ foreach (
 		'src/Privacy/Retention.php',
 		'src/Admin/SubmissionsAdmin.php',
 		'src/Http/SubmissionResult.php',
+		'src/Http/AcceptNegotiation.php',
+		'src/Http/SubmissionJsonResponse.php',
 		'src/Http/SubmissionFeedback.php',
 		'src/Http/SubmissionFeedbackToken.php',
 		'src/Http/SubmissionRecovery.php',
