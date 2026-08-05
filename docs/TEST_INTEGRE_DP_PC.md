@@ -173,3 +173,96 @@ configuré où son résolveur de polices plante sur le rendu public. Un `mu-plug
 croire à l'option **uniquement** pendant une soumission :
 `wp-content/mu-plugins/urbizen-essai-local.php`. Il vit hors du dépôt et ne doit jamais partir en
 production, où l'assistant a déjà écrit son jeu d'options complet.
+
+
+---
+
+## Second essai intégré — vrais clics navigateur, 5 août 2026
+
+Version du lot de ressources : **`0.2.3`**.
+
+### Le protocole d'initialisation ne dépend plus d'un message unique
+
+Le premier `urbizen_form_ready` pouvait se perdre : le script de la page parente est chargé en pied
+de page, et un cadre servi depuis le cache est prêt avant lui. Trois garanties se complètent
+désormais :
+
+1. le document **répète** sa demande — 0, 100, 250, 500, 1 000 ms, puis chaque seconde jusqu'à
+   10 s ;
+2. la page parente **émet aussi** la configuration au `load` du cadre **et** dès l'exécution de son
+   script, sans attendre d'être sollicitée — c'est ce qui couvre le cas où le cadre était déjà
+   chargé ;
+3. le document **accuse réception** (`urbizen_form_configured`), et tout renvoi cesse.
+
+Les renvois sont idempotents : le document verrouille au premier message valide. Origine exacte et
+`event.source` vérifiés aux deux extrémités, jamais `*`. Un accusé venu d'une fenêtre inconnue ne
+fait pas taire le parent.
+
+**Preuve que le premier `ready` peut être perdu** : le premier message a été intercepté et supprimé
+dans la page, puis le cadre rechargé. Le formulaire s'est initialisé quand même, bouton déverrouillé,
+aucun message d'erreur, accusé enregistré.
+
+### Invalidation durable du cache
+
+Une valeur unique, `URBIZEN_CHILD_FORMS_VERSION`, dans trois endroits : l'URL du cadre portée par
+les gabarits, les cinq références CSS/JS des documents DP et PC, et les bancs de contrat. Un banc
+échoue si les trois divergent, si une ressource interne n'est pas versionnée, ou si un secret
+apparaît dans l'URL du cadre. **Vérifié sans vider le cache** : la nouvelle URL versionnée a suffi à
+charger le nouveau document et ses nouveaux scripts.
+
+---
+
+## Ce qui est validé, et comment
+
+### Validé par test automatisé
+
+Protocole complet — répétition, accusé, arrêt des relances, expiration réelle, configuration
+dupliquée, `load` multiples, mauvaise origine, mauvaise source, autre cadre, absence de secret dans
+l'URL, parité des versions. Barèmes DP et PC, cas sur étude, validation métier, profils d'upload,
+réponses JSON, créneaux de notification, accusés client. **245 contrôles pour le seul pont.**
+
+### Validé par vrai clic navigateur, dans la coque réelle du site
+
+| Scénario | Référence | Résultat |
+|---|---|---|
+| **DP** — Garage + Piscine + ABF + dépôt, cadastre différé, façades différées, JPEG réel | `URB-2026-0008` | **459 €** persistés, `estime`, 1 fichier associé, 2 créneaux |
+| **PC chiffré** — Maison neuve + annexe/garage + ABF + dépôt, plans différés | `URB-2026-0009` | **1 059 €** persistés, `estime`, 2 créneaux |
+| **PC sur étude** — Autre + extension + ABF, sans dépôt | `URB-2026-0010` | `total = null`, `pricing_status = sur_etude`, 2 créneaux |
+
+Pour chacun : **une seule requête HTTP**, HTTP 201, JSON valide, écran de réussite, référence réelle
+affichée, aucun total client persisté, aucun message technique à l'écran.
+
+Également vérifié au clic : double clic → une seule requête, bouton `aria-busy` et désactivé ·
+nonce invalide → refus contrôlé, bouton rendu, rien de technique · erreur réseau → saisie conservée,
+nouvelle tentative possible, aucune fausse référence · fichier `.php` renommé en `.jpg` → refusé sur
+son type réel (`upload_invalid_mime`), aucune demande créée, aucun staging résiduel · 390 px → aucun
+débordement horizontal, plus aucune cible tactile sous 44 px · clavier → ordre du document, aucun
+`tabindex` positif, focus visible, focus porté sur le champ nommé par le serveur après refus.
+
+### Non validable localement
+
+- **Le transport réel des courriels.** Aucun message n'est remis ; les six créneaux restent en
+  `retry`. La configuration SMTP Hostinger n'est pas éprouvée.
+- **Les extensions présentes uniquement en production.**
+- **Les règles de cache et de sécurité du serveur Hostinger.**
+
+### Restant à vérifier sur Hostinger
+
+1. Remise effective des deux messages, et leur rendu dans un client de messagerie réel.
+2. Comportement du thème parent avec son jeu d'options complet — localement, l'assistant
+   d'onboarding détourne `admin-post.php` et un échafaudage le neutralise.
+3. Expiration réelle du nonce après 24 h.
+4. Cache HTTP du serveur sur les documents d'iframe : la version d'URL suppose que le serveur
+   n'ignore pas la chaîne de requête.
+5. Comportement sous HTTPS, où l'origine ne porte pas de port.
+
+---
+
+## Correctifs supplémentaires issus des vrais clics
+
+- **Le parent ne transmettait pas le jeton anti-robot.** Sa charge `postMessage` ne portait que cinq
+  clés : le jeton était bien émis par PHP mais s'arrêtait à la page parente. C'était la cause réelle
+  des refus `invalid_antispam_token`, et non le cache seul comme d'abord supposé.
+- **Le projet supplémentaire s'affichait deux fois** sur l'écran final — une fois depuis
+  `additional_projects`, une fois depuis le détail tarifaire, dont la seconde sans sa description.
+- **Deux cibles tactiles sous 44 px** (listes déroulantes à 41 px, boutons de navigation à 40 px).
