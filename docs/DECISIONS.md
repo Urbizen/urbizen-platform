@@ -3011,3 +3011,89 @@ supposaient un message unique ont été étendus à tous les créneaux, chacun s
 - Banc `tests/submissions/test-accuse-client.php`, 52 contrôles : destinataire incorruptible,
   sujet exact, contenu présent, contenu interdit, échappement, tarif sur étude, en-têtes, résolution
   par créneau, idempotence, indépendance des deux messages.
+
+---
+
+## D-057 — Le permis de construire réutilise le socle, et introduit le tarif sur étude
+
+**Contexte.** La déclaration préalable avait été raccordée en premier, et son implémentation
+portait des choses qui n'avaient rien de propre à elle : la façon de nommer un projet devant un
+humain, le calcul des suppléments, les règles de cohérence inter-champs, le profil de dépôt, le
+pont iframe. Raccorder le permis de construire en recopiant ce code aurait produit deux
+implémentations jumelles — et garanti qu'un correctif finisse par n'être appliqué qu'à l'une des
+deux, sur le parcours le moins souvent relu.
+
+**Décision.** Ce qui était propre à la DP devient paramétré par type de formulaire :
+
+- `CatalogueProjets` porte les pièces, les préfixes et tous les helpers ; chaque parcours ne
+  déclare que sa table de natures. Les pièces sont **communes**, parce que ce sont réellement les
+  mêmes dans les deux formulaires.
+- `PricingProjets` porte le calcul, les suppléments, l'ordre du récapitulatif et le plafond dérivé
+  de projets supplémentaires ; chaque barème ne déclare que ses socles.
+- `ValidationMetierProjets` porte les règles de cohérence ; chaque validateur ne désigne que son
+  catalogue et son barème.
+- `CatalogueRegistry` résout le catalogue **depuis le type de la demande**. Sans lui, la réponse
+  JSON et l'accusé client nommaient la DP en dur : un projet `maison_individuelle` aurait disparu
+  du récapitulatif sans rien signaler, puisque `libelle_nature()` rend `null` hors catalogue.
+- Le profil d'upload, le pont iframe et le banc du pont sont uniques et paramétrés.
+
+**Les identifiants PC sont canoniques** : `maison_individuelle`, `extension`, `surelevation`,
+`changement_destination`, `annexe_garage`, `autre`. Les libellés lus par le client sont inchangés —
+« Maison neuve » reste « Maison neuve » sous l'identifiant `maison_individuelle`, ce qui est
+précisément ce que permet la séparation entre identifiant et libellé. Les valeurs techniques
+françaises qui subsistaient dans les listes déroulantes du PC (qualité du déclarant, raccordements)
+sont remplacées, pas doublées : une seule convention subsiste, et un banc l'exige.
+
+**Barème.** Maison neuve 849 €, extension 649 €, surélévation 649 €, changement de destination
+649 €, annexe/garage 449 €. Suppléments inchangés : +100 € par projet supplémentaire, +80 € en
+secteur ABF, +30 € pour le dépôt sur le guichet numérique.
+
+**Le tarif sur étude, et pourquoi il est traité par le mécanisme.** « Autre » recouvre au permis de
+construire des projets dont l'ampleur n'est pas bornée — un bâtiment d'activité, une opération
+mixte. Annoncer un prix avant examen serait un engagement en l'air. Son socle vaut donc `null`, et
+le calcul commun en tire :
+
+- `base` et `total` nuls, **mais les deux clés présentes**. Un total absent et un total
+  volontairement non chiffré ne veulent pas dire la même chose : le premier est une anomalie, le
+  second une décision. Les gardes emploient donc `array_key_exists()` et non `isset()` — sans quoi
+  le contrôleur aurait refusé tout dossier sur étude.
+- `pricing_status = sur_etude`, persisté. Le déduire de la nullité du total à chaque lecture aurait
+  obligé chaque consommateur à redeviner l'intention.
+- Les suppléments restent **listés et chiffrés**, parce qu'ils sont connus. Ce qui ne peut pas
+  l'être, c'est leur somme avec un socle qui n'existe pas encore : additionner les seuls
+  suppléments produirait un « total » de 180 € pour un dossier qui en coûtera plusieurs centaines.
+  Un chiffre faux est pire qu'une absence de chiffre.
+- `normalize_pricing()` ne transtype plus `null` en `0`. C'était le défaut le plus coûteux du
+  chemin existant : un dossier sur étude aurait été persisté à zéro euro, et tout ce qui lit le
+  tarif — réponse JSON, écran d'administration, accusé client — aurait annoncé la gratuité.
+- `accepts_base()` accepte `null`, mais **seulement d'un barème qui comporte réellement une nature
+  sur étude**. Sinon un tarif absent passerait pour légitime là où il trahirait un calcul
+  défaillant.
+
+**Le repli d'aperçu disparaît.** Le formulaire PC portait `if ( ! ENDPOINT ) { showDone( true ); }` :
+un écran de réussite complet s'affichait sans le moindre envoi. L'écran final n'apparaît désormais
+qu'après un HTTP valide, un JSON valide, `success: true` et une référence réelle, et il est bâti
+exclusivement à partir de ce que le serveur a enregistré.
+
+**Une action de nonce par parcours.** `urbizen_permis_construire_submit` est distincte de celle de
+la DP. Un nonce est lié à son action : les partager laisserait un nonce émis pour une déclaration
+préalable autoriser l'envoi d'un permis de construire — deux barèmes, deux profils de dépôt.
+
+**Notifications.** Les deux créneaux de [D-055] et [D-056] s'appliquent tels quels. L'accusé nomme
+la démarche telle qu'elle se dit — « Permis de construire », jamais `permis_construire` — et un
+dossier sur étude y affiche « Tarif sur étude ». La mention imposée est reproduite au caractère
+près, et rien ne présente le message comme une facture, un devis accepté ou une commande confirmée.
+
+**Conséquences.**
+- `src/Forms/` : `CatalogueProjets`, `CataloguePermisConstruire`, `CatalogueRegistry`,
+  `PricingProjets`, `PricingPermisConstruire`, `ProjetsPricingStrategy`,
+  `PermisConstruirePricingStrategy`, `ValidationMetierProjets`, `ValidationMetierPermisConstruire`,
+  `definitions/permis_construire.php`.
+- `src/Mail/PermisConstruireNotificationStrategy.php` ; `CustomerAcknowledgementRenderer` et
+  `SubmissionJsonResponse` résolus par type.
+- `SubmissionController` : route PC, garde tarifaire en `array_key_exists()`.
+- `SubmissionRepository` : `pricing_status` persisté, montants nuls conservés.
+- Bancs : `tests/formulaires/test-contrat-pc.php` (129 contrôles),
+  `tests/cadastre/test-pont.mjs` (179, les deux parcours),
+  `tests/submissions/test-accuse-client.php` (82, les deux parcours),
+  `tests/submissions/test-compat.php` remis à jour.
