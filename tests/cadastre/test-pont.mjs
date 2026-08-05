@@ -76,7 +76,7 @@ const titre = (t) => console.log(`\n── ${t}`);
 
 async function monter(P, { reponse = null, statut = 200, jsonInvalide = false, reseauKo = false, delai = 0 } = {}) {
   const html = readFileSync(resolve(THEME, "assets/forms/" + P.fichier), "utf8").replace(
-    /<script src="[^"]*urbizen-form-(tarifs|pieces|bridge)\.js"><\/script>/g,
+    /<script src="[^"]*urbizen-form-(tarifs|pieces|bridge)\.js(\?[^"]*)?"><\/script>/g,
     ""
   );
 

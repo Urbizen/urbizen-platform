@@ -185,10 +185,23 @@
 
     var fd = new FormData(this.form);
 
-    // Les trois champs que la route exige, jamais devinés par le formulaire.
+    // Les champs que la route exige, jamais devinés par le formulaire.
     fd.set("action", this.configuration.action);
     fd.set("form_type", this.configuration.formType);
     fd.set(this.configuration.nonceField, this.configuration.nonce);
+
+    // Le jeton anti-robot est signé et horodaté par le serveur, comme le nonce.
+    // Le document ne peut pas le produire : c'est un fichier statique. Sans
+    // lui, la route refuse — et aucun envoi depuis un navigateur n'aboutit.
+    if (this.configuration.tokenField && this.configuration.token) {
+      fd.set(this.configuration.tokenField, this.configuration.token);
+    }
+
+    // Le pot de miel part vide. Il n'est renseigné que par un automate qui
+    // remplit tout ce qu'il trouve — c'est précisément ce qu'il détecte.
+    if (this.configuration.honeypotField && !fd.has(this.configuration.honeypotField)) {
+      fd.set(this.configuration.honeypotField, "");
+    }
 
     // Les champs dérivés — projets répétés, descriptions, report cadastral.
     this.serialiser(fd);

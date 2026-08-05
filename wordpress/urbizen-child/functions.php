@@ -220,6 +220,42 @@ function urbizen_child_est_page_formulaire_autorisation() {
 }
 
 /**
+ * Origine du site, au sens exact que le navigateur donne à ce mot.
+ *
+ * Une origine est un triplet — schéma, hôte, **port**. Composer seulement le
+ * schéma et l'hôte donne la bonne valeur tant que le port est celui par défaut,
+ * et une valeur fausse dès qu'il ne l'est pas. Le pont compare cette chaîne à
+ * `window.location.origin` au caractère près : un port omis fait rejeter la
+ * configuration, et le bouton d'envoi ne se déverrouille jamais.
+ *
+ * Le défaut ne se voyait pas en production — `urbizen.fr` répond en HTTPS sur
+ * 443, que le navigateur n'écrit pas. Il s'est révélé au premier essai intégré
+ * local, sur un serveur écoutant sur un autre port.
+ *
+ * @return string Origine complète, sans barre oblique finale.
+ */
+function urbizen_child_origine_site() {
+	$parties = wp_parse_url( home_url() );
+
+	if ( ! is_array( $parties ) || empty( $parties['scheme'] ) || empty( $parties['host'] ) ) {
+		return '';
+	}
+
+	$origine = $parties['scheme'] . '://' . $parties['host'];
+
+	// Les ports par défaut ne figurent pas dans `location.origin` : les ajouter
+	// produirait la même divergence, en sens inverse.
+	$defaut = array( 'http' => 80, 'https' => 443 );
+	$port   = isset( $parties['port'] ) ? (int) $parties['port'] : 0;
+
+	if ( $port > 0 && ( $defaut[ $parties['scheme'] ] ?? 0 ) !== $port ) {
+		$origine .= ':' . $port;
+	}
+
+	return $origine;
+}
+
+/**
  * Configuration de soumission du formulaire affiché.
  *
  * Le nonce est émis ici, dans la page parente, et non dans le document servi en
@@ -268,14 +304,27 @@ function urbizen_child_configuration_formulaire() {
 
 	$route = $gabarits[ $slug ];
 
+	// Le jeton anti-robot est émis ici pour la même raison que le nonce : il est
+	// signé et horodaté côté serveur, et le document servi en iframe est un
+	// fichier statique qu'aucun PHP ne rend. Sans lui, la route refuse toute
+	// soumission — `invalid_antispam_token` — et aucun envoi depuis un
+	// navigateur ne peut aboutir. Les bancs ne le voyaient pas : ils
+	// fabriquaient le jeton eux-mêmes.
+	$jeton = class_exists( '\\Urbizen\\Platform\\Security\\AntiSpam' )
+		? \Urbizen\Platform\Security\AntiSpam::issue_token()
+		: '';
+
 	return array(
-		'action'      => $route['action'],
-		'formType'    => $route['type'],
-		'nonceField'  => 'urbizen_conception_nonce',
-		'nonce'       => wp_create_nonce( $route['nonce'] ),
-		'submitUrl'   => admin_url( 'admin-post.php' ),
-		'origin'      => (string) wp_parse_url( home_url(), PHP_URL_SCHEME ) . '://' . (string) wp_parse_url( home_url(), PHP_URL_HOST ),
-		'frameSource' => '/wp-content/themes/urbizen-child/assets/forms/' . $route['frame'],
+		'action'         => $route['action'],
+		'formType'       => $route['type'],
+		'nonceField'     => 'urbizen_conception_nonce',
+		'nonce'          => wp_create_nonce( $route['nonce'] ),
+		'tokenField'     => 'urbizen_token',
+		'token'          => $jeton,
+		'honeypotField'  => 'company_website',
+		'submitUrl'      => admin_url( 'admin-post.php' ),
+		'origin'         => urbizen_child_origine_site(),
+		'frameSource'    => '/wp-content/themes/urbizen-child/assets/forms/' . $route['frame'],
 	);
 }
 

@@ -103,3 +103,73 @@ d'essai, corbeille vidée.
 - Retirer tout filtre posé pour l'essai (`nonce_life` notamment).
 - Consigner ici le résultat de chaque ligne, et **toute divergence**, avant d'ouvrir la PR à la
   fusion.
+
+
+---
+
+## Résultat du premier essai intégré local — 5 août 2026
+
+Réalisé sur MAMP avec le thème parent `hostinger-ai-theme` 2.0.18 récupéré en lecture seule.
+**Trois défauts trouvés, tous corrigés**, et deux limites d'environnement consignées.
+
+### Ce que l'essai a trouvé, et que les bancs ne pouvaient pas trouver
+
+1. **L'origine omettait le port.** `urbizen_child_configuration_formulaire()` composait
+   `schéma://hôte`, sans le port. Le pont compare cette chaîne à `window.location.origin` au
+   caractère près : sur tout serveur écoutant ailleurs que sur 80/443, la configuration était
+   rejetée et le bouton d'envoi ne se déverrouillait jamais. Latent en production — `urbizen.fr`
+   répond sur 443, que le navigateur n'écrit pas — mais réel. Corrigé par
+   `urbizen_child_origine_site()`.
+
+2. **Le jeton anti-robot n'était pas transmis.** Les documents DP et PC sont statiques : ils ne
+   peuvent pas porter un jeton signé, et le pont ne l'ajoutait pas. La route refusait donc
+   **toute** soumission réelle avec `invalid_antispam_token`. Aucun banc ne le voyait : tous
+   fabriquaient le jeton eux-mêmes avant d'appeler le pipeline. C'est le défaut le plus grave de
+   la série — il rendait les deux formulaires inutilisables en production. Le jeton est désormais
+   émis par la page parente, comme le nonce, et transmis par le pont avec le pot de miel.
+
+3. **Les scripts de l'iframe n'étaient pas versionnés.** Un document statique qui charge
+   `urbizen-form-bridge.js` sans version fait servir un pont périmé à tout visiteur revenant
+   après un déploiement — ici, des erreurs techniques silencieuses. Les cinq références portent
+   désormais `?v=0.2.0`, à faire suivre la version du thème enfant.
+
+### Ce qui a été vérifié dans la coque réelle
+
+Page et iframe chargées, en-tête et pied du site présents, aucun débordement · initialisation du
+pont, bouton désactivé puis déverrouillé · navigation sur les 8 étapes · Garage et Carport
+distincts · surfaces facultatives franchies sans saisie · report cadastral neutralisant les trois
+champs · report d'une pièce · projet supplémentaire, ABF et dépôt cumulés à **459 €** à l'écran ·
+soumission acceptée avec le jeu de champs corrigé, référence réelle et **459 € recalculés côté
+serveur**.
+
+### Ce qui n'a PAS pu être vérifié localement
+
+- **Le parcours d'envoi de bout en bout dans le navigateur.** Le document de l'iframe était servi
+  depuis le cache du navigateur, avec ses anciennes balises de script, et le pont chargé restait
+  la version d'avant correctif. Le correctif a donc été vérifié par une soumission portant
+  exactement le jeu de champs que le pont compose désormais — acceptée, référence attribuée — mais
+  le clic réel reste à rejouer sur un cache vidé.
+- **Le permis de construire de bout en bout.** Seule la configuration émise par sa page a été
+  vérifiée : action, jeton et origine corrects.
+- **Le transport réel des courriels.** Aucun message n'est remis localement ; la file reste en
+  `retry`. La configuration SMTP Hostinger n'est pas éprouvée.
+- **Les extensions présentes uniquement en production**, et les règles de cache ou de sécurité du
+  serveur Hostinger.
+
+### Une course à surveiller
+
+Le pont expire au bout de huit secondes s'il ne reçoit pas sa configuration. Sur un cadre servi
+depuis le cache, l'iframe peut poster `urbizen_form_ready` **avant** que la page parente n'ait
+attaché son écouteur : le message est perdu et le formulaire s'annonce non initialisé, sans
+recours. Observé une fois pendant l'essai. Le parent devrait émettre sa configuration sans attendre
+la demande, ou la réémettre périodiquement jusqu'à accusé.
+
+### Échafaudage local, à ne jamais déployer
+
+Le thème parent s'accroche à `admin_init` et redirige **toute** requête d'administration — donc
+`admin-post.php` — vers son assistant tant que l'option `hostinger_ai_version` est absente. Sur un
+WordPress local neuf, elle l'est. La poser pour de bon fait entrer le thème dans un état à demi
+configuré où son résolveur de polices plante sur le rendu public. Un `mu-plugin` local fait donc
+croire à l'option **uniquement** pendant une soumission :
+`wp-content/mu-plugins/urbizen-essai-local.php`. Il vit hors du dépôt et ne doit jamais partir en
+production, où l'assistant a déjà écrit son jeu d'options complet.
