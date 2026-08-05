@@ -212,9 +212,30 @@ verifier(
 	! str_contains( $dp, 'aucune donnée n’a été transmise' )
 		&& ! str_contains( $dp_maq, 'aucune donnée n’a été transmise' )
 );
+// Le permis de construire est raccordé à son tour : les mêmes garanties lui
+// sont opposées qu'à la déclaration préalable, sur les deux documents.
 verifier(
-	'PC · pas encore raccordé, ENDPOINT toujours vide',
-	str_contains( $pc, 'var ENDPOINT = ""' ) && str_contains( $pc_maq, 'var ENDPOINT = ""' )
+	'PC · le pont est chargé dans les deux documents',
+	str_contains( $pc, 'urbizen-form-bridge.js' ) && str_contains( $pc_maq, 'urbizen-form-bridge.js' )
+);
+verifier(
+	'PC · la référence réelle a sa place à l’écran final',
+	str_contains( $pc, 'id="dp-reference"' ) && str_contains( $pc_maq, 'id="dp-reference"' )
+);
+verifier(
+	'PC · aucune mention d’aperçu ne subsiste',
+	! str_contains( $pc, 'aucune donnée n’a été transmise' )
+		&& ! str_contains( $pc_maq, 'aucune donnée n’a été transmise' )
+);
+// L'endpoint vide était le repli qui affichait un écran de réussite sans le
+// moindre envoi. Sa disparition est ce qui rend le faux succès impossible.
+verifier(
+	'PC · le repli d’aperçu a disparu',
+	! str_contains( $pc, 'var ENDPOINT' ) && ! str_contains( $pc_maq, 'var ENDPOINT' )
+);
+verifier(
+	'PC · l’envoi passe par le pont',
+	str_contains( $pc, 'UrbizenPont.init' ) && str_contains( $pc_maq, 'UrbizenPont.init' )
 );
 
 echo "\n";

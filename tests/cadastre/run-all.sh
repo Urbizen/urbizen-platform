@@ -106,11 +106,12 @@ titre "Pièces du projet DP / PCMI — DOM simulé"
 node test-pieces.mjs
 verdict $? "test-pieces.mjs"
 
-# Pont sécurisé entre la page WordPress et l'iframe DP : ce qui protège le
-# nonce, et ce qui empêche qu'une erreur devienne un faux succès.
-titre "Pont DP — DOM simulé"
-node test-pont-dp.mjs
-verdict $? "test-pont-dp.mjs"
+# Pont sécurisé entre la page WordPress et les iframes DP et PC : ce qui protège
+# le nonce, et ce qui empêche qu'une erreur devienne un faux succès. Les deux
+# parcours passent par les mêmes contrôles, dans une seule boucle.
+titre "Pont DP / PC — DOM simulé"
+node test-pont.mjs
+verdict $? "test-pont.mjs"
 
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php

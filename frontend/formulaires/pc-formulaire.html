@@ -597,6 +597,7 @@
           <p class="dp-done-kicker">Votre demande d’urbanisme</p>
           <h3>Votre projet est prêt à être étudié</h3>
           <p>Un interlocuteur Urbizen vérifie les informations et les documents transmis avant toute commande.</p>
+          <p class="dp-reference">Référence de votre demande : <strong id="dp-reference"></strong></p>
           <div data-tarifs-recap-final aria-label="Estimation tarifaire"></div>
           <div data-pieces-recap-final></div>
           <ol class="dp-next-steps" aria-label="Prochaines étapes">
@@ -604,7 +605,6 @@
             <li>Confirmation du tarif<span>Vous recevez le montant définitif avant tout engagement.</span></li>
             <li>Ouverture de votre espace client<span>Votre dossier, son avancement et vos échanges seront centralisés.</span></li>
           </ol>
-          <p class="dp-preview-note" id="dp-preview-note" hidden>Aperçu du parcours : aucune donnée n’a été transmise.</p>
         </div>
       </div>
     </div>
@@ -613,10 +613,10 @@
 
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js"></script>
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js"></script>
 <script>
 (function () {
   "use strict";
-  var ENDPOINT = ""; // ex. "https://api.votresite.fr/api/dp"  (laisser vide = mode démo)
 
   var app = document.getElementById("dp-app");
   var form = document.getElementById("dp-form");
@@ -787,32 +787,60 @@
   nextBtn.addEventListener("click", function () { if (validateStep() && current < steps.length - 1) { current++; render(); } });
   backBtn.addEventListener("click", function () { if (current > 0) { current--; render(); } });
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var err = document.getElementById("dp-final-err");
-    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
-      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi."; return;
-    }
-    err.textContent = ""; sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
-    var fd = new FormData(form);
-    // « nature » est un choix unique : FormData porte déjà la bonne valeur. Le
-    // moteur y ajoute les projets supplémentaires et l'option de dépôt, sans
-    // aucun montant — le serveur devra recalculer.
-    tarifs.serialiser(fd);
-    pieces.serialiser(fd);
-    if (!ENDPOINT) { showDone(true); return; }
-    fetch(ENDPOINT, { method: "POST", body: fd })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
-      .then(function () { showDone(false); })
-      .catch(function () { sendBtn.disabled = false; sendBtn.textContent = "Envoyer ma demande"; err.textContent = "L’envoi a échoué. Réessayez ou contactez-moi directement."; });
+  // Le pont est le même module que celui de la déclaration préalable : il
+  // réclame sa configuration à la page parente, garde le bouton désactivé tant
+  // qu'il ne l'a pas reçue, et n'affiche l'écran final que sur un succès réel.
+  // Le type de formulaire et l'action viennent de cette configuration — le
+  // document ne les connaît pas, et ne peut donc pas se tromper de route.
+  var pont = UrbizenPont.init({
+    form: form,
+    bouton: sendBtn,
+    erreur: document.getElementById("dp-final-err"),
+    serialiser: function (fd) {
+      // « nature » est un choix unique : FormData porte déjà la bonne valeur.
+      // Les modules y ajoutent les projets répétés, leurs descriptions, les
+      // pièces différées et le report cadastral. Aucun montant n'est émis.
+      tarifs.serialiser(fd);
+      pieces.serialiser(fd);
+    },
+    afficherSucces: showDone
   });
 
-  function showDone(preview) {
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    var err = document.getElementById("dp-final-err");
+
+    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
+      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi.";
+      err.setAttribute("tabindex", "-1");
+      err.focus();
+      return;
+    }
+
+    pont.envoyer();
+  });
+
+  /**
+   * Écran final, bâti exclusivement à partir de la réponse du serveur.
+   *
+   * Aucune valeur n'est reprise de l'estimation affichée pendant la saisie :
+   * la référence, le tarif et les libellés viennent de ce qui a été
+   * effectivement enregistré. Un projet sur étude n'y reçoit aucun total.
+   */
+  function showDone(reponse) {
     form.style.display = "none";
-    tarifs.rendreRecapFinal();
-    pieces.rafraichirRecap();
-    document.getElementById("dp-preview-note").hidden = !preview;
-    document.getElementById("dp-done").classList.add("show");
+
+    var done = document.getElementById("dp-done");
+
+    document.getElementById("dp-reference").textContent = reponse.reference;
+
+    UrbizenPont.rendreConfirmation(document.querySelector("[data-tarifs-recap-final]"), reponse);
+    UrbizenPont.rendreDifferes(document.querySelector("[data-pieces-recap-final]"), reponse);
+
+    done.classList.add("show");
+    done.setAttribute("tabindex", "-1");
+    done.focus();
   }
 
   prefillFromHomepage();

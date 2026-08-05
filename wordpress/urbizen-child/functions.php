@@ -233,11 +233,23 @@ function urbizen_child_est_page_formulaire_autorisation() {
  * @return array<string, string>
  */
 function urbizen_child_configuration_formulaire() {
+	// Une entrée par parcours raccordé. Le gabarit de la page détermine la
+	// route : c'est le serveur qui décide, jamais un attribut du document servi
+	// en iframe. Un nonce est lié à son action, et chaque parcours a la sienne —
+	// partager une action laisserait un nonce émis pour une DP autoriser l'envoi
+	// d'un permis de construire.
 	$gabarits = array(
 		'page-formulaire-declaration-prealable' => array(
 			'action' => 'urbizen_declaration_prealable',
 			'nonce'  => 'urbizen_declaration_prealable_submit',
 			'type'   => 'declaration_prealable',
+			'frame'  => 'dp-formulaire.html',
+		),
+		'page-formulaire-permis-de-construire'  => array(
+			'action' => 'urbizen_permis_construire',
+			'nonce'  => 'urbizen_permis_construire_submit',
+			'type'   => 'permis_construire',
+			'frame'  => 'pc-formulaire.html',
 		),
 	);
 
@@ -248,9 +260,9 @@ function urbizen_child_configuration_formulaire() {
 	$slug = get_page_template_slug( get_queried_object_id() );
 
 	if ( ! isset( $gabarits[ $slug ] ) ) {
-		// Le permis de construire n'est pas encore raccordé : sans entrée ici,
-		// sa page ne reçoit aucune configuration et son formulaire reste
-		// inerte, plutôt que d'hériter d'une route qui n'est pas la sienne.
+		// Un gabarit absent de la table ne reçoit aucune configuration : son
+		// formulaire reste inerte, plutôt que d'hériter d'une route qui n'est
+		// pas la sienne.
 		return array();
 	}
 
@@ -263,7 +275,7 @@ function urbizen_child_configuration_formulaire() {
 		'nonce'       => wp_create_nonce( $route['nonce'] ),
 		'submitUrl'   => admin_url( 'admin-post.php' ),
 		'origin'      => (string) wp_parse_url( home_url(), PHP_URL_SCHEME ) . '://' . (string) wp_parse_url( home_url(), PHP_URL_HOST ),
-		'frameSource' => '/wp-content/themes/urbizen-child/assets/forms/dp-formulaire.html',
+		'frameSource' => '/wp-content/themes/urbizen-child/assets/forms/' . $route['frame'],
 	);
 }
 
