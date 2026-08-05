@@ -32,7 +32,23 @@ check( 'localisation se charge toujours', null !== $localisation );
 check( 'localisation conserve ses 14 champs', 14 === count( $localisation->fields() ) );
 check( 'localisation ne déclare aucune étape', array() === $localisation->steps() );
 check( 'localisation reste sans anomalie', $localisation->is_valid() );
-check( 'le registre ne connaît que deux formulaires', array( 'localisation', 'conception' ) === FormRegistry::KNOWN );
+// Inventaire exact, et non « contient » : ce banc existe pour signaler ce qui
+// change. Un type ajouté par mégarde doit le faire tomber, au même titre qu'un
+// type retiré. La liste suit les parcours réellement livrés.
+$formulaires_livres = array( 'localisation', 'conception', 'declaration_prealable', 'permis_construire' );
+
+check( 'le registre connaît exactement les quatre formulaires livrés', $formulaires_livres === FormRegistry::KNOWN );
+check( 'et sa liste blanche effective y correspond', $formulaires_livres === FormRegistry::all() );
+
+// Les deux parcours d'origine restent résolus à l'identique : c'est ce que
+// « compatibilité » veut dire ici, et l'ajout de types ne doit rien y changer.
+foreach ( array( 'declaration_prealable', 'permis_construire' ) as $ajoute ) {
+	$def = FormRegistry::get( $ajoute );
+
+	check( sprintf( 'la définition « %s » se charge', $ajoute ), null !== $def );
+	check( sprintf( 'la définition « %s » est sans anomalie', $ajoute ), null !== $def && $def->is_valid() );
+	check( sprintf( 'et porte bien son type « %s »', $ajoute ), null !== $def && $ajoute === $def->type() );
+}
 
 // ------------------------------------------------ tarification inchangée ----
 check( 'la base vaut toujours 449 €', 449 === Pricing::BASE );
@@ -98,7 +114,35 @@ check( 'aucune ressource de prototype', array() === (array) $proto );
 
 $theme = $racine . '/wordpress/urbizen-child';
 
-check( 'aucun gabarit de page conception dans le thème', array() === glob( $theme . '/templates/*conception*' ) );
+// Le gabarit de la page commerciale « Conception » existe désormais : cette
+// assertion datait d'une PR qui avait promis de ne pas toucher au thème. La
+// remplacer par sa négation ne prouverait rien ; ce qui mérite d'être tenu,
+// c'est que chaque parcours raccordé ait SON gabarit et son cadre, et qu'aucun
+// n'en emprunte un autre.
+$gabarits_attendus = array(
+	'page-formulaire-declaration-prealable.html' => 'dp-formulaire.html',
+	'page-formulaire-permis-de-construire.html'  => 'pc-formulaire.html',
+);
+
+foreach ( $gabarits_attendus as $gabarit => $cadre ) {
+	$chemin = $theme . '/templates/' . $gabarit;
+
+	check( sprintf( 'le gabarit « %s » existe', $gabarit ), is_readable( $chemin ) );
+
+	$html = is_readable( $chemin ) ? (string) file_get_contents( $chemin ) : '';
+
+	check( sprintf( '« %s » sert bien « %s »', $gabarit, $cadre ), str_contains( $html, $cadre ) );
+
+	// Un gabarit qui servirait le cadre d'un autre parcours poserait le mauvais
+	// nonce sur le bon formulaire : la demande serait refusée, sans que rien
+	// n'indique pourquoi.
+	foreach ( $gabarits_attendus as $autre ) {
+		if ( $autre !== $cadre ) {
+			check( sprintf( '« %s » n’emprunte pas « %s »', $gabarit, $autre ), ! str_contains( $html, $autre ) );
+		}
+	}
+}
+
 check( 'aucun pattern conception dans le thème', array() === glob( $theme . '/patterns/*conception*' ) );
 
 // Le thème enfant est-il resté à l'écart de cette PR ?
@@ -255,9 +299,52 @@ check( 'le champ piégé est company_website', 'company_website' === SubmissionC
 
 $controleur = $sources['src/Http/SubmissionController.php'];
 
-check( 'les deux hooks admin-post sont enregistrés',
-	str_contains( $controleur, "admin_post_nopriv_' . self::ACTION" )
-	&& str_contains( $controleur, "admin_post_' . self::ACTION" ) );
+// Les hooks ne sont plus écrits en dur : `register()` boucle sur la table de
+// routes. L'assertion textuelle d'origine ne prouvait qu'une graphie ; celle-ci
+// éprouve le résultat — chaque route livrée doit être accrochée, aux DEUX
+// points d'entrée. Un visiteur anonyme et une personne connectée doivent
+// pouvoir soumettre également.
+$GLOBALS['wpd_actions'] = array();
+SubmissionController::register();
+
+$routes_attendues = array(
+	SubmissionController::ACTION,
+	SubmissionController::ACTION_DP,
+	SubmissionController::ACTION_PC,
+);
+
+foreach ( $routes_attendues as $action ) {
+	check( sprintf( '« %s » est accrochée en nopriv', $action ),
+		isset( $GLOBALS['wpd_actions'][ 'admin_post_nopriv_' . $action ] ) );
+	check( sprintf( '« %s » est accrochée pour les connectés', $action ),
+		isset( $GLOBALS['wpd_actions'][ 'admin_post_' . $action ] ) );
+}
+
+// Et aucune route de plus : une action accrochée sans figurer à la table serait
+// un point d'entrée que rien ne documente.
+$accrochees = array_values(
+	array_unique(
+		array_map(
+			static fn( $h ) => preg_replace( '/^admin_post_(nopriv_)?/', '', $h ),
+			array_filter( array_keys( $GLOBALS['wpd_actions'] ), static fn( $h ) => str_starts_with( $h, 'admin_post_' ) )
+		)
+	)
+);
+
+sort( $accrochees );
+$attendues_triees = $routes_attendues;
+sort( $attendues_triees );
+
+check( 'aucune route admin-post en dehors de la table', $attendues_triees === $accrochees );
+
+// Chaque route porte SON action de nonce. Les partager laisserait un nonce émis
+// pour un parcours autoriser l'envoi d'un autre.
+check( 'les trois actions de nonce sont distinctes',
+	3 === count( array_unique( array(
+		SubmissionController::NONCE_ACTION,
+		SubmissionController::NONCE_ACTION_DP,
+		SubmissionController::NONCE_ACTION_PC,
+	) ) ) );
 check( 'la redirection passe par wp_safe_redirect', str_contains( $controleur, 'wp_safe_redirect(' ) );
 check( 'aucune redirection non sûre', ! preg_match( '/\bwp_redirect\s*\(/', $controleur ) );
 
