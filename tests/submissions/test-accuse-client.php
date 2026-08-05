@@ -32,6 +32,7 @@ use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\NotificationSlot;
 use Urbizen\Platform\Mail\NotificationStrategyRegistry;
+use Urbizen\Platform\Mail\PermisConstruireNotificationStrategy;
 
 /**
  * Installe une demande DP persistée, et rend son identifiant.
@@ -41,6 +42,18 @@ use Urbizen\Platform\Mail\NotificationStrategyRegistry;
  * @return int
  */
 function dp_persistee( array $charge = array(), ?array $tarif = null ): int {
+	return demande_persistee( 'declaration_prealable', $charge, $tarif );
+}
+
+/**
+ * Installe une demande persistée d'un type quelconque, et rend son identifiant.
+ *
+ * @param string                    $type   Type de formulaire.
+ * @param array<string, mixed>      $charge Charge à persister, fusionnée au défaut.
+ * @param array<string, mixed>|null $tarif  Tarif persisté ; `null` pour le défaut.
+ * @return int
+ */
+function demande_persistee( string $type, array $charge = array(), ?array $tarif = null ): int {
 	$id  = 7001;
 	$ref = 'URB-2026-0077';
 
@@ -63,7 +76,7 @@ function dp_persistee( array $charge = array(), ?array $tarif = null ): int {
 
 	$GLOBALS['wpd_meta'][ $id ] = array(
 		'_urbizen_reference'   => $ref,
-		'_urbizen_form_type'   => 'declaration_prealable',
+		'_urbizen_form_type'   => $type,
 		'_urbizen_status'      => 'received',
 		'_urbizen_payload'     => wp_json_encode( array_merge( $defaut, $charge ) ),
 		'_urbizen_pricing'     => wp_json_encode(
@@ -332,10 +345,130 @@ check( '23 · ni le dossier lui-même',
 // 10 · SOURCE UNIQUE
 // ======================================================================
 
+// ======================================================================
+// 11 · LE PERMIS DE CONSTRUIRE — mêmes garanties, catalogue propre
+// ======================================================================
+
+$GLOBALS['wpd_meta'] = array();
+$id = demande_persistee(
+	'permis_construire',
+	array(
+		'nature'                  => 'maison_individuelle',
+		'projets_supplementaires' => array( 'annexe_garage' ),
+		'pieces_differees'        => array( 'plans' ),
+		'prenom'                  => 'Camille',
+		'nom'                     => 'Fictif',
+	),
+	array(
+		'base'           => 849,
+		'options'        => array(
+			array( 'id' => 'projet_supplementaire:annexe_garage', 'price' => 100 ),
+			array( 'id' => 'secteur_abf', 'price' => 80 ),
+			array( 'id' => 'depot_guichet', 'price' => 30 ),
+		),
+		'total'          => 1059,
+		'pricing_status' => 'estime',
+	)
+);
+
+$pc = CustomerAcknowledgementRenderer::render( $id, 1000 );
+
+check( '25 · l’accusé d’un permis de construire se rend', is_array( $pc ) );
+check( '25 · adressé au demandeur validé', 'camille@exemple.test' === $pc['to'] );
+check( '25 · avec le sujet arrêté', 'Votre demande Urbizen a bien été reçue — URB-2026-0077' === $pc['subject'] );
+
+$corps_pc = (string) $pc['body'];
+
+check( '26 · la démarche est nommée telle qu’elle se dit',
+	str_contains( $corps_pc, 'Type de démarche : Permis de construire' ) );
+check( '26 · jamais sous son identifiant technique',
+	! str_contains( $corps_pc, 'permis_construire' ) );
+
+// Les libellés viennent du catalogue PC. Sans résolution par type, ils
+// seraient vides : « maison_individuelle » n'existe pas au catalogue DP.
+check( '27 · le projet principal porte son libellé PC', str_contains( $corps_pc, 'Maison neuve' ) );
+check( '27 · le projet supplémentaire aussi', str_contains( $corps_pc, 'Annexe / garage' ) );
+check( '27 · la pièce différée est nommée', str_contains( $corps_pc, 'Plans existants en votre possession' ) );
+check( '27 · le montant serveur y figure', str_contains( $corps_pc, '1059 €' ) );
+check( '27 · la mention imposée est présente', str_contains( $corps_pc, CustomerAcknowledgementRenderer::MENTION ) );
+check( '27 · la salutation compose prénom puis nom', str_contains( $corps_pc, 'Bonjour Camille Fictif,' ) );
+
+foreach ( array( 'secret-interne', '/var/private', '_urbizen_', 'received', 'http://', 'https://' ) as $interdit ) {
+	check( sprintf( '28 · « %s » n’apparaît pas dans l’accusé PC', $interdit ), ! str_contains( $corps_pc, $interdit ) );
+}
+
+// --- le cas sur étude ---
+
+$GLOBALS['wpd_meta'] = array();
+$id = demande_persistee(
+	'permis_construire',
+	array(
+		'nature'                  => 'autre',
+		'projets_supplementaires' => array( 'extension' ),
+		'pieces_differees'        => array(),
+	),
+	array(
+		'base'           => null,
+		'options'        => array(
+			array( 'id' => 'projet_supplementaire:extension', 'price' => 100 ),
+			array( 'id' => 'secteur_abf', 'price' => 80 ),
+		),
+		'total'          => null,
+		'pricing_status' => 'sur_etude',
+	)
+);
+
+$etude = (string) CustomerAcknowledgementRenderer::render( $id, 1000 )['body'];
+
+check( '29 · un dossier sur étude le dit', str_contains( $etude, 'Tarif sur étude' ) );
+check( '29 · et surtout pas « 0 € »', ! str_contains( $etude, '0 €' ) );
+check( '29 · aucun total fabriqué depuis les suppléments', ! str_contains( $etude, '180 €' ) );
+check( '29 · la mention reste présente', str_contains( $etude, CustomerAcknowledgementRenderer::MENTION ) );
+check( '29 · rien ne présente le message comme une commande',
+	! str_contains( $etude, 'facture' ) && ! str_contains( $etude, 'devis accepté' )
+	&& ! str_contains( $etude, 'commande confirmée' ) );
+
+// --- résolution par créneau, et indépendance des deux messages ---
+
+$admin_pc  = NotificationSlot::admin( $id );
+$client_pc = NotificationSlot::client( $id );
+
+check( '30 · le créneau administratif PC a sa stratégie interne',
+	NotificationStrategyRegistry::for_slot( 'permis_construire', $admin_pc )
+		instanceof PermisConstruireNotificationStrategy );
+check( '30 · le créneau client PC reçoit l’accusé',
+	NotificationStrategyRegistry::for_slot( 'permis_construire', $client_pc )
+		instanceof CustomerAcknowledgementStrategy );
+check( '30 · le PC figure à la liste blanche des accusés',
+	NotificationStrategyRegistry::has_customer_acknowledgement( 'permis_construire' ) );
+
+MailQueue::create_pending( $id, 1000 );
+MailQueue::create_pending( $id, 1000, $client_pc );
+MailQueue::mark_sending( $id, 1, 1000, $client_pc );
+MailQueue::mark_failure( $id, 1, 'transport_refused', 1000, $client_pc );
+
+check( '31 · les deux créneaux PC ont des identifiants distincts',
+	MailQueue::state( $id )['notification_id'] !== MailQueue::state( $id, $client_pc )['notification_id'] );
+check( '31 · l’échec de l’accusé PC ne touche pas la notification interne',
+	MailPolicy::PENDING === MailQueue::state( $id )['status']
+	&& MailPolicy::RETRY === MailQueue::state( $id, $client_pc )['status'] );
+check( '31 · chaque créneau compte ses propres tentatives',
+	0 === MailQueue::state( $id )['attempts'] && 1 === MailQueue::state( $id, $client_pc )['attempts'] );
+check( '31 · les clés d’idempotence diffèrent',
+	$admin_pc->idempotence( 'URB-2026-0077' ) !== $client_pc->idempotence( 'URB-2026-0077' ) );
+
+// ======================================================================
+// 12 · SOURCE UNIQUE
+// ======================================================================
+
 $source = (string) file_get_contents( URBIZEN_PLATFORM_DIR . 'src/Mail/CustomerAcknowledgementRenderer.php' );
 
 check( '24 · l’accusé ne fabrique aucun lien signé',
 	! str_contains( $source, 'SignedLink' ) );
+check( '32 · l’accusé n’est écrit qu’une fois, pour tous les parcours',
+	! str_contains( $source, 'CatalogueDeclarationPrealable' )
+	&& ! str_contains( $source, 'CataloguePermisConstruire' )
+	&& str_contains( $source, 'CatalogueRegistry' ) );
 check( '24 · et ne choisit son destinataire que par la charge persistée',
 	str_contains( $source, 'MailPolicy::customer_recipient' )
 	&& ! str_contains( $source, 'MailPolicy::recipient()' )
