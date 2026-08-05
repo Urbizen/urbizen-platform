@@ -238,6 +238,48 @@ verifier(
 	str_contains( $pc, 'UrbizenPont.init' ) && str_contains( $pc_maq, 'UrbizenPont.init' )
 );
 
+/* ================================================================== *
+ *  Version du lot de ressources : une seule, partout
+ * ================================================================== */
+
+// Un document neuf qui appellerait d'anciens scripts — ou l'inverse — est
+// exactement la panne que le versionnement doit fermer. Les trois endroits
+// doivent donc porter la même valeur, et le banc échoue à la moindre dérive.
+preg_match( "/const URBIZEN_CHILD_FORMS_VERSION = '([^']+)'/", $functions, $m );
+$version = $m[1] ?? '';
+
+verifier( 'une version de lot est déclarée', '' !== $version && 1 === preg_match( '/^\d+\.\d+\.\d+$/', $version ) );
+
+foreach ( array( 'declaration-prealable' => $dp, 'permis-de-construire' => $pc ) as $slug => $_ ) {
+	$gabarit = (string) file_get_contents( $theme . '/templates/page-formulaire-' . $slug . '.html' );
+
+	verifier(
+		sprintf( 'le cadre de « %s » porte la version du lot', $slug ),
+		str_contains( $gabarit, '.html?v=' . $version . '"' )
+	);
+	verifier(
+		sprintf( 'et aucun secret dans l’URL de « %s »', $slug ),
+		! preg_match( '/(nonce|token|_wpnonce|urbizen_token)=/i', $gabarit )
+	);
+}
+
+foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
+	preg_match_all( '/urbizen-form-[a-z]+\.(?:js|css)\?v=([0-9.]+)/', $doc, $versions );
+
+	verifier(
+		sprintf( '%s : les cinq ressources sont versionnées', $nom ),
+		5 === count( $versions[1] ?? array() )
+	);
+	verifier(
+		sprintf( '%s : toutes à la version du lot', $nom ),
+		array() !== ( $versions[1] ?? array() ) && array( $version ) === array_values( array_unique( $versions[1] ) )
+	);
+	verifier(
+		sprintf( '%s : aucune ressource interne sans version', $nom ),
+		! preg_match( '/urbizen-form-[a-z]+\.(?:js|css)"/', $doc )
+	);
+}
+
 echo "\n";
 
 if ( $echecs > 0 ) {

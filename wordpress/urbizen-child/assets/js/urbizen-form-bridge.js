@@ -27,7 +27,26 @@
 (function (global) {
   "use strict";
 
-  var DELAI_INITIALISATION = 8000;
+  var DELAI_INITIALISATION = 10000;
+
+  /**
+   * Temporisation des demandes de configuration, en millisecondes.
+   *
+   * Rien ne garantit que la page parente ait installé son écouteur au moment où
+   * ce document est prêt : son script est chargé en pied de page, et un cadre
+   * servi depuis le cache peut être prêt bien avant. Une demande unique perdue
+   * laissait le formulaire définitivement inerte.
+   *
+   * Les premières répétitions sont serrées — le cas courant se règle en
+   * quelques centaines de millisecondes — puis l'intervalle se stabilise à la
+   * seconde jusqu'au délai maximal. Le but n'est pas d'insister longtemps, mais
+   * de couvrir une fenêtre de course qui se compte en dizaines de
+   * millisecondes.
+   */
+  var RELANCES = [0, 100, 250, 500, 1000];
+
+  /** Intervalle des relances au-delà de la temporisation initiale. */
+  var RELANCE_REGULIERE = 1000;
 
   var MESSAGE_INIT =
     "Le formulaire n’a pas pu être initialisé. Veuillez actualiser la page ou nous contacter.";
@@ -90,6 +109,7 @@
     this.configuration = null;
     this.verrouille = false;
     this.envoiEnCours = false;
+    this.minuteurs = [];
 
     this._preparerBouton();
     this._ecouter();
@@ -129,11 +149,28 @@
       pont.configuration = message;
       pont.verrouille = true;
 
-      if (pont.minuteur) global.clearTimeout(pont.minuteur);
+      pont._arreterRelances();
+
+      // Accusé de réception : le parent cesse alors de renvoyer. Sans lui, il
+      // continuerait d'émettre à chaque `load` et à chaque demande, sans savoir
+      // que le document est servi.
+      if (global.parent !== global) {
+        global.parent.postMessage({ type: "urbizen_form_configured" }, global.location.origin);
+      }
 
       pont.bouton.disabled = false;
       pont.bouton.removeAttribute("aria-disabled");
     });
+  };
+
+  /** Éteint toutes les répétitions en attente. */
+  Pont.prototype._arreterRelances = function () {
+    for (var i = 0; i < this.minuteurs.length; i++) {
+      global.clearTimeout(this.minuteurs[i]);
+      global.clearInterval(this.minuteurs[i]);
+    }
+
+    this.minuteurs = [];
   };
 
   Pont.prototype._demander = function () {
@@ -147,11 +184,32 @@
       return;
     }
 
-    global.parent.postMessage({ type: "urbizen_form_ready" }, global.location.origin);
+    var demander = function () {
+      // Une configuration déjà acceptée n'a plus rien à demander. Le contrôle
+      // est ici et non seulement à la pose des minuteurs : une relance peut
+      // avoir été programmée juste avant l'acceptation.
+      if (pont.verrouille) return;
 
-    this.minuteur = global.setTimeout(function () {
-      if (!pont.verrouille) pont._echecInitialisation();
-    }, this.delai);
+      global.parent.postMessage({ type: "urbizen_form_ready" }, global.location.origin);
+    };
+
+    demander();
+
+    for (var i = 1; i < RELANCES.length; i++) {
+      this.minuteurs.push(global.setTimeout(demander, RELANCES[i]));
+    }
+
+    // Au-delà de la temporisation initiale, une relance par seconde jusqu'au
+    // délai maximal. L'intervalle est éteint en même temps que le reste.
+    this.minuteurs.push(global.setInterval(demander, RELANCE_REGULIERE));
+
+    this.minuteurs.push(
+      global.setTimeout(function () {
+        pont._arreterRelances();
+
+        if (!pont.verrouille) pont._echecInitialisation();
+      }, this.delai)
+    );
   };
 
   Pont.prototype._echecInitialisation = function () {
@@ -306,14 +364,22 @@
       ligne("Projet principal · " + projet.label, null === tarif.total && !tarif.base ? "Tarif sur étude" : euros(tarif.base || 0));
     }
 
+    // Les projets supplémentaires sont rendus depuis `additional_projects`,
+    // qui porte leur description. Le tarif les porte AUSSI, sous leur seul
+    // libellé de nature — et les rendre deux fois affichait « Piscine » sur
+    // deux lignes, dont une sans sa description. On retient donc les libellés
+    // déjà rendus pour les écarter du détail tarifaire.
+    var dejaRendus = {};
+
     (donnees.additional_projects || []).forEach(function (p) {
       var libelle = "Projet supplémentaire — " + p.label;
       if (p.description) libelle += " (" + p.description + ")";
       ligne(libelle, "+100 €", "is-detail");
+      dejaRendus[p.label] = true;
     });
 
     (tarif.options || []).forEach(function (option) {
-      if (!option.label || 0 === option.label.indexOf("Projet")) return;
+      if (!option.label || dejaRendus[option.label]) return;
       ligne(option.label, euros(option.amount));
     });
 

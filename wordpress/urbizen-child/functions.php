@@ -188,6 +188,21 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
  * l'accueil, sans écrire de CSS propre. On n'y inscrit un slug que lorsque son
  * gabarit existe réellement dans le thème.
  */
+/**
+ * Version du lot de ressources des formulaires.
+ *
+ * Une seule valeur pour trois endroits : l'URL du cadre produite par cette page,
+ * les feuilles et scripts que les documents DP et PC chargent, et les bancs de
+ * contrat. Les faire diverger reviendrait à servir un document neuf qui appelle
+ * d'anciens scripts, ou l'inverse — précisément la panne que le versionnement
+ * doit fermer.
+ *
+ * À incrémenter à chaque changement d'un de ces fichiers. Un paramètre tiré au
+ * hasard à chaque affichage invaliderait le cache en permanence : ce n'est pas
+ * une invalidation, c'est une suppression.
+ */
+const URBIZEN_CHILD_FORMS_VERSION = '0.2.3';
+
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
 	'page-permis-de-construire',
@@ -324,7 +339,13 @@ function urbizen_child_configuration_formulaire() {
 		'honeypotField'  => 'company_website',
 		'submitUrl'      => admin_url( 'admin-post.php' ),
 		'origin'         => urbizen_child_origine_site(),
+		// **Sans version.** Le gabarit porte `?v=…` sur le cadre ; la comparaison
+		// côté parent est un `indexOf`, donc un préfixe suffit. Y mettre la
+		// version obligerait les deux à rester synchrones au caractère près, et
+		// une divergence ferait échouer la vérification de source — le
+		// formulaire deviendrait inerte pour une raison invisible.
 		'frameSource'    => '/wp-content/themes/urbizen-child/assets/forms/' . $route['frame'],
+		'assetsVersion'  => URBIZEN_CHILD_FORMS_VERSION,
 	);
 }
 

@@ -186,6 +186,9 @@
     border-radius: var(--radius);
     padding: 9px 11px;
     width: 100%;
+    /* Cible tactile : 44 px, seuil retenu pour tout le parcours. Le
+       remplissage seul laissait les listes déroulantes à 41 px. */
+    min-height: 44px;
     transition: border-color .15s, box-shadow .15s;
   }
   /* champs "mesure" : mono, façon relevé cadastral */
@@ -271,6 +274,8 @@
   #dp-app button.dp-btn {
     font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 14px;
     padding: 10px 20px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent;
+    /* Même seuil que les champs : au doigt, 40 px se rate. */
+    min-height: 44px;
     transition: background .15s, border-color .15s, transform .05s;
   }
   #dp-app button.dp-btn:active { transform: translateY(1px); }
@@ -356,8 +361,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
-<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css?v=0.2.0" />
-<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css?v=0.2.0" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css?v=0.2.3" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css?v=0.2.3" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -611,9 +616,9 @@
   </div>
 </div>
 
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.0"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.0"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.0"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.3"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.3"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.3"></script>
 <script>
 (function () {
   "use strict";

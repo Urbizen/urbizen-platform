@@ -513,6 +513,10 @@ titre("PC · 11 — Un dossier sur étude n'affiche aucun total chiffré");
   const texte = cible.textContent;
 
   check("le total est annoncé « Tarif sur étude »", texte.includes("Tarif sur étude"));
+  // Un projet supplémentaire est porté à la fois par `additional_projects` et
+  // par le détail tarifaire : il ne doit apparaître qu'une fois.
+  check("le projet supplémentaire n'apparaît qu'une fois",
+    1 === (texte.match(/Extension/g) || []).length);
   check("les suppléments restent détaillés",
     texte.includes("Secteur Bâtiments de France") && texte.includes("80 €"));
   check("le projet supplémentaire est chiffré", texte.includes("100 €"));
@@ -523,6 +527,227 @@ titre("PC · 11 — Un dossier sur étude n'affiche aucun total chiffré");
     texte.includes("Estimation indicative. Le tarif définitif sera confirmé par Urbizen après vérification de votre projet, avant toute commande."));
 
   ctx.dom.window.close();
+}
+
+/* ================================================================== *
+ *  12. Le protocole d'initialisation : aucun message unique décisif
+ * ================================================================== */
+
+titre("12 — Protocole : répétition, accusé, et perte du premier « ready »");
+
+for (const P of PARCOURS) {
+  /* --- 12.1 · le document répète sa demande --------------------------- */
+  {
+    const ctx = await monter(P, { delai: 900 });
+
+    check(`${P.nom} · une première demande part au chargement`,
+      1 === ctx.versParent.filter((m) => "urbizen_form_ready" === m.donnees.type).length);
+
+    // Le premier « ready » est PERDU : personne n'y répond. Les répétitions
+    // doivent suffire à rattraper la course.
+    await new Promise((r) => setTimeout(r, 400));
+
+    const relances = ctx.versParent.filter((m) => "urbizen_form_ready" === m.donnees.type).length;
+
+    check(`${P.nom} · la demande est répétée si personne ne répond`, relances > 1);
+    check(`${P.nom} · chaque relance vise l'origine exacte, jamais « * »`,
+      ctx.versParent.every((m) => ORIGINE === m.cible));
+    check(`${P.nom} · le bouton reste désactivé tant qu'aucune réponse n'arrive`, ctx.bouton.disabled);
+
+    // Réponse tardive : le formulaire s'initialise malgré le « ready » perdu.
+    recevoir(ctx, { data: P.config });
+
+    check(`${P.nom} · une réponse tardive initialise quand même le formulaire`, ctx.pont.pret());
+    check(`${P.nom} · et déverrouille le bouton`, !ctx.bouton.disabled);
+
+    /* --- 12.2 · accusé de réception ----------------------------------- */
+    const accuses = ctx.versParent.filter((m) => "urbizen_form_configured" === m.donnees.type);
+
+    check(`${P.nom} · le document accuse réception`, 1 === accuses.length);
+    check(`${P.nom} · l'accusé part à l'origine exacte`, accuses.every((m) => ORIGINE === m.cible));
+
+    /* --- 12.3 · les relances cessent ---------------------------------- */
+    const avant = ctx.versParent.filter((m) => "urbizen_form_ready" === m.donnees.type).length;
+
+    await new Promise((r) => setTimeout(r, 1400));
+
+    const apres = ctx.versParent.filter((m) => "urbizen_form_ready" === m.donnees.type).length;
+
+    check(`${P.nom} · plus aucune demande après l'accusé`, avant === apres);
+
+    /* --- 12.4 · configuration dupliquée ------------------------------- */
+    recevoir(ctx, { data: { ...P.config, submitUrl: "https://pirate.test/collecte" } });
+
+    check(`${P.nom} · une configuration dupliquée ne remplace rien`,
+      P.config.submitUrl === ctx.pont.configuration.submitUrl);
+    check(`${P.nom} · et ne produit pas un second accusé`,
+      1 === ctx.versParent.filter((m) => "urbizen_form_configured" === m.donnees.type).length);
+
+    ctx.dom.window.close();
+  }
+
+  /* --- 12.5 · le délai expire pour de bon ----------------------------- */
+  {
+    // Aucune réponse, jamais : on laisse réellement le minuteur arriver à son
+    // terme plutôt que d'en simuler l'issue.
+    const ctx = await monter(P, { delai: 700 });
+
+    await new Promise((r) => setTimeout(r, 1000));
+
+    check(`${P.nom} · sans réponse, l'initialisation échoue`, ctx.bouton.disabled);
+    check(`${P.nom} · avec le message prévu`,
+      "Le formulaire n’a pas pu être initialisé. Veuillez actualiser la page ou nous contacter." === ctx.erreur.textContent);
+
+    const avant = ctx.versParent.length;
+
+    await new Promise((r) => setTimeout(r, 1200));
+
+    check(`${P.nom} · et les relances s'arrêtent avec lui`, avant === ctx.versParent.length);
+
+    ctx.dom.window.close();
+  }
+
+  /* --- 12.6 · le jeton anti-robot voyage dans la configuration -------- */
+  {
+    const ctx = await monter(P, { reponse: { success: true, reference: "URB-X" }, statut: 201 });
+
+    recevoir(ctx, {
+      data: {
+        ...P.config,
+        tokenField: "urbizen_token",
+        token: "jeton-de-banc",
+        honeypotField: "company_website",
+      },
+    });
+
+    ctx.form.querySelector("#a1").checked = true;
+    ctx.form.querySelector("#a2").checked = true;
+    ctx.pont.envoyer();
+    await new Promise((r) => setTimeout(r, 20));
+
+    const fd = ctx.requetes[0].options.body;
+
+    check(`${P.nom} · le jeton anti-robot part avec la requête`, "jeton-de-banc" === fd.get("urbizen_token"));
+    check(`${P.nom} · le pot de miel part vide`, "" === fd.get("company_website"));
+
+    ctx.dom.window.close();
+  }
+}
+
+/* ================================================================== *
+ *  13. Côté parent : émission spontanée, accusé, et sources hostiles
+ * ================================================================== */
+
+titre("13 — Côté parent : le renvoi ne dépend pas d'être sollicité");
+
+for (const P of PARCOURS) {
+  const dom = new JSDOM(
+    `<!doctype html><body><iframe data-urbizen-form-frame src="/wp-content/themes/urbizen-child/assets/forms/${P.fichier}?v=0.2.1"></iframe></body>`,
+    { url: ORIGINE + "/formulaire/", runScripts: "dangerously", pretendToBeVisual: true }
+  );
+
+  const { window } = dom;
+  await new Promise((r) => ("complete" === window.document.readyState ? r() : window.addEventListener("load", r)));
+
+  window.urbizenFormConfig = {
+    ...P.config,
+    tokenField: "urbizen_token",
+    token: "jeton-parent",
+    honeypotField: "company_website",
+    origin: ORIGINE,
+    // Volontairement SANS version : la comparaison est un préfixe, et exiger la
+    // version au caractère près ferait échouer la vérification de source à la
+    // moindre dérive entre le gabarit et la configuration.
+    frameSource: "/wp-content/themes/urbizen-child/assets/forms/" + P.fichier,
+  };
+
+  const cadre = window.document.querySelector("iframe");
+  const recu = [];
+  const fausseFenetre = { postMessage: (d, c) => recu.push({ d, c }) };
+  Object.defineProperty(cadre, "contentWindow", { value: fausseFenetre, configurable: true });
+
+  window.eval(readFileSync(PARENT, "utf8"));
+
+  // Le script s'exécute alors que le cadre est DÉJÀ chargé : `load` ne se
+  // rejouera pas. L'émission immédiate est la seule chose qui sauve ce cas.
+  check(`${P.nom} · le parent émet sans avoir été sollicité`,
+    1 === recu.length && "urbizen_form_config" === recu[0].d.type);
+  check(`${P.nom} · la configuration porte le jeton anti-robot`, "jeton-parent" === recu[0].d.token);
+  check(`${P.nom} · et le champ du pot de miel`, "company_website" === recu[0].d.honeypotField);
+  check(`${P.nom} · à l'origine exacte, jamais « * »`, ORIGINE === recu[0].c);
+
+  function envoyer({ origin = ORIGINE, source = fausseFenetre, data = { type: "urbizen_form_ready" } }) {
+    const e = new window.MessageEvent("message", { data, origin });
+    Object.defineProperty(e, "source", { value: source, configurable: true });
+    window.dispatchEvent(e);
+  }
+
+  // Un `load` peut se produire plusieurs fois ; chaque émission reste valable
+  // tant que l'accusé n'est pas arrivé, et sans effet ensuite.
+  cadre.dispatchEvent(new window.Event("load"));
+  cadre.dispatchEvent(new window.Event("load"));
+
+  check(`${P.nom} · chaque « load » réémet tant qu'aucun accusé n'est reçu`, 3 === recu.length);
+
+  envoyer({});
+  check(`${P.nom} · une demande explicite est servie aussi`, 4 === recu.length);
+
+  // Sources et origines hostiles : rien ne sort.
+  const avant = recu.length;
+
+  envoyer({ origin: "https://pirate.test" });
+  envoyer({ source: { postMessage() {} } });
+  envoyer({ data: { type: "autre_chose" } });
+
+  check(`${P.nom} · une autre origine n'obtient rien`, avant === recu.length);
+  check(`${P.nom} · une autre fenêtre non plus`, avant === recu.length);
+  check(`${P.nom} · ni un type inattendu`, avant === recu.length);
+
+  // Accusé : tout renvoi cesse, y compris sur « load ».
+  envoyer({ data: { type: "urbizen_form_configured" } });
+
+  const apresAccuse = recu.length;
+
+  envoyer({});
+  cadre.dispatchEvent(new window.Event("load"));
+
+  check(`${P.nom} · après l'accusé, plus aucun renvoi`, apresAccuse === recu.length);
+  check(`${P.nom} · même sur une nouvelle demande`, apresAccuse === recu.length);
+
+  // Un accusé venu d'ailleurs ne doit pas faire taire le parent.
+  const dom2 = recu.length;
+  envoyer({ source: { postMessage() {} }, data: { type: "urbizen_form_configured" } });
+  envoyer({});
+
+  check(`${P.nom} · un accusé d'une fenêtre inconnue est ignoré`, dom2 === recu.length);
+
+  dom.window.close();
+}
+
+/* ================================================================== *
+ *  14. L'URL du cadre : versionnée, et sans le moindre secret
+ * ================================================================== */
+
+titre("14 — L'URL du cadre");
+
+for (const P of PARCOURS) {
+  const gabarit = readFileSync(
+    resolve(THEME, "templates/page-formulaire-" + ("DP" === P.nom ? "declaration-prealable" : "permis-de-construire") + ".html"),
+    "utf8"
+  );
+
+  check(`${P.nom} · le cadre porte une version déterministe`,
+    /\.html\?v=\d+\.\d+\.\d+"/.test(gabarit));
+  check(`${P.nom} · aucun nonce dans l'URL`, !/nonce/i.test(gabarit));
+  check(`${P.nom} · aucun jeton anti-robot dans l'URL`, !/urbizen_token|token=/i.test(gabarit));
+  check(`${P.nom} · l'URL reste de même origine`, !/src="https?:\/\//.test(gabarit));
+
+  const doc = readFileSync(resolve(THEME, "assets/forms/" + P.fichier), "utf8");
+  const versionCadre = (gabarit.match(/\.html\?v=([\d.]+)"/) || [])[1];
+  const versionsRes = [...doc.matchAll(/urbizen-form-[a-z]+\.(?:js|css)\?v=([\d.]+)/g)].map((m) => m[1]);
+
+  check(`${P.nom} · document et ressources partagent la même version`,
+    versionsRes.length > 0 && versionsRes.every((v) => v === versionCadre));
 }
 
 console.log("");
