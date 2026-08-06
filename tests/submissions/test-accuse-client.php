@@ -458,6 +458,34 @@ check( '31 · les clés d’idempotence diffèrent',
 	$admin_pc->idempotence( 'URB-2026-0077' ) !== $client_pc->idempotence( 'URB-2026-0077' ) );
 
 // ======================================================================
+// 11 bis · CE QUI VA SE PASSER, ET CE QUE LE MESSAGE NE PROMET PAS
+// ======================================================================
+
+$GLOBALS['wpd_meta'] = array();
+$id     = dp_persistee();
+$suite  = (string) CustomerAcknowledgementRenderer::render( $id, 1000 )['body'];
+
+check( '33 · la suite annoncée est présente au caractère près',
+	str_contains( $suite, CustomerAcknowledgementRenderer::SUITE ) );
+check( '33 · et elle est bien celle qui a été arrêtée',
+	'Un interlocuteur Urbizen vérifiera les informations transmises et prendra contact avec vous sous 24 heures ouvrées afin de confirmer votre besoin, les éventuelles pièces complémentaires et le tarif définitif avant toute commande.'
+	=== CustomerAcknowledgementRenderer::SUITE );
+
+// Ce que le message ne doit jamais laisser entendre. Un accusé de réception
+// n'est ni un devis accepté, ni une commande, ni un dépôt en mairie — et la
+// nuance décide de ce que le client croit avoir engagé.
+$promesses = array(
+	'devis accepté', 'devis validé', 'commande confirmée', 'commande enregistrée',
+	'dossier validé', 'dossier complet', 'déposé en mairie', 'dépôt effectué',
+	'bon pour accord',
+);
+
+foreach ( $promesses as $promesse ) {
+	check( sprintf( '34 · l’accusé ne dit pas « %s »', $promesse ),
+		! str_contains( mb_strtolower( $suite ), $promesse ) );
+}
+
+// ======================================================================
 // 12 · SOURCE UNIQUE
 // ======================================================================
 

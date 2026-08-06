@@ -28,6 +28,7 @@ use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\PricingStrategyContextuelle;
+use Urbizen\Platform\Forms\MatriceChamps;
 use Urbizen\Platform\Forms\ValidationMetierRegistry;
 use Urbizen\Platform\Forms\PricingStrategyRegistry;
 use Urbizen\Platform\Forms\Validator;
@@ -409,6 +410,32 @@ final class SubmissionController {
 
 				return $renoncer( SubmissionResult::VALIDATION_FAILED, $erreurs_metier )->with_recovery( $reprise_id );
 			}
+		}
+
+		// --- 8 ter · champs que la nature ne justifie pas ---
+		// La définition a jugé chaque champ, la cohérence métier les a jugés
+		// ensemble ; reste ce qu'aucune des deux ne voit — un champ parfaitement
+		// valide mais sans objet pour ce projet. Une surface de plancher sur une
+		// piscine n'est pas une donnée inutile, c'est une donnée FAUSSE : elle
+		// finirait dans le CERFA.
+		//
+		// L'écart est retiré, pas refusé. C'est le plus souvent le reliquat d'une
+		// nature changée en cours de saisie, et faire échouer la demande pour
+		// cela serait disproportionné. Le masquage côté navigateur reste une
+		// politesse ; ce filtrage-ci est la règle.
+		$ecartes = array();
+
+		$validation['clean'] = MatriceChamps::filtrer( $type, $validation['clean'], $ecartes );
+
+		if ( array() !== $ecartes ) {
+			Logger::info(
+				sprintf(
+					'soumission %s : %d champ(s) sans objet pour la nature déclarée, écarté(s) : %s',
+					$type,
+					count( $ecartes ),
+					implode( ', ', $ecartes )
+				)
+			);
 		}
 
 		// --- 9 · prix, recalculé côté serveur ---

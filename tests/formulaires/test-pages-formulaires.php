@@ -280,6 +280,33 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 	);
 }
 
+/* ================================================================== *
+ *  Écran final : ce qui est annoncé, et ce qui ne l'est pas
+ * ================================================================== */
+
+$titre_final = 'Votre demande a bien été enregistrée.';
+$suite_final = 'Un interlocuteur Urbizen va vérifier les informations transmises et prendra contact '
+	. 'avec vous sous 24 heures ouvrées afin de confirmer votre besoin, les éventuelles pièces '
+	. 'complémentaires et le tarif définitif avant toute commande.';
+
+foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
+	verifier( sprintf( '%s : l’écran final annonce l’enregistrement', $nom ), str_contains( $doc, $titre_final ) );
+	verifier( sprintf( '%s : et la prise de contact sous 24 h ouvrées', $nom ), str_contains( $doc, $suite_final ) );
+
+	// La référence, le récapitulatif et la mention tarifaire restent en place :
+	// le nouveau message s'ajoute à la preuve, il ne la remplace pas.
+	verifier( sprintf( '%s : la référence réelle y figure toujours', $nom ), str_contains( $doc, 'id="dp-reference"' ) );
+	verifier( sprintf( '%s : le récapitulatif tarifaire aussi', $nom ), str_contains( $doc, 'data-tarifs-recap-final' ) );
+
+	// Ce qu'un écran de réussite ne doit jamais laisser croire.
+	foreach ( array( 'devis accepté', 'commande confirmée', 'dossier validé', 'déposé en mairie' ) as $promesse ) {
+		verifier(
+			sprintf( '%s : rien ne dit « %s »', $nom, $promesse ),
+			! str_contains( mb_strtolower( $doc ), $promesse )
+		);
+	}
+}
+
 echo "\n";
 
 if ( $echecs > 0 ) {

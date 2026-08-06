@@ -49,6 +49,17 @@ final class CustomerAcknowledgementRenderer {
 	public const MENTION = 'Estimation indicative. Le tarif définitif sera confirmé par Urbizen après vérification de votre projet, avant toute commande.';
 
 	/**
+	 * Ce qui va se passer, et sous quel délai.
+	 *
+	 * La formulation dit une vérification et une prise de contact — jamais un
+	 * devis accepté, une commande confirmée, un dossier validé ni un dépôt
+	 * effectué. C'est la même information que l'écran final, adaptée au fait
+	 * qu'on écrit après coup et non au moment du clic. Un banc en vérifie la
+	 * présence exacte, ici et sur les deux écrans.
+	 */
+	public const SUITE = 'Un interlocuteur Urbizen vérifiera les informations transmises et prendra contact avec vous sous 24 heures ouvrées afin de confirmer votre besoin, les éventuelles pièces complémentaires et le tarif définitif avant toute commande.';
+
+	/**
 	 * Rend l'accusé complet d'une demande.
 	 *
 	 * @param int      $id  Demande.
@@ -145,8 +156,8 @@ final class CustomerAcknowledgementRenderer {
 		$html[] = self::estimation( is_array( $demande['pricing'] ?? null ) ? $demande['pricing'] : array() );
 		$html[] = self::a_transmettre( $type, $charge );
 
-		$html[] = '<p style="margin:20px 0 0">Notre équipe vérifie votre dossier et revient vers vous. ';
-		$html[] = 'Vous pouvez répondre à ce message en indiquant la référence ci-dessus.</p>';
+		$html[] = '<p style="margin:20px 0 0">' . esc_html( self::SUITE ) . '</p>';
+		$html[] = '<p style="margin:12px 0 0">Vous pouvez répondre à ce message en indiquant la référence ci-dessus.</p>';
 		$html[] = '<p style="margin:16px 0 0;font-size:12px;color:#5b6b80">Ce message est un accusé de réception automatique. ';
 		$html[] = 'Aucun document n\'y est joint.</p>';
 		$html[] = '</div>';
