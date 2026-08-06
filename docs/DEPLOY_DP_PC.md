@@ -13,6 +13,7 @@
 | Version du lot de formulaires | `0.2.3` |
 | Migrations de schéma | **aucune** — catalogue vide, aucun `dbDelta`, aucun `CREATE TABLE` |
 | Accès | SSH Hostinger, clé `~/.ssh/urbizen_hostinger`, port 65002 |
+| Production | WordPress 7.0.2 · PHP 8.3.31 · `urbizen-platform` 0.13.1 |
 | Variables | `SSH_USER`, `SSH_HOST`, `WP_ROOT` — jamais versionnées, jamais affichées |
 
 L'absence de migration est ce qui rend le retour arrière simple : **restaurer le code suffit**, et la
@@ -85,11 +86,48 @@ empreinte n'existe dans **aucun** commit, sur **aucune** branche.
 > qu'il faille conserver. C'est le sens de la sauvegarde du § 4 : elle n'est pas une formalité ici,
 > elle est la seule copie de cet état.
 
-### Ce que l'audit ne peut pas établir sans SSH
+### Relevé de production — audit SSH en lecture seule
 
-Version de WordPress, version de PHP, `hostinger_ai_version`, extensions actives, mécanisme SMTP,
-extensions de cache et de sécurité, chemins exacts, propriétaire et permissions, espace disque, état
-de WP-Cron, et l'inventaire complet des fichiers du plugin.
+| Élément | Valeur |
+|---|---|
+| WordPress | **7.0.2** |
+| PHP | **8.3.31** |
+| Thème actif | `urbizen-child` sur `hostinger-ai-theme` |
+| `hostinger_ai_version` | **définie** (`1779364309`) |
+| Transport de courriel | **`fluent-smtp` 2.2.95** |
+| Cache | **`litespeed-cache` 7.8.1** |
+| Sécurité dédiée | aucune extension spécialisée ; `hostinger` 3.0.69 et `hostinger-easy-onboarding` 2.1.27 |
+| Autres extensions notables | `fluentform` 6.2.5, `kadence-blocks`, `all-in-one-seo-pack`, `google-site-kit`, `optinmonster` |
+| Greffon Urbizen | `urbizen-platform` **0.13.1**, actif |
+| WP-Cron | fonctionnel — « spawning is working as expected » |
+| Thème enfant | `wp-content/themes/urbizen-child`, `755`, propriétaire = compte SSH, modifié le 1ᵉʳ août |
+| Greffon | `wp-content/plugins/urbizen-platform`, `755`, propriétaire = compte SSH, modifié le 29 juillet |
+| Espace disque | 5,0 To libres sur 21 To (77 % utilisés) |
+
+**Trois conséquences directes.**
+
+1. **`hostinger_ai_version` est définie.** La redirection d'onboarding du thème parent ne se
+   déclenche donc pas, et `admin-post.php` est joignable. C'est la confirmation — par la mesure et
+   non plus par déduction — que l'échafaudage `mu-plugin` employé en local est bien un artefact
+   local, sans équivalent ni utilité en production. **Il ne doit pas partir.**
+2. **`fluent-smtp` assure le transport.** Les courriels partiront donc réellement, ce qui rend le
+   contrôle du § 7 concluant sur ce point. Sa configuration — expéditeur, domaine d'envoi — est à
+   vérifier **dans son interface**, pas en lisant ses options : elles contiennent des identifiants.
+3. **LiteSpeed 7.8.1 est présent**, donc `wp litespeed-purge all` est disponible. La purge du § 6
+   n'est pas hypothétique.
+
+**Deux points de vigilance.**
+
+- `fluentform` occupe déjà le terrain des formulaires. Nos routes sont nommées
+  `admin_post_urbizen_*` et ne peuvent pas entrer en collision, mais un contrôle de la page DP après
+  déploiement doit s'assurer qu'aucune de ses ressources ne s'injecte dans le cadre.
+- Les permissions `755` avec le compte SSH pour propriétaire permettent un `rsync` sans élévation.
+  Aucune commande de ce document n'a besoin de `sudo`, et aucune ne doit en employer.
+
+### Ce qui reste à relever
+
+L'inventaire fichier par fichier du greffon déployé, pour compléter la comparaison du § 2.3 au-delà
+des seuls fichiers publiquement lisibles du thème.
 
 ---
 
@@ -360,7 +398,7 @@ créées entre-temps sont conservées** — la restauration ne porte que sur du 
 | 11 | Administration : référence, tarif, créneaux | incohérence |
 | 12 | Mobile 390 px, aucun débordement | débordement |
 | 13 | Journaux PHP propres | erreur répétée |
-| 14 | Cache purgé, ancienne URL de cadre disparue | l'ancienne persiste |
+| 14 | `wp litespeed-purge all` exécuté, ancienne URL de cadre disparue | l'ancienne persiste |
 | 15 | **Décision : maintien ou retour arrière** | — |
 
 ### Critères de succès
