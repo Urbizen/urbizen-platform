@@ -34,6 +34,22 @@
     "demande, les éléments complémentaires nécessaires à la réalisation du " +
     "dossier.";
 
+  /**
+   * Formats et taille acceptés, énoncés une seule fois en tête d'étape.
+   *
+   * La liste et le plafond reproduisent le profil d'upload du serveur — cinq
+   * extensions, dix mébioctets par fichier. Annoncer un format de plus
+   * produirait un refus que le client ne comprendrait pas ; en annoncer un de
+   * moins lui ferait convertir un fichier pour rien. Un banc de contrat
+   * compare cette phrase au profil serveur.
+   *
+   * Elle vit ici et pas sous chaque champ : sept blocs de dépôt, sept
+   * répétitions de la même ligne, ce serait du bruit — et sur mobile, un
+   * empilement illisible.
+   */
+  var MESSAGE_FORMATS =
+    "Formats acceptés : PDF, JPG, JPEG, PNG et WEBP — 10 Mo maximum par fichier.";
+
   // Il n'y a volontairement pas de mention par ligne : répétée sous chacune des
   // sept pièces, elle noyait l'encadré d'ouverture qui porte déjà l'information.
   // Chaque rangée n'affiche que le document demandé, le bouton de dépôt et la
@@ -169,6 +185,7 @@
           "précédentes le sont."
       )
     );
+    intro.appendChild(el("p", "dp-pieces-intro-formats", MESSAGE_FORMATS));
     this.conteneur.appendChild(intro);
 
     this.pieces.forEach(function (piece) {
@@ -379,6 +396,7 @@
       return new Pieces(config);
     },
     MESSAGE_RASSURANT: MESSAGE_RASSURANT,
+    MESSAGE_FORMATS: MESSAGE_FORMATS,
     LIBELLE_REPORT: LIBELLE_REPORT,
     TITRE_REPORT: TITRE_REPORT
   };

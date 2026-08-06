@@ -201,7 +201,7 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
  * hasard à chaque affichage invaliderait le cache en permanence : ce n'est pas
  * une invalidation, c'est une suppression.
  */
-const URBIZEN_CHILD_FORMS_VERSION = '0.2.3';
+const URBIZEN_CHILD_FORMS_VERSION = '0.2.4';
 
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',

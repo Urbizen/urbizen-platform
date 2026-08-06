@@ -456,6 +456,74 @@ check("le message rassurant n'est déclaré que dans le module",
 
 /* ------------------------------------------------------------------ */
 
+/* ================================================================== *
+ *  Formats acceptés : la phrase doit dire le profil serveur, exactement
+ * ================================================================== */
+
+titre("Formats acceptés");
+
+{
+  const PHRASE = "Formats acceptés : PDF, JPG, JPEG, PNG et WEBP — 10 Mo maximum par fichier.";
+  const module = readFileSync(MODULE, "utf8");
+  const politique = readFileSync(
+    resolve(ROOT, "wordpress/urbizen-platform/src/Files/UploadPolicy.php"),
+    "utf8"
+  );
+
+  check("la phrase est celle qui a été arrêtée, au caractère près",
+    module.includes(PHRASE));
+
+  // Elle doit décrire le profil serveur : annoncer un format de plus produit un
+  // refus incompréhensible, un de moins fait convertir un fichier pour rien.
+  const extensions = [...politique.matchAll(/^\s*'([a-z]+)'\s*=>\s*'(?:application|image)\//gm)].map((m) => m[1]);
+  const annonces = (PHRASE.match(/\b(PDF|JPG|JPEG|PNG|WEBP)\b/g) || []).map((x) => x.toLowerCase());
+
+  check("les formats annoncés sont exactement ceux du profil serveur",
+    extensions.length > 0 && [...extensions].sort().join() === [...annonces].sort().join());
+
+  const plafond = (politique.match(/MAX_FILE_SIZE\s*=\s*(\d+)/) || [])[1];
+
+  check("le plafond annoncé est celui du profil serveur",
+    "10485760" === plafond && PHRASE.includes("10 Mo"));
+
+  // Une seule fois, en tête d'étape : sept blocs de dépôt, sept répétitions,
+  // ce serait du bruit — et sur mobile un empilement illisible.
+  const occurrences = (module.match(/Formats acceptés/g) || []).length;
+
+  check("la phrase n'est écrite qu'une fois dans le module", 1 === occurrences);
+  check("elle est rendue en tête d'étape, pas sous chaque champ",
+    module.includes("dp-pieces-intro-formats"));
+
+  // Aucune autre mention de formats ne doit subsister : les documents en
+  // portaient une, périmée — « PDF, JPG, PNG », sans JPEG, sans WEBP, sans
+  // plafond. Deux énoncés contradictoires dans la même étape valent moins que
+  // pas d'énoncé du tout.
+  for (const [nom, chemin] of [...Object.entries(FORMULAIRES), ...Object.entries(MAQUETTES)]) {
+    const doc = readFileSync(chemin, "utf8");
+
+    check(`${nom} · aucune mention de formats dans le document`, !doc.includes("Formats acceptés"));
+  }
+
+  // Ce qui a été écarté de l'ancienne version déployée ne doit pas revenir. On
+  // vise la PROMESSE, pas la nomenclature : « PCMI4 » désigne une pièce du
+  // CERFA et figure légitimement dans le formulaire PC depuis l'origine. Ce
+  // qui est proscrit, c'est de promettre qu'elle est produite automatiquement,
+  // et d'annoncer DP1 à DP8 comme une liste systématiquement fournie.
+  const interdits = [
+    "rédigée automatiquement",
+    "rédigé automatiquement",
+    "DP1 à DP8",
+    "notice est automatique",
+  ];
+
+  for (const interdit of interdits) {
+    check(`« ${interdit} » n'est réintroduit nulle part`,
+      !module.includes(interdit)
+      && !Object.values(FORMULAIRES).some((c) => readFileSync(c, "utf8").includes(interdit))
+      && !Object.values(MAQUETTES).some((c) => readFileSync(c, "utf8").includes(interdit)));
+  }
+}
+
 console.log("");
 if (fail) {
   console.log(`[31m${fail} CONTROLE(S) EN ECHEC[0m`);

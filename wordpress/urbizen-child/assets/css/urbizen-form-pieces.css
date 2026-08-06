@@ -24,6 +24,16 @@
   line-height: 1.55;
 }
 
+/* Formats acceptés : une ligne technique, discrète, jamais répétée sous les
+   champs. Elle reste lisible à 390 px — pas de mise en forme sur une seule
+   ligne qui déborderait. */
+#dp-app .dp-pieces-intro-formats {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
 #dp-app .dp-pieces-intro-note {
   margin: 8px 0 0;
   color: var(--ink-soft);
