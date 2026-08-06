@@ -77,6 +77,10 @@ final class FormDefinition {
 		'max',
 		'maxlength',
 		'increment',
+		// Une mesure renseignée vaut plus que zéro. Distinct de `min` : « 0 »
+		// resterait dans les bornes tout en ne décrivant rien, et il faut
+		// pouvoir le refuser sans interdire une borne basse à zéro.
+		'strict_positif',
 		// Affichage conditionnel.
 		'visible_if',
 		// Tarification.

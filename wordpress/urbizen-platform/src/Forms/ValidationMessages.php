@@ -41,7 +41,13 @@ final class ValidationMessages {
 				return __( 'Cette adresse électronique n’est pas valide.', 'urbizen-platform' );
 
 			case 'nombre_invalide':
-				return __( 'Indiquez un nombre entier valide.', 'urbizen-platform' );
+				// « entier » n'était vrai que tant que tous les nombres l'étaient.
+				// Les mesures acceptent désormais la virgule, et le message doit
+				// le dire — sinon la personne corrige ce qui n'est pas en cause.
+				return __( 'Indiquez un nombre valide. La virgule et le point sont acceptés.', 'urbizen-platform' );
+
+			case 'mesure_nulle':
+				return __( 'Indiquez une mesure supérieure à zéro, ou laissez le champ vide.', 'urbizen-platform' );
 
 			case 'sous_le_minimum':
 				return __( 'La valeur est inférieure au minimum autorisé.', 'urbizen-platform' );

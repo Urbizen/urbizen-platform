@@ -259,31 +259,104 @@ final class Validator {
 	 * @param array<string, string> $errors Erreurs, modifiées sur place.
 	 * @return int|null
 	 */
-	private static function clean_number( array $field, $brut, string $name, array &$errors ): ?int {
-		if ( null === $brut || '' === $brut || is_array( $brut ) ) {
-			return null;
+	private static function clean_number( array $field, $brut, string $name, array &$errors ) {
+		// Un champ dont le pas est fractionnaire mesure quelque chose : une
+		// longueur, une surface. Les autres comptent : des logements, des
+		// niveaux, des panneaux. Les deux ne se valident pas de la même façon,
+		// et confondre les deux est ce qui faisait rejeter « 8.5 » — le contrôle
+		// historique exigeait que la valeur soit égale à sa troncature entière.
+		$pas      = isset( $field['increment'] ) ? (float) $field['increment'] : 1.0;
+		$decimale = $pas > 0.0 && $pas < 1.0;
+
+		if ( ! $decimale ) {
+			return self::clean_entier( $field, $brut, $name, $errors );
 		}
 
-		$valeur = is_string( $brut ) ? trim( $brut ) : $brut;
+		return self::clean_decimal( $field, $brut, $name, $errors );
+	}
 
-		if ( ! is_numeric( $valeur ) || (string) (int) $valeur !== (string) $valeur ) {
-			$errors[ $name ] = 'nombre_invalide';
-			return null;
+	/**
+	 * Mesure décimale, telle qu'une personne l'écrit.
+	 *
+	 * Tout passe par {@see NombreLocalise} : c'est le seul chemin, et il rend un
+	 * verdict explicite plutôt qu'un nombre ou `false`. Un transtypage PHP
+	 * transformerait « 8,5 » en 8 sans rien signaler, et cette valeur-là finit
+	 * dans un CERFA.
+	 *
+	 * La valeur est persistée sous sa **forme canonique**, en chaîne : point
+	 * décimal, deux décimales au plus, sans zéro inutile. `8,50` devient `8.5`
+	 * et `34,00` devient `34`. Une chaîne et non un flottant, pour que ce qui
+	 * est relu soit exactement ce qui a été écrit — un flottant réintroduirait
+	 * les surprises de représentation que l'arrondi vient d'écarter.
+	 *
+	 * @param array<string, mixed>  $field  Déclaration.
+	 * @param mixed                 $brut   Valeur reçue.
+	 * @param string                $name   Nom du champ.
+	 * @param array<string, string> $errors Erreurs, modifiées sur place.
+	 * @return string|null
+	 */
+	private static function clean_decimal( array $field, $brut, string $name, array &$errors ): ?string {
+		$min = isset( $field['min'] ) ? (float) $field['min'] : null;
+		$max = isset( $field['max'] ) ? (float) $field['max'] : null;
+
+		// `strict_positif` : une mesure renseignée vaut forcément plus que zéro.
+		// Un bassin de 0 m de long n'est pas une mesure, c'est une case remplie
+		// par habitude — et la distinguer d'un champ laissé vide compte, parce
+		// que le second veut dire « je ne sais pas ».
+		$strict = ! empty( $field['strict_positif'] );
+
+		$issue = NombreLocalise::decimal( $brut, $min, $max, $strict );
+
+		switch ( $issue['etat'] ) {
+			case NombreLocalise::ABSENT:
+				return null;
+
+			case NombreLocalise::VALIDE:
+				return NombreLocalise::canonique( (float) $issue['valeur'] );
+
+			case NombreLocalise::BORNE:
+				$errors[ $name ] = 'mesure_nulle' === $issue['raison'] ? 'mesure_nulle' : 'hors_bornes';
+				return null;
+
+			default:
+				$errors[ $name ] = 'nombre_invalide';
+				return null;
 		}
+	}
 
-		$entier = (int) $valeur;
+	/**
+	 * Comptage entier.
+	 *
+	 * `3,5` panneaux n'est pas une valeur à arrondir : c'est une saisie qui n'a
+	 * pas de sens, et l'arrondir inventerait une réponse.
+	 *
+	 * @param array<string, mixed>  $field  Déclaration.
+	 * @param mixed                 $brut   Valeur reçue.
+	 * @param string                $name   Nom du champ.
+	 * @param array<string, string> $errors Erreurs, modifiées sur place.
+	 * @return int|null
+	 */
+	private static function clean_entier( array $field, $brut, string $name, array &$errors ): ?int {
+		$min = isset( $field['min'] ) ? (int) $field['min'] : null;
+		$max = isset( $field['max'] ) ? (int) $field['max'] : null;
 
-		if ( isset( $field['min'] ) && $entier < (int) $field['min'] ) {
-			$errors[ $name ] = 'sous_le_minimum';
-			return null;
+		$issue = NombreLocalise::entier( $brut, $min, $max );
+
+		switch ( $issue['etat'] ) {
+			case NombreLocalise::ABSENT:
+				return null;
+
+			case NombreLocalise::VALIDE:
+				return (int) $issue['valeur'];
+
+			case NombreLocalise::BORNE:
+				$errors[ $name ] = 'sous_borne' === $issue['raison'] ? 'sous_le_minimum' : 'au_dela_du_maximum';
+				return null;
+
+			default:
+				$errors[ $name ] = 'nombre_invalide';
+				return null;
 		}
-
-		if ( isset( $field['max'] ) && $entier > (int) $field['max'] ) {
-			$errors[ $name ] = 'au_dela_du_maximum';
-			return null;
-		}
-
-		return $entier;
 	}
 
 	/**
