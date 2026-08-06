@@ -84,16 +84,36 @@ supprimer la copie du cadastre — pas à départager deux implémentations riva
 
 ### Ce que le serveur reçoit
 
-| Champ | Mode | Rôle |
-|---|---|---|
-| `mode_adresse` | les deux | `automatique` ou `manuel` |
-| `terrain_adresse` | les deux | adresse complète, lisible |
-| `terrain_voie` | manuel | numéro et voie |
-| `terrain_complement` | manuel | facultatif |
-| `terrain_cp`, `terrain_ville` | les deux | code postal, commune |
-| `terrain_libelle_service` | automatique | libellé rendu par le service, tel quel |
-| `terrain_insee` | automatique | code commune, s'il est fourni |
-| `terrain_lat`, `terrain_lon` | automatique | coordonnées, **seulement si le service les fournit** |
+| Champ | Mode | Existant ? | Rôle |
+|---|---|---|---|
+| `mode_adresse` | les deux | **nouveau** | `automatique` ou `manuel` |
+| `terrain_adresse` | automatique | existant | la ligne lisible rendue par le service, telle quelle |
+| `terrain_voie` | manuel | **nouveau** | « numéro et voie » |
+| `terrain_complement` | manuel | **nouveau** | facultatif |
+| `terrain_cp` | les deux | existant | code postal |
+| `terrain_ville` | les deux | existant | commune |
+| `terrain_insee` | automatique | **nouveau** | code commune, s'il est fourni |
+| `terrain_lat`, `terrain_lon` | automatique | **nouveau** | coordonnées, **seulement si le service les fournit** |
+
+**Pas de `terrain_libelle_service`** : il aurait porté la même chaîne que
+`terrain_adresse`, et deux représentations d'une même adresse finissent toujours
+par diverger. En mode automatique, `terrain_adresse` **est** le libellé du
+service.
+
+**Pas de `terrain_numero` non plus** : le numéro voyage dans `terrain_voie`, où
+la personne l'écrit et où le service le fournit à côté de la voie. Lui donner un
+champ à part reviendrait à stocker les mêmes chiffres deux fois.
+
+La fabrique est unique : `definitions/champs-adresse.php` rend ces champs, et
+les trois définitions l'appellent. Elle prend l'étape d'accueil, le caractère
+obligatoire — vrai en DP et PC, faux en conception — et la condition propre au
+parcours.
+
+**Une limite assumée.** Le validateur n'accepte **qu'une** condition par champ.
+Quand un parcours en impose une — la conception et son `a_terrain` — c'est elle
+qui prime, et la distinction de mode est alors assurée par le filtrage serveur,
+qui n'a pas cette limite. En DP et PC, où aucune condition de parcours ne
+s'ajoute, la condition de mode s'applique directement.
 
 Le mode déclaré par le navigateur n'est jamais cru sur parole : le serveur applique ses règles
 d'après `mode_adresse`, **et** écarte tout champ qui n'appartient pas au mode retenu.
