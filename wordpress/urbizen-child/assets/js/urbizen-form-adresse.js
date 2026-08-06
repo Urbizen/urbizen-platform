@@ -1,5 +1,5 @@
 /**
- * Adresse du terrain, cherchée pendant la frappe.
+ * Une adresse, cherchée pendant la frappe.
  *
  * Une adresse tapée à la main arrive fautée : voie abrégée, commune mal
  * orthographiée, code postal d'à côté. Le dossier part alors sur une adresse
@@ -22,9 +22,16 @@
  * `postcode`, `city`, `cityCode`, `latitude`, `longitude`). En inventer un
  * second condamnerait l'administration à lire deux formes d'une même adresse.
  *
+ * **Plusieurs blocs par page.** Le module ne connaît pas les noms des champs
+ * qu'il remplit : il connaît des *rôles*, et c'est le document qui dit quel nom
+ * canonique porte chaque rôle. Un formulaire peut donc poser autant de blocs
+ * d'adresse qu'il en a besoin — le terrain, le déclarant — sans que deux
+ * instances se marchent dessus. Chacune tient son propre état, sa propre
+ * requête et ses propres identifiants.
+ *
  * Rien n'est deviné : une valeur que le service ne fournit pas reste vide.
  * Compléter une adresse incomplète par une autre adresse serait la pire des
- * obligeances — le dossier partirait sur un terrain qui n'est pas le bon.
+ * obligeances — le dossier partirait sur une adresse qui n'est pas la bonne.
  */
 (function (global) {
   "use strict";
@@ -138,9 +145,17 @@
     this._appliquerMode();
   }
 
-  /** Le champ nommé, dans ce composant seulement. */
-  Adresse.prototype._champ = function (nom) {
-    return this.racine.querySelector('[data-adresse-champ="' + nom + '"]');
+  /**
+   * Le contrôle qui tient un rôle, dans ce composant seulement.
+   *
+   * Le module ne connaît que des **rôles** — `adresse`, `cp`, `ville`, `insee`,
+   * `lat`, `lon`, `voie`, `complement`, `mode`. C'est le document qui dit quel
+   * nom canonique porte chaque rôle : `terrain_cp` ici, `cp_declarant` là. Sans
+   * cette indirection, le module ne saurait servir qu'un seul bloc d'adresse
+   * par page — ce qu'il faisait, et ce qui l'empêchait de servir le déclarant.
+   */
+  Adresse.prototype._champ = function (role) {
+    return this.racine.querySelector('[data-adresse-champ="' + role + '"]');
   };
 
   Adresse.prototype._ecrire = function (nom, valeur) {
@@ -191,7 +206,7 @@
 
     // Le mode est persisté explicitement. Le déduire de ce qui est rempli
     // reviendrait à deviner, et à se tromper sur une adresse à un seul champ.
-    this._ecrire("mode_adresse", manuel ? "manuel" : "automatique");
+    this._ecrire("mode", manuel ? "manuel" : "automatique");
 
     // Les champs partagés restent envoyés dans les deux modes ; seul leur
     // caractère modifiable change. En automatique ils viennent de la sélection
@@ -254,13 +269,13 @@
    */
   Adresse.prototype._oublierSelection = function (complet) {
     var self = this;
-    var noms = ["terrain_adresse", "terrain_insee", "terrain_lat", "terrain_lon"];
+    var roles = ["adresse", "insee", "lat", "lon"];
 
     // Modification du texte : la totalité part, code postal et commune compris.
     // Ils décrivaient l'adresse précédente, que le champ ne montre plus.
-    if (false !== complet) { noms = noms.concat(["terrain_cp", "terrain_ville"]); }
+    if (false !== complet) { roles = roles.concat(["cp", "ville"]); }
 
-    noms.forEach(function (n) { self._ecrire(n, ""); });
+    roles.forEach(function (r) { self._ecrire(r, ""); });
 
     this.selectionnee = false;
   };
@@ -393,7 +408,9 @@
         // La même case, le même mode : une seule façon d'être en manuel.
         self.$manuel.checked = true;
         self.$manuel.dispatchEvent(new Event("change", { bubbles: true }));
-        var v = self.racine.querySelector('[data-adresse-champ="terrain_voie"]');
+        // Le premier contrôle actif du groupe manuel, quel que soit son nom :
+        // nommer « terrain_voie » ici condamnerait le module au seul terrain.
+        var v = self.$groupeManuel && self.$groupeManuel.querySelector("input:not([disabled])");
         if (v) v.focus();
       });
       this.$etat.appendChild(b);
@@ -520,17 +537,16 @@
     var voie = texte(a.street, 160);
     var numero = texte(a.houseNumber, 20);
 
-    this._ecrire("terrain_adresse", libelle);
-    this._ecrire("terrain_libelle_service", libelle);
-    this._ecrire("terrain_cp", texte(a.postcode, 10));
-    this._ecrire("terrain_ville", texte(a.city, 120));
-    this._ecrire("terrain_insee", texte(a.cityCode, 10));
+    this._ecrire("adresse", libelle);
+    this._ecrire("cp", texte(a.postcode, 10));
+    this._ecrire("ville", texte(a.city, 120));
+    this._ecrire("insee", texte(a.cityCode, 10));
 
     var lat = nombre(a.latitude), lon = nombre(a.longitude);
 
     // Les coordonnées ne partent que si le service les a réellement données.
-    this._ecrire("terrain_lat", null === lat ? "" : lat);
-    this._ecrire("terrain_lon", null === lon ? "" : lon);
+    this._ecrire("lat", null === lat ? "" : lat);
+    this._ecrire("lon", null === lon ? "" : lon);
 
     // La voie du service n'alimente PAS le champ manuel : il porterait alors une
     // adresse concurrente, prête à partir si la personne bascule. Le mode manuel

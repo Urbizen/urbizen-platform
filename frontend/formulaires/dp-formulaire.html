@@ -530,10 +530,10 @@
                        désactivé, donc ils quittent le FormData. Placés à côté,
                        ils partiraient vides mais présents, et une adresse
                        abandonnée continuerait de voyager. -->
-                  <input type="hidden" name="terrain_adresse" data-adresse-champ="terrain_adresse">
-                  <input type="hidden" name="terrain_insee" data-adresse-champ="terrain_insee">
-                  <input type="hidden" name="terrain_lat" data-adresse-champ="terrain_lat">
-                  <input type="hidden" name="terrain_lon" data-adresse-champ="terrain_lon">
+                  <input type="hidden" name="terrain_adresse" data-adresse-champ="adresse">
+                  <input type="hidden" name="terrain_insee" data-adresse-champ="insee">
+                  <input type="hidden" name="terrain_lat" data-adresse-champ="lat">
+                  <input type="hidden" name="terrain_lon" data-adresse-champ="lon">
                 </div>
                 <p class="dp-adresse-etat" role="status" aria-live="polite" data-adresse-etat hidden></p>
                 <label class="dp-adresse-bascule">
@@ -541,17 +541,17 @@
                 </label>
                 <!-- Le mode canonique, jamais montré, et jamais désactivé : il
                      part dans les deux modes, c'est lui qui les distingue. -->
-                <input type="hidden" name="mode_adresse" value="automatique" data-adresse-champ="mode_adresse">
+                <input type="hidden" name="mode_adresse" value="automatique" data-adresse-champ="mode">
                 <div class="dp-grid" data-adresse-groupe-manuel hidden>
-                  <div class="dp-field col-2"><label for="t_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="t_voie" name="terrain_voie" data-adresse-champ="terrain_voie" autocomplete="off"></div>
-                  <div class="dp-field col-2"><label for="t_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="t_comp" name="terrain_complement" data-adresse-champ="terrain_complement" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="t_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="t_voie" name="terrain_voie" data-adresse-champ="voie" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="t_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="t_comp" name="terrain_complement" data-adresse-champ="complement" autocomplete="off"></div>
                 </div>
                 <!-- Code postal et commune : UN seul jeu, partagé par les deux
                      modes. Deux jeux portant les mêmes noms enverraient deux
                      valeurs, et le serveur en retiendrait une au hasard. -->
                 <div class="dp-grid" data-adresse-groupe-commun>
-                  <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric" data-adresse-champ="terrain_cp" autocomplete="off"></div>
-                  <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville" data-adresse-champ="terrain_ville" autocomplete="off"></div>
+                  <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric" data-adresse-champ="cp" autocomplete="off"></div>
+                  <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville" data-adresse-champ="ville" autocomplete="off"></div>
                 </div>
               </div>
               <div class="dp-field"><label for="t_sec">Section cadastrale</label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. AB"></div>
