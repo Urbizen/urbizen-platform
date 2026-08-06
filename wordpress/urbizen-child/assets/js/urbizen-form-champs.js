@@ -167,6 +167,7 @@
    * frappe serait la façon la plus sûre de faire perdre confiance au formulaire.
    */
   Champs.prototype._bassin = function () {
+    var module = this;
     var form = this.form;
     var surface = form.querySelector("[data-bassin-surface]");
 
@@ -180,22 +181,33 @@
 
     surface.addEventListener("input", function () {
       corrigee = true;
-      if (note) note.hidden = true;
+      module._etatSurface(true);
     });
+
+    // Retour explicite au calcul : un état implicite qu'on ne sait pas défaire
+    // est pire que pas d'automatisme du tout.
+    var bouton = form.querySelector("[data-bassin-recalculer]");
+
+    if (bouton) {
+      bouton.addEventListener("click", function (e) {
+        e.preventDefault();
+        corrigee = false;
+        recalculer();
+      });
+    }
 
     var recalculer = function () {
       if (corrigee) return;
 
       var nombre = function (champ) {
         var e = form.querySelector('[name="' + champ + '"]');
-        if (!e || "" === e.value) return null;
-        // La virgule est convertie ici, mais elle n'arrive en pratique jamais :
-        // un `input type="number"` la refuse et rend une valeur vide. Accepter
-        // réellement « 8,5 » demanderait de passer ces champs en `text` avec
-        // `inputmode="decimal"` ET de normaliser côté serveur. Tant que ce n'est
-        // pas fait, cette conversion ne sert que si le type change un jour.
-        var v = parseFloat(String(e.value).replace(",", "."));
-        return isFinite(v) && v > 0 ? v : null;
+        if (!e) return null;
+
+        // L'analyse partagée, jamais `parseFloat` sur une chaîne française :
+        // `parseFloat("8,5")` rend 8, et le bassin perdrait un demi-mètre.
+        var issue = global.UrbizenNombres.analyser(e.value, global.UrbizenNombres.bornesDe(e));
+
+        return global.UrbizenNombres.VALIDE === issue.etat && issue.valeur > 0 ? issue.valeur : null;
       };
 
       var l = nombre(surface.getAttribute("data-bassin-longueur") || "");
@@ -203,14 +215,38 @@
 
       if (null === l || null === g) return;
 
-      surface.value = Math.round(l * g * 100) / 100;
-      if (note) note.hidden = false;
+      // Écrite à la française : la personne relit ce qu'elle aurait écrit.
+      surface.value = global.UrbizenNombres.afficher(l * g);
+      module._etatSurface(false);
     };
+
+    this._recalculer = recalculer;
 
     [surface.getAttribute("data-bassin-longueur"), surface.getAttribute("data-bassin-largeur")].forEach(function (champ) {
       var e = form.querySelector('[name="' + champ + '"]');
       if (e) e.addEventListener("input", recalculer);
     });
+  };
+
+  /**
+   * Dit à l'écran d'où vient la surface affichée.
+   *
+   * Deux états, nommés : « calculée » tant que personne n'y a touché,
+   * « personnalisée » ensuite — avec le moyen de revenir en arrière. Un
+   * automatisme qui cesse sans le dire laisse croire à une panne.
+   */
+  Champs.prototype._etatSurface = function (personnalisee) {
+    var note = this.form.querySelector("[data-bassin-note]");
+    var bouton = this.form.querySelector("[data-bassin-recalculer]");
+
+    if (note) {
+      note.textContent = personnalisee
+        ? "Surface personnalisée."
+        : "Calculée depuis la longueur et la largeur. Modifiez-la si le bassin n’est pas rectangulaire.";
+      note.hidden = false;
+    }
+
+    if (bouton) bouton.hidden = !personnalisee;
   };
 
   /** Toute sélection de nature déclenche une réévaluation. */

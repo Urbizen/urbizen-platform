@@ -20,7 +20,9 @@ use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,6 +48,12 @@ final class SubmissionsAdmin {
 			10,
 			2
 		);
+
+		// La fiche de demande n'affichait rien : le type de contenu ne déclare
+		// que `title`. Une métaboîte est le seul endroit où montrer ce qui a été
+		// reçu sans rendre le contenu modifiable — un dossier se lit, il ne se
+		// réécrit pas à la main.
+		add_action( 'add_meta_boxes', array( self::class, 'enregistrer_metaboite' ) );
 
 		// L'action de reprise est une écriture : elle passe par POST, un nonce
 		// et un contrôle de capacité. Elle ne fait que replacer la notification
@@ -360,5 +368,66 @@ final class SubmissionsAdmin {
 		);
 
 		return $libelles[ $status ] ?? $status;
+	}
+
+	/**
+	 * Déclare la fiche de lecture d'une demande.
+	 *
+	 * @return void
+	 */
+	public static function enregistrer_metaboite(): void {
+		add_meta_box(
+			'urbizen-precisions-projet',
+			__( 'Précisions sur le projet', 'urbizen-platform' ),
+			array( self::class, 'rendre_metaboite' ),
+			SubmissionPostType::POST_TYPE,
+			'normal',
+			'high'
+		);
+	}
+
+	/**
+	 * Rend les précisions renseignées, et la note interne s'il y en a une.
+	 *
+	 * Lecture seule, et **rien que ce qui est renseigné** : une rubrique
+	 * constellée de tirets se lit moins bien qu'une rubrique courte. Tout est
+	 * échappé — ces valeurs viennent d'un formulaire public.
+	 *
+	 * @param \WP_Post $post Demande affichée.
+	 * @return void
+	 */
+	public static function rendre_metaboite( $post ): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$demande = SubmissionRepository::get( (int) $post->ID );
+		$charge  = is_array( $demande ) && is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
+		$lignes  = PrecisionsProjet::lignes( $charge );
+
+		if ( array() === $lignes ) {
+			echo '<p>' . esc_html__( 'Aucune précision n’a été renseignée pour ce projet.', 'urbizen-platform' ) . '</p>';
+		} else {
+			echo '<table class="widefat striped"><tbody>';
+
+			foreach ( $lignes as $libelle => $valeur ) {
+				printf(
+					'<tr><th scope="row" style="width:16em">%s</th><td>%s</td></tr>',
+					esc_html( $libelle ),
+					esc_html( $valeur )
+				);
+			}
+
+			echo '</tbody></table>';
+		}
+
+		// La note interne, quand elle existe. Elle n'est jamais reprise dans un
+		// courriel : elle s'adresse à Urbizen, pas au demandeur.
+		$note = (string) get_post_meta( (int) $post->ID, '_urbizen_note_interne', true );
+
+		if ( '' !== $note ) {
+			echo '<h4>' . esc_html__( 'Note interne', 'urbizen-platform' ) . '</h4>';
+			echo '<p class="description">' . esc_html( $note ) . '</p>';
+		}
 	}
 }

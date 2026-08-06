@@ -593,6 +593,9 @@ $definition = array(
 			'max'       => 100,
 			'increment' => 0.01,
 			'unit'      => 'm',
+			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
+			// mesure, c'est une case remplie par habitude. Vide reste vide.
+			'strict_positif' => true,
 		),
 		array(
 			'name'      => 'largeur_bassin_m',
@@ -603,6 +606,9 @@ $definition = array(
 			'max'       => 100,
 			'increment' => 0.01,
 			'unit'      => 'm',
+			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
+			// mesure, c'est une case remplie par habitude. Vide reste vide.
+			'strict_positif' => true,
 		),
 		array(
 			'name'      => 'surface_bassin_m2',
@@ -613,6 +619,9 @@ $definition = array(
 			'max'       => 5000,
 			'increment' => 0.01,
 			'unit'      => 'm²',
+			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
+			// mesure, c'est une case remplie par habitude. Vide reste vide.
+			'strict_positif' => true,
 		),
 		array(
 			'name'      => 'profondeur_bassin_m',
@@ -623,6 +632,9 @@ $definition = array(
 			'max'       => 20,
 			'increment' => 0.01,
 			'unit'      => 'm',
+			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
+			// mesure, c'est une case remplie par habitude. Vide reste vide.
+			'strict_positif' => true,
 		),
 		// Trois états, et « je ne sais pas » en est un : au stade de la prise de
 		// contact, ne pas savoir est une réponse légitime, et l'absence de
@@ -642,7 +654,7 @@ $definition = array(
 					'label' => __( 'Non', 'urbizen-platform' ),
 				),
 				array(
-					'value' => 'ne_sais_pas',
+					'value' => 'inconnu',
 					'label' => __( 'Je ne sais pas', 'urbizen-platform' ),
 				),
 			),
@@ -656,6 +668,9 @@ $definition = array(
 			'max'        => 20,
 			'increment'  => 0.01,
 			'unit'       => 'm',
+			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
+			// mesure, c'est une case remplie par habitude. Vide reste vide.
+			'strict_positif' => true,
 			// La hauteur n'a de sens que si un abri est annoncé. `visible_if`
 			// rend l'exigence conditionnelle côté définition ; l'interface la
 			// masque, et le serveur l'écarte si l'abri n'est pas « oui ».

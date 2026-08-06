@@ -30,6 +30,7 @@
 namespace Urbizen\Platform\Mail;
 
 use Urbizen\Platform\Forms\CatalogueRegistry;
+use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -153,6 +154,7 @@ final class CustomerAcknowledgementRenderer {
 		$html[] = self::demarche( $type );
 
 		$html[] = self::projet( $type, $charge );
+		$html[] = self::precisions( $charge );
 		$html[] = self::estimation( is_array( $demande['pricing'] ?? null ) ? $demande['pricing'] : array() );
 		$html[] = self::a_transmettre( $type, $charge );
 
@@ -255,6 +257,28 @@ final class CustomerAcknowledgementRenderer {
 		$html[] = '</p>';
 
 		return implode( '', $html );
+	}
+
+	/**
+	 * Rappel d'une phrase de ce que le client a communiqué.
+	 *
+	 * Un accusé n'est pas un dossier technique. On ne recopie donc pas la
+	 * rubrique complète de la notification interne : une ligne suffit à montrer
+	 * que l'information est bien arrivée, ce qui est tout ce que le client
+	 * cherche à vérifier. Rien n'est affiché s'il n'a rien précisé.
+	 *
+	 * @param array<string, mixed> $charge Charge persistée.
+	 * @return string
+	 */
+	private static function precisions( array $charge ): string {
+		$resume = PrecisionsProjet::resume( $charge );
+
+		if ( '' === $resume ) {
+			return '';
+		}
+
+		return '<p style="margin:0 0 20px"><strong>Informations communiquées :</strong><br>'
+			. esc_html( $resume ) . '</p>';
 	}
 
 	/**

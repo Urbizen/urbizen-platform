@@ -65,7 +65,7 @@ async function monter(P) {
   const w = dom.window;
   await new Promise((r) => ("complete" === w.document.readyState ? r() : w.addEventListener("load", r)));
 
-  for (const f of ["urbizen-form-tarifs.js", "urbizen-form-pieces.js", "urbizen-form-champs.js", "urbizen-form-bridge.js"]) {
+  for (const f of ["urbizen-form-tarifs.js", "urbizen-form-pieces.js", "urbizen-form-nombres.js", "urbizen-form-champs.js", "urbizen-form-bridge.js"]) {
     w.eval(readFileSync(resolve(THEME, "assets/js/" + f), "utf8"));
   }
 
@@ -259,6 +259,136 @@ titre("Source unique");
 
   check("la page émet la matrice depuis le greffon", functions.includes("MatriceChamps::pour_type"));
   check("et la liste des champs conditionnels", functions.includes("MatriceChamps::CONDITIONNELS"));
+}
+
+/* ================================================================== *
+ *  Piscine : saisie française, calcul, et retour au calcul
+ * ================================================================== */
+
+titre("Piscine — nombres français et surface proposée");
+
+{
+  const P = PARCOURS[0];
+  const ctx = await monter(P);
+
+  ctx.w.UrbizenNombres.surveiller(ctx.form);
+  ctx.choisir("piscine");
+
+  const d = ctx.d;
+  const val = (n) => d.querySelector(`[name="${n}"]`).value;
+  const set = (n, v) => {
+    const e = d.querySelector(`[name="${n}"]`);
+    e.value = v;
+    e.dispatchEvent(new ctx.w.Event("input", { bubbles: true }));
+  };
+  const note = () => d.querySelector("[data-bassin-note]");
+  const bouton = () => d.querySelector("[data-bassin-recalculer]");
+
+  // Le champ doit accepter la virgule : un `type="number"` la refuserait et
+  // rendrait une valeur vide, ce qui était le défaut d'origine.
+  check("les mesures ne sont plus des champs « number »",
+    "text" === d.querySelector('[name="longueur_bassin_m"]').type);
+  check("elles annoncent un clavier décimal",
+    "decimal" === d.querySelector('[name="longueur_bassin_m"]').getAttribute("inputmode"));
+
+  set("longueur_bassin_m", "8,5");
+  check("la virgule est conservée dans le champ", "8,5" === val("longueur_bassin_m"));
+
+  set("largeur_bassin_m", "4");
+  check("8,5 × 4 propose 34", "34" === val("surface_bassin_m2"));
+  check("la note dit d'où vient la valeur", note().textContent.startsWith("Calculée"));
+  check("aucun bouton de recalcul tant que rien n'est personnalisé", bouton().hidden);
+
+  set("longueur_bassin_m", "8.25");
+  check("8.25 × 4 propose 33", "33" === val("surface_bassin_m2"));
+
+  // Correction manuelle : le calcul cesse, et le dit.
+  set("surface_bassin_m2", "30");
+  check("la surface devient personnalisée", "Surface personnalisée." === note().textContent);
+  check("le retour au calcul est proposé", !bouton().hidden);
+
+  set("longueur_bassin_m", "10");
+  check("changer la longueur n'écrase plus la surface", "30" === val("surface_bassin_m2"));
+
+  bouton().click();
+  check("le recalcul rend la main au calcul", "40" === val("surface_bassin_m2"));
+  check("et la note repasse à « calculée »", note().textContent.startsWith("Calculée"));
+
+  // Une saisie illisible n'entraîne aucun calcul : mieux vaut rien qu'un chiffre
+  // inventé à partir d'une valeur qu'on n'a pas su lire.
+  set("longueur_bassin_m", "8,5,2");
+  check("une valeur illisible n'entraîne aucun calcul", "40" === val("surface_bassin_m2"));
+
+  ctx.dom.window.close();
+}
+
+titre("Piscine — abri et hauteur");
+
+{
+  const P = PARCOURS[0];
+  const ctx = await monter(P);
+  const d = ctx.d;
+
+  ctx.choisir("piscine");
+
+  const abri = (v) => {
+    const e = d.querySelector(`[name="presence_abri_piscine"][value="${v}"]`);
+    e.checked = true;
+    e.dispatchEvent(new ctx.w.Event("change", { bubbles: true }));
+  };
+  const hauteur = () => d.querySelector('[data-champ="hauteur_abri_m"]');
+  const envoyee = () => new ctx.w.FormData(ctx.form).has("hauteur_abri_m");
+
+  check("les trois réponses existent",
+    3 === d.querySelectorAll('[name="presence_abri_piscine"]').length);
+  check("aucune n'est cochée d'office",
+    null === d.querySelector('[name="presence_abri_piscine"]:checked'));
+  check("la hauteur est masquée tant qu'aucun abri n'est annoncé", hauteur().hidden);
+
+  abri("oui");
+  d.querySelector('[name="hauteur_abri_m"]').value = "1,8";
+  check("« oui » révèle la hauteur", !hauteur().hidden);
+  check("et elle part avec la requête", envoyee());
+
+  abri("non");
+  check("« non » la masque", hauteur().hidden);
+  check("et la retire de la requête", !envoyee());
+
+  abri("inconnu");
+  check("« inconnu » la masque aussi", hauteur().hidden);
+  check("et la retire également", !envoyee());
+
+  abri("oui");
+  check("revenir à « oui » la rend, avec sa valeur", !hauteur().hidden && "1,8" === d.querySelector('[name="hauteur_abri_m"]').value);
+
+  ctx.dom.window.close();
+}
+
+titre("Piscine — analyse partagée avec le serveur");
+
+{
+  const P = PARCOURS[0];
+  const ctx = await monter(P);
+  const N = ctx.w.UrbizenNombres;
+
+  // Les mêmes acceptations et les mêmes refus que le normaliseur PHP : une
+  // saisie acceptée ici ne doit jamais être refusée là-bas.
+  for (const bon of ["8", "8,5", "8.5", " 8,5 ", ",5", "34,25"]) {
+    check(`« ${bon} » est accepté`, N.VALIDE === N.analyser(bon, {}).etat);
+  }
+
+  for (const mauvais of ["8,5,2", "8,5.2", "1e3", "abc", "8.", "8 m"]) {
+    check(`« ${mauvais} » est refusé`, N.FORMAT === N.analyser(mauvais, {}).etat);
+  }
+
+  check("un champ vide est absent, pas invalide", N.ABSENT === N.analyser("", {}).etat);
+  check("un négatif sort des bornes", N.BORNE === N.analyser("-3", { min: 0 }).etat);
+  check("zéro est refusé pour une mesure", N.BORNE === N.analyser("0", { strict: true }).etat);
+  check("au-delà de la borne haute", N.BORNE === N.analyser("200", { max: 100 }).etat);
+  check("l'écriture rendue est française", "8,5" === N.afficher(8.5));
+  check("sans décimale inutile", "34" === N.afficher(34));
+
+  ctx.dom.window.close();
 }
 
 console.log("");

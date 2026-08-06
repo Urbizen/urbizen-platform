@@ -540,13 +540,47 @@ $admin_code = implode(
 
 preg_match_all( "/'(_urbizen_[a-z_]+)'/", $admin_code, $lues );
 
-check( 'la liste ne lit que des métadonnées non personnelles',
+// La contrainte portait sur l'écran de LISTE : il affiche plusieurs dossiers à
+// la fois, et n'a aucune raison de toucher à leur contenu. Une fiche de détail
+// est un autre objet — elle existe pour montrer le dossier à Urbizen, et lit
+// donc ce que la liste s'interdit. On sépare donc les deux au lieu d'assouplir
+// la règle pour tout le monde.
+// La coupure se fait à la DÉFINITION de la fiche, pas à la première mention de
+// son nom : celle-ci apparaît dès `register()`, et couper là viderait la
+// section de liste — un banc qui ne regarde rien passe toujours.
+$debut_fiche = strpos( $admin_code, 'function enregistrer_metaboite' );
+$colonnes    = false === $debut_fiche ? $admin_code : substr( $admin_code, 0, $debut_fiche );
+
+preg_match_all( "/'(_urbizen_[a-z_]+)'/", $colonnes, $lues_liste );
+
+check( 'la LISTE ne lit que des métadonnées non personnelles',
 	array( '_urbizen_form_type', '_urbizen_status', '_urbizen_files_count', '_urbizen_files_total_size', '_urbizen_files_status', '_urbizen_created_at_gmt' )
-		=== array_values( array_unique( $lues[1] ) ) );
-check( 'la liste ne lit jamais les documents eux-mêmes', ! preg_match( "/'_urbizen_files'/", $admin_code ) );
-check( 'la liste ne lit jamais le payload', ! str_contains( $admin_code, '_urbizen_payload' ) );
+		=== array_values( array_unique( $lues_liste[1] ) ) );
+check( 'la liste ne lit jamais les documents eux-mêmes', ! preg_match( "/'_urbizen_files'/", $colonnes ) );
+check( 'la liste ne lit jamais le payload', ! str_contains( $colonnes, '_urbizen_payload' ) );
 check( 'la liste vérifie la capacité avant d’afficher', str_contains( $admin_code, 'current_user_can(' ) );
-check( 'la liste échappe tout ce qu’elle affiche',
-	substr_count( $admin_code, 'echo ' ) === substr_count( $admin_code, 'esc_html(' ) );
+
+// La fiche de détail, elle, doit rester sous capacité et ne jamais fabriquer de
+// lien de téléchargement : les documents ne s'atteignent que par un lien signé.
+$debut_rendu = strpos( $admin_code, 'function rendre_metaboite' );
+$fiche       = false === $debut_rendu ? '' : substr( $admin_code, $debut_rendu );
+
+check( 'la section de liste est réellement analysée', '' !== trim( $colonnes ) && strlen( $colonnes ) > 2000 );
+
+check( 'la fiche de détail vérifie la capacité', '' === $fiche || str_contains( $fiche, 'current_user_can(' ) );
+check( 'la fiche de détail ne fabrique aucun lien signé',
+	! str_contains( $fiche, 'SignedLink' ) && ! str_contains( $fiche, '_urbizen_files' ) );
+
+// L'échappement : plutôt que compter les `echo`, on vérifie qu'aucune sortie
+// n'émet une variable nue. Un comptage se déséquilibre au premier `echo` de
+// chaîne littérale ; celui-ci ne se trompe que si une valeur sort en clair.
+preg_match_all( '/(?:echo|print)\s+[^;]*?\$[a-z_]+/i', $admin_code, $sorties );
+
+$nues = array_filter(
+	$sorties[0] ?? array(),
+	static fn( $bout ) => ! preg_match( '/esc_(html|attr|url)(__|_e)?\s*\(/', $bout )
+);
+
+check( 'aucune sortie de l’administration n’émet une valeur non échappée', array() === $nues );
 
 verdict();

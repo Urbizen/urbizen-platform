@@ -21,6 +21,7 @@ namespace Urbizen\Platform\Mail;
 
 use Urbizen\Platform\Files\SignedLink;
 use Urbizen\Platform\Forms\FormRegistry;
+use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -157,6 +158,17 @@ final class MailRenderer {
 		// --- Réponses du demandeur ---
 		$html[] = self::titre( 'Réponses' );
 		$html[] = self::table( self::reponses( $demande ) );
+
+		// --- Précisions du projet ---
+		// Rendues avant le tarif : l'interlocuteur qui rappelle le prospect a
+		// besoin des dimensions, pas du montant. La rubrique n'apparaît que si
+		// quelque chose a été renseigné.
+		$precisions = PrecisionsProjet::lignes( is_array( $demande['payload'] ) ? $demande['payload'] : array() );
+
+		if ( array() !== $precisions ) {
+			$html[] = self::titre( PrecisionsProjet::RUBRIQUE );
+			$html[] = self::table( $precisions );
+		}
 
 		// --- Tarification ---
 		$html[] = self::titre( 'Tarification' );

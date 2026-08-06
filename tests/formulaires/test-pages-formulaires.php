@@ -270,9 +270,13 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 	// conditionnels, pont. Le compte est vérifié et non seulement la cohérence
 	// des versions : une ressource qui disparaîtrait du document passerait
 	// autrement inaperçue.
+	// Sept : deux feuilles et cinq scripts — tarifs, pièces, nombres, champs
+	// conditionnels, pont. Le compte est vérifié et non seulement la cohérence
+	// des versions : une ressource qui disparaîtrait passerait autrement
+	// inaperçue.
 	verifier(
-		sprintf( '%s : les six ressources sont versionnées', $nom ),
-		6 === count( $versions[1] ?? array() )
+		sprintf( '%s : les sept ressources sont versionnées', $nom ),
+		7 === count( $versions[1] ?? array() )
 	);
 	verifier(
 		sprintf( '%s : toutes à la version du lot', $nom ),

@@ -171,6 +171,14 @@ conservant les URL existantes.
 - [ ] Courriels transactionnels et rappels automatiques
 - [ ] Purge RGPD planifiée et outils d'export et d'effacement
 - [ ] Environnement de préproduction, sauvegardes automatisées, supervision
+- [ ] **Notes internes sur une demande.** Le type de contenu ne déclarait que
+      `title` : rien ne permettait d'attacher une remarque à un dossier. Une
+      métaboîte de lecture existe désormais et affiche `_urbizen_note_interne`
+      quand elle est présente, mais rien ne permet encore d'en **écrire** une
+      depuis l'administration. Trois exigences quand ce sera fait : l'écriture
+      passe par un nonce et une capacité explicite ; l'accès en lecture reste
+      réservé aux personnes autorisées ; une note interne n'apparaît **jamais**
+      dans un courriel client — elle s'adresse à Urbizen, pas au demandeur.
 - [ ] Tests automatisés dans `tests/`, scripts de déploiement dans `scripts/`
 
 ---

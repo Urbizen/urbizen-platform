@@ -218,6 +218,11 @@ final class MatriceChamps {
 			return $clean;
 		}
 
+		// D'abord les sous-champs : leur pertinence dépend d'une autre réponse,
+		// pas de la nature. Les traiter avant évite qu'un champ conservé par la
+		// matrice survive à un pilote qui ne le justifie plus.
+		$clean = self::filtrer_sous_champs( $clean, $ecarts );
+
 		$nature = isset( $clean['nature'] ) && is_string( $clean['nature'] ) ? $clean['nature'] : '';
 
 		foreach ( self::CONDITIONNELS as $champ ) {
@@ -226,11 +231,64 @@ final class MatriceChamps {
 			}
 
 			if ( self::applicable( $type, $nature, $champ ) ) {
+				// Applicable mais vide : le champ n'est pas persisté pour autant.
+				// Un `null` dans la charge se lit « mesuré, valeur inconnue »,
+				// alors que la personne n'a simplement rien écrit. L'absence de
+				// clé dit exactement cela, et rien de plus.
+				if ( null === $clean[ $champ ] || '' === $clean[ $champ ] ) {
+					unset( $clean[ $champ ] );
+				}
+
 				continue;
 			}
 
 			// Une valeur vide n'a rien à signaler : elle ne serait pas persistée
 			// de toute façon, et la consigner noierait les vrais écarts.
+			if ( null !== $clean[ $champ ] && '' !== $clean[ $champ ] ) {
+				$ecarts[] = $champ;
+			}
+
+			unset( $clean[ $champ ] );
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Champs dont la pertinence dépend d'une autre réponse, pas de la nature.
+	 *
+	 * `champ => array( pilote, valeur_qui_l_autorise )`. La hauteur d'un abri
+	 * n'a de sens que si un abri est annoncé : reçue sans lui, elle décrit un
+	 * objet qui n'existe pas. C'est le cas typique du reliquat — la personne a
+	 * répondu « oui », mesuré, puis changé d'avis.
+	 *
+	 * @var array<string, array<int, string>>
+	 */
+	private const SOUS_CHAMPS = array(
+		'hauteur_abri_m' => array( 'presence_abri_piscine', 'oui' ),
+	);
+
+	/**
+	 * Retire les sous-champs que leur pilote ne justifie pas.
+	 *
+	 * @param array<string, mixed> $clean  Réponses nettoyées.
+	 * @param array<int, string>   $ecarts Noms écartés, modifiés sur place.
+	 * @return array<string, mixed>
+	 */
+	private static function filtrer_sous_champs( array $clean, array &$ecarts ): array {
+		foreach ( self::SOUS_CHAMPS as $champ => $regle ) {
+			if ( ! array_key_exists( $champ, $clean ) ) {
+				continue;
+			}
+
+			list( $pilote, $attendue ) = $regle;
+
+			$valeur = isset( $clean[ $pilote ] ) ? $clean[ $pilote ] : null;
+
+			if ( is_scalar( $valeur ) && $attendue === (string) $valeur ) {
+				continue;
+			}
+
 			if ( null !== $clean[ $champ ] && '' !== $clean[ $champ ] ) {
 				$ecarts[] = $champ;
 			}
