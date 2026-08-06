@@ -49,6 +49,7 @@ foreach (
 		'src/Forms/NombreLocalise.php',
 		'src/Forms/MatriceChamps.php',
 		'src/Forms/PrecisionsProjet.php',
+		'src/Forms/AdresseTerrain.php',
 		'src/Forms/ConceptionPricingStrategy.php',
 		'src/Forms/PricingStrategyRegistry.php',
 		'src/Forms/Validator.php',

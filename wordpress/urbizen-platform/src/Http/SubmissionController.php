@@ -28,6 +28,7 @@ use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\PricingStrategyContextuelle;
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\MatriceChamps;
 use Urbizen\Platform\Forms\ValidationMetierRegistry;
 use Urbizen\Platform\Forms\PricingStrategyRegistry;
@@ -427,10 +428,18 @@ final class SubmissionController {
 
 		$validation['clean'] = MatriceChamps::filtrer( $type, $validation['clean'], $ecartes );
 
+		// --- 8 quater · l'adresse du mode inactif ---
+		// Une demande ne porte qu'une adresse. Le navigateur désactive les
+		// contrôles du mode abandonné, donc ils ne partent pas ; mais une charge
+		// forgée les enverrait tous, et deux adresses contradictoires
+		// arriveraient dans le même dossier. Le mode retenu tranche, ici, avant
+		// toute persistance.
+		$validation['clean'] = AdresseTerrain::filtrer( $validation['clean'], $ecartes );
+
 		if ( array() !== $ecartes ) {
 			Logger::info(
 				sprintf(
-					'soumission %s : %d champ(s) sans objet pour la nature déclarée, écarté(s) : %s',
+					'soumission %s : %d champ(s) sans objet pour la nature ou le mode déclaré, écarté(s) : %s',
 					$type,
 					count( $ecartes ),
 					implode( ', ', $ecartes )

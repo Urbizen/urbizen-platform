@@ -40,6 +40,11 @@ defined( 'ABSPATH' ) || exit;
 // Première définition à s'appuyer sur une classe. L'autochargeur du greffon la
 // fournit en production ; ce garde-fou rend le fichier autoportant pour les
 // bancs, qui chargent une définition sans démarrer le greffon.
+// La fabrique des champs d'adresse est partagée par les trois parcours. Elle
+// est chargée ici plutôt que par l'autochargeur : ce n'est pas une classe mais
+// une fonction, et la définition doit rester autoportante pour les bancs.
+require_once __DIR__ . '/champs-adresse.php';
+
 if ( ! class_exists( CatalogueDeclarationPrealable::class ) ) {
 	require_once __DIR__ . '/../CatalogueProjets.php';
 	require_once __DIR__ . '/../CatalogueDeclarationPrealable.php';
@@ -319,31 +324,10 @@ $definition = array(
 		 *  Terrain
 		 * ---------------------------------------------------------- */
 
-		array(
-			'name'      => 'terrain_adresse',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Adresse du terrain', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 300,
-		),
-		array(
-			'name'      => 'terrain_cp',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Code postal', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 10,
-			'inputmode' => 'numeric',
-		),
-		array(
-			'name'      => 'terrain_ville',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Commune', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 120,
-		),
+		// L'adresse du terrain vient de la fabrique partagée : deux modes de
+		// saisie, les mêmes identifiants pour tous les parcours. La recopier
+		// ici aurait suffi à la faire diverger du permis de construire.
+		...urbizen_champs_adresse_terrain( 'terrain', true ),
 
 		// Les trois références cadastrales sont facultatives : elles ne figurent
 		// que sur l'acte de propriété. Les exiger ferait abandonner une demande

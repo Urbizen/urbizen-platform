@@ -364,7 +364,18 @@ $pos_pricing = strpos( $controleur, "\$pricing = \$validation['pricing']" );
 
 verifier( 'il filtre après la cohérence métier', $pos_metier < $pos_filtre );
 verifier( 'et avant la tarification', $pos_filtre < $pos_pricing );
-verifier( 'les écarts sont journalisés', str_contains( $controleur, 'sans objet pour la nature déclarée' ) );
+verifier( 'les écarts sont journalisés', str_contains( $controleur, 'sans objet pour la nature ou le mode déclaré' ) );
+
+// L'adresse suit le même chemin : filtrée par son mode, avant toute écriture,
+// et dans le même relevé d'écarts — un masquage défaillant doit se voir au même
+// endroit, qu'il porte sur une nature ou sur un mode de saisie.
+$pos_adresse = strpos( $controleur, 'AdresseTerrain::filtrer(' );
+
+verifier( 'le contrôleur filtre aussi l’adresse', false !== $pos_adresse );
+verifier( 'après le filtrage par nature', $pos_filtre < $pos_adresse );
+verifier( 'et avant la tarification', $pos_adresse < $pos_pricing );
+verifier( 'les deux filtrages partagent le relevé d’écarts',
+	1 === substr_count( $controleur, '$ecartes = array();' ) );
 
 /* ================================================================== *
  *  Bilan
