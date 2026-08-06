@@ -29,6 +29,8 @@
   --u-brand-dk:    #0E6E48;   /* vert foncé : survols */
   --u-brand-sf:    #E4F5EC;   /* vert très clair : fonds d'accent, focus */
   --u-mint:        #54CF99;   /* menthe : états confirmés, filets d'accent */
+  --u-mint-surface: #CAE6D4;  /* menthe clair : fonds de planche et surfaces éditoriales */
+  --u-mint-pale: #D0EDDC;     /* menthe pâle : surlignages et actions secondaires */
 
   /* --- Couleur : erreur (réservée à la validation) --- */
   --u-error:       #C0392B;

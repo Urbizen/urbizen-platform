@@ -33,16 +33,18 @@
      tel: appelle, sur clic. Fermeture : croix, Échap, clic sur le fond. Focus
      déplacé dans le panneau sans faire défiler la page (preventScroll), restitué
      à l'icône à la fermeture ; Tab piégé ; défilement de fond verrouillé. */
+  var contactTriggers = document.querySelectorAll(".link-tel, .js-open-contact");
   var telBtn = document.querySelector(".link-tel");
   var panel = document.getElementById("contact-panel");
-  if (telBtn && panel) {
+  if (contactTriggers.length && panel) {
     var closeBtn = panel.querySelector(".contact-close");
     // Hôte de reparentage : le wrapper `.urbizen-accueil` (et NON <body>), pour
     // sortir le panneau du header — dont le `backdrop-filter` créait un bloc
     // englobant qui tronquait le `position: fixed` — tout en CONSERVANT le style
     // scopé `.urbizen-accueil .contact-panel`. Repli <body> pour la maquette
     // autonome (CSS non scopé).
-    var host = telBtn.closest(".urbizen-accueil") || document.body;
+    var activeTrigger = telBtn || contactTriggers[0];
+    var host = activeTrigger.closest(".urbizen-accueil") || document.body;
     var docEl = document.documentElement;
     var prevOverflow = "";
     var backdrop = null;
@@ -57,7 +59,8 @@
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     };
-    var openContact = function () {
+    var openContact = function (trigger) {
+      activeTrigger = trigger || activeTrigger;
       if (!moved) {
         host.appendChild(panel);
         backdrop = document.createElement("div");
@@ -67,10 +70,11 @@
         host.appendChild(backdrop);
         moved = true;
       }
+      contactTriggers.forEach(function (item) { item.setAttribute("aria-expanded", "false"); });
+      activeTrigger.setAttribute("aria-expanded", "true");
       backdrop.hidden = false;
       panel.hidden = false;
-      telBtn.setAttribute("aria-expanded", "true");
-      prevOverflow = docEl.style.overflow;   // verrou de défilement (style en ligne, insensible au scoping)
+      prevOverflow = docEl.style.overflow;
       docEl.style.overflow = "hidden";
       focusSafe(closeBtn || panel);
       document.addEventListener("keydown", onKeydown);
@@ -79,26 +83,87 @@
       if (panel.hidden) return;
       panel.hidden = true;
       if (backdrop) backdrop.hidden = true;
-      telBtn.setAttribute("aria-expanded", "false");
+      contactTriggers.forEach(function (item) { item.setAttribute("aria-expanded", "false"); });
       docEl.style.overflow = prevOverflow;
       document.removeEventListener("keydown", onKeydown);
-      if (restore !== false) focusSafe(telBtn);
+      if (restore !== false) focusSafe(activeTrigger);
     };
-    telBtn.addEventListener("click", function () { if (panel.hidden) openContact(); else closeContact(true); });
+    contactTriggers.forEach(function (trigger) {
+      trigger.addEventListener("click", function () {
+        if (panel.hidden) openContact(trigger);
+        else closeContact(true);
+      });
+    });
     if (closeBtn) closeBtn.addEventListener("click", function () { closeContact(true); });
   }
 
+  /* ----- Formulaire de renseignements dépliant ----- */
+  var inquiryToggle = document.querySelector(".js-toggle-inquiry");
+  var inquiryPanel = document.getElementById("cta-inquiry-form");
+  if (inquiryToggle && inquiryPanel) {
+    inquiryToggle.addEventListener("click", function () {
+      var open = inquiryPanel.hidden;
+      inquiryPanel.hidden = !open;
+      inquiryToggle.setAttribute("aria-expanded", open ? "true" : "false");
+      var label = inquiryToggle.querySelector("span");
+      if (label) label.textContent = open ? "Fermer le formulaire" : "Demander des renseignements";
+      if (open) inquiryPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  }
+
+  /* ----- Planche du HERO : animation au moment où elle devient visible ----- */
+  var heroBoard = document.querySelector(".hero-v7 .hero-board");
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (heroBoard && !reduceMotion) {
+    var startHeroBoardAnimation = function () {
+      if (!heroBoard.classList.contains("is-animated")) {
+        heroBoard.classList.add("is-animated");
+      }
+    };
+    if ("IntersectionObserver" in window) {
+      var heroBoardObserver = new IntersectionObserver(function (entries) {
+        if (entries[0] && entries[0].isIntersecting) {
+          startHeroBoardAnimation();
+          heroBoardObserver.disconnect();
+        }
+      }, { threshold: 0.25 });
+      heroBoardObserver.observe(heroBoard);
+    } else {
+      startHeroBoardAnimation();
+    }
+  }
+
   /* ----- Sélection du type de projet + routage vers le formulaire ----- */
-  // URLs internes réelles (pages WordPress publiées). Aucun chemin relatif de
-  // maquette : selon la nature du projet, on oriente vers la page du service
-  // correspondant, où la démarche est confirmée par Urbizen.
+  // Destinations finales du tunnel. Les pages WordPress dédiées DP et PC
+  // réutilisent les formulaires de référence ; Conception possède déjà sa
+  // propre section de formulaire.
   var FORM_URLS = {
-    dp:   "/declarations-prealables/",
-    pcmi: "/permis-de-construire/"
+    dp:          "/formulaire-declaration-prealable/",
+    pcmi:        "/formulaire-permis-de-construire/",
+    conception:  "/conception/#formulaire-conception"
   };
-  // Projets orientés permis de construire ; les autres démarrent en déclaration
-  // préalable (Urbizen confirme la démarche après étude — pas de détermination définitive ici).
-  var PC_PROJETS = ["maison"];
+  var FORM_BY_PROJECT = {
+    maison:      "pcmi",
+    conception:  "conception"
+  };
+  var FORM_COPY = {
+    dp: {
+      button: "Continuer vers ma déclaration préalable",
+      hint: "Orientation proposée : déclaration préalable. Urbizen confirme la démarche après étude."
+    },
+    pcmi: {
+      button: "Continuer vers mon permis de construire",
+      hint: "Orientation proposée : permis de construire. Vos informations seront reprises dans le formulaire."
+    },
+    conception: {
+      button: "Continuer vers mes plans sur mesure",
+      hint: "Vous allez ouvrir le formulaire de conception de plans sur mesure."
+    }
+  };
+
+  function formForProject(project) {
+    return FORM_BY_PROJECT[project] || "dp";
+  }
 
   var selectedProjet = null;
   var continueBtn = document.getElementById("js-continue");
@@ -118,8 +183,10 @@
         card.setAttribute("aria-pressed", "true");
         selectedProjet = card.getAttribute("data-projet");
         try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
+        var form = formForProject(selectedProjet);
         continueBtn.disabled = false;
-        if (continueHint) continueHint.textContent = "Vos informations de localisation seront reprises dans le formulaire.";
+        continueBtn.textContent = FORM_COPY[form].button;
+        if (continueHint) continueHint.textContent = FORM_COPY[form].hint;
       });
     });
   }
@@ -129,7 +196,7 @@
       if (!selectedProjet) return;
       // adresse, parcelle et projet sont déjà conservés en sessionStorage :
       // le formulaire (branche dédiée) les relira pour se pré-remplir.
-      var form = PC_PROJETS.indexOf(selectedProjet) !== -1 ? "pcmi" : "dp";
+      var form = formForProject(selectedProjet);
       window.location.href = FORM_URLS[form];
     });
   }
