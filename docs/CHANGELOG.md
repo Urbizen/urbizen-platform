@@ -5,6 +5,66 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.14.0] — Déclaration préalable et permis de construire raccordés
+
+Les deux parcours postent réellement. Le serveur recalcule tout ce qui engage
+Urbizen, chaque demande produit une notification interne et un accusé de
+réception client, et le permis de construire admet un tarif sur étude.
+
+Le détail des arbitrages est consigné dans `DECISIONS.md` : D-055 (créneaux de
+notification), D-056 (accusé de réception client), D-057 (socle partagé DP/PC et
+tarif sur étude).
+
+### Ajouté
+
+- **Permis de construire** : définition serveur, catalogue de six natures sous
+  identifiants canoniques, barème — maison neuve 849 €, extension 649 €,
+  surélévation 649 €, changement de destination 649 €, annexe/garage 449 € —
+  validation métier, profil de dépôt et notifications.
+- **Tarif sur étude** pour la nature « Autre » du permis de construire :
+  `base` et `total` valent `null`, la clé `total` **existe**, `pricing_status`
+  vaut `sur_etude` et les suppléments restent chiffrés séparément. Aucun total
+  n'est fabriqué depuis eux, et aucun zéro n'est affiché.
+- **Créneaux de notification** : chaque demande ouvre deux messages
+  indépendants — notification interne et accusé client — avec leurs propres
+  états, verrous, reprises et clés d'idempotence.
+- **Accusé de réception client** : destinataire lu uniquement dans l'adresse
+  validée puis persistée, contenu sans lien signé ni donnée technique, mention
+  tarifaire au caractère près.
+- **Réponses JSON** par négociation de contenu, sans aucune donnée technique.
+- **Pont iframe sécurisé** : nonce et jeton anti-robot émis par la page parente,
+  vérification stricte de l'origine et de la source aux deux extrémités,
+  répétition bornée des demandes et accusé de réception.
+- **Formats de dépôt annoncés au client** : « Formats acceptés : PDF, JPG, JPEG,
+  PNG et WEBP — 10 Mo maximum par fichier. », énoncée une seule fois en tête
+  d'étape et comparée au profil serveur par un banc.
+
+### Modifié
+
+- Les mécanismes propres à la déclaration préalable deviennent **paramétrés par
+  type** : `CatalogueProjets`, `PricingProjets`, `ValidationMetierProjets`,
+  `CatalogueRegistry`. Chaque parcours ne déclare que sa table de natures et ses
+  socles.
+- `normalize_pricing()` ne transtype plus `null` en `0` : un dossier sur étude
+  aurait été persisté à zéro euro.
+- Version du lot de ressources des formulaires : **0.2.4**, portée par l'URL du
+  cadre, les cinq références CSS/JS des documents et les bancs de contrat.
+
+### Corrigé
+
+- Le jeton anti-robot n'atteignait pas le document servi en iframe : la route
+  refusait **toute** soumission réelle. Les deux formulaires étaient
+  inutilisables depuis un navigateur.
+- L'origine composée par le thème omettait le port, ce qui faisait rejeter la
+  configuration sur tout serveur n'écoutant pas sur 80 ou 443.
+- Le premier message d'initialisation pouvait se perdre sans recours.
+- Le projet supplémentaire s'affichait deux fois sur l'écran final.
+- Deux cibles tactiles restaient sous 44 px.
+- L'annonce des formats acceptés était périmée — « PDF, JPG, PNG » — alors que
+  le serveur accepte aussi JPEG et WEBP, et plafonne à 10 Mo par fichier.
+
+---
+
 ## [Non publié — formulaires Déclaration préalable et Permis de construire]
 
 ### Ajouté
