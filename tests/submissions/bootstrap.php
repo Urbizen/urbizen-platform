@@ -46,6 +46,7 @@ foreach (
 		'src/Forms/ValidationMetierDeclarationPrealable.php',
 		'src/Forms/ValidationMetierPermisConstruire.php',
 		'src/Forms/ValidationMetierRegistry.php',
+		'src/Forms/NombreLocalise.php',
 		'src/Forms/MatriceChamps.php',
 		'src/Forms/ConceptionPricingStrategy.php',
 		'src/Forms/PricingStrategyRegistry.php',
