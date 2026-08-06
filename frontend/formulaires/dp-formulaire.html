@@ -335,8 +335,12 @@
   #dp-app .dp-locate:hover { background: var(--cadastre-sf); }
   #dp-app .dp-locate.loading { opacity: .6; pointer-events: none; }
   #dp-app .dp-map-wrap { margin-top: 12px; }
-  #dp-app .dp-map-wrap[hidden],
-  #dp-app .dp-parcel[hidden] { display: none !important; }
+  /* `hidden` doit l'emporter sur toute règle d'affichage. Les groupes de champs
+     déclarent `display: flex`, ce qui bat la règle du navigateur : un champ
+     écarté par la matrice restait désactivé — donc jamais envoyé — mais
+     toujours à l'écran. Un formulaire qui montre ce qu'il n'attend pas se lit
+     comme un formulaire en panne. */
+  #dp-app [hidden] { display: none !important; }
   #dp-app .dp-map-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   #dp-app .dp-map-hint { font-size: 12.5px; color: var(--ink-soft); }
   #dp-app .dp-map-toggle {
@@ -361,8 +365,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
-<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css?v=0.2.5" />
-<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css?v=0.2.5" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css?v=0.2.6" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css?v=0.2.6" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -648,11 +652,11 @@
   </div>
 </div>
 
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.5"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.5"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-nombres.js?v=0.2.5"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-champs.js?v=0.2.5"></script>
-<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.5"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.6"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.6"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-nombres.js?v=0.2.6"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-champs.js?v=0.2.6"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.6"></script>
 <script>
 (function () {
   "use strict";

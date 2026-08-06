@@ -108,6 +108,30 @@ tarif sur étude).
 - **Modules partagés** `assets/js/urbizen-form-tarifs.js` et
   `urbizen-form-pieces.js`, avec leurs feuilles : le calcul, le répéteur et le
   rendu des pièces n’existent qu’en un exemplaire pour les quatre documents.
+- **Précisions du bassin** : longueur, largeur, surface, profondeur, présence
+  d’un abri et hauteur de l’abri, toutes facultatives. La surface est proposée
+  depuis longueur × largeur en écriture française ; dès qu’elle est corrigée,
+  l’état « Surface personnalisée » s’affiche et un bouton rend la main au
+  calcul. La hauteur d’abri n’apparaît qu’à la réponse « oui ». Un champ laissé
+  vide reste inconnu : il n’est pas persisté et ne devient jamais zéro ; une
+  mesure renseignée doit valoir plus que zéro.
+- **Nombres écrits à la française** : `8,5` est accepté partout, côté serveur
+  comme côté navigateur, par un normaliseur unique à verdict explicite
+  (`NombreLocalise`, `urbizen-form-nombres.js`). Les écritures ambiguës —
+  `8,5,2`, `8,5.2`, `1e3` — sont refusées, jamais devinées.
+- **Rubrique « Précisions sur le projet »** dans l’écran d’administration, la
+  notification interne et, en une phrase, l’accusé client. Une seule classe
+  (`PrecisionsProjet`) sait comment une précision se dit.
+
+### Corrigé
+
+- **Le masquage d’un champ était sans effet visuel.** `#dp-app .dp-field`
+  déclare `display: flex`, ce qui l’emporte sur l’attribut `hidden` : une
+  piscine affichait encore six champs de surface de plancher. Les contrôles
+  étaient bien désactivés — rien n’a jamais été envoyé ni enregistré hors
+  contexte — mais le formulaire montrait ce qu’il n’attendait pas. Les quatre
+  documents portent désormais `#dp-app [hidden] { display: none !important; }`,
+  et un banc l’exige.
 
 ### Modifié
 

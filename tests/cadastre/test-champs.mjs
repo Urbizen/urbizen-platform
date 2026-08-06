@@ -364,6 +364,86 @@ titre("Piscine — abri et hauteur");
   ctx.dom.window.close();
 }
 
+titre("Le bassin ne déborde sur aucune autre nature");
+
+{
+  /* Section 1 compare chaque nature à la matrice, ce qui couvre le bassin par
+   * construction. Ce contrôle-ci le dit en clair, parce que c'est le risque
+   * propre au lot : six champs neufs, tous nommés, qui ne doivent apparaître
+   * que là où un bassin se décrit. Une matrice mal éditée passerait la
+   * section 1 — elle compare le rendu à la matrice, pas la matrice au métier.
+   *
+   * Deux natures les portent, et la seconde n'est pas un oubli : le PC pour
+   * maison individuelle demandait déjà « Bassin de piscine » (`piscine_m2`)
+   * avant ce lot, une maison neuve se déposant souvent avec sa piscine. Ce
+   * banc fige donc dix-huit natures moins ces deux-là. */
+  const BASSIN = ["longueur_bassin_m", "largeur_bassin_m", "surface_bassin_m2",
+    "profondeur_bassin_m", "presence_abri_piscine", "hauteur_abri_m"];
+  const PORTEUSES = { declaration_prealable: "piscine", permis_construire: "maison_individuelle" };
+
+  for (const P of PARCOURS) {
+    const ctx = await monter(P);
+    const porteuse = PORTEUSES[P.type];
+    const autres = Object.keys(MATRICE[P.type]).filter((n) => porteuse !== n);
+    let vus = 0, partis = 0, actifs = 0, balayees = 0;
+
+    for (const nature of autres) {
+      if (!ctx.choisir(nature)) continue;
+
+      balayees++;
+      vus += ctx.visibles().filter((c) => BASSIN.includes(c)).length;
+      partis += ctx.envoyes().filter((c) => BASSIN.includes(c)).length;
+      actifs += BASSIN.filter((c) => {
+        const e = ctx.d.querySelector(`[name="${c}"]`);
+        return e && !e.disabled;
+      }).length;
+    }
+
+    check(`${P.nom} · ${balayees} autres natures balayées`, balayees === autres.length && balayees > 0);
+    check(`${P.nom} · aucune n'affiche un champ de bassin`, 0 === vus);
+    check(`${P.nom} · aucune n'en laisse un actif`, 0 === actifs);
+    check(`${P.nom} · aucune n'en envoie`, 0 === partis);
+
+    // Et la nature porteuse, elle, les rend bien : un balayage qui ne
+    // prouverait que l'absence passerait tout aussi bien sur un formulaire
+    // qui n'a rien. La hauteur d'abri reste hors compte — elle attend qu'un
+    // abri soit annoncé.
+    ctx.choisir(porteuse);
+    check(`${P.nom} · « ${porteuse} » les affiche`,
+      5 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
+
+    ctx.dom.window.close();
+  }
+}
+
+titre("Le masquage est aussi visuel");
+
+{
+  /* Les contrôles ci-dessus vérifient l'attribut `hidden` et l'état `disabled`
+   * — donc la garantie qui compte : rien ne part. Ils ne disaient rien de ce
+   * que la personne voit, et c'est exactement là que le défaut s'était logé :
+   * `#dp-app .dp-field { display: flex; }` bat la règle du navigateur pour
+   * `[hidden]`, si bien qu'une piscine affichait encore six champs de surface
+   * de plancher, grisés mais présents.
+   *
+   * Le contrôle porte sur la feuille de style plutôt que sur un rendu calculé :
+   * jsdom n'applique pas la cascade des feuilles de l'agent utilisateur, donc
+   * un `getComputedStyle` y serait rassurant à tort. */
+  const REGLE = /#dp-app \[hidden\]\s*\{[^}]*display:\s*none\s*!important/;
+
+  for (const f of [
+    "wordpress/urbizen-child/assets/forms/dp-formulaire.html",
+    "wordpress/urbizen-child/assets/forms/pc-formulaire.html",
+    "frontend/formulaires/dp-formulaire.html",
+    "frontend/formulaires/pc-formulaire.html",
+  ]) {
+    const ou = f.startsWith("frontend/") ? "maquette" : "thème";
+
+    check(`${ou} · ${f.split("/").pop()} · \`hidden\` l'emporte sur l'affichage`,
+      REGLE.test(readFileSync(resolve(ROOT, f), "utf8")));
+  }
+}
+
 titre("Piscine — analyse partagée avec le serveur");
 
 {
