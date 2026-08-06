@@ -48,6 +48,7 @@
     this.conditionnels = [];
 
     this._ecouter();
+    this._bassin();
   }
 
   /**
@@ -114,6 +115,7 @@
       });
     });
 
+    this._sousChamps();
     this._annoncer(visibles);
   };
 
@@ -129,6 +131,88 @@
     if (bloc) bloc.hidden = 0 === visibles;
   };
 
+  /**
+   * Sous-champs qui ne dépendent pas de la nature mais d'une autre réponse.
+   *
+   * La hauteur d'un abri n'a de sens que si un abri est annoncé. Le marqueur
+   * `data-visible-si="champ=valeur"` porte la condition dans le document, là où
+   * elle se lit en même temps que le champ qu'elle gouverne.
+   */
+  Champs.prototype._sousChamps = function () {
+    var form = this.form;
+
+    Array.prototype.forEach.call(form.querySelectorAll("[data-visible-si]"), function (groupe) {
+      var regle = (groupe.getAttribute("data-visible-si") || "").split("=");
+      var pilote = form.querySelector('[name="' + regle[0] + '"]:checked');
+      var actif = pilote && pilote.value === regle[1];
+
+      // Le parent commande : un sous-champ d'un groupe masqué le reste.
+      if (groupe.hidden && !groupe.hasAttribute("data-sous-champ-masque")) return;
+
+      groupe.hidden = !actif;
+      groupe.setAttribute("data-sous-champ-masque", "1");
+
+      Array.prototype.forEach.call(groupe.querySelectorAll("input, select, textarea"), function (c) {
+        c.disabled = !actif;
+      });
+    });
+  };
+
+  /**
+   * Surface du bassin, proposée depuis la longueur et la largeur.
+   *
+   * **Proposée, pas imposée.** Un bassin n'est pas toujours rectangulaire, et
+   * une personne qui corrige la surface a une raison de le faire. Dès qu'elle y
+   * touche, le calcul cesse de la remplacer : écraser une correction à chaque
+   * frappe serait la façon la plus sûre de faire perdre confiance au formulaire.
+   */
+  Champs.prototype._bassin = function () {
+    var form = this.form;
+    var surface = form.querySelector("[data-bassin-surface]");
+
+    if (!surface) return;
+
+    var note = form.querySelector("[data-bassin-note]");
+    var corrigee = false;
+
+    // Une valeur déjà saisie à l'arrivée est une valeur de l'utilisateur.
+    if ("" !== surface.value) corrigee = true;
+
+    surface.addEventListener("input", function () {
+      corrigee = true;
+      if (note) note.hidden = true;
+    });
+
+    var recalculer = function () {
+      if (corrigee) return;
+
+      var nombre = function (champ) {
+        var e = form.querySelector('[name="' + champ + '"]');
+        if (!e || "" === e.value) return null;
+        // La virgule est convertie ici, mais elle n'arrive en pratique jamais :
+        // un `input type="number"` la refuse et rend une valeur vide. Accepter
+        // réellement « 8,5 » demanderait de passer ces champs en `text` avec
+        // `inputmode="decimal"` ET de normaliser côté serveur. Tant que ce n'est
+        // pas fait, cette conversion ne sert que si le type change un jour.
+        var v = parseFloat(String(e.value).replace(",", "."));
+        return isFinite(v) && v > 0 ? v : null;
+      };
+
+      var l = nombre(surface.getAttribute("data-bassin-longueur") || "");
+      var g = nombre(surface.getAttribute("data-bassin-largeur") || "");
+
+      if (null === l || null === g) return;
+
+      surface.value = Math.round(l * g * 100) / 100;
+      if (note) note.hidden = false;
+    };
+
+    [surface.getAttribute("data-bassin-longueur"), surface.getAttribute("data-bassin-largeur")].forEach(function (champ) {
+      var e = form.querySelector('[name="' + champ + '"]');
+      if (e) e.addEventListener("input", recalculer);
+    });
+  };
+
   /** Toute sélection de nature déclenche une réévaluation. */
   Champs.prototype._ecouter = function () {
     var module = this;
@@ -136,6 +220,19 @@
     Array.prototype.forEach.call(this.form.querySelectorAll('[name="nature"]'), function (entree) {
       entree.addEventListener("change", function () {
         module.rafraichir();
+      });
+    });
+
+    // Les pilotes de sous-champs sont déduits des règles portées par le
+    // document : le module n'a pas à connaître leurs noms. Nommer ici un champ
+    // précis reviendrait à recopier une donnée métier dans du code générique.
+    Array.prototype.forEach.call(this.form.querySelectorAll("[data-visible-si]"), function (groupe) {
+      var pilote = (groupe.getAttribute("data-visible-si") || "").split("=")[0];
+
+      Array.prototype.forEach.call(module.form.querySelectorAll('[name="' + pilote + '"]'), function (entree) {
+        entree.addEventListener("change", function () {
+          module._sousChamps();
+        });
       });
     });
   };

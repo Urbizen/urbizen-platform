@@ -106,16 +106,32 @@ for (const P of PARCOURS) {
   for (const nature of Object.keys(MATRICE[P.type])) {
     if (!ctx.choisir(nature)) continue;
 
+    // Un champ porteur de `data-visible-si` dépend en outre d'une autre
+    // réponse : la hauteur d'un abri n'apparaît que si un abri est annoncé.
+    // L'attendre visible sans avoir répondu serait exiger l'inverse de ce que
+    // le formulaire doit faire.
     const attendus = MATRICE[P.type][nature]
-      .filter((c) => ctx.d.querySelector(`[data-champ="${c}"]`))
+      .filter((c) => {
+        const g = ctx.d.querySelector(`[data-champ="${c}"]`);
+        if (!g) return false;
+        const regle = g.getAttribute("data-visible-si");
+        if (!regle) return true;
+        const [pilote, valeur] = regle.split("=");
+        const coche = ctx.d.querySelector(`[name="${pilote}"]:checked`);
+        return !!coche && coche.value === valeur;
+      })
       .sort();
 
     check(`${P.nom} · « ${nature} » n'affiche que ce que le serveur admet`,
       JSON.stringify(attendus) === JSON.stringify(ctx.visibles()));
 
-    // Le contrôle décisif : ce qui part, et non ce qui se voit.
-    check(`${P.nom} · « ${nature} » n'envoie que cela`,
-      JSON.stringify(ctx.visibles()) === JSON.stringify(ctx.envoyes()));
+    // Le contrôle décisif : **rien ne part qui ne soit visible**. L'égalité
+    // stricte serait fausse — un groupe de boutons radio non coché est visible
+    // et n'envoie rien, ce qui est le comportement normal d'un formulaire.
+    const vus = ctx.visibles();
+    const hors = ctx.envoyes().filter((c) => !vus.includes(c));
+
+    check(`${P.nom} · « ${nature} » n'envoie rien qui ne soit visible`, 0 === hors.length);
   }
 
   ctx.dom.window.close();

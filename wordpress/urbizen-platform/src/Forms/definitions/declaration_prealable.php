@@ -508,6 +508,98 @@ $definition = array(
 			'unit'      => 'm²',
 		),
 
+
+		/* ---------------------------------------------------------- *
+		 *  Précisions selon la nature du projet
+		 * ---------------------------------------------------------- */
+
+		// Toutes facultatives, et conditionnées par la nature : la matrice
+		// {@see MatriceChamps} décide lesquelles s'affichent et lesquelles sont
+		// écartées. Les bornes sont larges à dessein — elles écartent l'absurde,
+		// pas l'inhabituel. Une piscine de 50 m de long existe ; une de 500 m
+		// non, et une valeur négative jamais.
+
+		array(
+			'name'      => 'longueur_bassin_m',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Longueur approximative du bassin', 'urbizen-platform' ),
+			'min'       => 0,
+			'max'       => 100,
+			'increment' => 0.01,
+			'unit'      => 'm',
+		),
+		array(
+			'name'      => 'largeur_bassin_m',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Largeur approximative du bassin', 'urbizen-platform' ),
+			'min'       => 0,
+			'max'       => 100,
+			'increment' => 0.01,
+			'unit'      => 'm',
+		),
+		array(
+			'name'      => 'surface_bassin_m2',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Surface approximative du bassin', 'urbizen-platform' ),
+			'min'       => 0,
+			'max'       => 5000,
+			'increment' => 0.01,
+			'unit'      => 'm²',
+		),
+		array(
+			'name'      => 'profondeur_bassin_m',
+			'type'      => 'number',
+			'step'      => 'surfaces',
+			'label'     => __( 'Profondeur approximative', 'urbizen-platform' ),
+			'min'       => 0,
+			'max'       => 20,
+			'increment' => 0.01,
+			'unit'      => 'm',
+		),
+		// Trois états, et « je ne sais pas » en est un : au stade de la prise de
+		// contact, ne pas savoir est une réponse légitime, et l'absence de
+		// réponse ne doit pas se lire comme « non ».
+		array(
+			'name'    => 'presence_abri_piscine',
+			'type'    => 'radio',
+			'step'    => 'surfaces',
+			'label'   => __( 'Abri de piscine', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'oui',
+					'label' => __( 'Oui', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'non',
+					'label' => __( 'Non', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'ne_sais_pas',
+					'label' => __( 'Je ne sais pas', 'urbizen-platform' ),
+				),
+			),
+		),
+		array(
+			'name'       => 'hauteur_abri_m',
+			'type'       => 'number',
+			'step'       => 'surfaces',
+			'label'      => __( 'Hauteur approximative de l’abri', 'urbizen-platform' ),
+			'min'        => 0,
+			'max'        => 20,
+			'increment'  => 0.01,
+			'unit'       => 'm',
+			// La hauteur n'a de sens que si un abri est annoncé. `visible_if`
+			// rend l'exigence conditionnelle côté définition ; l'interface la
+			// masque, et le serveur l'écarte si l'abri n'est pas « oui ».
+			'visible_if' => array(
+				'field' => 'presence_abri_piscine',
+				'in'    => array( 'oui' ),
+			),
+		),
+
 		/* ---------------------------------------------------------- *
 		 *  Contexte
 		 * ---------------------------------------------------------- */

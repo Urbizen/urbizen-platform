@@ -530,8 +530,17 @@
             <p class="dp-step-hint">Servent au calcul de la taxe d’aménagement. Laissez 0 si non concerné.</p>
             <div class="dp-grid">
               <div class="dp-field" data-champ="surface_taxable"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="longueur_bassin_m"><label for="b_lon">Longueur approximative du bassin</label><div class="dp-suffix"><input type="number" id="b_lon" name="longueur_bassin_m" class="measure" min="0" max="100" step="0.01" inputmode="decimal"><span class="unit">m</span></div></div>
+              <div class="dp-field" data-champ="largeur_bassin_m"><label for="b_lar">Largeur approximative du bassin</label><div class="dp-suffix"><input type="number" id="b_lar" name="largeur_bassin_m" class="measure" min="0" max="100" step="0.01" inputmode="decimal"><span class="unit">m</span></div></div>
+              <div class="dp-field" data-champ="profondeur_bassin_m"><label for="b_pro">Profondeur approximative</label><div class="dp-suffix"><input type="number" id="b_pro" name="profondeur_bassin_m" class="measure" min="0" max="20" step="0.01" inputmode="decimal"><span class="unit">m</span></div></div>
+              <div class="dp-field col-2" data-champ="presence_abri_piscine"><label>Abri de piscine</label><div class="dp-seg" role="radiogroup" aria-label="Abri de piscine">
+                  <input type="radio" id="ab_o" name="presence_abri_piscine" value="oui"><label for="ab_o">Oui</label>
+                  <input type="radio" id="ab_n" name="presence_abri_piscine" value="non"><label for="ab_n">Non</label>
+                  <input type="radio" id="ab_i" name="presence_abri_piscine" value="ne_sais_pas"><label for="ab_i">Je ne sais pas</label>
+                </div></div>
+              <div class="dp-field" data-champ="hauteur_abri_m" data-visible-si="presence_abri_piscine=oui"><label for="b_hab">Hauteur approximative de l’abri</label><div class="dp-suffix"><input type="number" id="b_hab" name="hauteur_abri_m" class="measure" min="0" max="20" step="0.01" inputmode="decimal"><span class="unit">m</span></div></div>
               <div class="dp-field" data-champ="nb_stationnement"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
-              <div class="dp-field" data-champ="piscine_m2"><label for="x_pis">Bassin de piscine</label><div class="dp-suffix"><input type="number" id="x_pis" name="piscine_m2" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="surface_bassin_m2"><label for="x_pis">Surface approximative du bassin</label><div class="dp-suffix"><input type="number" id="x_pis" name="surface_bassin_m2" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
               <div class="dp-field col-2" style="margin-top:6px">
                 <label>Le terrain est-il en secteur protégé (ABF)&nbsp;?</label>
                 <div class="dp-seg" role="radiogroup">

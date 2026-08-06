@@ -59,7 +59,32 @@ final class MatriceChamps {
 		'surface_taxable',
 		'nb_logements',
 		'nb_stationnement',
-		'piscine_m2',
+		// Précisions propres à la piscine. Elles suivent la même règle que les
+		// surfaces : conditionnées par la nature, écartées sinon.
+		'longueur_bassin_m',
+		'largeur_bassin_m',
+		'surface_bassin_m2',
+		'profondeur_bassin_m',
+		'presence_abri_piscine',
+		'hauteur_abri_m',
+	);
+
+	/**
+	 * Les six précisions de piscine, dans l'ordre où elles se posent.
+	 *
+	 * Nommées une fois : la DP les attache à sa nature « piscine », le PC à sa
+	 * maison individuelle — un projet neuf comporte souvent un bassin. Les
+	 * recopier aux deux endroits aurait suffi à les faire diverger.
+	 *
+	 * @var array<int, string>
+	 */
+	private const BASSIN = array(
+		'longueur_bassin_m',
+		'largeur_bassin_m',
+		'surface_bassin_m2',
+		'profondeur_bassin_m',
+		'presence_abri_piscine',
+		'hauteur_abri_m',
 	);
 
 	/**
@@ -80,7 +105,8 @@ final class MatriceChamps {
 		'carport'                => array( 'emprise_avant', 'emprise_creee' ),
 		// Une piscine n'a ni plancher ni emprise au sens du bâti. Le bassin est
 		// la seule mesure qui la décrive.
-		'piscine'                => array( 'piscine_m2' ),
+		// Une piscine ne décrit que son bassin — et le décrit vraiment.
+		'piscine'                => self::BASSIN,
 		'cloture_mur'            => array(),
 		'modification_facade'    => array(),
 		'ravalement'             => array(),
@@ -101,7 +127,7 @@ final class MatriceChamps {
 		// L'ordre suit celui du catalogue — donc celui des cartes du formulaire.
 		// Un banc l'exige : deux listes qui décrivent la même chose et divergent
 		// finissent par se contredire.
-		'maison_individuelle'    => array( 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_logements', 'nb_stationnement', 'piscine_m2' ),
+		'maison_individuelle'    => array( 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_logements', 'nb_stationnement', ...self::BASSIN ),
 		'extension'              => array( 'sp_existante', 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable' ),
 		'annexe_garage'          => array( 'sp_creee', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_stationnement' ),
 		'surelevation'           => array( 'sp_existante', 'sp_creee', 'sp_totale', 'surface_taxable', 'nb_logements' ),

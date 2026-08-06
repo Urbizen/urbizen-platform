@@ -129,9 +129,19 @@ foreach ( $sans_plancher as $nature => $quoi ) {
 }
 
 // La piscine ne demande QUE son bassin : ni plancher, ni emprise au sens du bâti.
+$bassin = array( 'longueur_bassin_m', 'largeur_bassin_m', 'surface_bassin_m2', 'profondeur_bassin_m', 'presence_abri_piscine', 'hauteur_abri_m' );
+
 verifier(
-	'une piscine ne décrit que son bassin',
-	array( 'piscine_m2' ) === MatriceChamps::champs( 'declaration_prealable', 'piscine' )
+	'une piscine ne décrit que son bassin — et le décrit vraiment',
+	$bassin === MatriceChamps::champs( 'declaration_prealable', 'piscine' )
+);
+verifier(
+	'aucun doublon de surface de bassin ne subsiste',
+	! in_array( 'piscine_m2', MatriceChamps::CONDITIONNELS, true )
+);
+verifier(
+	'une maison neuve peut aussi décrire un bassin',
+	array() === array_diff( $bassin, MatriceChamps::champs( 'permis_construire', 'maison_individuelle' ) )
 );
 
 // Une clôture, un ravalement, des panneaux : rien de chiffré tant que les
@@ -209,7 +219,7 @@ $charge = array(
 	'sp_creee'      => 18.0,
 	'sp_totale'     => 138.0,
 	'emprise_creee' => 20.0,
-	'piscine_m2'    => 32.0,
+	'surface_bassin_m2' => 32.0,
 	'description'   => 'Bassin 4 × 8 m',
 	'email'         => 'camille@exemple.test',
 );
@@ -222,7 +232,7 @@ foreach ( PLANCHER as $champ ) {
 }
 
 verifier( 'piscine · l\'emprise est écartée elle aussi', ! array_key_exists( 'emprise_creee', $filtre ) );
-verifier( 'piscine · le bassin est conservé', 32.0 === $filtre['piscine_m2'] );
+verifier( 'piscine · le bassin est conservé', 32.0 === $filtre['surface_bassin_m2'] );
 verifier( 'piscine · la description est conservée', 'Bassin 4 × 8 m' === $filtre['description'] );
 verifier( 'piscine · l\'adresse de courriel est conservée', 'camille@exemple.test' === $filtre['email'] );
 verifier( 'piscine · la nature est conservée', 'piscine' === $filtre['nature'] );
@@ -276,7 +286,7 @@ verifier( 'PC · la description survit', 'Bâtiment mixte' === $pc['description'
 
 $maison = MatriceChamps::filtrer(
 	'permis_construire',
-	array( 'nature' => 'maison_individuelle', 'sp_creee' => 110.0, 'nb_logements' => 1, 'piscine_m2' => 24.0 )
+	array( 'nature' => 'maison_individuelle', 'sp_creee' => 110.0, 'nb_logements' => 1, 'surface_bassin_m2' => 24.0 )
 );
 
 verifier( 'PC · une maison neuve garde surface, logements et bassin', 3 === count( $maison ) - 1 );
