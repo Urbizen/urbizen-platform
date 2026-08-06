@@ -263,20 +263,21 @@ foreach ( array( 'declaration-prealable' => $dp, 'permis-de-construire' => $pc )
 	);
 }
 
+// Le compte attendu diffère d'un parcours à l'autre : la déclaration préalable
+// charge en plus le module d'adresse assistée. Le compte est vérifié, et pas
+// seulement la cohérence des versions — une ressource qui disparaîtrait d'un
+// document passerait autrement inaperçue.
+//
+// Socle commun, sept : deux feuilles — tarifs, pièces — et cinq scripts —
+// tarifs, pièces, nombres, champs conditionnels, pont.
+$attendues = array( 'DP thème' => 8, 'DP maquette' => 8, 'PC thème' => 7, 'PC maquette' => 7 );
+
 foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	preg_match_all( '/urbizen-form-[a-z]+\.(?:js|css)\?v=([0-9.]+)/', $doc, $versions );
 
-	// Six : deux feuilles et quatre scripts — tarifs, pièces, champs
-	// conditionnels, pont. Le compte est vérifié et non seulement la cohérence
-	// des versions : une ressource qui disparaîtrait du document passerait
-	// autrement inaperçue.
-	// Sept : deux feuilles et cinq scripts — tarifs, pièces, nombres, champs
-	// conditionnels, pont. Le compte est vérifié et non seulement la cohérence
-	// des versions : une ressource qui disparaîtrait passerait autrement
-	// inaperçue.
 	verifier(
-		sprintf( '%s : les sept ressources sont versionnées', $nom ),
-		7 === count( $versions[1] ?? array() )
+		sprintf( '%s : les %d ressources sont versionnées', $nom, $attendues[ $nom ] ),
+		$attendues[ $nom ] === count( $versions[1] ?? array() )
 	);
 	verifier(
 		sprintf( '%s : toutes à la version du lot', $nom ),
@@ -286,6 +287,34 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 		sprintf( '%s : aucune ressource interne sans version', $nom ),
 		! preg_match( '/urbizen-form-[a-z]+\.(?:js|css)"/', $doc )
 	);
+}
+
+// Le module d'adresse n'est chargé que là où le balisage existe. Le charger
+// partout ne casserait rien — il ne s'initialise pas sans composant — mais
+// ferait télécharger un script inutile, et laisserait croire que le permis de
+// construire porte déjà l'adresse assistée.
+foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq ) as $nom => $doc ) {
+	verifier( sprintf( '%s : le module d’adresse est chargé', $nom ),
+		str_contains( $doc, 'urbizen-form-adresse.js?v=' . $version ) );
+	verifier( sprintf( '%s : le composant est balisé une seule fois', $nom ),
+		1 === substr_count( $doc, 'data-adresse>' ) );
+	verifier( sprintf( '%s : la recherche ne porte aucun nom soumis', $nom ),
+		(bool) preg_match( '/data-adresse-recherche(?![^>]*\sname=)/', $doc ) );
+	verifier( sprintf( '%s : le mode part avec une valeur par défaut', $nom ),
+		str_contains( $doc, 'name="mode_adresse" value="automatique"' ) );
+	verifier( sprintf( '%s : la case porte le libellé exact', $nom ),
+		str_contains( $doc, 'Je renseigne l’adresse manuellement' ) );
+	verifier( sprintf( '%s : le titre de recherche est le bon', $nom ),
+		str_contains( $doc, 'Rechercher l’adresse du terrain' ) );
+	verifier( sprintf( '%s : aucun appel IGN recopié dans le document', $nom ),
+		! str_contains( $doc, 'geocodage/completion' ) );
+	verifier( sprintf( '%s : un seul jeu de code postal et commune', $nom ),
+		1 === substr_count( $doc, 'name="terrain_cp"' ) && 1 === substr_count( $doc, 'name="terrain_ville"' ) );
+}
+
+foreach ( array( 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
+	verifier( sprintf( '%s : le module d’adresse n’y est pas encore', $nom ),
+		! str_contains( $doc, 'urbizen-form-adresse.js' ) && ! str_contains( $doc, 'data-adresse>' ) );
 }
 
 /* ================================================================== *

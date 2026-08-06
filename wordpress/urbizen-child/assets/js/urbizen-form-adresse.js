@@ -44,6 +44,10 @@
     invite: "Adresse introuvable ? Renseignez-la manuellement.",
     aucune: "Aucune adresse trouvée.",
     panne: "La recherche d’adresse est momentanément indisponible.",
+    aInvalider: "Sélectionnez une adresse dans la liste pour la retenir.",
+    enCours: "Vérification de l’adresse…",
+    incomplete: "Cette adresse n’a pas pu être vérifiée complètement.",
+    retenue: function (a) { return "Adresse retenue : " + a; },
     // Le décompte est annoncé, pas seulement affiché : sans lecteur d'écran on
     // voit la liste s'ouvrir, avec lui on n'a que ce que l'on annonce.
     resultats: function (n) {
@@ -103,6 +107,13 @@
     this.propositions = [];
     this.index = -1;
     this.requete = null;
+    // Une réponse lente arrivant après une réponse récente réafficherait des
+    // propositions périmées. Chaque recherche porte un numéro ; seule la
+    // dernière a le droit d'écrire à l'écran.
+    this.jeton = 0;
+    // Faux tant qu'aucune proposition n'a été retenue. Une chaîne tapée n'est
+    // pas une adresse : c'est une intention de recherche.
+    this.selectionnee = false;
 
     this.$recherche = racine.querySelector("[data-adresse-recherche]");
     this.$liste = racine.querySelector("[data-adresse-propositions]");
@@ -110,12 +121,18 @@
     this.$manuel = racine.querySelector("[data-adresse-manuel]");
     this.$groupeAuto = racine.querySelector("[data-adresse-groupe-auto]");
     this.$groupeManuel = racine.querySelector("[data-adresse-groupe-manuel]");
+    // Code postal et commune sont un SEUL jeu de contrôles, partagé. Deux jeux
+    // portant les mêmes noms enverraient deux valeurs, et le serveur en
+    // retiendrait une au hasard.
+    this.$groupeCommun = racine.querySelector("[data-adresse-groupe-commun]");
 
     if (!this.$recherche || !this.$liste) return;
 
     this.$liste.id = this.uid + "-liste";
+    this.$recherche.setAttribute("role", "combobox");
     this.$recherche.setAttribute("aria-controls", this.$liste.id);
     this.$recherche.setAttribute("aria-expanded", "false");
+    this.$recherche.setAttribute("aria-autocomplete", "list");
 
     this._ecouter();
     this._appliquerMode();
@@ -133,6 +150,11 @@
 
   Adresse.prototype._ecouter = function () {
     var self = this;
+
+    // L'invalidation est immédiate, sans attendre l'anti-rebond : entre la
+    // frappe et la requête, la charge ne doit jamais porter une adresse que le
+    // champ ne montre plus.
+    this.$recherche.addEventListener("input", function () { self._invalider(); });
 
     this.$recherche.addEventListener("input", antiRebond(function () {
       self._chercher(self.$recherche.value.trim());
@@ -171,12 +193,37 @@
     // reviendrait à deviner, et à se tromper sur une adresse à un seul champ.
     this._ecrire("mode_adresse", manuel ? "manuel" : "automatique");
 
+    // Les champs partagés restent envoyés dans les deux modes ; seul leur
+    // caractère modifiable change. En automatique ils viennent de la sélection
+    // et se lisent sans s'éditer — les corriger à la main produirait une
+    // adresse que le service n'a jamais rendue.
+    this._verrouillerCommuns(!manuel);
+
     if (manuel) {
-      // Ce que le service avait rempli n'a plus cours : le garder ferait
-      // coexister deux adresses dans la même demande.
-      this._oublierSelection();
+      // Ce que le service avait rempli n'a plus cours. Le code postal et la
+      // commune, eux, restent : ils sont vrais, ils sont partagés, et les
+      // effacer obligerait à retaper ce qui est déjà juste.
+      this._oublierSelection(false);
       this._message("");
+      this.$recherche.value = "";
     }
+  };
+
+  /**
+   * Rend les champs partagés lisibles seulement, ou modifiables.
+   *
+   * `readonly` et non `disabled` : un contrôle désactivé disparaît du
+   * `FormData`, et le mode automatique a besoin de ces deux valeurs.
+   *
+   * @param {boolean} verrouiller Vrai en mode automatique.
+   */
+  Adresse.prototype._verrouillerCommuns = function (verrouiller) {
+    if (!this.$groupeCommun) return;
+
+    Array.prototype.forEach.call(this.$groupeCommun.querySelectorAll("input"), function (c) {
+      if (verrouiller) { c.setAttribute("readonly", "readonly"); }
+      else { c.removeAttribute("readonly"); }
+    });
   };
 
   Adresse.prototype._basculer = function (groupe, actif) {
@@ -198,12 +245,38 @@
     });
   };
 
-  Adresse.prototype._oublierSelection = function () {
+  /**
+   * Efface la sélection : la personne a changé d'avis ou de texte.
+   *
+   * Le code postal et la commune partent avec le reste. Les garder ferait
+   * survivre la moitié d'une adresse que le champ ne montre plus, et le serveur
+   * les prendrait pour la sélection courante.
+   */
+  Adresse.prototype._oublierSelection = function (complet) {
     var self = this;
+    var noms = ["terrain_adresse", "terrain_insee", "terrain_lat", "terrain_lon"];
 
-    ["terrain_libelle_service", "terrain_insee", "terrain_lat", "terrain_lon"].forEach(function (n) {
-      self._ecrire(n, "");
-    });
+    // Modification du texte : la totalité part, code postal et commune compris.
+    // Ils décrivaient l'adresse précédente, que le champ ne montre plus.
+    if (false !== complet) { noms = noms.concat(["terrain_cp", "terrain_ville"]); }
+
+    noms.forEach(function (n) { self._ecrire(n, ""); });
+
+    this.selectionnee = false;
+  };
+
+  /**
+   * Une frappe après une sélection annule cette sélection.
+   *
+   * Sans cela, corriger une lettre laisserait partir l'adresse précédente avec
+   * ses coordonnées, sous un libellé que la personne a modifié. C'est la façon
+   * la plus discrète d'envoyer un dossier au mauvais endroit.
+   */
+  Adresse.prototype._invalider = function () {
+    if (!this.selectionnee) return;
+
+    this._oublierSelection();
+    this._message(MESSAGES.aInvalider);
   };
 
   /* ----- Recherche ----- */
@@ -215,6 +288,7 @@
     this.requete = new AbortController();
 
     var self = this;
+    var jeton = ++this.jeton;
     var url = SERVICE.completion +
       "?text=" + encodeURIComponent(texteSaisi) +
       "&type=StreetAddress,PositionOfInterest" +
@@ -224,11 +298,21 @@
 
     lireJson(url, this.requete.signal)
       .then(function (d) {
+        // Réponse d'une recherche dépassée : elle n'a plus rien à dire.
+        if (jeton !== self.jeton) return;
+
         self.racine.classList.remove("is-loading");
-        self.propositions = d && d.results ? d.results : [];
+
+        // Une réponse qui n'a pas la forme attendue vaut une panne : mieux vaut
+        // proposer la saisie manuelle que d'afficher une liste vide sans raison.
+        if (!d || !Array.isArray(d.results)) { self.propositions = []; self._rendre(true); return; }
+
+        self.propositions = d.results;
         self._rendre();
       })
       .catch(function (err) {
+        if (jeton !== self.jeton) return;
+
         self.racine.classList.remove("is-loading");
         if ("AbortError" === err.name) return;
         // Panne : on le dit en clair, sans code ni URL, et on montre la sortie.
@@ -244,7 +328,7 @@
     this.$recherche.removeAttribute("aria-activedescendant");
 
     if (panne || !this.propositions.length) {
-      this._message((panne ? MESSAGES.panne : MESSAGES.aucune) + " " + MESSAGES.invite);
+      this._message(panne ? MESSAGES.panne : MESSAGES.aucune, true);
       this._fermer();
       return;
     }
@@ -280,10 +364,42 @@
     this.$recherche.removeAttribute("aria-activedescendant");
   };
 
-  Adresse.prototype._message = function (t) {
+  /**
+   * Écrit dans la zone d'état, et propose la sortie quand il y en a une.
+   *
+   * La zone est en `aria-live` : ce qui s'y écrit est annoncé sans déplacer le
+   * focus. Déplacer le focus à l'arrivée des résultats couperait la frappe.
+   *
+   * @param {string} t      Message.
+   * @param {boolean} sortie Proposer la bascule manuelle.
+   */
+  Adresse.prototype._message = function (t, sortie) {
     if (!this.$etat) return;
-    this.$etat.textContent = t;
-    this.$etat.hidden = "" === t;
+
+    while (this.$etat.firstChild) this.$etat.removeChild(this.$etat.firstChild);
+
+    if ("" === t) { this.$etat.hidden = true; return; }
+
+    this.$etat.appendChild(document.createTextNode(t));
+
+    if (sortie && this.$manuel) {
+      var self = this;
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "dp-btn dp-btn-lien";
+      b.setAttribute("data-adresse-sortie", "");
+      b.textContent = MESSAGES.invite;
+      b.addEventListener("click", function () {
+        // La même case, le même mode : une seule façon d'être en manuel.
+        self.$manuel.checked = true;
+        self.$manuel.dispatchEvent(new Event("change", { bubbles: true }));
+        var v = self.racine.querySelector('[data-adresse-champ="terrain_voie"]');
+        if (v) v.focus();
+      });
+      this.$etat.appendChild(b);
+    }
+
+    this.$etat.hidden = false;
   };
 
   Adresse.prototype._clavier = function (e) {
@@ -335,29 +451,32 @@
     this.$recherche.value = p.fulltext || "";
     this._fermer();
 
-    // Ce que l'autocomplétion sait déjà est écrit tout de suite : si /search
-    // échoue, la demande reste exploitable.
-    this._appliquer({
-      label: p.fulltext,
-      street: p.street,
-      postcode: p.zipcode,
-      city: p.city,
-      cityCode: p.inseeCode || (p.inseeCodes && p.inseeCodes[0]),
-      longitude: p.x,
-      latitude: p.y
-    });
-
     var self = this;
+    var jeton = ++this.jeton;
 
-    // /search rend le code INSEE et les coordonnées canoniques. Son échec
-    // n'annule rien : on garde ce que l'autocomplétion a fourni.
+    // L'autocomplétion ne rend pas le code INSEE ; seul /search le donne, et le
+    // serveur l'exige en mode automatique. La sélection n'est donc acquise
+    // qu'au retour de /search : l'annoncer plus tôt promettrait une adresse que
+    // l'envoi refuserait ensuite.
+    this.racine.classList.add("is-loading");
+    this._message(MESSAGES.enCours);
+
     lireJson(SERVICE.recherche + "?q=" + encodeURIComponent(p.fulltext || "") + "&limit=1&index=address")
       .then(function (fc) {
-        if (!fc || !fc.features || !fc.features.length) return;
+        if (jeton !== self.jeton) return;
 
-        var f = fc.features[0];
-        var pr = f.properties || {};
-        var co = f.geometry && f.geometry.coordinates ? f.geometry.coordinates : [];
+        self.racine.classList.remove("is-loading");
+
+        if (!fc || !Array.isArray(fc.features) || !fc.features.length) {
+          self._selectionImpossible();
+          return;
+        }
+
+        var trait = fc.features[0];
+        var pr = trait.properties || {};
+        var co = trait.geometry && trait.geometry.coordinates ? trait.geometry.coordinates : [];
+
+        if (!pr.citycode) { self._selectionImpossible(); return; }
 
         self._appliquer({
           label: pr.label || p.fulltext,
@@ -369,10 +488,30 @@
           longitude: co[0],
           latitude: co[1]
         });
-      })
-      .catch(function () { /* silence : rien à corriger, rien à alarmer. */ });
 
-    this._message("");
+        self.selectionnee = true;
+        self._message(MESSAGES.retenue(pr.label || p.fulltext || ""));
+      })
+      .catch(function (err) {
+        if (jeton !== self.jeton) return;
+
+        self.racine.classList.remove("is-loading");
+        if ("AbortError" === err.name) return;
+        self._selectionImpossible();
+      });
+  };
+
+  /**
+   * La proposition retenue n'a pas pu être complétée.
+   *
+   * On ne garde rien de partiel : une adresse sans code commune serait refusée
+   * à l'envoi, et laisser croire qu'elle est retenue ferait buter la personne
+   * sur une erreur qu'elle ne comprendrait pas. On propose la saisie manuelle,
+   * qui, elle, aboutit toujours.
+   */
+  Adresse.prototype._selectionImpossible = function () {
+    this._oublierSelection();
+    this._message(MESSAGES.incomplete, true);
   };
 
   /** Écrit une sélection dans les champs, sans jamais combler un vide. */
@@ -393,10 +532,10 @@
     this._ecrire("terrain_lat", null === lat ? "" : lat);
     this._ecrire("terrain_lon", null === lon ? "" : lon);
 
-    // La voie et le numéro alimentent aussi les champs manuels : si la personne
-    // bascule ensuite pour corriger un détail, elle repart de ce qui a été
-    // trouvé plutôt que d'une page blanche.
-    if (voie) this._ecrire("terrain_voie", numero ? numero + " " + voie : voie);
+    // La voie du service n'alimente PAS le champ manuel : il porterait alors une
+    // adresse concurrente, prête à partir si la personne bascule. Le mode manuel
+    // se remplit à la main, c'est ce qui le rend sans ambiguïté.
+    void voie; void numero;
   };
 
   /** Monte tous les composants d'adresse d'un formulaire. */

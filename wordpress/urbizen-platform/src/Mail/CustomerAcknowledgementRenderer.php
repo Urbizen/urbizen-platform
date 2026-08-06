@@ -30,6 +30,7 @@
 namespace Urbizen\Platform\Mail;
 
 use Urbizen\Platform\Forms\CatalogueRegistry;
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
@@ -153,6 +154,7 @@ final class CustomerAcknowledgementRenderer {
 		$html[] = '<p style="margin:0 0 20px;font-size:18px"><strong>' . esc_html( $reference ) . '</strong></p>';
 		$html[] = self::demarche( $type );
 
+		$html[] = self::adresse( $charge );
 		$html[] = self::projet( $type, $charge );
 		$html[] = self::precisions( $charge );
 		$html[] = self::estimation( is_array( $demande['pricing'] ?? null ) ? $demande['pricing'] : array() );
@@ -270,6 +272,30 @@ final class CustomerAcknowledgementRenderer {
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return string
 	 */
+	/**
+	 * L'adresse du terrain, telle qu'elle se lit.
+	 *
+	 * Rien d'autre : ni le mode de saisie, ni le code commune, ni les
+	 * coordonnées. Le demandeur connaît son terrain — ce qu'il vérifie ici,
+	 * c'est qu'Urbizen l'a bien noté, pas ce qu'Urbizen en a déduit.
+	 *
+	 * @param array<string, mixed> $charge Charge persistée.
+	 * @return string Chaîne vide s'il n'y a pas d'adresse.
+	 */
+	private static function adresse( array $charge ): string {
+		$lignes = AdresseTerrain::lignes_adresse( $charge );
+
+		if ( array() === $lignes ) {
+			return '';
+		}
+
+		$html   = array();
+		$html[] = '<p style="margin:0 0 8px"><strong>Adresse du terrain</strong></p>';
+		$html[] = '<p style="margin:0 0 16px">' . implode( '<br>', array_map( 'esc_html', $lignes ) ) . '</p>';
+
+		return implode( "\n", $html );
+	}
+
 	private static function precisions( array $charge ): string {
 		$resume = PrecisionsProjet::resume( $charge );
 

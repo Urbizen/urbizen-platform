@@ -20,6 +20,7 @@ use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionPostType;
 use Urbizen\Platform\Submissions\SubmissionRepository;
@@ -403,11 +404,49 @@ final class SubmissionsAdmin {
 
 		$demande = SubmissionRepository::get( (int) $post->ID );
 		$charge  = is_array( $demande ) && is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
-		$lignes  = PrecisionsProjet::lignes( $charge );
+		// L'adresse d'abord : c'est ce qu'on cherche en ouvrant un dossier.
+		if ( AdresseTerrain::existe( $charge ) ) {
+			echo '<h4>' . esc_html( AdresseTerrain::RUBRIQUE ) . '</h4>';
+			// Chaque ligne est échappée AVANT d'être jointe : le séparateur est
+			// du balisage voulu, tout le reste vient du formulaire. `printf` et
+			// non `echo` : la sortie porte alors visiblement son échappement,
+			// ce que le banc de compatibilité vérifie à la lecture.
+			$adresse = array();
+
+			foreach ( AdresseTerrain::lignes_adresse( $charge ) as $ligne ) {
+				$adresse[] = esc_html( $ligne );
+			}
+
+			printf( '<p>%s</p>', implode( '<br>', $adresse ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lignes échappées ci-dessus.
+
+			$provenance = AdresseTerrain::provenance( $charge );
+
+			if ( '' !== $provenance ) {
+				echo '<p class="description"><strong>' . esc_html( $provenance ) . '</strong></p>';
+			}
+
+			// Code commune et coordonnées : utiles à l'instruction, sans intérêt
+			// pour le demandeur. Ils ne sortent donc que sur cet écran.
+			$reperes = AdresseTerrain::reperes( $charge );
+
+			if ( array() !== $reperes ) {
+				$bouts = array();
+
+				foreach ( $reperes as $libelle => $valeur ) {
+					$bouts[] = esc_html( $libelle ) . ' : ' . esc_html( $valeur );
+				}
+
+				printf( '<p class="description">%s</p>', implode( ' · ', $bouts ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- bouts échappés ci-dessus.
+			}
+		}
+
+		$lignes = PrecisionsProjet::lignes( $charge );
 
 		if ( array() === $lignes ) {
+			echo '<h4>' . esc_html( PrecisionsProjet::RUBRIQUE ) . '</h4>';
 			echo '<p>' . esc_html__( 'Aucune précision n’a été renseignée pour ce projet.', 'urbizen-platform' ) . '</p>';
 		} else {
+			echo '<h4>' . esc_html( PrecisionsProjet::RUBRIQUE ) . '</h4>';
 			echo '<table class="widefat striped"><tbody>';
 
 			foreach ( $lignes as $libelle => $valeur ) {

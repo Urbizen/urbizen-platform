@@ -363,6 +363,44 @@
   #dp-app .dp-travail-suppr,
   #dp-app button.dp-btn { min-height: 44px; }
   #dp-app .dp-file-btn { display: inline-flex; align-items: center; justify-content: center; }
+
+  /* -- Adresse assistée --
+     La liste se superpose au reste : elle doit passer AU-DESSUS du bloc
+     suivant, sinon les propositions se lisent à moitié. */
+  #dp-app .dp-adresse { position: relative; }
+  #dp-app .dp-adresse-liste {
+    list-style: none; margin: 4px 0 0; padding: 4px;
+    position: absolute; z-index: 20; left: 0; right: 0;
+    max-height: 280px; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: var(--radius); box-shadow: 0 8px 24px rgba(18,35,59,.12);
+  }
+  #dp-app .dp-adresse-liste li {
+    /* 44 px au doigt, et le texte long revient à la ligne plutôt que d'être
+       coupé : une adresse tronquée ne se choisit pas en confiance. */
+    min-height: 44px; display: flex; align-items: center;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere;
+  }
+  #dp-app .dp-adresse-liste li:hover { background: var(--cadastre-sf); }
+  /* L'option active se distingue par le fond ET par la barre : la couleur
+     seule exclurait qui ne la perçoit pas. */
+  #dp-app .dp-adresse-liste li[aria-selected="true"] {
+    background: var(--cadastre-sf); box-shadow: inset 3px 0 0 var(--cadastre);
+  }
+  #dp-app .dp-adresse-etat {
+    margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  #dp-app .dp-adresse-bascule {
+    display: flex; align-items: center; gap: 9px; min-height: 44px;
+    margin-top: 6px; font-size: 13.5px; font-weight: 400; cursor: pointer;
+  }
+  #dp-app .dp-adresse-bascule input { accent-color: var(--cadastre); width: 18px; height: 18px; flex: none; }
+  #dp-app .dp-facultatif { font-weight: 400; color: var(--ink-faint); }
+  #dp-app [data-adresse-groupe-manuel] { margin-top: 10px; }
+  #dp-app [data-adresse-groupe-commun] { margin-top: 10px; }
+  #dp-app [data-adresse-groupe-commun] input[readonly] { background: var(--cadastre-sf); }
   #dp-app .dp-seg label { display: flex; align-items: center; justify-content: center; }
   #dp-app .dp-locate,
   #dp-app .dp-map-toggle,
@@ -397,8 +435,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
-<link rel="stylesheet" href="../css/urbizen-form-tarifs.css?v=0.2.6" />
-<link rel="stylesheet" href="../css/urbizen-form-pieces.css?v=0.2.6" />
+<link rel="stylesheet" href="../css/urbizen-form-tarifs.css?v=0.2.7" />
+<link rel="stylesheet" href="../css/urbizen-form-pieces.css?v=0.2.7" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -478,9 +516,45 @@
             <h2 class="dp-step-title">Où se situe le terrain&nbsp;?</h2>
             <p class="dp-step-hint">Les références cadastrales figurent sur votre acte de propriété ou sur <span style="font-family:'IBM Plex Mono',monospace">cadastre.gouv.fr</span> (section + numéro de parcelle).</p>
             <div class="dp-grid">
-              <div class="dp-field col-2"><label for="t_adr">Adresse du terrain <span class="req">*</span></label><input type="text" id="t_adr" name="terrain_adresse"></div>
-              <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric"></div>
-              <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville"></div>
+              <div class="dp-field col-2 dp-adresse" data-adresse>
+                <div data-adresse-groupe-auto>
+                  <label for="t_rech">Rechercher l’adresse du terrain <span class="req">*</span></label>
+                  <!-- Sans `name` : ce champ pilote la recherche, il n'est pas
+                       l'adresse. Tant qu'aucune proposition n'est retenue, il
+                       n'y a pas d'adresse, et rien ne doit partir. -->
+                  <input type="text" id="t_rech" data-adresse-recherche autocomplete="off"
+                         placeholder="Commencez à taper, puis choisissez dans la liste">
+                  <ul class="dp-adresse-liste" role="listbox" aria-label="Adresses proposées"
+                      data-adresse-propositions hidden></ul>
+                  <!-- Les champs canoniques de la sélection vivent DANS le
+                       groupe automatique : en mode manuel le groupe est
+                       désactivé, donc ils quittent le FormData. Placés à côté,
+                       ils partiraient vides mais présents, et une adresse
+                       abandonnée continuerait de voyager. -->
+                  <input type="hidden" name="terrain_adresse" data-adresse-champ="terrain_adresse">
+                  <input type="hidden" name="terrain_insee" data-adresse-champ="terrain_insee">
+                  <input type="hidden" name="terrain_lat" data-adresse-champ="terrain_lat">
+                  <input type="hidden" name="terrain_lon" data-adresse-champ="terrain_lon">
+                </div>
+                <p class="dp-adresse-etat" role="status" aria-live="polite" data-adresse-etat hidden></p>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" data-adresse-manuel> Je renseigne l’adresse manuellement
+                </label>
+                <!-- Le mode canonique, jamais montré, et jamais désactivé : il
+                     part dans les deux modes, c'est lui qui les distingue. -->
+                <input type="hidden" name="mode_adresse" value="automatique" data-adresse-champ="mode_adresse">
+                <div class="dp-grid" data-adresse-groupe-manuel hidden>
+                  <div class="dp-field col-2"><label for="t_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="t_voie" name="terrain_voie" data-adresse-champ="terrain_voie" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="t_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="t_comp" name="terrain_complement" data-adresse-champ="terrain_complement" autocomplete="off"></div>
+                </div>
+                <!-- Code postal et commune : UN seul jeu, partagé par les deux
+                     modes. Deux jeux portant les mêmes noms enverraient deux
+                     valeurs, et le serveur en retiendrait une au hasard. -->
+                <div class="dp-grid" data-adresse-groupe-commun>
+                  <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric" data-adresse-champ="terrain_cp" autocomplete="off"></div>
+                  <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville" data-adresse-champ="terrain_ville" autocomplete="off"></div>
+                </div>
+              </div>
               <div class="dp-field"><label for="t_sec">Section cadastrale</label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. AB"></div>
               <div class="dp-field"><label for="t_num">N° de parcelle</label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 0142"></div>
               <div class="dp-field col-2">
@@ -684,11 +758,12 @@
   </div>
 </div>
 
-<script src="../js/urbizen-form-tarifs.js?v=0.2.6"></script>
-<script src="../js/urbizen-form-pieces.js?v=0.2.6"></script>
-<script src="../js/urbizen-form-nombres.js?v=0.2.6"></script>
-<script src="../js/urbizen-form-champs.js?v=0.2.6"></script>
-<script src="../js/urbizen-form-bridge.js?v=0.2.6"></script>
+<script src="../js/urbizen-form-tarifs.js?v=0.2.7"></script>
+<script src="../js/urbizen-form-pieces.js?v=0.2.7"></script>
+<script src="../js/urbizen-form-nombres.js?v=0.2.7"></script>
+<script src="../js/urbizen-form-adresse.js?v=0.2.7"></script>
+<script src="../js/urbizen-form-champs.js?v=0.2.7"></script>
+<script src="../js/urbizen-form-bridge.js?v=0.2.7"></script>
 <script>
 (function () {
   "use strict";
@@ -904,6 +979,11 @@
   // Les champs conditionnés par la nature. La matrice vient du serveur, par le
   // pont : ce module ne fait que l'appliquer.
   UrbizenNombres.surveiller(form);
+  // Une seule initialisation, et seulement si le balisage est là : un document
+  // sans bloc d'adresse ne doit produire ni erreur ni instance.
+  if (window.UrbizenAdresse && form.querySelector("[data-adresse]")) {
+    UrbizenAdresse.surveiller(form);
+  }
 
   var champs = UrbizenChamps.init({
     form: form,

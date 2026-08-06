@@ -225,6 +225,99 @@ foreach ( array( 'adresse_mode_absent', 'adresse_mode_inconnu', 'coordonnee_orph
 		! str_contains( $m, '_' ) && ! str_contains( $m, 'null' ) );
 }
 
+echo "\n── 8. Les trois rendus, sans doublon\n";
+
+if ( ! defined( 'URBIZEN_PLATFORM_DIR' ) ) {
+	define( 'URBIZEN_PLATFORM_DIR', $racine . '/wordpress/urbizen-platform/' );
+}
+
+if ( ! function_exists( 'esc_html' ) ) {
+	/**
+	 * Doublure d'échappement.
+	 *
+	 * @param string $t Texte.
+	 * @return string
+	 */
+	function esc_html( $t ) { // phpcs:ignore
+		return htmlspecialchars( (string) $t, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'apply_filters' ) ) {
+	/**
+	 * Doublure de filtre.
+	 *
+	 * @param string $h Crochet.
+	 * @param mixed  $v Valeur.
+	 * @return mixed
+	 */
+	function apply_filters( $h, $v ) { // phpcs:ignore
+		return $v;
+	}
+}
+
+$charge_auto = array(
+	'nature'          => 'piscine',
+	'description'     => 'Bassin enterré.',
+	'mode_adresse'    => 'automatique',
+	'terrain_adresse' => '12 rue Exemple, 31000 Toulouse',
+	'terrain_insee'   => '31555',
+	'terrain_cp'      => '31000',
+	'terrain_ville'   => 'Toulouse',
+	'terrain_lat'     => '43.6',
+	'terrain_lon'     => '1.44',
+);
+
+$corps = \Urbizen\Platform\Mail\MailRenderer::body(
+	array(
+		'id'             => 1,
+		'reference'      => 'URB-2026-0000',
+		'created_at_gmt' => '2026-08-06 00:00:00',
+		'form_type'      => 'declaration_prealable',
+		'consent_at_gmt' => '2026-08-06 00:00:00',
+		'payload'        => $charge_auto,
+		'pricing'        => array( 'base' => 249, 'total' => 249 ),
+		'files'          => array(),
+	),
+	0
+);
+
+verifier( 'notification · la rubrique d’adresse est présente', str_contains( $corps, 'Adresse du terrain' ) );
+verifier( 'notification · l’adresse ne paraît qu’une fois',
+	1 === substr_count( $corps, '12 rue Exemple, 31000 Toulouse' ) );
+verifier( 'notification · la provenance y figure', str_contains( $corps, 'Adresse sélectionnée automatiquement' ) );
+verifier( 'notification · le code commune ne paraît qu’une fois', 1 === substr_count( $corps, '31555' ) );
+
+// Le tableau générique ne doit reprendre aucun champ assumé par la classe.
+foreach ( AdresseTerrain::champs() as $champ ) {
+	verifier( sprintf( 'notification · « %s » n’est pas répété', $champ ), ! str_contains( $corps, $champ ) );
+}
+
+verifier( 'notification · aucun libellé de formulaire ne double la rubrique',
+	! str_contains( $corps, '>Commune<' ) && ! str_contains( $corps, '>Latitude<' ) );
+verifier( 'notification · le reste du tableau survit', str_contains( $corps, 'Bassin enterré.' ) );
+
+// L'accusé client : l'adresse lisible, et rien de technique.
+$vue = new ReflectionMethod( \Urbizen\Platform\Mail\CustomerAcknowledgementRenderer::class, 'adresse' );
+$accuse = (string) $vue->invoke( null, $charge_auto );
+
+verifier( 'accusé · l’adresse lisible y est', str_contains( $accuse, '12 rue Exemple, 31000 Toulouse' ) );
+verifier( 'accusé · aucun code commune', ! str_contains( $accuse, '31555' ) );
+verifier( 'accusé · aucune coordonnée', ! str_contains( $accuse, '43.6' ) && ! str_contains( $accuse, '1.44' ) );
+verifier( 'accusé · aucun mode technique',
+	! str_contains( $accuse, 'automatique' ) && ! str_contains( $accuse, 'mode_adresse' ) );
+verifier( 'accusé · aucun identifiant de champ', ! str_contains( $accuse, 'terrain_' ) );
+
+// Échappement : une valeur hostile ne peut pas venir du service, mais le rendu
+// doit rester sûr quoi qu'il arrive.
+$hostile = $vue->invoke(
+	null,
+	array( 'mode_adresse' => 'manuel', 'terrain_voie' => '<script>alert(1)</script>', 'terrain_cp' => '31000', 'terrain_ville' => 'Toulouse' )
+);
+
+verifier( 'accusé · une valeur hostile est échappée',
+	! str_contains( $hostile, '<script>' ) && str_contains( $hostile, '&lt;script&gt;' ) );
+
 printf( "\n%s\n", 0 === $echecs ? 'TOUS LES CONTROLES PASSENT' : sprintf( '%d CONTROLE(S) EN ECHEC', $echecs ) );
 
 exit( 0 === $echecs ? 0 : 1 );

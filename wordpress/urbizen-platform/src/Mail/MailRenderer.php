@@ -20,6 +20,7 @@
 namespace Urbizen\Platform\Mail;
 
 use Urbizen\Platform\Files\SignedLink;
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\FormRegistry;
 use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionRepository;
@@ -159,6 +160,21 @@ final class MailRenderer {
 		$html[] = self::titre( 'Réponses' );
 		$html[] = self::table( self::reponses( $demande ) );
 
+		// --- Adresse du terrain ---
+		// Avant les précisions : on lit d'abord où, puis quoi. La rubrique
+		// n'apparaît que si le parcours en pose une.
+		$charge = is_array( $demande['payload'] ) ? $demande['payload'] : array();
+
+		if ( AdresseTerrain::existe( $charge ) ) {
+			$html[] = self::titre( AdresseTerrain::RUBRIQUE );
+			$html[] = self::table(
+				array(
+					'Adresse'    => implode( ', ', AdresseTerrain::lignes_adresse( $charge ) ),
+					'Provenance' => AdresseTerrain::provenance( $charge ),
+				) + AdresseTerrain::reperes( $charge )
+			);
+		}
+
 		// --- Précisions du projet ---
 		// Rendues avant le tarif : l'interlocuteur qui rappelle le prospect a
 		// besoin des dimensions, pas du montant. La rubrique n'apparaît que si
@@ -210,7 +226,7 @@ final class MailRenderer {
 			// montre plus bas, avec son libellé client et son écriture
 			// française. Le montrer deux fois, une fois en `8.5` et une fois en
 			// « 8,5 m », donnerait à douter des deux.
-			if ( PrecisionsProjet::porte( $nom ) ) {
+			if ( PrecisionsProjet::porte( $nom ) || AdresseTerrain::porte( $nom ) ) {
 				continue;
 			}
 
