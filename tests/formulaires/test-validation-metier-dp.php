@@ -98,7 +98,13 @@ function demande_minimale( string $nature, array $ajouts = array() ): array {
 			'adresse_declarant' => '12 rue des Lilas',
 			'cp_declarant'      => '33000',
 			'ville_declarant'   => 'Bordeaux',
-			'terrain_adresse'   => '12 rue des Lilas',
+			// L'adresse du terrain est désormais exigée, et son mode avec elle :
+			// une DP sans mode d'adresse est refusée, ce que couvre
+			// `test-adresse-terrain.php`. Ici on la fournit valide, pour que le
+			// banc éprouve bien ce qu'il annonce — la recevabilité sans surface.
+			'mode_adresse'      => 'automatique',
+			'terrain_adresse'   => '12 rue des Lilas, 33000 Bordeaux',
+			'terrain_insee'     => '33063',
 			'terrain_cp'        => '33000',
 			'terrain_ville'     => 'Bordeaux',
 			'nature'            => $nature,

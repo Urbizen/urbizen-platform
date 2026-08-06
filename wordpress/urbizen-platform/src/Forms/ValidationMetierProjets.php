@@ -68,6 +68,12 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 		$bareme    = static::BAREME;
 		$erreurs   = array();
 
+		// --- 0 · l'adresse du terrain ---
+		// Elle ne dépend d'aucune nature : elle se juge d'abord. Un parcours qui
+		// ne la déclare pas n'est pas concerné — la clé est alors absente de la
+		// charge nettoyée, et la règle ne s'applique pas.
+		$erreurs += AdresseTerrain::verifier( $clean );
+
 		$principal = $this->chaine( $clean['nature'] ?? null );
 
 		// --- 1 · nature principale ---

@@ -101,6 +101,103 @@ final class AdresseTerrain {
 	}
 
 	/**
+	 * Champs exigés par chaque mode.
+	 *
+	 * Le code commune fait partie du minimum en automatique : il vient de la
+	 * sélection, et son absence signale une adresse composée à la main dans un
+	 * mode qui prétend le contraire. En manuel, on n'exige que ce qu'une
+	 * personne peut honnêtement écrire.
+	 *
+	 * @var array<string, array<int, string>>
+	 */
+	private const EXIGES = array(
+		self::AUTOMATIQUE => array( 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'terrain_insee' ),
+		self::MANUEL      => array( 'terrain_voie', 'terrain_cp', 'terrain_ville' ),
+	);
+
+	/**
+	 * L'adresse est-elle cohérente avec le mode déclaré ?
+	 *
+	 * **Un mode absent ou inventé refuse la demande.** C'est le seul traitement
+	 * honnête : sans mode, deux jeux de champs concurrents arrivent sans que
+	 * rien ne dise lequel fait foi, et en choisir un reviendrait à décider de
+	 * l'adresse du dossier à la place du demandeur. Écarter les deux
+	 * silencieusement serait pire encore — la demande partirait sans adresse.
+	 *
+	 * Le parcours qui ne pose pas d'adresse n'est pas concerné : la clé est
+	 * absente de la charge nettoyée, et la règle ne s'applique pas.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, string> Erreurs par champ, vide si tout va bien.
+	 */
+	public static function verifier( array $clean ): array {
+		// Le parcours ne déclare pas d'adresse : rien à exiger.
+		if ( ! array_key_exists( 'mode_adresse', $clean ) ) {
+			return array();
+		}
+
+		$brut = $clean['mode_adresse'];
+
+		if ( null === $brut || '' === $brut ) {
+			return array( 'mode_adresse' => 'adresse_mode_absent' );
+		}
+
+		$mode = self::mode( $clean );
+
+		if ( null === $mode ) {
+			return array( 'mode_adresse' => 'adresse_mode_inconnu' );
+		}
+
+		$erreurs = array();
+
+		foreach ( self::EXIGES[ $mode ] as $champ ) {
+			$valeur = $clean[ $champ ] ?? null;
+
+			if ( null === $valeur || '' === $valeur ) {
+				$erreurs[ $champ ] = 'champ_requis';
+			}
+		}
+
+		// Les coordonnées vont par deux, et restent dans les bornes du globe.
+		// Une valeur hors bornes n'est pas une imprécision : c'est une donnée
+		// qui ne vient pas du service.
+		$erreurs += self::verifier_coordonnees( $clean );
+
+		return $erreurs;
+	}
+
+	/**
+	 * Contrôle de la paire de coordonnées.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, string>
+	 */
+	private static function verifier_coordonnees( array $clean ): array {
+		$lat = self::valeur( $clean, 'terrain_lat' );
+		$lon = self::valeur( $clean, 'terrain_lon' );
+
+		if ( '' === $lat && '' === $lon ) {
+			return array();
+		}
+
+		if ( '' === $lat || '' === $lon ) {
+			// Une coordonnée seule ne localise rien. Le filtrage l'écartera ;
+			// la signaler ici évite qu'une charge forgée passe pour complète.
+			return array( '' === $lat ? 'terrain_lat' : 'terrain_lon' => 'coordonnee_orpheline' );
+		}
+
+		if ( ! is_numeric( $lat ) || abs( (float) $lat ) > 90.0 ) {
+			return array( 'terrain_lat' => 'hors_bornes' );
+		}
+
+		if ( ! is_numeric( $lon ) || abs( (float) $lon ) > 180.0 ) {
+			return array( 'terrain_lon' => 'hors_bornes' );
+		}
+
+		return array();
+	}
+
+	/**
 	 * Ne garde que l'adresse du mode retenu.
 	 *
 	 * Le retrait est silencieux, comme celui de {@see MatriceChamps} : une
@@ -125,8 +222,31 @@ final class AdresseTerrain {
 			return $clean;
 		}
 
-		$mode   = self::mode( $clean );
-		$gardes = null === $mode ? array() : self::PAR_MODE[ $mode ];
+		$mode = self::mode( $clean );
+
+		// Mode absent ou inventé : la demande est refusée par `verifier()`, et
+		// rien ne doit subsister. Laisser passer le code postal et la commune
+		// enregistrerait un fragment d'adresse sans savoir de quelle adresse
+		// c'est le fragment.
+		if ( null === $mode ) {
+			foreach ( array_merge( self::COMMUNS, self::PAR_MODE[ self::AUTOMATIQUE ], self::PAR_MODE[ self::MANUEL ] ) as $champ ) {
+				if ( ! array_key_exists( $champ, $clean ) ) {
+					continue;
+				}
+
+				if ( null !== $clean[ $champ ] && '' !== $clean[ $champ ] ) {
+					$ecarts[] = $champ;
+				}
+
+				unset( $clean[ $champ ] );
+			}
+
+			unset( $clean['mode_adresse'] );
+
+			return $clean;
+		}
+
+		$gardes = self::PAR_MODE[ $mode ];
 
 		foreach ( self::PAR_MODE as $champs ) {
 			foreach ( $champs as $champ ) {

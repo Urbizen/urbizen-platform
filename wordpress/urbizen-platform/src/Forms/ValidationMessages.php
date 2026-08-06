@@ -49,6 +49,21 @@ final class ValidationMessages {
 			case 'mesure_nulle':
 				return __( 'Indiquez une mesure supérieure à zéro, ou laissez le champ vide.', 'urbizen-platform' );
 
+			// L'adresse arrive de deux façons ; sans savoir laquelle, on ne peut
+			// ni choisir ni deviner. Le message dit quoi faire, pas ce qui
+			// manque techniquement.
+			case 'adresse_mode_absent':
+				return __( 'Indiquez l’adresse du terrain, en la recherchant ou en la saisissant manuellement.', 'urbizen-platform' );
+
+			case 'adresse_mode_inconnu':
+				return __( 'Le mode de saisie de l’adresse n’est pas reconnu. Reprenez la saisie de l’adresse.', 'urbizen-platform' );
+
+			case 'coordonnee_orpheline':
+				return __( 'La position du terrain est incomplète. Sélectionnez à nouveau l’adresse.', 'urbizen-platform' );
+
+			case 'hors_bornes':
+				return __( 'Cette valeur est en dehors des limites autorisées.', 'urbizen-platform' );
+
 			case 'sous_le_minimum':
 				return __( 'La valeur est inférieure au minimum autorisé.', 'urbizen-platform' );
 
