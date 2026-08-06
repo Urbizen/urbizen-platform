@@ -271,6 +271,47 @@ function urbizen_child_origine_site() {
 }
 
 /**
+ * Interdit la mise en cache d'une page qui porte un secret à usage unique.
+ *
+ * Le défaut que cette fonction ferme s'est produit en production, et il était
+ * silencieux : LiteSpeed servait la page de formulaire depuis son cache, donc
+ * **le même jeton anti-robot à tous les visiteurs**. Ce jeton est à usage
+ * unique — `AntiSpam::reserve_token()` refuse un jeton déjà réservé. Le premier
+ * visiteur qui envoyait sa demande le consommait ; tous les suivants étaient
+ * refusés, avec un message d'erreur générique, jusqu'à expiration du cache.
+ *
+ * Une exclusion existe dans la configuration de LiteSpeed. Elle est nécessaire
+ * mais fragile : elle vit dans un réglage, qu'une réinstallation, une
+ * restauration ou une migration efface sans bruit. La règle doit voyager avec
+ * le code qui crée le problème.
+ *
+ * Deux mécanismes, parce qu'ils ne couvrent pas la même chose : `nocache_headers()`
+ * s'adresse aux caches HTTP en aval, `litespeed_control_set_nocache` au cache
+ * de pages de LiteSpeed, qui décide avant d'émettre le moindre en-tête.
+ *
+ * **Seule la page est visée.** Les feuilles, scripts et images gardent leur
+ * cache : ils portent une version dans leur URL, ce qui est précisément la
+ * bonne façon de les invalider. Les rendre non cacheables ferait payer à chaque
+ * visiteur un défaut qui ne les concerne pas.
+ *
+ * @return void
+ */
+function urbizen_child_interdire_cache_formulaire() {
+	if ( ! urbizen_child_est_page_formulaire_autorisation() ) {
+		return;
+	}
+
+	// Le cache de pages de LiteSpeed, avec un motif lisible dans ses journaux.
+	do_action( 'litespeed_control_set_nocache', 'page portant un jeton de formulaire à usage unique' );
+
+	// Les caches HTTP en aval — proxy, navigateur — pour la page seule.
+	if ( ! headers_sent() ) {
+		nocache_headers();
+	}
+}
+add_action( 'template_redirect', 'urbizen_child_interdire_cache_formulaire' );
+
+/**
  * Configuration de soumission du formulaire affiché.
  *
  * Le nonce est émis ici, dans la page parente, et non dans le document servi en

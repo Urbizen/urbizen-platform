@@ -307,6 +307,64 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 	}
 }
 
+/* ================================================================== *
+ *  Pages à jeton : jamais mises en cache
+ * ================================================================== */
+
+// Le défaut s'est produit en production : la page servie du cache donnait le
+// MÊME jeton à usage unique à tous les visiteurs. Le premier qui envoyait le
+// consommait, tous les suivants étaient refusés.
+verifier(
+	'une règle interdit le cache des pages de formulaire',
+	str_contains( $functions, 'function urbizen_child_interdire_cache_formulaire' )
+);
+verifier(
+	'elle s’adresse au cache de pages de LiteSpeed',
+	str_contains( $functions, "do_action( 'litespeed_control_set_nocache'" )
+);
+verifier(
+	'et aux caches HTTP en aval',
+	str_contains( $functions, 'nocache_headers()' )
+);
+verifier(
+	'elle est accrochée assez tôt pour agir',
+	str_contains( $functions, "add_action( 'template_redirect', 'urbizen_child_interdire_cache_formulaire' )" )
+);
+
+// Elle ne doit viser QUE les pages de formulaire : le reste du site garde son
+// cache, et les ressources versionnées aussi.
+verifier(
+	'elle ne s’applique qu’aux pages de formulaire',
+	1 === preg_match(
+		'/function urbizen_child_interdire_cache_formulaire.*?urbizen_child_est_page_formulaire_autorisation\(\).*?return;/s',
+		$functions
+	)
+);
+
+$portee = substr(
+	$functions,
+	(int) strpos( $functions, 'function urbizen_child_interdire_cache_formulaire' ),
+	1400
+);
+
+foreach ( array( '.css', '.js', 'wp_enqueue', 'assets/' ) as $hors_portee ) {
+	verifier(
+		sprintf( 'la règle ne touche à aucune ressource « %s »', $hors_portee ),
+		! str_contains( $portee, $hors_portee )
+	);
+}
+
+// Le jeton doit rester présent dans la configuration émise : le rendre non
+// cacheable ne sert à rien s'il disparaît.
+verifier(
+	'la configuration émet toujours un jeton anti-robot',
+	str_contains( $functions, "'token'" ) && str_contains( $functions, 'AntiSpam::issue_token()' )
+);
+verifier(
+	'et il est produit à chaque rendu, pas mémorisé',
+	! preg_match( '/(get_option|get_transient|set_transient)\([^)]*token/i', $functions )
+);
+
 echo "\n";
 
 if ( $echecs > 0 ) {
