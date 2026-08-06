@@ -266,9 +266,13 @@ foreach ( array( 'declaration-prealable' => $dp, 'permis-de-construire' => $pc )
 foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	preg_match_all( '/urbizen-form-[a-z]+\.(?:js|css)\?v=([0-9.]+)/', $doc, $versions );
 
+	// Six : deux feuilles et quatre scripts — tarifs, pièces, champs
+	// conditionnels, pont. Le compte est vérifié et non seulement la cohérence
+	// des versions : une ressource qui disparaîtrait du document passerait
+	// autrement inaperçue.
 	verifier(
-		sprintf( '%s : les cinq ressources sont versionnées', $nom ),
-		5 === count( $versions[1] ?? array() )
+		sprintf( '%s : les six ressources sont versionnées', $nom ),
+		6 === count( $versions[1] ?? array() )
 	);
 	verifier(
 		sprintf( '%s : toutes à la version du lot', $nom ),

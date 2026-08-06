@@ -109,6 +109,12 @@ verdict $? "test-pieces.mjs"
 # Pont sécurisé entre la page WordPress et les iframes DP et PC : ce qui protège
 # le nonce, et ce qui empêche qu'une erreur devienne un faux succès. Les deux
 # parcours passent par les mêmes contrôles, dans une seule boucle.
+# Les champs conditionnés par la nature : la matrice du serveur, appliquée par
+# le navigateur, et surtout ce qui part réellement dans le FormData.
+titre "Champs conditionnels DP / PC — DOM simulé"
+node test-champs.mjs
+verdict $? "test-champs.mjs"
+
 titre "Pont DP / PC — DOM simulé"
 node test-pont.mjs
 verdict $? "test-pont.mjs"
@@ -124,7 +130,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 8 bancs passent.\033[0m\n'
+	printf '\033[32mLes 9 bancs passent.\033[0m\n'
 	exit 0
 fi
 

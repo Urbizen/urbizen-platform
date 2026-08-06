@@ -480,7 +480,7 @@
                   <input type="radio" id="i_exist" name="intervention" value="existant"><label for="i_exist">Sur l’existant</label>
                 </div>
               </div>
-              <div class="dp-field"><label for="p_log">Nombre de logements créés</label><input type="number" id="p_log" name="nb_logements" class="measure" min="0" step="1" value="1"></div>
+              <div class="dp-field" data-champ="nb_logements"><label for="p_log">Nombre de logements créés</label><input type="number" id="p_log" name="nb_logements" class="measure" min="0" step="1" value="1"></div>
               <div class="dp-field col-2"><label for="p_desc">Description du projet <span class="req">*</span></label><textarea id="p_desc" name="description" placeholder="Ex. : maison de plain-pied de 132 m² de surface de plancher, toiture à deux pans, garage attenant de 20 m²."></textarea></div>
               <div class="dp-field col-2"><label for="p_ins">Insertion et parti architectural</label><textarea id="p_ins" name="insertion" style="min-height:70px" placeholder="Ex. : volumétrie basse s’inscrivant dans la pente, teintes claires en harmonie avec le bâti voisin, haie conservée en limite."></textarea></div>
               <div class="dp-field col-2"><label for="p_mat">Matériaux et couleurs</label><input type="text" id="p_mat" name="materiaux" placeholder="Ex. : enduit ton sable · tuiles terre cuite · menuiseries alu RAL 7016"></div>
@@ -493,11 +493,11 @@
             <h2 class="dp-step-title">Surfaces</h2>
             <p class="dp-step-hint">Au-delà de 150 m² de surface de plancher, le recours à un architecte est obligatoire (rubrique « Réseaux &amp; intervenants »).</p>
             <div class="dp-grid">
-              <div class="dp-field"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_existante"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_creee"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_totale"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="emprise_avant"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="emprise_creee"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
             </div>
             <div class="dp-attest" id="archi-flag" style="border-left-color:var(--cadastre);margin-top:18px;display:none">
               <span aria-hidden="true" style="font-family:'IBM Plex Mono',monospace;color:var(--cadastre)">!</span>
@@ -528,9 +528,9 @@
             <h2 class="dp-step-title">Éléments de calcul des taxes</h2>
             <p class="dp-step-hint">Servent au calcul de la taxe d’aménagement. Laissez 0 si non concerné.</p>
             <div class="dp-grid">
-              <div class="dp-field"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
-              <div class="dp-field"><label for="x_pis">Bassin de piscine</label><div class="dp-suffix"><input type="number" id="x_pis" name="piscine_m2" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="surface_taxable"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="nb_stationnement"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
+              <div class="dp-field" data-champ="piscine_m2"><label for="x_pis">Bassin de piscine</label><div class="dp-suffix"><input type="number" id="x_pis" name="piscine_m2" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
               <div class="dp-field col-2" style="margin-top:6px">
                 <label>Le terrain est-il en secteur protégé (ABF)&nbsp;?</label>
                 <div class="dp-seg" role="radiogroup">
@@ -618,6 +618,7 @@
 
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.5"></script>
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.5"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-champs.js?v=0.2.5"></script>
 <script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.5"></script>
 <script>
 (function () {
@@ -797,8 +798,21 @@
   // qu'il ne l'a pas reçue, et n'affiche l'écran final que sur un succès réel.
   // Le type de formulaire et l'action viennent de cette configuration — le
   // document ne les connaît pas, et ne peut donc pas se tromper de route.
+  // Les champs conditionnés par la nature. La matrice vient du serveur, par le
+  // pont : ce module ne fait que l'appliquer.
+  var champs = UrbizenChamps.init({
+    form: form,
+    surNature: function () {
+      var choisi = form.querySelector('input[name="nature"]:checked');
+      return choisi ? choisi.value : "";
+    }
+  });
+
   var pont = UrbizenPont.init({
     form: form,
+    surMatrice: function (matrice, conditionnels) {
+      champs.appliquerMatrice(matrice, conditionnels);
+    },
     bouton: sendBtn,
     erreur: document.getElementById("dp-final-err"),
     serialiser: function (fd) {

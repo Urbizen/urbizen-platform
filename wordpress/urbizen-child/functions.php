@@ -370,6 +370,18 @@ function urbizen_child_configuration_formulaire() {
 		? \Urbizen\Platform\Security\AntiSpam::issue_token()
 		: '';
 
+	// Le greffon est la source de vérité métier. Absent — désactivé, en cours de
+	// mise à jour — le formulaire n'affiche aucun champ conditionnel plutôt que
+	// de tous les afficher : mieux vaut demander trop peu que demander une
+	// surface de plancher pour une piscine.
+	$matrice       = array();
+	$conditionnels = array();
+
+	if ( class_exists( '\\Urbizen\\Platform\\Forms\\MatriceChamps' ) ) {
+		$matrice       = (array) ( \Urbizen\Platform\Forms\MatriceChamps::pour_type( $route['type'] ) ?? array() );
+		$conditionnels = \Urbizen\Platform\Forms\MatriceChamps::CONDITIONNELS;
+	}
+
 	return array(
 		'action'         => $route['action'],
 		'formType'       => $route['type'],
@@ -378,6 +390,13 @@ function urbizen_child_configuration_formulaire() {
 		'tokenField'     => 'urbizen_token',
 		'token'          => $jeton,
 		'honeypotField'  => 'company_website',
+		// La matrice métier voyage telle quelle depuis le greffon : le
+		// navigateur n'en tient pas une seconde copie. Une liste recopiée à la
+		// main dériverait, et l'interface finirait par proposer un champ que le
+		// serveur écarte — ou l'inverse, plus grave : masquer un champ que le
+		// serveur attend.
+		'matrice'        => $matrice,
+		'champsConditionnels' => $conditionnels,
 		'submitUrl'      => admin_url( 'admin-post.php' ),
 		'origin'         => urbizen_child_origine_site(),
 		// **Sans version.** Le gabarit porte `?v=…` sur le cadre ; la comparaison

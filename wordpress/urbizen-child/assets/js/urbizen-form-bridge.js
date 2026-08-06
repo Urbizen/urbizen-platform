@@ -101,6 +101,7 @@
     this.bouton = config.bouton;
     this.erreur = config.erreur;
     this.serialiser = config.serialiser || function () {};
+    this.surMatrice = config.surMatrice || null;
     this.afficherSucces = config.afficherSucces;
     // Injectable pour que les bancs puissent réellement laisser le délai
     // expirer, plutôt que de simuler son issue.
@@ -160,6 +161,10 @@
 
       pont.bouton.disabled = false;
       pont.bouton.removeAttribute("aria-disabled");
+
+      // La matrice métier arrive avec la configuration : elle vient du serveur,
+      // et c'est ce qui garantit que l'interface et lui s'accordent.
+      if (pont.surMatrice) pont.surMatrice(message.matrice, message.champsConditionnels);
     });
   };
 

@@ -147,6 +147,10 @@
         tokenField: config.tokenField,
         token: config.token,
         honeypotField: config.honeypotField,
+        // La matrice métier, telle que le serveur la déclare. Le document ne la
+        // recopie pas : il l'applique.
+        matrice: config.matrice,
+        champsConditionnels: config.champsConditionnels,
         submitUrl: config.submitUrl
       },
       ORIGINE
