@@ -205,6 +205,15 @@ final class MailRenderer {
 				continue;
 			}
 
+			// Un champ qui dispose d'un rendu métier dédié n'est pas répété ici.
+			// Il n'est pas perdu pour autant : la rubrique correspondante le
+			// montre plus bas, avec son libellé client et son écriture
+			// française. Le montrer deux fois, une fois en `8.5` et une fois en
+			// « 8,5 m », donnerait à douter des deux.
+			if ( PrecisionsProjet::porte( $nom ) ) {
+				continue;
+			}
+
 			$champ    = null !== $def ? $def->field( $nom ) : null;
 			$libelle  = is_array( $champ ) && isset( $champ['label'] ) ? (string) $champ['label'] : $nom;
 			$lignes[ $libelle ] = self::aplatir( $valeur );

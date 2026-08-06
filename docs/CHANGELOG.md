@@ -123,8 +123,30 @@ tarif sur étude).
   notification interne et, en une phrase, l’accusé client. Une seule classe
   (`PrecisionsProjet`) sait comment une précision se dit.
 
+- **Une piscine dans un permis de maison individuelle passe par une question**
+  — « Une piscine est-elle prévue dans le projet ? », à trois réponses fermées
+  (`piscine_prevue`). Sans un « oui », aucune mesure n’est demandée, envoyée ni
+  enregistrée ; « je ne sais pas » se conserve comme réponse. Une DP dont le
+  projet **est** une piscine n’a pas cette porte : les mesures s’y posent
+  d’emblée. La règle est déclarative — un sous-champ dont le pilote n’est pas
+  posé par la nature n’est conditionné par rien — et la fermeture se propage
+  d’elle-même le long de la chaîne piscine → abri → hauteur.
+
 ### Corrigé
 
+- **Les mesures paraissaient deux fois dans la notification interne** : en forme
+  canonique dans le tableau générique des réponses, en français dans la rubrique
+  dédiée. Deux écritures d’un même nombre dans un même message donnent à douter
+  des deux. `PrecisionsProjet` déclare désormais ce qu’elle assume, et le rendu
+  générique s’en abstient — aucune liste n’est recopiée dans le renderer.
+- **Cibles tactiles portées à 44 px** sur les choix segmentés, les cartes à
+  cocher, les boutons de dépôt, d’ajout de projet, de localisation et de
+  navigation, ainsi que sur les libellés d’attestation, dont la ligne entière
+  commande désormais la case.
+- **Zones d’erreur croisées dans la déclaration préalable** : le message de la
+  surface s’affichait sous la profondeur, et celui de la profondeur sous le
+  bloc « abri ». `aria-describedby` restait juste — un lecteur d’écran
+  annonçait le bon message — mais l’œil lisait l’erreur au mauvais endroit.
 - **Le masquage d’un champ était sans effet visuel.** `#dp-app .dp-field`
   déclare `display: flex`, ce qui l’emporte sur l’attribut `hidden` : une
   piscine affichait encore six champs de surface de plancher. Les contrôles

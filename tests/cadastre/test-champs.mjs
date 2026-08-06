@@ -85,13 +85,28 @@ async function monter(P) {
     r.dispatchEvent(new w.Event("change", { bubbles: true }));
     return true;
   };
+  /** Répond à une question à liste fermée, comme le ferait un clic. */
+  const repondre = (nom, valeur) => {
+    const r = [...d.querySelectorAll(`input[name="${nom}"]`)].find((i) => i.value === valeur);
+    if (!r) return false;
+    r.checked = true;
+    r.dispatchEvent(new w.Event("change", { bubbles: true }));
+    return true;
+  };
+  const saisir = (nom, valeur) => {
+    const e = d.querySelector(`[name="${nom}"]`);
+    if (!e) return false;
+    e.value = valeur;
+    e.dispatchEvent(new w.Event("input", { bubbles: true }));
+    return true;
+  };
   const visibles = () => [...d.querySelectorAll("[data-champ]")].filter((g) => !g.hidden).map((g) => g.getAttribute("data-champ")).sort();
   const envoyes = () => {
     const fd = new w.FormData(form);
     return MATRICE.conditionnels.filter((c) => fd.has(c)).sort();
   };
 
-  return { dom, w, d, form, champs, choisir, visibles, envoyes };
+  return { dom, w, d, form, champs, choisir, repondre, saisir, visibles, envoyes };
 }
 
 /* ================================================================== *
@@ -364,6 +379,81 @@ titre("Piscine — abri et hauteur");
   ctx.dom.window.close();
 }
 
+titre("PC maison — la piscine passe par une question");
+
+{
+  /* Une maison neuve peut comporter un bassin, ou non. Demander six mesures à
+   * tout constructeur reviendrait à supposer un projet qu'il n'a pas décrit.
+   * La question ouvre le bloc, et rien d'autre ne l'ouvre.
+   *
+   * Le cas qui compte vraiment est celui du **changement d'avis** : on répond
+   * oui, on mesure, on repasse à non. Les valeurs restent dans les contrôles —
+   * c'est une politesse, revenir en arrière ne doit pas coûter une nouvelle
+   * saisie — mais elles ne doivent plus partir. */
+  const BASSIN = ["longueur_bassin_m", "largeur_bassin_m", "surface_bassin_m2",
+    "profondeur_bassin_m", "presence_abri_piscine", "hauteur_abri_m"];
+  const ctx = await monter(PARCOURS[1]);
+
+  ctx.choisir("maison_individuelle");
+
+  check("sans réponse · aucun champ de bassin visible",
+    0 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
+  check("sans réponse · la question, elle, est posée", ctx.visibles().includes("piscine_prevue"));
+  check("sans réponse · rien ne part", 0 === ctx.envoyes().filter((c) => BASSIN.includes(c)).length);
+
+  ctx.repondre("piscine_prevue", "oui");
+
+  // Cinq, pas six : la hauteur d'abri attend encore sa propre réponse.
+  check("oui · les cinq mesures s'affichent",
+    5 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
+  check("oui · la hauteur d'abri attend l'abri", !ctx.visibles().includes("hauteur_abri_m"));
+
+  ctx.saisir("longueur_bassin_m", "8,5");
+  ctx.saisir("largeur_bassin_m", "4");
+  ctx.repondre("presence_abri_piscine", "oui");
+  ctx.saisir("hauteur_abri_m", "1,8");
+
+  check("oui · la hauteur d'abri suit l'abri", ctx.visibles().includes("hauteur_abri_m"));
+  check("oui · la surface est proposée à 34",
+    "34" === ctx.d.querySelector('[name="surface_bassin_m2"]').value);
+  check("oui · les six partent", 6 === ctx.envoyes().filter((c) => BASSIN.includes(c)).length);
+
+  for (const reponse of ["non", "inconnu"]) {
+    ctx.repondre("piscine_prevue", reponse);
+
+    check(`${reponse} · plus aucun champ de bassin visible`,
+      0 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
+    check(`${reponse} · aucun ne part`, 0 === ctx.envoyes().filter((c) => BASSIN.includes(c)).length);
+    check(`${reponse} · la réponse, elle, part`, ctx.envoyes().includes("piscine_prevue"));
+    check(`${reponse} · la hauteur tombe avec l'abri`,
+      ctx.d.querySelector('[name="hauteur_abri_m"]').disabled);
+  }
+
+  // Retour à « oui » : ce que la personne avait écrit est toujours là.
+  ctx.repondre("piscine_prevue", "oui");
+
+  check("retour à oui · la longueur est retrouvée",
+    "8,5" === ctx.d.querySelector('[name="longueur_bassin_m"]').value);
+  check("retour à oui · la hauteur d'abri aussi",
+    "1,8" === ctx.d.querySelector('[name="hauteur_abri_m"]').value);
+  check("retour à oui · les six repartent", 6 === ctx.envoyes().filter((c) => BASSIN.includes(c)).length);
+
+  // Dernier mot avant l'envoi : c'est l'état final qui décide.
+  ctx.repondre("piscine_prevue", "non");
+  check("dernier mot à « non » · rien ne part", 0 === ctx.envoyes().filter((c) => BASSIN.includes(c)).length);
+
+  // Et la DP « piscine » n'a pas cette porte du tout.
+  const dp = await monter(PARCOURS[0]);
+  dp.choisir("piscine");
+
+  check("DP · aucune question préalable n'est posée", !dp.visibles().includes("piscine_prevue"));
+  check("DP · les mesures s'affichent d'emblée",
+    5 === dp.visibles().filter((c) => BASSIN.includes(c)).length);
+
+  ctx.dom.window.close();
+  dp.dom.window.close();
+}
+
 titre("Le bassin ne déborde sur aucune autre nature");
 
 {
@@ -406,9 +496,16 @@ titre("Le bassin ne déborde sur aucune autre nature");
 
     // Et la nature porteuse, elle, les rend bien : un balayage qui ne
     // prouverait que l'absence passerait tout aussi bien sur un formulaire
-    // qui n'a rien. La hauteur d'abri reste hors compte — elle attend qu'un
-    // abri soit annoncé.
+    // qui n'a rien. Sur le PC, il faut d'abord répondre « oui » à la question
+    // d'entrée — c'est précisément ce que la porte veut dire.
     ctx.choisir(porteuse);
+
+    if ("permis_construire" === P.type) {
+      check(`${P.nom} · « ${porteuse} » n'affiche rien avant la réponse`,
+        0 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
+      ctx.repondre("piscine_prevue", "oui");
+    }
+
     check(`${P.nom} · « ${porteuse} » les affiche`,
       5 === ctx.visibles().filter((c) => BASSIN.includes(c)).length);
 
@@ -426,9 +523,12 @@ titre("Le masquage est aussi visuel");
    * `[hidden]`, si bien qu'une piscine affichait encore six champs de surface
    * de plancher, grisés mais présents.
    *
-   * Le contrôle porte sur la feuille de style plutôt que sur un rendu calculé :
-   * jsdom n'applique pas la cascade des feuilles de l'agent utilisateur, donc
-   * un `getComputedStyle` y serait rassurant à tort. */
+   * On mesure donc le **style calculé**, pas l'attribut. jsdom applique la
+   * cascade des feuilles d'auteur et honore `!important` : sans le correctif,
+   * ce même contrôle rend `flex` — il n'est pas décoratif.
+   *
+   * Quatre preuves, parce qu'un champ écarté doit disparaître de quatre
+   * façons : de l'écran, du clavier, de l'interaction et de l'envoi. */
   const REGLE = /#dp-app \[hidden\]\s*\{[^}]*display:\s*none\s*!important/;
 
   for (const f of [
@@ -439,8 +539,70 @@ titre("Le masquage est aussi visuel");
   ]) {
     const ou = f.startsWith("frontend/") ? "maquette" : "thème";
 
-    check(`${ou} · ${f.split("/").pop()} · \`hidden\` l'emporte sur l'affichage`,
+    check(`${ou} · ${f.split("/").pop()} · la règle est présente`,
       REGLE.test(readFileSync(resolve(ROOT, f), "utf8")));
+  }
+
+  for (const P of PARCOURS) {
+    const ctx = await monter(P);
+
+    // Une nature qui n'admet ni plancher ni bassin : tout ce qui est
+    // conditionnel doit alors être invisible pour de bon.
+    ctx.choisir("permis_construire" === P.type ? "autre" : "cloture_mur");
+
+    const masques = [...ctx.d.querySelectorAll("[data-champ]")].filter((g) => g.hidden);
+    const rendus = masques.filter((g) => "none" !== ctx.w.getComputedStyle(g).display);
+    const actifs = masques.filter((g) =>
+      [...g.querySelectorAll("input, select, textarea")].some((c) => !c.disabled));
+    const atteignables = masques.filter((g) =>
+      [...g.querySelectorAll("input, select, textarea, button, a[href]")].some(
+        (c) => !c.disabled && -1 !== (c.tabIndex || 0)));
+    const envoyes = ctx.envoyes();
+
+    check(`${P.nom} · ${masques.length} groupes écartés, et il y en a`, masques.length > 0);
+    check(`${P.nom} · leur style calculé est bien « none »`, 0 === rendus.length);
+    check(`${P.nom} · aucun de leurs contrôles n'est actif`, 0 === actifs.length);
+    check(`${P.nom} · aucun n'est atteignable au clavier`, 0 === atteignables.length);
+    check(`${P.nom} · aucun ne part dans le FormData`, 0 === envoyes.length);
+
+    ctx.dom.window.close();
+  }
+}
+
+titre("Cibles tactiles à 44 px");
+
+{
+  /* Le seuil est une exigence produit, pas une préférence : 40 px se rate au
+   * doigt. Le contrôle lit la feuille de style — jsdom ne met pas en page, il
+   * ne peut donc pas mesurer une hauteur rendue — et exige que chaque famille
+   * de contrôle nommée porte le seuil. */
+  const CIBLES = [
+    ".dp-seg label",
+    ".dp-check",
+    ".dp-locate",
+    ".dp-map-toggle",
+    ".dp-parcel-ok",
+    ".dp-cadastre-inconnu",
+    ".dp-attest label[for]",
+    ".dp-file-btn",
+    ".dp-travail-ajouter",
+    ".dp-travail-suppr",
+    "button.dp-btn",
+  ];
+
+  for (const f of [
+    "wordpress/urbizen-child/assets/forms/dp-formulaire.html",
+    "wordpress/urbizen-child/assets/forms/pc-formulaire.html",
+    "frontend/formulaires/dp-formulaire.html",
+    "frontend/formulaires/pc-formulaire.html",
+  ]) {
+    const css = readFileSync(resolve(ROOT, f), "utf8");
+    const ou = f.startsWith("frontend/") ? "maquette" : "thème";
+    const bloc = css.match(/#dp-app \.dp-seg label,[\s\S]*?min-height:\s*44px;\s*\}/);
+    const manquantes = CIBLES.filter((s) => !bloc || !bloc[0].includes(`#dp-app ${s},`) && !bloc[0].includes(`#dp-app ${s} {`) && !bloc[0].includes(`#dp-app ${s}\n`));
+
+    check(`${ou} · ${f.split("/").pop()} · les ${CIBLES.length} familles portent 44 px`,
+      !!bloc && 0 === manquantes.length);
   }
 }
 

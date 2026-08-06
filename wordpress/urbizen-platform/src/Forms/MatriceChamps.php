@@ -59,6 +59,10 @@ final class MatriceChamps {
 		'surface_taxable',
 		'nb_logements',
 		'nb_stationnement',
+		// Une maison neuve peut comporter un bassin, ou non. La question précède
+		// les mesures : sans elle, on demanderait ses dimensions de piscine à
+		// tout constructeur de maison.
+		'piscine_prevue',
 		// Précisions propres à la piscine. Elles suivent la même règle que les
 		// surfaces : conditionnées par la nature, écartées sinon.
 		'longueur_bassin_m',
@@ -75,6 +79,11 @@ final class MatriceChamps {
 	 * Nommées une fois : la DP les attache à sa nature « piscine », le PC à sa
 	 * maison individuelle — un projet neuf comporte souvent un bassin. Les
 	 * recopier aux deux endroits aurait suffi à les faire diverger.
+	 *
+	 * La différence entre les deux natures n'est pas la liste, c'est la porte
+	 * d'entrée. Une DP « piscine » **est** une piscine : les mesures se posent
+	 * d'emblée. Une maison individuelle peut en comporter une : `piscine_prevue`
+	 * ouvre le bloc, et rien ne se demande tant qu'on n'a pas répondu.
 	 *
 	 * @var array<int, string>
 	 */
@@ -127,7 +136,7 @@ final class MatriceChamps {
 		// L'ordre suit celui du catalogue — donc celui des cartes du formulaire.
 		// Un banc l'exige : deux listes qui décrivent la même chose et divergent
 		// finissent par se contredire.
-		'maison_individuelle'    => array( 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_logements', 'nb_stationnement', ...self::BASSIN ),
+		'maison_individuelle'    => array( 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_logements', 'nb_stationnement', 'piscine_prevue', ...self::BASSIN ),
 		'extension'              => array( 'sp_existante', 'sp_creee', 'sp_totale', 'emprise_avant', 'emprise_creee', 'surface_taxable' ),
 		'annexe_garage'          => array( 'sp_creee', 'emprise_avant', 'emprise_creee', 'surface_taxable', 'nb_stationnement' ),
 		'surelevation'           => array( 'sp_existante', 'sp_creee', 'sp_totale', 'surface_taxable', 'nb_logements' ),
@@ -218,12 +227,12 @@ final class MatriceChamps {
 			return $clean;
 		}
 
-		// D'abord les sous-champs : leur pertinence dépend d'une autre réponse,
-		// pas de la nature. Les traiter avant évite qu'un champ conservé par la
-		// matrice survive à un pilote qui ne le justifie plus.
-		$clean = self::filtrer_sous_champs( $clean, $ecarts );
-
 		$nature = isset( $clean['nature'] ) && is_string( $clean['nature'] ) ? $clean['nature'] : '';
+
+		// D'abord les sous-champs : leur pertinence dépend d'une autre réponse
+		// autant que de la nature. Les traiter avant évite qu'un champ conservé
+		// par la matrice survive à un pilote qui ne le justifie plus.
+		$clean = self::filtrer_sous_champs( $type, $nature, $clean, $ecarts );
 
 		foreach ( self::CONDITIONNELS as $champ ) {
 			if ( ! array_key_exists( $champ, $clean ) ) {
@@ -262,26 +271,49 @@ final class MatriceChamps {
 	 * objet qui n'existe pas. C'est le cas typique du reliquat — la personne a
 	 * répondu « oui », mesuré, puis changé d'avis.
 	 *
+	 * **Un pilote que la nature ne pose pas ne gouverne rien.** `piscine_prevue`
+	 * n'existe que pour la maison individuelle ; l'exiger d'une DP « piscine »
+	 * effacerait les mesures d'un projet qui est une piscine. La règle est donc
+	 * inerte quand son pilote n'est pas applicable, plutôt que d'être recopiée
+	 * une fois par nature.
+	 *
+	 * **L'ordre compte** : les règles s'appliquent en cascade, chacune lisant
+	 * une charge déjà nettoyée par les précédentes. `presence_abri_piscine`
+	 * disparaît avec la piscine, et `hauteur_abri_m` disparaît avec l'abri.
+	 *
 	 * @var array<string, array<int, string>>
 	 */
 	private const SOUS_CHAMPS = array(
-		'hauteur_abri_m' => array( 'presence_abri_piscine', 'oui' ),
+		'longueur_bassin_m'     => array( 'piscine_prevue', 'oui' ),
+		'largeur_bassin_m'      => array( 'piscine_prevue', 'oui' ),
+		'surface_bassin_m2'     => array( 'piscine_prevue', 'oui' ),
+		'profondeur_bassin_m'   => array( 'piscine_prevue', 'oui' ),
+		'presence_abri_piscine' => array( 'piscine_prevue', 'oui' ),
+		'hauteur_abri_m'        => array( 'presence_abri_piscine', 'oui' ),
 	);
 
 	/**
 	 * Retire les sous-champs que leur pilote ne justifie pas.
 	 *
+	 * @param string               $type   Type de formulaire.
+	 * @param string               $nature Nature du projet principal.
 	 * @param array<string, mixed> $clean  Réponses nettoyées.
 	 * @param array<int, string>   $ecarts Noms écartés, modifiés sur place.
 	 * @return array<string, mixed>
 	 */
-	private static function filtrer_sous_champs( array $clean, array &$ecarts ): array {
+	private static function filtrer_sous_champs( string $type, string $nature, array $clean, array &$ecarts ): array {
 		foreach ( self::SOUS_CHAMPS as $champ => $regle ) {
 			if ( ! array_key_exists( $champ, $clean ) ) {
 				continue;
 			}
 
 			list( $pilote, $attendue ) = $regle;
+
+			// Pilote non posé pour cette nature : la question n'existe pas, donc
+			// elle ne conditionne rien.
+			if ( ! self::applicable( $type, $nature, $pilote ) ) {
+				continue;
+			}
 
 			$valeur = isset( $clean[ $pilote ] ) ? $clean[ $pilote ] : null;
 

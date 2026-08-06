@@ -41,6 +41,7 @@ final class PrecisionsProjet {
 	 * @var array<string, array{0:string,1:string}>
 	 */
 	private const LIBELLES = array(
+		'piscine_prevue'        => array( 'Piscine prévue', '' ),
 		'longueur_bassin_m'     => array( 'Longueur du bassin', 'm' ),
 		'largeur_bassin_m'      => array( 'Largeur du bassin', 'm' ),
 		'surface_bassin_m2'     => array( 'Surface du bassin', 'm²' ),
@@ -66,6 +67,11 @@ final class PrecisionsProjet {
 	 * @var array<string, array<string, string>>
 	 */
 	private const CHOIX = array(
+		'piscine_prevue'        => array(
+			'oui'     => 'Oui',
+			'non'     => 'Non',
+			'inconnu' => 'Je ne sais pas',
+		),
 		'presence_abri_piscine' => array(
 			'oui'     => 'Oui',
 			'non'     => 'Non',
@@ -77,6 +83,35 @@ final class PrecisionsProjet {
 	 * Intitulé de la rubrique, partout le même.
 	 */
 	public const RUBRIQUE = 'Précisions sur le projet';
+
+	/**
+	 * Champs dont cette classe assume l'affichage.
+	 *
+	 * Les rendus génériques — le tableau exhaustif d'une notification, un écran
+	 * d'administration — s'en servent pour **ne pas** les rendre une seconde
+	 * fois. Sans cela, un dossier annonçait deux fois les mêmes mesures : une
+	 * fois en forme canonique (`8.5`) sous un libellé de formulaire, une fois en
+	 * français (`8,5 m`) sous son libellé client. Deux écritures d'un même
+	 * nombre dans un même message, c'est une occasion de douter des deux.
+	 *
+	 * La liste se déduit du catalogue plutôt que d'être recopiée : ajouter une
+	 * précision ici suffit à la retirer de partout ailleurs.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function champs(): array {
+		return array_keys( self::LIBELLES );
+	}
+
+	/**
+	 * Ce champ dispose-t-il déjà d'un rendu métier dédié ?
+	 *
+	 * @param string $champ Nom canonique.
+	 * @return bool
+	 */
+	public static function porte( string $champ ): bool {
+		return isset( self::LIBELLES[ $champ ] );
+	}
 
 	/**
 	 * Lignes à afficher : libellé → valeur écrite en français.
@@ -163,6 +198,18 @@ final class PrecisionsProjet {
 		}
 
 		if ( array() === $morceaux ) {
+			// Rien à décrire, mais la question a pu être posée. Le dire en une
+			// clause vaut mieux que de laisser croire qu'on n'a pas écouté.
+			$prevue = isset( $charge['piscine_prevue'] ) ? (string) $charge['piscine_prevue'] : '';
+
+			if ( 'non' === $prevue ) {
+				return 'Aucune piscine prévue.';
+			}
+
+			if ( 'inconnu' === $prevue ) {
+				return 'Piscine encore à confirmer.';
+			}
+
 			return '';
 		}
 

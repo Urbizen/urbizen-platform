@@ -65,6 +65,13 @@ if ( ! function_exists( 'is_email' ) ) {
 $racine = dirname( __DIR__, 2 );
 $src    = $racine . '/wordpress/urbizen-platform/src';
 
+// Le registre charge les définitions depuis le greffon. Le banc n'en démarre
+// pas, mais il rend le chemin disponible : sans lui, le rendu du courriel
+// n'aurait pas de libellés et le contrôle du doublon serait sans objet.
+if ( ! defined( 'URBIZEN_PLATFORM_DIR' ) ) {
+	define( 'URBIZEN_PLATFORM_DIR', $racine . '/wordpress/urbizen-platform/' );
+}
+
 spl_autoload_register(
 	static function ( $classe ) use ( $src ) {
 		$fichier = $src . '/' . str_replace( '\\', '/', str_replace( 'Urbizen\\Platform\\', '', $classe ) ) . '.php';
@@ -340,6 +347,144 @@ verifier( 'rien de précisé, rien de résumé', '' === PrecisionsProjet::resume
 $hostile = PrecisionsProjet::lignes( array( 'presence_abri_piscine' => '<script>alert(1)</script>' ) );
 
 verifier( 'une valeur hors liste ne produit aucune ligne', array() === $hostile );
+
+echo "\n── 8. Permis de construire : la piscine passe par une question\n";
+
+/* Une maison individuelle peut comporter un bassin — mais on le demande avant
+ * de le mesurer. Ce qui compte ici n'est pas l'affichage : c'est qu'une charge
+ * forgée, postée sans navigateur, ne puisse pas faire entrer des dimensions
+ * que personne n'a annoncées. */
+$brut_pc = require $src . '/Forms/definitions/permis_construire.php';
+$def_pc  = new FormDefinition( $brut_pc['type'], $brut_pc['title'], $brut_pc['submit_label'], $brut_pc['fields'], $brut_pc['steps'] );
+
+verifier( '« piscine_prevue » est déclaré côté PC', null !== $def_pc->field( 'piscine_prevue' ) );
+verifier( 'et pas côté DP', null === $def->field( 'piscine_prevue' ) );
+
+/**
+ * Soumission de maison individuelle, traitée comme le contrôleur.
+ *
+ * @param FormDefinition       $def_pc Définition PC.
+ * @param array<string, mixed> $extra  Champs ajoutés.
+ * @return array{clean:array<string,mixed>,ecarts:array<int,string>}
+ */
+function maison( FormDefinition $def_pc, array $extra = array() ): array {
+	$post = array_merge(
+		array(
+			'declarant_type'    => 'particulier',
+			'nom'               => 'Fictif',
+			'prenom'            => 'Camille',
+			'qualite'           => 'proprietaire',
+			'email'             => 'camille@exemple.test',
+			'telephone'         => '0600000000',
+			'adresse_declarant' => '1 rue Imaginaire',
+			'cp_declarant'      => '33000',
+			'ville_declarant'   => 'Bordeaux',
+			'terrain_adresse'   => '1 rue Imaginaire',
+			'terrain_cp'        => '33000',
+			'terrain_ville'     => 'Bordeaux',
+			'dossier_type'      => 'pcmi',
+			'nature'            => 'maison_individuelle',
+			'description'       => 'Maison neuve.',
+			'abf'               => 'non',
+			'demolition'        => 'non',
+			'attest_exact'      => '1',
+			'attest_rgpd'       => '1',
+		),
+		$extra
+	);
+
+	$v      = Validator::validate( $def_pc, $post );
+	$ecarts = array();
+	$clean  = MatriceChamps::filtrer( 'permis_construire', $v['clean'], $ecarts );
+
+	return array( 'clean' => $clean, 'ecarts' => $ecarts );
+}
+
+$mesures = array(
+	'longueur_bassin_m'     => '8,5',
+	'largeur_bassin_m'      => '4',
+	'surface_bassin_m2'     => '34',
+	'profondeur_bassin_m'   => '1,5',
+	'presence_abri_piscine' => 'oui',
+	'hauteur_abri_m'        => '1,8',
+);
+
+$avec = maison( $def_pc, array_merge( array( 'piscine_prevue' => 'oui' ), $mesures ) );
+
+verifier( 'PC · annoncée, la longueur est conservée', '8.5' === $avec['clean']['longueur_bassin_m'] );
+verifier( 'PC · annoncée, la hauteur d’abri aussi', '1.8' === $avec['clean']['hauteur_abri_m'] );
+
+// Le cas qui compte : la personne a mesuré, puis a répondu « non ». Le
+// navigateur n'enverrait rien, mais le serveur ne se repose pas là-dessus.
+foreach ( array( 'non', 'inconnu' ) as $reponse ) {
+	$sans = maison( $def_pc, array_merge( array( 'piscine_prevue' => $reponse ), $mesures ) );
+
+	foreach ( array_keys( $mesures ) as $champ ) {
+		verifier( sprintf( 'PC · « %s » écarte %s', $reponse, $champ ), ! array_key_exists( $champ, $sans['clean'] ) );
+	}
+
+	verifier( sprintf( 'PC · « %s » conserve la réponse', $reponse ), $reponse === $sans['clean']['piscine_prevue'] );
+}
+
+// Sans aucune réponse, les mesures n'entrent pas davantage : une absence n'est
+// pas un « oui » qu'on aurait oublié de dire.
+$muet = maison( $def_pc, $mesures );
+
+verifier( 'PC · sans réponse, aucune mesure n’entre',
+	array() === array_intersect( array_keys( $mesures ), array_keys( $muet['clean'] ) ) );
+
+$lignes_pc = PrecisionsProjet::lignes( maison( $def_pc, array( 'piscine_prevue' => 'non' ) )['clean'] );
+
+verifier( 'PC · « non » se dit sobrement', 'Non' === ( $lignes_pc['Piscine prévue'] ?? '' ) );
+verifier( 'PC · et le résumé client le dit en une phrase',
+	'Aucune piscine prévue.' === PrecisionsProjet::resume( maison( $def_pc, array( 'piscine_prevue' => 'non' ) )['clean'] ) );
+
+echo "\n── 9. Aucun doublon dans les rendus\n";
+
+/* Les mesures apparaissaient deux fois dans la notification interne : une fois
+ * en forme canonique sous le libellé du formulaire, une fois en français sous
+ * son libellé client. Deux écritures d'un même nombre dans un même message,
+ * c'est une occasion de douter des deux.
+ *
+ * L'exclusion est déclarative : le catalogue de présentation dit ce qu'il
+ * porte, et le rendu générique s'abstient. Aucune liste de piscine n'est
+ * recopiée dans le renderer. */
+foreach ( array_keys( $mesures ) as $champ ) {
+	verifier( sprintf( 'le catalogue assume « %s »', $champ ), PrecisionsProjet::porte( $champ ) );
+}
+
+verifier( 'le catalogue assume « piscine_prevue »', PrecisionsProjet::porte( 'piscine_prevue' ) );
+verifier( 'et n’assume pas « nature »', ! PrecisionsProjet::porte( 'nature' ) );
+verifier( 'ni « description »', ! PrecisionsProjet::porte( 'description' ) );
+
+$corps = \Urbizen\Platform\Mail\MailRenderer::body(
+	array(
+		'id'             => 1,
+		'reference'      => 'URB-2026-0000',
+		'created_at_gmt' => '2026-08-06 00:00:00',
+		'form_type'      => 'declaration_prealable',
+		'consent_at_gmt' => '2026-08-06 00:00:00',
+		'payload'        => $r['clean'],
+		'pricing'        => array( 'base' => 249, 'total' => 249 ),
+		'files'          => array(),
+	),
+	0
+);
+
+verifier( 'la rubrique dédiée est présente', str_contains( $corps, PrecisionsProjet::RUBRIQUE ) );
+verifier( 'la longueur s’y lit une seule fois, en français', 1 === substr_count( $corps, '8,5 m' ) );
+verifier( 'et jamais en forme canonique', ! str_contains( $corps, '>8.5<' ) );
+verifier( 'la surface ne paraît qu’une fois', 1 === substr_count( $corps, '34 m²' ) );
+verifier( 'la profondeur ne paraît qu’une fois', 1 === substr_count( $corps, '1,5 m' ) );
+verifier( 'aucun libellé de formulaire ne double la rubrique',
+	! str_contains( $corps, 'Longueur approximative du bassin' ) );
+verifier( 'aucun identifiant technique ne sort',
+	! str_contains( $corps, 'longueur_bassin_m' ) && ! str_contains( $corps, 'presence_abri_piscine' ) );
+
+// Les autres réponses, elles, restent : l'exclusion vise le doublon, pas le
+// tableau. Un champ qui disparaîtrait des deux endroits serait une perte.
+verifier( 'le tableau générique conserve le reste', str_contains( $corps, 'Bassin enterré.' ) );
+verifier( 'et son libellé', str_contains( $corps, 'Description du projet' ) );
 
 printf( "\n%s\n", 0 === $echecs ? 'TOUS LES CONTROLES PASSENT' : sprintf( '%d CONTROLE(S) EN ECHEC', $echecs ) );
 

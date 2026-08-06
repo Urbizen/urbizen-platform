@@ -96,7 +96,7 @@
 
       if (actif) visibles++;
 
-      Array.prototype.forEach.call(groupe.querySelectorAll("input, select, textarea"), function (controle) {
+      Array.prototype.forEach.call(groupe.querySelectorAll("input, select, textarea, button"), function (controle) {
         // Désactivé = absent du FormData. C'est ce qui empêche une surface
         // saisie pour une extension de partir avec une piscine.
         controle.disabled = !actif;
@@ -134,28 +134,51 @@
   /**
    * Sous-champs qui ne dépendent pas de la nature mais d'une autre réponse.
    *
-   * La hauteur d'un abri n'a de sens que si un abri est annoncé. Le marqueur
+   * La hauteur d'un abri n'a de sens que si un abri est annoncé, et l'abri
+   * lui-même n'a de sens que si une piscine est prévue. Le marqueur
    * `data-visible-si="champ=valeur"` porte la condition dans le document, là où
    * elle se lit en même temps que le champ qu'elle gouverne.
+   *
+   * Deux règles font tenir l'enchaînement :
+   *
+   * 1. **La matrice commande en premier.** Un champ que la nature n'admet pas
+   *    ne peut être ramené par aucune réponse.
+   * 2. **Un pilote désactivé ne gouverne rien.** Un contrôle désactivé est un
+   *    contrôle qu'on ne pose pas ; sa valeur résiduelle ne doit pas ouvrir le
+   *    champ qu'il gouverne. C'est ce qui propage la fermeture le long de la
+   *    chaîne, sans que le document ait à déclarer des conditions composées.
+   *
+   * La boucle se répète jusqu'à stabilité pour ne pas dépendre de l'ordre du
+   * document : une chaîne écrite à l'envers doit converger, pas se tromper.
    */
   Champs.prototype._sousChamps = function () {
+    var module = this;
     var form = this.form;
+    var groupes = form.querySelectorAll("[data-visible-si]");
 
-    Array.prototype.forEach.call(form.querySelectorAll("[data-visible-si]"), function (groupe) {
-      var regle = (groupe.getAttribute("data-visible-si") || "").split("=");
-      var pilote = form.querySelector('[name="' + regle[0] + '"]:checked');
-      var actif = pilote && pilote.value === regle[1];
+    for (var passe = 0; passe < groupes.length + 1; passe++) {
+      var change = false;
 
-      // Le parent commande : un sous-champ d'un groupe masqué le reste.
-      if (groupe.hidden && !groupe.hasAttribute("data-sous-champ-masque")) return;
+      Array.prototype.forEach.call(groupes, function (groupe) {
+        var regle = (groupe.getAttribute("data-visible-si") || "").split("=");
+        var champ = groupe.getAttribute("data-champ");
+        var pilote = form.querySelector('[name="' + regle[0] + '"]:checked');
 
-      groupe.hidden = !actif;
-      groupe.setAttribute("data-sous-champ-masque", "1");
+        var actif =
+          (!champ || module.applicable(champ)) && !!pilote && !pilote.disabled && pilote.value === regle[1];
 
-      Array.prototype.forEach.call(groupe.querySelectorAll("input, select, textarea"), function (c) {
-        c.disabled = !actif;
+        if (groupe.hidden === !actif) return;
+
+        change = true;
+        groupe.hidden = !actif;
+
+        Array.prototype.forEach.call(groupe.querySelectorAll("input, select, textarea, button"), function (c) {
+          c.disabled = !actif;
+        });
       });
-    });
+
+      if (!change) break;
+    }
   };
 
   /**
@@ -262,9 +285,14 @@
     // Les pilotes de sous-champs sont déduits des règles portées par le
     // document : le module n'a pas à connaître leurs noms. Nommer ici un champ
     // précis reviendrait à recopier une donnée métier dans du code générique.
-    Array.prototype.forEach.call(this.form.querySelectorAll("[data-visible-si]"), function (groupe) {
-      var pilote = (groupe.getAttribute("data-visible-si") || "").split("=")[0];
+    // Un même pilote gouvernant plusieurs champs, on ne l'écoute qu'une fois.
+    var pilotes = {};
 
+    Array.prototype.forEach.call(this.form.querySelectorAll("[data-visible-si]"), function (groupe) {
+      pilotes[(groupe.getAttribute("data-visible-si") || "").split("=")[0]] = true;
+    });
+
+    Object.keys(pilotes).forEach(function (pilote) {
       Array.prototype.forEach.call(module.form.querySelectorAll('[name="' + pilote + '"]'), function (entree) {
         entree.addEventListener("change", function () {
           module._sousChamps();

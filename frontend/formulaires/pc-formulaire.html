@@ -341,6 +341,37 @@
      toujours à l'écran. Un formulaire qui montre ce qu'il n'attend pas se lit
      comme un formulaire en panne. */
   #dp-app [hidden] { display: none !important; }
+
+  /* -- Cibles tactiles --
+     44 px, pas 40 : c'est la largeur d'un doigt adulte, et c'est le seuil
+     retenu partout dans le parcours. La zone utile compte, pas le dessin —
+     une case à cocher de 16 px reste une case de 16 px, mais la ligne
+     entière la commande.
+     Les règles sont groupées ici plutôt que dispersées dans chaque
+     composant : c'est une exigence transverse, et un banc doit pouvoir la
+     lire d'un seul endroit. */
+  #dp-app .dp-seg label,
+  #dp-app .dp-check,
+  #dp-app .dp-locate,
+  #dp-app .dp-map-toggle,
+  #dp-app .dp-parcel-ok,
+  #dp-app .dp-cadastre-inconnu,
+  #dp-app .dp-attest label[for],
+  #dp-app .dp-file-btn,
+  #dp-app .dp-travail-ajouter,
+  #dp-app .dp-travail-suppr,
+  #dp-app button.dp-btn { min-height: 44px; }
+  #dp-app .dp-file-btn { display: inline-flex; align-items: center; justify-content: center; }
+  #dp-app .dp-seg label { display: flex; align-items: center; justify-content: center; }
+  #dp-app .dp-locate,
+  #dp-app .dp-map-toggle,
+  #dp-app .dp-parcel-ok { display: inline-flex; align-items: center; gap: 8px; }
+  #dp-app .dp-cadastre-inconnu { display: flex; align-items: center; gap: 9px; }
+  /* Le libellé d'une attestation couvre toute sa ligne, case comprise :
+     viser 16 px de côté au doigt est une invitation à se tromper. */
+  #dp-app .dp-attest { position: relative; }
+  #dp-app .dp-attest label[for] { display: flex; align-items: center; }
+  #dp-app .dp-attest label[for]::before { content: ""; position: absolute; inset: 0; }
   #dp-app .dp-map-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   #dp-app .dp-map-hint { font-size: 12.5px; color: var(--ink-soft); }
   #dp-app .dp-map-toggle {
@@ -533,17 +564,22 @@
             <p class="dp-step-hint">Servent au calcul de la taxe d’aménagement. Laissez 0 si non concerné.</p>
             <div class="dp-grid">
               <div class="dp-field" data-champ="surface_taxable"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field" data-champ="longueur_bassin_m"><label for="b_lon">Longueur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lon" name="longueur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="longueur_bassin_m" role="alert" hidden></p></div>
-              <div class="dp-field" data-champ="largeur_bassin_m"><label for="b_lar">Largeur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lar" name="largeur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="largeur_bassin_m" role="alert" hidden></p></div>
-              <div class="dp-field" data-champ="profondeur_bassin_m"><label for="b_pro">Profondeur approximative</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_pro" name="profondeur_bassin_m" class="measure" data-min="0" data-max="20" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="profondeur_bassin_m" role="alert" hidden></p></div>
-              <div class="dp-field col-2" data-champ="presence_abri_piscine"><label>Abri de piscine</label><div class="dp-seg" role="radiogroup" aria-label="Abri de piscine">
+              <div class="dp-field" data-champ="nb_stationnement"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
+              <div class="dp-field col-2" data-champ="piscine_prevue"><label>Une piscine est-elle prévue dans le projet&nbsp;?</label><div class="dp-seg" role="radiogroup" aria-label="Une piscine est-elle prévue dans le projet ?">
+                  <input type="radio" id="pp_o" name="piscine_prevue" value="oui"><label for="pp_o">Oui</label>
+                  <input type="radio" id="pp_n" name="piscine_prevue" value="non"><label for="pp_n">Non</label>
+                  <input type="radio" id="pp_i" name="piscine_prevue" value="inconnu"><label for="pp_i">Je ne sais pas</label>
+                </div></div>
+              <div class="dp-field" data-champ="longueur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_lon">Longueur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lon" name="longueur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="longueur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="largeur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_lar">Largeur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lar" name="largeur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="largeur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="surface_bassin_m2" data-visible-si="piscine_prevue=oui"><label for="b_sur">Surface approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_sur" name="surface_bassin_m2" class="measure" data-min="0" data-max="5000" data-step="0.01" data-bassin-surface data-bassin-longueur="longueur_bassin_m" data-bassin-largeur="largeur_bassin_m" data-mesure><span class="unit">m²</span></div><p class="dp-hint" data-bassin-note hidden></p><button type="button" class="dp-btn dp-btn-lien" data-bassin-recalculer hidden>Recalculer à partir de la longueur et de la largeur</button><p class="dp-err" data-erreur-pour="surface_bassin_m2" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="profondeur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_pro">Profondeur approximative</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_pro" name="profondeur_bassin_m" class="measure" data-min="0" data-max="20" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="profondeur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field col-2" data-champ="presence_abri_piscine" data-visible-si="piscine_prevue=oui"><label>Abri de piscine</label><div class="dp-seg" role="radiogroup" aria-label="Abri de piscine">
                   <input type="radio" id="ab_o" name="presence_abri_piscine" value="oui"><label for="ab_o">Oui</label>
                   <input type="radio" id="ab_n" name="presence_abri_piscine" value="non"><label for="ab_n">Non</label>
                   <input type="radio" id="ab_i" name="presence_abri_piscine" value="inconnu"><label for="ab_i">Je ne sais pas</label>
                 </div></div>
               <div class="dp-field" data-champ="hauteur_abri_m" data-visible-si="presence_abri_piscine=oui"><label for="b_hab">Hauteur approximative de l’abri</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_hab" name="hauteur_abri_m" class="measure" data-min="0" data-max="20" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="hauteur_abri_m" role="alert" hidden></p></div>
-              <div class="dp-field" data-champ="nb_stationnement"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
-              <div class="dp-field" data-champ="surface_bassin_m2"><label for="x_pis">Surface approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="x_pis" name="surface_bassin_m2" class="measure" data-min="0" data-step="0.01" value="0" data-mesure><span class="unit">m²</span></div><p class="dp-err" data-erreur-pour="surface_bassin_m2" role="alert" hidden></p></div>
               <div class="dp-field col-2" style="margin-top:6px">
                 <label>Le terrain est-il en secteur protégé (ABF)&nbsp;?</label>
                 <div class="dp-seg" role="radiogroup">

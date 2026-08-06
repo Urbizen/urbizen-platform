@@ -284,12 +284,67 @@ verifier( 'PC · « Autre » écarte la surface', ! array_key_exists( 'sp_creee'
 verifier( 'PC · « Autre » écarte le nombre de logements', ! array_key_exists( 'nb_logements', $pc ) );
 verifier( 'PC · la description survit', 'Bâtiment mixte' === $pc['description'] );
 
+/* Une maison neuve peut comporter un bassin — à condition qu'on l'ait dit.
+ * `piscine_prevue` est la porte : sans un « oui », les mesures décrivent un
+ * ouvrage que personne n'a annoncé, et une charge forgée ne doit pas pouvoir
+ * les faire entrer par la fenêtre. */
 $maison = MatriceChamps::filtrer(
 	'permis_construire',
-	array( 'nature' => 'maison_individuelle', 'sp_creee' => 110.0, 'nb_logements' => 1, 'surface_bassin_m2' => 24.0 )
+	array( 'nature' => 'maison_individuelle', 'sp_creee' => 110.0, 'nb_logements' => 1, 'piscine_prevue' => 'oui', 'surface_bassin_m2' => 24.0 )
 );
 
-verifier( 'PC · une maison neuve garde surface, logements et bassin', 3 === count( $maison ) - 1 );
+verifier( 'PC · une maison neuve garde surface, logements et bassin annoncé', 4 === count( $maison ) - 1 );
+verifier( 'PC · le bassin annoncé survit', 24.0 === $maison['surface_bassin_m2'] );
+
+foreach ( array( 'non', 'inconnu' ) as $reponse ) {
+	$ecarts = array();
+	$sans   = MatriceChamps::filtrer(
+		'permis_construire',
+		array(
+			'nature'                => 'maison_individuelle',
+			'piscine_prevue'        => $reponse,
+			'longueur_bassin_m'     => 8.5,
+			'largeur_bassin_m'      => 4.0,
+			'surface_bassin_m2'     => 34.0,
+			'profondeur_bassin_m'   => 1.5,
+			'presence_abri_piscine' => 'oui',
+			'hauteur_abri_m'        => 1.8,
+		),
+		$ecarts
+	);
+
+	$restants = array_diff( array_keys( $sans ), array( 'nature', 'piscine_prevue' ) );
+
+	verifier( sprintf( 'PC · « %s » écarte toutes les mesures de bassin', $reponse ), array() === $restants );
+	verifier( sprintf( 'PC · « %s » conserve la réponse elle-même', $reponse ), $reponse === $sans['piscine_prevue'] );
+	verifier( sprintf( 'PC · « %s » journalise les six écarts', $reponse ), 6 === count( $ecarts ) );
+}
+
+// L'abri s'efface avec la piscine, et la hauteur avec l'abri : la chaîne se
+// referme d'un bout à l'autre, sans qu'aucune règle ne nomme deux pilotes.
+$chaine = MatriceChamps::filtrer(
+	'permis_construire',
+	array( 'nature' => 'maison_individuelle', 'piscine_prevue' => 'oui', 'presence_abri_piscine' => 'non', 'hauteur_abri_m' => 1.8 )
+);
+
+verifier( 'PC · sans abri, la hauteur tombe', ! array_key_exists( 'hauteur_abri_m', $chaine ) );
+verifier( 'PC · l’abri annoncé « non » se conserve', 'non' === $chaine['presence_abri_piscine'] );
+
+// Et la DP « piscine » ne connaît pas cette porte : l'exiger d'un projet qui
+// EST une piscine effacerait précisément ce qu'il décrit.
+$dp_piscine = MatriceChamps::filtrer(
+	'declaration_prealable',
+	array( 'nature' => 'piscine', 'longueur_bassin_m' => 8.5, 'largeur_bassin_m' => 4.0 )
+);
+
+verifier( 'DP · une piscine garde ses mesures sans question préalable', 8.5 === $dp_piscine['longueur_bassin_m'] && 4.0 === $dp_piscine['largeur_bassin_m'] );
+
+$dp_forge = MatriceChamps::filtrer(
+	'declaration_prealable',
+	array( 'nature' => 'piscine', 'piscine_prevue' => 'oui', 'longueur_bassin_m' => 8.5 )
+);
+
+verifier( 'DP · « piscine_prevue » n’y est pas admis', ! array_key_exists( 'piscine_prevue', $dp_forge ) );
 
 /* ================================================================== *
  *  7. Le filtrage est branché dans le pipeline

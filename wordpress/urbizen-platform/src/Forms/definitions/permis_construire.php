@@ -584,6 +584,31 @@ $definition = array(
 		// pas l'inhabituel. Une piscine de 50 m de long existe ; une de 500 m
 		// non, et une valeur négative jamais.
 
+		// Une maison neuve n'est pas une piscine. La question précède les
+		// mesures, et rien ne se demande tant qu'elle n'a pas de réponse :
+		// afficher six champs de bassin à tout constructeur reviendrait à
+		// supposer un projet qu'il n'a pas décrit. « Je ne sais pas » est une
+		// réponse à part entière — elle se conserve, sans ouvrir les mesures.
+		array(
+			'name'    => 'piscine_prevue',
+			'type'    => 'radio',
+			'step'    => 'surfaces',
+			'label'   => __( 'Une piscine est-elle prévue dans le projet ?', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => 'oui',
+					'label' => __( 'Oui', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'non',
+					'label' => __( 'Non', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'inconnu',
+					'label' => __( 'Je ne sais pas', 'urbizen-platform' ),
+				),
+			),
+		),
 		array(
 			'name'      => 'longueur_bassin_m',
 			'type'      => 'number',
@@ -596,6 +621,13 @@ $definition = array(
 			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
 			// mesure, c'est une case remplie par habitude. Vide reste vide.
 			'strict_positif' => true,
+			// La question « une piscine est-elle prévue ? » ouvre le bloc. Sans
+			// un « oui », la mesure décrit un ouvrage qui n'existe pas : elle
+			// est écartée plutôt que persistée.
+			'visible_if' => array(
+				'field' => 'piscine_prevue',
+				'in'    => array( 'oui' ),
+			),
 		),
 		array(
 			'name'      => 'largeur_bassin_m',
@@ -609,6 +641,13 @@ $definition = array(
 			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
 			// mesure, c'est une case remplie par habitude. Vide reste vide.
 			'strict_positif' => true,
+			// La question « une piscine est-elle prévue ? » ouvre le bloc. Sans
+			// un « oui », la mesure décrit un ouvrage qui n'existe pas : elle
+			// est écartée plutôt que persistée.
+			'visible_if' => array(
+				'field' => 'piscine_prevue',
+				'in'    => array( 'oui' ),
+			),
 		),
 		array(
 			'name'      => 'surface_bassin_m2',
@@ -622,6 +661,13 @@ $definition = array(
 			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
 			// mesure, c'est une case remplie par habitude. Vide reste vide.
 			'strict_positif' => true,
+			// La question « une piscine est-elle prévue ? » ouvre le bloc. Sans
+			// un « oui », la mesure décrit un ouvrage qui n'existe pas : elle
+			// est écartée plutôt que persistée.
+			'visible_if' => array(
+				'field' => 'piscine_prevue',
+				'in'    => array( 'oui' ),
+			),
 		),
 		array(
 			'name'      => 'profondeur_bassin_m',
@@ -635,6 +681,13 @@ $definition = array(
 			// Renseignée, une mesure vaut plus que zéro : « 0 » n'est pas une
 			// mesure, c'est une case remplie par habitude. Vide reste vide.
 			'strict_positif' => true,
+			// La question « une piscine est-elle prévue ? » ouvre le bloc. Sans
+			// un « oui », la mesure décrit un ouvrage qui n'existe pas : elle
+			// est écartée plutôt que persistée.
+			'visible_if' => array(
+				'field' => 'piscine_prevue',
+				'in'    => array( 'oui' ),
+			),
 		),
 		// Trois états, et « je ne sais pas » en est un : au stade de la prise de
 		// contact, ne pas savoir est une réponse légitime, et l'absence de
@@ -657,6 +710,13 @@ $definition = array(
 					'value' => 'inconnu',
 					'label' => __( 'Je ne sais pas', 'urbizen-platform' ),
 				),
+			),
+			// La question « une piscine est-elle prévue ? » ouvre le bloc. Sans
+			// un « oui », la mesure décrit un ouvrage qui n'existe pas : elle
+			// est écartée plutôt que persistée.
+			'visible_if' => array(
+				'field' => 'piscine_prevue',
+				'in'    => array( 'oui' ),
 			),
 		),
 		array(
