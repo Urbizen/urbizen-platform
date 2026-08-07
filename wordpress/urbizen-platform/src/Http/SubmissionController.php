@@ -393,7 +393,50 @@ final class SubmissionController {
 			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] )->with_recovery( $reprise_id );
 		}
 
-		// --- 8 bis · cohérence métier ---
+		// --- 8 bis · les adresses, dans l'ordre où elles se décident ---
+		// L'ordre n'est pas indifférent. Le mode du déclarant tranche AVANT tout
+		// le reste : une charge portant à la fois ses champs automatiques et ses
+		// champs manuels ne doit jamais laisser le mode inactif alimenter la
+		// copie faite plus bas.
+		$ecartes = array();
+
+		$declarant = AdresseTerrain::pour( AdresseTerrain::DECLARANT );
+		$terrain   = AdresseTerrain::pour( AdresseTerrain::TERRAIN );
+
+		$validation['clean'] = $declarant->filtrer( $validation['clean'], $ecartes );
+
+		// L'adresse du déclarant est jugée seule, et son échec s'arrête ici. En
+		// laissant la suite se dérouler, le terrain — pas encore reconstruit —
+		// signalerait les mêmes manques sous d'autres noms : la personne lirait
+		// deux fois la même erreur sans savoir laquelle corriger.
+		//
+		// C'est la définition, et non la charge, qui dit si le parcours pose une
+		// adresse de déclarant : une charge forgée peut retirer le mode, pas
+		// changer ce que le formulaire déclare.
+		$erreurs_adresse = $declarant->verifier(
+			$validation['clean'],
+			null !== $definition->field( $declarant->nom( 'mode' ) )
+		);
+
+		if ( array() !== $erreurs_adresse ) {
+			$reprise    = SubmissionRecovery::from_validation( $type, $definition, $validation['clean'], $erreurs_adresse );
+			$reprise_id = SubmissionRecoveryStore::store( $reprise );
+
+			return $renoncer( SubmissionResult::VALIDATION_FAILED, $erreurs_adresse )->with_recovery( $reprise_id );
+		}
+
+		// Case cochée : le terrain reçu est intégralement écarté, puis
+		// reconstruit depuis le déclarant qui vient d'être validé. Purger
+		// d'abord et recopier ensuite est ce qui garantit qu'aucune valeur
+		// forgée ne se mêle à la copie — le navigateur n'envoie rien qui
+		// survive à cette étape.
+		if ( AdresseTerrain::reportee( $validation['clean'] ) ) {
+			$reporte             = $declarant->exporter( $validation['clean'] );
+			$validation['clean'] = $terrain->purger( $validation['clean'], $ecartes );
+			$validation['clean'] = $terrain->importer( $validation['clean'], $reporte );
+		}
+
+		// --- 8 ter · cohérence métier ---
 		// La définition a jugé chaque champ isolément ; elle ne peut rien dire de
 		// ce qui les lie. Un doublon de projet, un supplément identique au projet
 		// principal ou une liste forgée passeraient la validation de forme, et le
@@ -413,7 +456,7 @@ final class SubmissionController {
 			}
 		}
 
-		// --- 8 ter · champs que la nature ne justifie pas ---
+		// --- 8 quater · champs que la nature ne justifie pas ---
 		// La définition a jugé chaque champ, la cohérence métier les a jugés
 		// ensemble ; reste ce qu'aucune des deux ne voit — un champ parfaitement
 		// valide mais sans objet pour ce projet. Une surface de plancher sur une
@@ -424,17 +467,16 @@ final class SubmissionController {
 		// nature changée en cours de saisie, et faire échouer la demande pour
 		// cela serait disproportionné. Le masquage côté navigateur reste une
 		// politesse ; ce filtrage-ci est la règle.
-		$ecartes = array();
-
 		$validation['clean'] = MatriceChamps::filtrer( $type, $validation['clean'], $ecartes );
 
-		// --- 8 quater · l'adresse du mode inactif ---
-		// Une demande ne porte qu'une adresse. Le navigateur désactive les
-		// contrôles du mode abandonné, donc ils ne partent pas ; mais une charge
-		// forgée les enverrait tous, et deux adresses contradictoires
+		// --- 8 quinquies · l'adresse du mode inactif ---
+		// Une demande ne porte qu'une adresse par rôle. Le navigateur désactive
+		// les contrôles du mode abandonné, donc ils ne partent pas ; mais une
+		// charge forgée les enverrait tous, et deux adresses contradictoires
 		// arriveraient dans le même dossier. Le mode retenu tranche, ici, avant
-		// toute persistance.
-		$validation['clean'] = AdresseTerrain::filtrer( $validation['clean'], $ecartes );
+		// toute persistance. Le déclarant a déjà été filtré plus haut, avant de
+		// servir de source à la recopie.
+		$validation['clean'] = $terrain->filtrer( $validation['clean'], $ecartes );
 
 		if ( array() !== $ecartes ) {
 			Logger::info(

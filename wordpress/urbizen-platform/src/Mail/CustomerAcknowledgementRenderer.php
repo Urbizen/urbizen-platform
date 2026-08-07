@@ -273,25 +273,48 @@ final class CustomerAcknowledgementRenderer {
 	 * @return string
 	 */
 	/**
-	 * L'adresse du terrain, telle qu'elle se lit.
+	 * Les adresses, telles qu'elles se lisent.
 	 *
 	 * Rien d'autre : ni le mode de saisie, ni le code commune, ni les
-	 * coordonnées. Le demandeur connaît son terrain — ce qu'il vérifie ici,
-	 * c'est qu'Urbizen l'a bien noté, pas ce qu'Urbizen en a déduit.
+	 * coordonnées, ni le nom d'un champ. Le demandeur connaît ses adresses — ce
+	 * qu'il vérifie ici, c'est qu'Urbizen les a bien notées, pas ce qu'Urbizen
+	 * en a déduit.
+	 *
+	 * **Quand les deux adresses n'en font qu'une, elle n'est écrite qu'une
+	 * fois**, sous un titre qui le dit. La répéter à l'identique sous deux
+	 * titres ferait relire deux fois la même chose pour rien, et laisserait
+	 * craindre une saisie en double.
 	 *
 	 * @param array<string, mixed> $charge Charge persistée.
 	 * @return string Chaîne vide s'il n'y a pas d'adresse.
 	 */
 	private static function adresse( array $charge ): string {
-		$lignes = AdresseTerrain::lignes_adresse( $charge );
+		$declarant = AdresseTerrain::pour( AdresseTerrain::DECLARANT );
+		$terrain   = AdresseTerrain::pour( AdresseTerrain::TERRAIN );
 
-		if ( array() === $lignes ) {
+		$blocs = array();
+
+		// Une seule adresse pour les deux : un seul bloc, un titre qui l'assume.
+		if ( AdresseTerrain::reportee( $charge ) && $declarant->existe( $charge ) ) {
+			$blocs[] = array( 'Adresse du déclarant et du terrain', $declarant->lignes_adresse( $charge ) );
+		} else {
+			foreach ( array( $declarant, $terrain ) as $adresse ) {
+				if ( $adresse->existe( $charge ) ) {
+					$blocs[] = array( $adresse->rubrique(), $adresse->lignes_adresse( $charge ) );
+				}
+			}
+		}
+
+		if ( array() === $blocs ) {
 			return '';
 		}
 
-		$html   = array();
-		$html[] = '<p style="margin:0 0 8px"><strong>Adresse du terrain</strong></p>';
-		$html[] = '<p style="margin:0 0 16px">' . implode( '<br>', array_map( 'esc_html', $lignes ) ) . '</p>';
+		$html = array();
+
+		foreach ( $blocs as list( $titre, $lignes ) ) {
+			$html[] = '<p style="margin:0 0 8px"><strong>' . esc_html( $titre ) . '</strong></p>';
+			$html[] = '<p style="margin:0 0 16px">' . implode( '<br>', array_map( 'esc_html', $lignes ) ) . '</p>';
+		}
 
 		return implode( "\n", $html );
 	}

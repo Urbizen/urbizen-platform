@@ -165,14 +165,26 @@ final class MailRenderer {
 		// n'apparaît que si le parcours en pose une.
 		$charge = is_array( $demande['payload'] ) ? $demande['payload'] : array();
 
-		if ( AdresseTerrain::existe( $charge ) ) {
-			$html[] = self::titre( AdresseTerrain::RUBRIQUE );
-			$html[] = self::table(
-				array(
-					'Adresse'    => implode( ', ', AdresseTerrain::lignes_adresse( $charge ) ),
-					'Provenance' => AdresseTerrain::provenance( $charge ),
-				) + AdresseTerrain::reperes( $charge )
+		foreach ( AdresseTerrain::toutes() as $adresse ) {
+			if ( ! $adresse->existe( $charge ) ) {
+				continue;
+			}
+
+			$lignes = array(
+				'Adresse'    => implode( ', ', $adresse->lignes_adresse( $charge ) ),
+				'Provenance' => $adresse->provenance( $charge ),
 			);
+
+			// L'interlocuteur interne doit voir que le terrain n'a pas été
+			// saisi mais reporté : sans cette mention, deux rubriques
+			// identiques donneraient à croire à une saisie deux fois faite,
+			// donc deux fois vérifiée.
+			if ( AdresseTerrain::TERRAIN === $adresse->role() && AdresseTerrain::reportee( $charge ) ) {
+				$lignes['Provenance'] = 'Même adresse que le déclarant';
+			}
+
+			$html[] = self::titre( $adresse->rubrique() );
+			$html[] = self::table( $lignes + $adresse->reperes( $charge ) );
 		}
 
 		// --- Précisions du projet ---

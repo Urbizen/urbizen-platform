@@ -33,6 +33,7 @@
  * @package Urbizen\Platform
  */
 
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
 
 defined( 'ABSPATH' ) || exit;
@@ -294,40 +295,45 @@ $definition = array(
 			'maxlength' => 30,
 			'inputmode' => 'tel',
 		),
-		array(
-			'name'      => 'adresse_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Adresse postale du déclarant', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 300,
-		),
-		array(
-			'name'      => 'cp_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Code postal', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 10,
-			'inputmode' => 'numeric',
-		),
-		array(
-			'name'      => 'ville_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Commune', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 120,
-		),
+		// L'adresse du déclarant vient de la fabrique partagée, comme celle du
+		// terrain : mêmes deux modes, même vocabulaire, une seule logique. Les
+		// noms restent **historiques** — `adresse_declarant` et non
+		// `declarant_adresse` : les renommer aurait cassé un contrat déjà servi
+		// pour la seule satisfaction d'une symétrie.
+		//
+		// L'obligation n'est plus portée ici mais par
+		// {@see AdresseTerrain::verifier()}, seul à connaître le mode retenu.
+		...urbizen_champs_adresse( AdresseTerrain::DECLARANT, 'declarant' ),
 
 		/* ---------------------------------------------------------- *
 		 *  Terrain
 		 * ---------------------------------------------------------- */
 
+		// La case qui évite la double saisie. Cochée, le serveur reconstruit le
+		// terrain depuis le déclarant validé et ignore toute adresse terrain
+		// que le navigateur aurait envoyée : c'est lui, et non le document, qui
+		// fait foi. Seule la valeur canonique la coche.
+		array(
+			'name'    => AdresseTerrain::REPORT,
+			'type'    => 'checkbox',
+			'step'    => 'terrain',
+			'label'   => __( 'L’adresse du terrain est la même que celle du déclarant', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => AdresseTerrain::REPORT_VRAI,
+					'label' => __( 'Même adresse que le déclarant', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'non',
+					'label' => __( 'Adresse du terrain distincte', 'urbizen-platform' ),
+				),
+			),
+		),
+
 		// L'adresse du terrain vient de la fabrique partagée : deux modes de
 		// saisie, les mêmes identifiants pour tous les parcours. La recopier
 		// ici aurait suffi à la faire diverger du permis de construire.
-		...urbizen_champs_adresse_terrain( 'terrain', true ),
+		...urbizen_champs_adresse( AdresseTerrain::TERRAIN, 'terrain' ),
 
 		// Les trois références cadastrales sont facultatives : elles ne figurent
 		// que sur l'acte de propriété. Les exiger ferait abandonner une demande

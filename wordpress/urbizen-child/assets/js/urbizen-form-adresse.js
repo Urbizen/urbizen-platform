@@ -55,6 +55,10 @@
     enCours: "Vérification de l’adresse…",
     incomplete: "Cette adresse n’a pas pu être vérifiée complètement.",
     retenue: function (a) { return "Adresse retenue : " + a; },
+    // Le report annonce ce qui partira, pas ce qui est affiché : c'est le
+    // serveur qui reconstruira le terrain, et il le fera depuis ces valeurs-là.
+    reportOk: "Cette adresse sera enregistrée comme adresse du terrain.",
+    reportIncomplet: "Complétez l’adresse du déclarant : elle n’est pas encore utilisable pour le terrain.",
     // Le décompte est annoncé, pas seulement affiché : sans lecteur d'écran on
     // voit la liste s'ouvrir, avec lui on n'a que ce que l'on annonce.
     resultats: function (n) {
@@ -111,6 +115,8 @@
   function Adresse(racine) {
     this.racine = racine;
     this.uid = "adr" + ++compteur;
+    // Déclaré avant tout : le montage écrit déjà le mode, et écrire notifie.
+    this._auditeurs = [];
     this.propositions = [];
     this.index = -1;
     this.requete = null;
@@ -161,6 +167,115 @@
   Adresse.prototype._ecrire = function (nom, valeur) {
     var e = this._champ(nom);
     if (e) e.value = null === valeur || undefined === valeur ? "" : String(valeur);
+    this._notifier();
+  };
+
+  /** La valeur d'un rôle, réduite à une chaîne. */
+  Adresse.prototype._lire = function (role) {
+    var e = this._champ(role);
+    return e ? String(e.value || "").trim() : "";
+  };
+
+  /** Le bloc servi : `terrain`, `declarant`… tel que le document l'annonce. */
+  Adresse.prototype.role = function () {
+    return this.racine.getAttribute("data-adresse") || "";
+  };
+
+  /** Sommes-nous en saisie manuelle ? */
+  Adresse.prototype.manuel = function () {
+    return !!(this.$manuel && this.$manuel.checked);
+  };
+
+  /**
+   * L'adresse est-elle complète, au sens où le serveur l'exigera ?
+   *
+   * Les mêmes minimums que `AdresseTerrain::EXIGES`, appliqués ici pour dire
+   * *avant* l'envoi ce que le serveur dirait après. En automatique, une chaîne
+   * tapée ne suffit pas : il faut une sélection aboutie, donc un code commune —
+   * c'est lui que `/search` apporte et que le serveur réclame.
+   */
+  Adresse.prototype.valide = function () {
+    if ("" === this._lire("cp") || "" === this._lire("ville")) return false;
+
+    if (this.manuel()) return "" !== this._lire("voie");
+
+    return this.selectionnee && "" !== this._lire("adresse") && "" !== this._lire("insee");
+  };
+
+  /**
+   * L'adresse telle qu'elle se lit, en lignes.
+   *
+   * Même découpage que `AdresseTerrain::lignes_adresse()`. Le rendu final reste
+   * celui du serveur ; ceci n'existe que pour montrer à l'écran ce qui va
+   * partir, et une confirmation qui montrerait autre chose ne confirmerait rien.
+   */
+  Adresse.prototype.lisible = function () {
+    var lignes = [];
+    var bas = (this._lire("cp") + " " + this._lire("ville")).trim();
+
+    if (this.manuel()) {
+      lignes.push(this._lire("voie"));
+      lignes.push(this._lire("complement"));
+    } else {
+      var libelle = this._lire("adresse");
+      lignes.push(libelle);
+
+      // Le libellé du service porte déjà commune et code postal : les répéter
+      // ferait douter de l'adresse qu'on lit.
+      if ("" !== bas && "" !== libelle && -1 !== libelle.indexOf(bas)) bas = "";
+    }
+
+    if ("" !== bas) lignes.push(bas);
+
+    return lignes.filter(function (l) { return "" !== l; });
+  };
+
+  /**
+   * Montre ou retire complètement ce composant.
+   *
+   * Retiré, il est masqué **et** tous ses contrôles sont désactivés : ils
+   * quittent alors le `FormData`, l'ordre de tabulation et toute obligation.
+   * Masquer sans désactiver laisserait partir une adresse que la personne a
+   * remplacée — exactement ce que la bascule de mode évite déjà.
+   *
+   * @param {boolean} actif Vrai pour rendre le composant au formulaire.
+   */
+  Adresse.prototype.activer = function (actif) {
+    this.racine.hidden = !actif;
+
+    if (!actif) this._fermer();
+
+    Array.prototype.forEach.call(
+      this.racine.querySelectorAll("input, select, textarea, button"),
+      function (c) {
+        c.disabled = !actif;
+
+        if (!actif) {
+          c.removeAttribute("aria-invalid");
+          c.classList.remove("is-error");
+        }
+      }
+    );
+
+    // Rendre le composant, c'est le rendre dans son mode : le groupe inactif
+    // doit rester désactivé, sans quoi les deux modes partiraient ensemble.
+    if (actif) this._appliquerMode();
+  };
+
+  /**
+   * S'abonne aux changements de cette adresse.
+   *
+   * @param {Function} rappel Appelé après toute modification.
+   */
+  Adresse.prototype.surChangement = function (rappel) {
+    this._auditeurs.push(rappel);
+  };
+
+  Adresse.prototype._notifier = function () {
+    if (!this._auditeurs) return;
+
+    var self = this;
+    this._auditeurs.forEach(function (r) { r(self); });
   };
 
   Adresse.prototype._ecouter = function () {
@@ -176,6 +291,12 @@
     }, ANTI_REBOND_MS));
 
     this.$recherche.addEventListener("keydown", function (e) { self._clavier(e); });
+
+    // La saisie manuelle n'emprunte pas `_ecrire` : elle est tapée dans les
+    // contrôles. Sans cette écoute, une confirmation affichée ailleurs
+    // montrerait une adresse déjà périmée.
+    this.racine.addEventListener("input", function () { self._notifier(); });
+    this.racine.addEventListener("change", function () { self._notifier(); });
 
     this._surClicDocument = function (e) {
       if (!self.racine.contains(e.target)) self._fermer();
@@ -278,6 +399,9 @@
     roles.forEach(function (r) { self._ecrire(r, ""); });
 
     this.selectionnee = false;
+    // Après le drapeau, jamais avant : `valide()` le consulte, et notifier trop
+    // tôt ferait lire un état que la ligne suivante dément.
+    this._notifier();
   };
 
   /**
@@ -507,6 +631,9 @@
         });
 
         self.selectionnee = true;
+        // Idem : la sélection n'est acquise qu'ici, et c'est seulement
+        // maintenant qu'un abonné peut la lire pour ce qu'elle est.
+        self._notifier();
         self._message(MESSAGES.retenue(pr.label || p.fulltext || ""));
       })
       .catch(function (err) {
@@ -554,20 +681,148 @@
     void voie; void numero;
   };
 
-  /** Monte tous les composants d'adresse d'un formulaire. */
+  /* ----- « L'adresse du terrain est la même que celle du déclarant » ----- */
+
+  /**
+   * La case qui évite la double saisie.
+   *
+   * **Elle ne recopie rien.** Recopier dans le navigateur produirait une
+   * seconde adresse, vraie au moment du clic et fausse dès la correction
+   * suivante — et le serveur aurait alors à départager deux versions de la même
+   * chose. Le terrain est donc simplement retiré du formulaire, et le serveur
+   * le reconstruit depuis le déclarant qu'il vient lui-même de valider.
+   *
+   * Ce que la case fait ici, elle le fait pour les yeux et pour le clavier :
+   * montrer l'adresse qui sera retenue, la tenir à jour, et refuser d'avancer
+   * quand elle n'est pas utilisable.
+   *
+   * @param {HTMLElement} racine   Conteneur portant `data-adresse-report`.
+   * @param {Array}       adresses Composants déjà montés.
+   */
+  function Report(racine, adresses) {
+    this.racine = racine;
+    this.$case = racine.querySelector("[data-adresse-report-case]");
+    this.$encadre = racine.querySelector("[data-adresse-report-encadre]");
+    this.$adresse = racine.querySelector("[data-adresse-report-adresse]");
+    this.$note = racine.querySelector("[data-adresse-report-note]");
+
+    this.declarant = null;
+    this.terrain = null;
+
+    adresses.forEach(function (a) {
+      if ("declarant" === a.role()) this.declarant = a;
+      if ("terrain" === a.role()) this.terrain = a;
+    }, this);
+
+    // Sans les deux blocs, la case n'a rien à reporter : mieux vaut ne rien
+    // faire que masquer un terrain qu'aucun déclarant ne remplacerait.
+    if (!this.$case || !this.declarant || !this.terrain) return;
+
+    var self = this;
+
+    this.$case.addEventListener("change", function () { self.appliquer(); });
+
+    // L'encadré suit le déclarant : une adresse corrigée après le cochage ne
+    // doit jamais rester affichée sous sa forme précédente.
+    this.declarant.surChangement(function () { self._rafraichir(); });
+
+    this.appliquer();
+  }
+
+  Report.prototype.coche = function () {
+    return !!(this.$case && this.$case.checked);
+  };
+
+  /**
+   * La progression est-elle permise ?
+   *
+   * Faux dans un seul cas : la case est cochée et le déclarant est incomplet.
+   * Le terrain étant alors masqué, la validation d'étape du document ne le voit
+   * pas — laisser passer enverrait une demande sans adresse de terrain.
+   */
+  Report.prototype.pret = function () {
+    return !this.coche() || !this.declarant || this.declarant.valide();
+  };
+
+  Report.prototype.appliquer = function () {
+    if (!this.terrain) return;
+
+    this.terrain.activer(!this.coche());
+    this._rafraichir();
+  };
+
+  Report.prototype._rafraichir = function () {
+    if (!this.$encadre) return;
+
+    if (!this.coche()) {
+      this.$encadre.hidden = true;
+      this.racine.classList.remove("is-error");
+      return;
+    }
+
+    var valide = this.declarant.valide();
+
+    this.$encadre.hidden = false;
+    this.racine.classList.toggle("is-error", !valide);
+    this.$encadre.setAttribute("aria-invalid", valide ? "false" : "true");
+
+    if (this.$adresse) {
+      while (this.$adresse.firstChild) this.$adresse.removeChild(this.$adresse.firstChild);
+
+      // `textContent` et jamais `innerHTML` : ces lignes viennent d'un service
+      // externe ou de la frappe, et le séparateur est le seul balisage voulu.
+      this.declarant.lisible().forEach(function (l, i) {
+        if (i) this.$adresse.appendChild(document.createElement("br"));
+        this.$adresse.appendChild(document.createTextNode(l));
+      }, this);
+    }
+
+    if (this.$note) {
+      this.$note.textContent = valide ? MESSAGES.reportOk : MESSAGES.reportIncomplet;
+    }
+  };
+
+  /** Monte tous les composants d'adresse d'un formulaire, et leurs reports. */
   function surveiller(racine) {
+    var portee = racine || document;
     var trouves = [];
 
-    Array.prototype.forEach.call((racine || document).querySelectorAll("[data-adresse]"), function (n) {
+    Array.prototype.forEach.call(portee.querySelectorAll("[data-adresse]"), function (n) {
       trouves.push(new Adresse(n));
+    });
+
+    // Les reports après les adresses : ils s'appuient dessus.
+    Array.prototype.forEach.call(portee.querySelectorAll("[data-adresse-report]"), function (n) {
+      n.__report = new Report(n, trouves);
     });
 
     return trouves;
   }
 
+  /**
+   * Tous les reports d'un formulaire permettent-ils d'avancer ?
+   *
+   * Appelé par la validation d'étape du document, qui ne peut pas juger d'un
+   * bloc qu'elle ne voit plus.
+   *
+   * @param {HTMLElement} racine Formulaire, ou document entier.
+   * @return {boolean}
+   */
+  function reportPret(racine) {
+    var ok = true;
+
+    Array.prototype.forEach.call((racine || document).querySelectorAll("[data-adresse-report]"), function (n) {
+      if (n.__report && !n.__report.pret()) ok = false;
+    });
+
+    return ok;
+  }
+
   global.UrbizenAdresse = {
     surveiller: surveiller,
+    reportPret: reportPret,
     Adresse: Adresse,
+    Report: Report,
     SERVICE: SERVICE,
     MESSAGES: MESSAGES
   };

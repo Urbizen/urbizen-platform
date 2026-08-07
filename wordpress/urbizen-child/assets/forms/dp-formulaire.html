@@ -399,6 +399,16 @@
   #dp-app .dp-adresse-bascule input { accent-color: var(--cadastre); width: 18px; height: 18px; flex: none; }
   #dp-app .dp-facultatif { font-weight: 400; color: var(--ink-faint); }
   #dp-app [data-adresse-groupe-manuel] { margin-top: 10px; }
+  #dp-app .dp-report-encadre {
+    margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line);
+    border-left: 3px solid var(--cadastre); border-radius: var(--radius);
+    background: var(--cadastre-sf);
+  }
+  #dp-app .dp-report.is-error .dp-report-encadre { border-left-color: var(--error); background: #FDF3F3; }
+  #dp-app .dp-report-titre { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+  #dp-app .dp-report-adresse { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+  #dp-app .dp-report-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  #dp-app .dp-report.is-error .dp-report-note { color: var(--error); font-weight: 600; }
   #dp-app [data-adresse-groupe-commun] { margin-top: 10px; }
   #dp-app [data-adresse-groupe-commun] input[readonly] { background: var(--cadastre-sf); }
   #dp-app .dp-seg label { display: flex; align-items: center; justify-content: center; }
@@ -504,9 +514,45 @@
               </div>
               <div class="dp-field"><label for="f_email">E-mail <span class="req">*</span></label><input type="email" id="f_email" name="email" autocomplete="email"></div>
               <div class="dp-field"><label for="f_tel">Téléphone <span class="req">*</span></label><input type="tel" id="f_tel" name="telephone" autocomplete="tel"></div>
-              <div class="dp-field col-2"><label for="f_adr">Adresse postale du déclarant <span class="req">*</span></label><input type="text" id="f_adr" name="adresse_declarant" autocomplete="street-address"></div>
-              <div class="dp-field"><label for="f_cp">Code postal <span class="req">*</span></label><input type="text" id="f_cp" name="cp_declarant" class="measure" inputmode="numeric" autocomplete="postal-code"></div>
-              <div class="dp-field"><label for="f_ville">Commune <span class="req">*</span></label><input type="text" id="f_ville" name="ville_declarant" autocomplete="address-level2"></div>
+              <!-- Adresse du déclarant : le même composant que le terrain, monté
+                   sur ses propres noms canoniques. Les trois champs historiques
+                   — adresse_declarant, cp_declarant, ville_declarant — sont
+                   conservés tels quels ; seuls les rôles techniques changent. -->
+              <div class="dp-field col-2 dp-adresse" data-adresse="declarant">
+                <div data-adresse-groupe-auto>
+                  <label for="d_rech">Rechercher l’adresse du déclarant <span class="req">*</span></label>
+                  <!-- Sans `name` : ce champ pilote la recherche, il n'est pas
+                       l'adresse. Tant qu'aucune proposition n'est retenue, il
+                       n'y a pas d'adresse, et rien ne doit partir. -->
+                  <input type="text" id="d_rech" data-adresse-recherche autocomplete="off"
+                         placeholder="Commencez à taper, puis choisissez dans la liste">
+                  <ul class="dp-adresse-liste" role="listbox" aria-label="Adresses proposées"
+                      data-adresse-propositions hidden></ul>
+                  <!-- Les champs canoniques vivent DANS le groupe automatique :
+                       en mode manuel le groupe est désactivé, donc ils quittent
+                       le FormData. -->
+                  <input type="hidden" name="adresse_declarant" data-adresse-champ="adresse">
+                  <input type="hidden" name="insee_declarant" data-adresse-champ="insee">
+                  <input type="hidden" name="lat_declarant" data-adresse-champ="lat">
+                  <input type="hidden" name="lon_declarant" data-adresse-champ="lon">
+                </div>
+                <p class="dp-adresse-etat" role="status" aria-live="polite" data-adresse-etat hidden></p>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" data-adresse-manuel> Je renseigne l’adresse manuellement
+                </label>
+                <!-- Le mode canonique, jamais montré, et jamais désactivé. -->
+                <input type="hidden" name="mode_adresse_declarant" value="automatique" data-adresse-champ="mode">
+                <div class="dp-grid" data-adresse-groupe-manuel hidden>
+                  <div class="dp-field col-2"><label for="d_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="d_voie" name="voie_declarant" data-adresse-champ="voie" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="d_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="d_comp" name="complement_declarant" data-adresse-champ="complement" autocomplete="off"></div>
+                </div>
+                <!-- Code postal et commune : UN seul jeu, partagé par les deux
+                     modes, et les noms historiques du déclarant. -->
+                <div class="dp-grid" data-adresse-groupe-commun>
+                  <div class="dp-field"><label for="f_cp">Code postal <span class="req">*</span></label><input type="text" id="f_cp" name="cp_declarant" class="measure" inputmode="numeric" data-adresse-champ="cp" autocomplete="off"></div>
+                  <div class="dp-field"><label for="f_ville">Commune <span class="req">*</span></label><input type="text" id="f_ville" name="ville_declarant" data-adresse-champ="ville" autocomplete="off"></div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -516,7 +562,24 @@
             <h2 class="dp-step-title">Où se situe le terrain&nbsp;?</h2>
             <p class="dp-step-hint">Les références cadastrales figurent sur votre acte de propriété ou sur <span style="font-family:'IBM Plex Mono',monospace">cadastre.gouv.fr</span> (section + numéro de parcelle).</p>
             <div class="dp-grid">
-              <div class="dp-field col-2 dp-adresse" data-adresse>
+              <!-- Le report. Cochée, la case retire entièrement le bloc terrain
+                   du formulaire : le serveur reconstruira l'adresse depuis le
+                   déclarant qu'il aura lui-même validé. Le navigateur ne recopie
+                   rien — deux versions d'une même adresse finiraient par diverger.
+                   `value="oui"` est la SEULE valeur qui coche ; décochée, la case
+                   n'envoie pas le champ du tout. -->
+              <div class="dp-field col-2 dp-report" data-adresse-report>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" name="terrain_meme_adresse_declarant" value="oui" data-adresse-report-case>
+                  L’adresse du terrain est la même que celle du déclarant
+                </label>
+                <div class="dp-report-encadre" role="status" aria-live="polite" data-adresse-report-encadre hidden>
+                  <p class="dp-report-titre">Adresse retenue pour le terrain</p>
+                  <p class="dp-report-adresse" data-adresse-report-adresse></p>
+                  <p class="dp-report-note" data-adresse-report-note></p>
+                </div>
+              </div>
+              <div class="dp-field col-2 dp-adresse" data-adresse="terrain">
                 <div data-adresse-groupe-auto>
                   <label for="t_rech">Rechercher l’adresse du terrain <span class="req">*</span></label>
                   <!-- Sans `name` : ce champ pilote la recherche, il n'est pas
@@ -959,6 +1022,13 @@
       } else {
         errTravaux.textContent = "";
       }
+    }
+    // Le bloc terrain retiré par « même adresse » échappe à la boucle ci-dessus :
+    // masqué, il n'a plus de champ visible à exiger. C'est alors la validité de
+    // l'adresse du déclarant qui conditionne la progression — sans quoi une
+    // demande partirait sans adresse de terrain du tout.
+    if (window.UrbizenAdresse && UrbizenAdresse.reportPret && !UrbizenAdresse.reportPret(form)) {
+      ok = false;
     }
     if (firstBad) firstBad.focus();
     return ok;

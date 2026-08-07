@@ -369,13 +369,38 @@ verifier( 'les écarts sont journalisés', str_contains( $controleur, 'sans obje
 // L'adresse suit le même chemin : filtrée par son mode, avant toute écriture,
 // et dans le même relevé d'écarts — un masquage défaillant doit se voir au même
 // endroit, qu'il porte sur une nature ou sur un mode de saisie.
-$pos_adresse = strpos( $controleur, 'AdresseTerrain::filtrer(' );
+$pos_adresse = strpos( $controleur, '$terrain->filtrer(' );
 
-verifier( 'le contrôleur filtre aussi l’adresse', false !== $pos_adresse );
+verifier( 'le contrôleur filtre aussi l’adresse du terrain', false !== $pos_adresse );
 verifier( 'après le filtrage par nature', $pos_filtre < $pos_adresse );
 verifier( 'et avant la tarification', $pos_adresse < $pos_pricing );
 verifier( 'les deux filtrages partagent le relevé d’écarts',
 	1 === substr_count( $controleur, '$ecartes = array();' ) );
+
+/*
+ * L'adresse du déclarant suit un ordre plus strict, et cet ordre EST la règle
+ * de sécurité : filtrée d'abord, jugée ensuite, et seulement alors recopiée
+ * vers un terrain intégralement purgé.
+ *
+ * Filtrer avant de juger interdit qu'une charge portant les deux modes du
+ * déclarant laisse le mode abandonné alimenter la copie. Purger avant
+ * d'importer interdit qu'une adresse terrain forgée survive à la recopie.
+ * Inverser l'une ou l'autre de ces paires rouvrirait la porte en silence.
+ */
+$pos_decl_filtre = strpos( $controleur, '$declarant->filtrer(' );
+$pos_decl_verif  = strpos( $controleur, '$declarant->verifier(' );
+$pos_export      = strpos( $controleur, '$declarant->exporter(' );
+$pos_purge       = strpos( $controleur, '$terrain->purger(' );
+$pos_import      = strpos( $controleur, '$terrain->importer(' );
+
+verifier( 'le déclarant est filtré', false !== $pos_decl_filtre );
+verifier( 'puis jugé', $pos_decl_filtre < $pos_decl_verif );
+verifier( 'puis exporté', $pos_decl_verif < $pos_export );
+verifier( 'le terrain est purgé avant d’être reconstruit', $pos_purge < $pos_import );
+verifier( 'et la purge suit le jugement du déclarant', $pos_decl_verif < $pos_purge );
+verifier( 'toute la reconstruction précède la cohérence métier', $pos_import < $pos_metier );
+verifier( 'seule la valeur canonique déclenche le report',
+	str_contains( $controleur, 'AdresseTerrain::reportee(' ) );
 
 /* ================================================================== *
  *  Bilan

@@ -58,6 +58,20 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 	protected const BAREME = PricingProjets::class;
 
 	/**
+	 * Les adresses que ce parcours exige, par rôle.
+	 *
+	 * Vide par défaut : un parcours qui ne dit rien n'exige rien, et une adresse
+	 * absente de la charge y reste un cas légitime — la conception sans terrain.
+	 * Un parcours qui, lui, ne peut pas aboutir sans adresse le déclare, et
+	 * l'absence devient alors une erreur plutôt qu'un silence.
+	 *
+	 * @return array<int, string> Rôles au sens de {@see AdresseTerrain}.
+	 */
+	protected function adresses_exigees(): array {
+		return array();
+	}
+
+	/**
 	 * Contrôle les réponses nettoyées.
 	 *
 	 * @param array<string, mixed> $clean Réponses nettoyées.
@@ -68,11 +82,21 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 		$bareme    = static::BAREME;
 		$erreurs   = array();
 
-		// --- 0 · l'adresse du terrain ---
-		// Elle ne dépend d'aucune nature : elle se juge d'abord. Un parcours qui
-		// ne la déclare pas n'est pas concerné — la clé est alors absente de la
-		// charge nettoyée, et la règle ne s'applique pas.
-		$erreurs += AdresseTerrain::verifier( $clean );
+		// --- 0 · les adresses ---
+		// Elles ne dépendent d'aucune nature : elles se jugent d'abord. Un
+		// parcours qui n'en déclare pas n'est pas concerné — la clé de mode est
+		// alors absente de la charge nettoyée, et la règle ne s'applique pas.
+		//
+		// Les adresses que le parcours **exige** sont, elles, réclamées même
+		// absentes : depuis que l'obligation ne repose plus sur `required` —
+		// le validateur générique ne sait pas combiner « mode » et « même
+		// adresse que le déclarant » — c'est ici qu'une charge ayant retiré le
+		// mode pour passer entre les gouttes est rattrapée.
+		$exigees = $this->adresses_exigees();
+
+		foreach ( AdresseTerrain::toutes() as $adresse ) {
+			$erreurs += $adresse->verifier( $clean, in_array( $adresse->role(), $exigees, true ) );
+		}
 
 		$principal = $this->chaine( $clean['nature'] ?? null );
 

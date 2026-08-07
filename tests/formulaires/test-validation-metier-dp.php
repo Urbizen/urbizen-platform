@@ -95,7 +95,14 @@ function demande_minimale( string $nature, array $ajouts = array() ): array {
 			'qualite'           => 'proprietaire',
 			'email'             => 'claire.martin@exemple.fr',
 			'telephone'         => '0600000000',
-			'adresse_declarant' => '12 rue des Lilas',
+			// L'adresse du déclarant est elle aussi assistée, et exigée : elle
+			// porte donc son mode et son code commune, comme celle du terrain.
+			// Un jeu volontairement invalide n'a pas sa place ici — ce banc
+			// éprouve la recevabilité sans surface, et les adresses fautives
+			// sont couvertes par `test-adresse-terrain.php`.
+			'mode_adresse_declarant' => 'automatique',
+			'adresse_declarant' => '12 rue des Lilas, 33000 Bordeaux',
+			'insee_declarant'   => '33063',
 			'cp_declarant'      => '33000',
 			'ville_declarant'   => 'Bordeaux',
 			// L'adresse du terrain est désormais exigée, et son mode avec elle :
@@ -256,11 +263,11 @@ $maximum = array_values( array_diff( CatalogueDeclarationPrealable::natures(), a
 
 verifier(
 	sprintf( 'un dossier réunissant les %d autres natures reste accepté', $limite ),
+	// Un dossier légitime porte ses deux adresses : la limite éprouvée ici est
+	// celle des projets supplémentaires, pas celle des adresses. Les lui
+	// retirer ferait échouer le banc pour une raison qui n'est pas la sienne.
 	array() === $metier->valider(
-		array(
-			'nature'                  => 'extension',
-			'projets_supplementaires' => $maximum,
-		)
+		demande_minimale( 'extension', array( 'projets_supplementaires' => $maximum ) )
 	)
 );
 

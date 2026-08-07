@@ -65,6 +65,7 @@ use Urbizen\Platform\Forms\CatalogueDeclarationPrealable;
 use Urbizen\Platform\Forms\DeclarationPrealablePricingStrategy;
 use Urbizen\Platform\Forms\FormDefinition;
 use Urbizen\Platform\Forms\PricingDeclarationPrealable;
+use Urbizen\Platform\Forms\ValidationMetierDeclarationPrealable;
 
 $brut = require $src . '/Forms/definitions/declaration_prealable.php';
 $def  = new FormDefinition( $brut['type'], $brut['title'], $brut['submit_label'], $brut['fields'], $brut['steps'] );
@@ -229,8 +230,46 @@ echo "\n── 4. Ce que le serveur exige, et ce qu'il n'exige pas\n";
 
 $requis = array_column( array_filter( $def->fields(), static fn( $f ) => ! empty( $f['required'] ) ), 'name' );
 
-foreach ( array( 'email', 'telephone', 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'nature', 'qualite', 'declarant_type' ) as $name ) {
+foreach ( array( 'email', 'telephone', 'nature', 'qualite', 'declarant_type' ) as $name ) {
 	verifier( sprintf( '« %s » est obligatoire', $name ), in_array( $name, $requis, true ) );
+}
+
+/*
+ * Les adresses ne portent plus `required`, et ce n'est pas un relâchement :
+ * l'obligation a changé de couche. Le validateur générique n'accepte qu'une
+ * condition par champ — il ne saurait pas combiner « mode de saisie » et
+ * « même adresse que le déclarant ». Lui laisser l'obligation aurait rendu
+ * obligatoire, case cochée, un bloc terrain que la personne ne remplit plus.
+ *
+ * C'est donc AdresseTerrain qui l'exige, et le banc le prouve ici plutôt que
+ * de se contenter de constater l'absence du drapeau.
+ */
+foreach ( array( 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'terrain_voie', 'adresse_declarant', 'cp_declarant', 'ville_declarant', 'voie_declarant' ) as $name ) {
+	verifier( sprintf( '« %s » ne porte pas `required` générique', $name ), ! in_array( $name, $requis, true ) );
+}
+
+$metier = new ValidationMetierDeclarationPrealable();
+
+// Une DP sans la moindre adresse : les deux rôles doivent se plaindre, chacun
+// sous son propre nom de mode.
+$sans_adresse = $metier->valider( array( 'nature' => 'piscine' ) );
+
+verifier( 'le métier exige l’adresse du déclarant',
+	'adresse_mode_absent' === ( $sans_adresse['mode_adresse_declarant'] ?? '' ) );
+verifier( 'le métier exige l’adresse du terrain',
+	'adresse_mode_absent' === ( $sans_adresse['mode_adresse'] ?? '' ) );
+
+// Et il exige le détail de chaque mode, pas seulement le mode lui-même.
+$mode_seul = $metier->valider(
+	array(
+		'nature'                 => 'piscine',
+		'mode_adresse'           => 'automatique',
+		'mode_adresse_declarant' => 'manuel',
+	)
+);
+
+foreach ( array( 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'terrain_insee', 'voie_declarant', 'cp_declarant', 'ville_declarant' ) as $name ) {
+	verifier( sprintf( 'le métier exige « %s »', $name ), 'champ_requis' === ( $mode_seul[ $name ] ?? '' ) );
 }
 
 foreach ( array( 'cad_section', 'cad_numero', 'terrain_superficie', 'pieces_differees', 'projets_supplementaires', 'informations_cadastrales_differees', 'depot_guichet', 'materiaux', 'remarques' ) as $name ) {

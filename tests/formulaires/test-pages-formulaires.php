@@ -296,8 +296,47 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq ) as $nom => $doc ) {
 	verifier( sprintf( '%s : le module d’adresse est chargé', $nom ),
 		str_contains( $doc, 'urbizen-form-adresse.js?v=' . $version ) );
-	verifier( sprintf( '%s : le composant est balisé une seule fois', $nom ),
-		1 === substr_count( $doc, 'data-adresse>' ) );
+	// Deux blocs, chacun nommant son rôle : le module ne connaît que des rôles,
+	// et c'est le document qui dit lequel il monte. Sans ce marquage, la case
+	// « même adresse » ne saurait pas quel bloc retirer.
+	verifier( sprintf( '%s : deux composants d’adresse sont balisés', $nom ),
+		2 === substr_count( $doc, 'data-adresse=' ) );
+	verifier( sprintf( '%s : l’un porte le rôle déclarant', $nom ),
+		1 === substr_count( $doc, 'data-adresse="declarant"' ) );
+	verifier( sprintf( '%s : l’autre le rôle terrain', $nom ),
+		1 === substr_count( $doc, 'data-adresse="terrain"' ) );
+	verifier( sprintf( '%s : aucun composant sans rôle', $nom ),
+		! str_contains( $doc, 'data-adresse>' ) );
+	verifier( sprintf( '%s : deux recherches indépendantes', $nom ),
+		2 === substr_count( $doc, 'data-adresse-recherche' ) );
+	verifier( sprintf( '%s : le mode du déclarant part avec une valeur par défaut', $nom ),
+		str_contains( $doc, 'name="mode_adresse_declarant" value="automatique"' ) );
+	verifier( sprintf( '%s : les noms historiques du déclarant sont conservés', $nom ),
+		1 === substr_count( $doc, 'name="adresse_declarant"' )
+		&& 1 === substr_count( $doc, 'name="cp_declarant"' )
+		&& 1 === substr_count( $doc, 'name="ville_declarant"' ) );
+	verifier( sprintf( '%s : aucun doublon en convention inverse', $nom ),
+		! str_contains( $doc, 'name="declarant_adresse"' )
+		&& ! str_contains( $doc, 'name="declarant_cp"' )
+		&& ! str_contains( $doc, 'name="declarant_ville"' ) );
+	verifier( sprintf( '%s : les champs neufs du déclarant sont là', $nom ),
+		str_contains( $doc, 'name="voie_declarant"' )
+		&& str_contains( $doc, 'name="complement_declarant"' )
+		&& str_contains( $doc, 'name="insee_declarant"' )
+		&& str_contains( $doc, 'name="lat_declarant"' )
+		&& str_contains( $doc, 'name="lon_declarant"' ) );
+
+	// La case de report : une seule valeur la coche, et le document ne doit en
+	// émettre aucune autre. Décochée, une case n'envoie rien du tout.
+	verifier( sprintf( '%s : la case de report est déclarée une fois', $nom ),
+		1 === substr_count( $doc, 'name="terrain_meme_adresse_declarant"' ) );
+	verifier( sprintf( '%s : elle n’émet que la valeur canonique', $nom ),
+		str_contains( $doc, 'name="terrain_meme_adresse_declarant" value="oui"' ) );
+	verifier( sprintf( '%s : son libellé est exact', $nom ),
+		str_contains( $doc, 'L’adresse du terrain est la même que celle du déclarant' ) );
+	verifier( sprintf( '%s : l’encadré de confirmation existe', $nom ),
+		str_contains( $doc, 'data-adresse-report-encadre' )
+		&& str_contains( $doc, 'data-adresse-report-adresse' ) );
 	verifier( sprintf( '%s : la recherche ne porte aucun nom soumis', $nom ),
 		(bool) preg_match( '/data-adresse-recherche(?![^>]*\sname=)/', $doc ) );
 	verifier( sprintf( '%s : le mode part avec une valeur par défaut', $nom ),
@@ -314,7 +353,7 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq ) as $nom => $doc 
 
 foreach ( array( 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	verifier( sprintf( '%s : le module d’adresse n’y est pas encore', $nom ),
-		! str_contains( $doc, 'urbizen-form-adresse.js' ) && ! str_contains( $doc, 'data-adresse>' ) );
+		! str_contains( $doc, 'urbizen-form-adresse.js' ) && ! str_contains( $doc, 'data-adresse>' ) && ! str_contains( $doc, 'data-adresse=' ) );
 }
 
 /* ================================================================== *

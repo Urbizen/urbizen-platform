@@ -119,6 +119,13 @@ titre "Pont DP / PC — DOM simulé"
 node test-pont.mjs
 verdict $? "test-pont.mjs"
 
+# Deux adresses assistées sur une même page, et la case qui reporte celle du
+# déclarant sur le terrain : indépendance des instances, retrait effectif du
+# bloc terrain, et rien de masqué qui reste soumettable.
+titre "Adresses assistées DP — DOM simulé"
+node test-adresse.mjs
+verdict $? "test-adresse.mjs"
+
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php
 verdict $? "test-render.php"
@@ -130,7 +137,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 9 bancs passent.\033[0m\n'
+	printf '\033[32mLes 10 bancs passent.\033[0m\n'
 	exit 0
 fi
 

@@ -404,22 +404,33 @@ final class SubmissionsAdmin {
 
 		$demande = SubmissionRepository::get( (int) $post->ID );
 		$charge  = is_array( $demande ) && is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
-		// L'adresse d'abord : c'est ce qu'on cherche en ouvrant un dossier.
-		if ( AdresseTerrain::existe( $charge ) ) {
-			echo '<h4>' . esc_html( AdresseTerrain::RUBRIQUE ) . '</h4>';
+		// Les adresses d'abord : c'est ce qu'on cherche en ouvrant un dossier.
+		// Le déclarant, puis le terrain — la personne, puis le lieu.
+		foreach ( AdresseTerrain::toutes() as $adresse ) {
+			if ( ! $adresse->existe( $charge ) ) {
+				continue;
+			}
+
+			echo '<h4>' . esc_html( $adresse->rubrique() ) . '</h4>';
 			// Chaque ligne est échappée AVANT d'être jointe : le séparateur est
 			// du balisage voulu, tout le reste vient du formulaire. `printf` et
 			// non `echo` : la sortie porte alors visiblement son échappement,
 			// ce que le banc de compatibilité vérifie à la lecture.
-			$adresse = array();
+			$lignes_adresse = array();
 
-			foreach ( AdresseTerrain::lignes_adresse( $charge ) as $ligne ) {
-				$adresse[] = esc_html( $ligne );
+			foreach ( $adresse->lignes_adresse( $charge ) as $ligne ) {
+				$lignes_adresse[] = esc_html( $ligne );
 			}
 
-			printf( '<p>%s</p>', implode( '<br>', $adresse ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lignes échappées ci-dessus.
+			printf( '<p>%s</p>', implode( '<br>', $lignes_adresse ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lignes échappées ci-dessus.
 
-			$provenance = AdresseTerrain::provenance( $charge );
+			// Un terrain reporté le dit ici. Deux rubriques identiques sans
+			// cette mention laisseraient croire à deux saisies distinctes, donc
+			// à une concordance vérifiée par le demandeur — elle ne l'est pas,
+			// elle est le fait du serveur.
+			$provenance = AdresseTerrain::TERRAIN === $adresse->role() && AdresseTerrain::reportee( $charge )
+				? 'Même adresse que le déclarant'
+				: $adresse->provenance( $charge );
 
 			if ( '' !== $provenance ) {
 				echo '<p class="description"><strong>' . esc_html( $provenance ) . '</strong></p>';
@@ -427,7 +438,7 @@ final class SubmissionsAdmin {
 
 			// Code commune et coordonnées : utiles à l'instruction, sans intérêt
 			// pour le demandeur. Ils ne sortent donc que sur cet écran.
-			$reperes = AdresseTerrain::reperes( $charge );
+			$reperes = $adresse->reperes( $charge );
 
 			if ( array() !== $reperes ) {
 				$bouts = array();

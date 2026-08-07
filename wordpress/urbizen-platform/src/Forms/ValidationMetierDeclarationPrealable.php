@@ -27,4 +27,19 @@ final class ValidationMetierDeclarationPrealable extends ValidationMetierProjets
 	 * @var class-string<PricingProjets>
 	 */
 	protected const BAREME = PricingDeclarationPrealable::class;
+
+	/**
+	 * Les deux adresses sont exigées.
+	 *
+	 * Une déclaration préalable sans adresse de déclarant ou sans adresse de
+	 * terrain n'est pas instruisable : la mairie ne saurait ni qui écrit, ni où.
+	 * Quand la case « même adresse » est cochée, le terrain a déjà été
+	 * reconstruit depuis le déclarant avant d'arriver ici — l'exiger reste donc
+	 * juste, et referme la porte sur une charge qui l'aurait vidé après coup.
+	 *
+	 * @return array<int, string>
+	 */
+	protected function adresses_exigees(): array {
+		return array( AdresseTerrain::DECLARANT, AdresseTerrain::TERRAIN );
+	}
 }
