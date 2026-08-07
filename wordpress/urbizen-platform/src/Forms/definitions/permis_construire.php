@@ -34,9 +34,15 @@
  * @package Urbizen\Platform
  */
 
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\CataloguePermisConstruire;
 
 defined( 'ABSPATH' ) || exit;
+
+// La fabrique d'adresse est partagée par les parcours : elle vit à côté des
+// définitions, et chacune la charge. `require_once` et non `require` — la
+// déclaration préalable l'a peut-être déjà amenée dans la même requête.
+require_once __DIR__ . '/champs-adresse.php';
 
 // L'autochargeur du greffon fournit ces classes en production ; ce garde-fou
 // rend le fichier autoportant pour les bancs, qui chargent une définition sans
@@ -317,61 +323,51 @@ $definition = array(
 			'maxlength' => 30,
 			'inputmode' => 'tel',
 		),
-		array(
-			'name'      => 'adresse_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Adresse postale du déclarant', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 300,
-		),
-		array(
-			'name'      => 'cp_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Code postal', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 10,
-			'inputmode' => 'numeric',
-		),
-		array(
-			'name'      => 'ville_declarant',
-			'type'      => 'text',
-			'step'      => 'declarant',
-			'label'     => __( 'Commune', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 120,
-		),
+		// L'adresse du déclarant vient de la fabrique partagée, comme en
+		// déclaration préalable : mêmes deux modes, même vocabulaire de rôles,
+		// une seule logique. Les noms restent **historiques** —
+		// `adresse_declarant` et non `declarant_adresse` : des demandes de
+		// permis les portent déjà, et les renommer aurait cassé leur relecture
+		// pour la seule satisfaction d'une symétrie.
+		//
+		// L'obligation n'est plus portée ici mais par
+		// {@see AdresseTerrain::verifier()}, seul à connaître le mode retenu.
+		...urbizen_champs_adresse( AdresseTerrain::DECLARANT, 'declarant' ),
 
 		/* ---------------------------------------------------------- *
 		 *  Terrain
 		 * ---------------------------------------------------------- */
 
+		// La case qui évite la double saisie. Cochée, le serveur reconstruit
+		// l'adresse du terrain depuis celle du déclarant validé et ignore toute
+		// adresse terrain reçue : c'est lui, et non le document, qui fait foi.
+		// Seule la valeur canonique la coche — celle déjà retenue en
+		// déclaration préalable, jamais une seconde convention.
+		//
+		// Elle ne concerne QUE le composant d'adresse. Les références
+		// cadastrales, la superficie et l'état du terrain restent saisis, quoi
+		// qu'il arrive : ils décrivent la parcelle, pas le lieu où l'on écrit.
 		array(
-			'name'      => 'terrain_adresse',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Adresse du terrain', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 300,
+			'name'    => AdresseTerrain::REPORT,
+			'type'    => 'checkbox',
+			'step'    => 'terrain',
+			'label'   => __( 'L’adresse du terrain est la même que celle du déclarant', 'urbizen-platform' ),
+			'options' => array(
+				array(
+					'value' => AdresseTerrain::REPORT_VRAI,
+					'label' => __( 'Même adresse que le déclarant', 'urbizen-platform' ),
+				),
+				array(
+					'value' => 'non',
+					'label' => __( 'Adresse du terrain distincte', 'urbizen-platform' ),
+				),
+			),
 		),
-		array(
-			'name'      => 'terrain_cp',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Code postal', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 10,
-			'inputmode' => 'numeric',
-		),
-		array(
-			'name'      => 'terrain_ville',
-			'type'      => 'text',
-			'step'      => 'terrain',
-			'label'     => __( 'Commune', 'urbizen-platform' ),
-			'required'  => true,
-			'maxlength' => 120,
-		),
+
+		// L'adresse du terrain sort de la même fabrique que celle du déclarant.
+		// Le permis n'avait qu'une adresse en texte libre ; il reçoit les deux
+		// modes de saisie, sans que ses noms canoniques changent.
+		...urbizen_champs_adresse( AdresseTerrain::TERRAIN, 'terrain' ),
 
 		// Les trois références cadastrales sont facultatives : elles ne figurent
 		// que sur l'acte de propriété. Les exiger ferait abandonner une demande

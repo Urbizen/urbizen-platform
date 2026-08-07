@@ -238,12 +238,44 @@ verifier( 'et ne porte aucune erreur', array() === $def->errors() );
 
 $requis = array_column( array_filter( $def->fields(), static fn( $f ) => ! empty( $f['required'] ) ), 'name' );
 
-foreach ( array( 'email', 'telephone', 'adresse_declarant', 'cp_declarant', 'ville_declarant' ) as $champ ) {
+foreach ( array( 'email', 'telephone' ) as $champ ) {
 	verifier( sprintf( '« %s » est exigé', $champ ), in_array( $champ, $requis, true ) );
 }
 
-foreach ( array( 'terrain_adresse', 'terrain_cp', 'terrain_ville' ) as $champ ) {
-	verifier( sprintf( 'l’adresse du terrain exige « %s »', $champ ), in_array( $champ, $requis, true ) );
+/*
+ * Les adresses ne portent plus `required`, et ce n'est pas un relâchement :
+ * l'obligation a changé de couche, comme en déclaration préalable. Le
+ * validateur générique n'accepte qu'une condition par champ — il ne saurait pas
+ * combiner « mode de saisie » et « même adresse que le déclarant », et lui
+ * laisser l'obligation aurait rendu obligatoire, case cochée, un bloc terrain
+ * que la personne ne remplit plus.
+ *
+ * Le banc le prouve donc là où l'obligation vit désormais, plutôt que de se
+ * contenter de constater l'absence du drapeau.
+ */
+foreach ( array( 'adresse_declarant', 'cp_declarant', 'ville_declarant', 'voie_declarant', 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'terrain_voie' ) as $champ ) {
+	verifier( sprintf( '« %s » ne porte pas `required` générique', $champ ), ! in_array( $champ, $requis, true ) );
+}
+
+$metier_pc = new ValidationMetierPermisConstruire();
+
+$sans_adresse = $metier_pc->valider( array( 'nature' => 'extension' ) );
+
+verifier( 'le métier exige l’adresse du déclarant',
+	'adresse_mode_absent' === ( $sans_adresse['mode_adresse_declarant'] ?? '' ) );
+verifier( 'le métier exige l’adresse du terrain',
+	'adresse_mode_absent' === ( $sans_adresse['mode_adresse'] ?? '' ) );
+
+$mode_seul = $metier_pc->valider(
+	array(
+		'nature'                 => 'extension',
+		'mode_adresse'           => 'automatique',
+		'mode_adresse_declarant' => 'manuel',
+	)
+);
+
+foreach ( array( 'terrain_adresse', 'terrain_cp', 'terrain_ville', 'terrain_insee', 'voie_declarant', 'cp_declarant', 'ville_declarant' ) as $champ ) {
+	verifier( sprintf( 'le métier exige « %s »', $champ ), 'champ_requis' === ( $mode_seul[ $champ ] ?? '' ) );
 }
 
 verifier( 'le projet principal est exigé', in_array( 'nature', $requis, true ) );
@@ -385,16 +417,47 @@ foreach ( $refus as $quoi => $clean ) {
 	verifier( sprintf( 'refusé : %s', $quoi ), array() !== $metier->valider( $clean ) );
 }
 
-$accepte = array(
-	'nature'                  => 'maison_individuelle',
-	'projets_supplementaires' => array( 'extension', 'annexe_garage' ),
+/**
+ * Les deux adresses d'un dossier recevable.
+ *
+ * Le métier les exige désormais : un dossier qui ne les porterait pas serait
+ * refusé pour une raison étrangère à ce que ces contrôles éprouvent — la
+ * cohérence des natures de projet. Les fournir valides, c'est isoler ce qui est
+ * réellement mesuré ici.
+ *
+ * @param array<string, mixed> $ajouts Ce que le contrôle impose.
+ * @return array<string, mixed>
+ */
+function avec_adresses( array $ajouts = array() ): array {
+	return array_merge(
+		array(
+			'mode_adresse_declarant' => 'automatique',
+			'adresse_declarant'      => '10 Rue de Rivoli 75004 Paris',
+			'insee_declarant'        => '75104',
+			'cp_declarant'           => '75004',
+			'ville_declarant'        => 'Paris',
+			'mode_adresse'           => 'automatique',
+			'terrain_adresse'        => '5 Avenue Anatole France 75007 Paris',
+			'terrain_insee'          => '75107',
+			'terrain_cp'             => '75007',
+			'terrain_ville'          => 'Paris',
+		),
+		$ajouts
+	);
+}
+
+$accepte = avec_adresses(
+	array(
+		'nature'                  => 'maison_individuelle',
+		'projets_supplementaires' => array( 'extension', 'annexe_garage' ),
+	)
 );
 
 verifier( 'accepté : un dossier cohérent', array() === $metier->valider( $accepte ) );
 
 // La matrice des six : chaque nature, principale, doit passer.
 foreach ( $natures as $id ) {
-	verifier( sprintf( 'la nature « %s » est acceptée comme principale', $id ), array() === $metier->valider( array( 'nature' => $id ) ) );
+	verifier( sprintf( 'la nature « %s » est acceptée comme principale', $id ), array() === $metier->valider( avec_adresses( array( 'nature' => $id ) ) ) );
 }
 
 // Les descriptions n'ont aucune incidence : ni sur l'acceptation, ni sur le prix.
