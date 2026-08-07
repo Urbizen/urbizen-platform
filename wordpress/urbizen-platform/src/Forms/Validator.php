@@ -295,6 +295,38 @@ final class Validator {
 	 * @param array<string, string> $errors Erreurs, modifiées sur place.
 	 * @return string|null
 	 */
+	/**
+	 * Décimales que le champ déclare, par son pas.
+	 *
+	 * **La précision est déjà dans le contrat.** Un champ qui annonce
+	 * `increment => 0.000001` dit qu'il compte au millionième ; en persister
+	 * deux décimales trahit sa propre déclaration. C'est ce qui plaçait une
+	 * latitude de 48,8555 à 48,86, soit six cents mètres plus loin.
+	 *
+	 * Aucun attribut nouveau n'est donc introduit : le pas suffisait, il n'était
+	 * pas lu. Les vingt-deux champs au centième gardent exactement leurs deux
+	 * décimales, et les champs au pas entier ne passent jamais par ici — ils
+	 * sont comptés, pas mesurés.
+	 *
+	 * @param array<string, mixed> $field Déclaration du champ.
+	 * @return int|null Null si le champ ne déclare rien d'exploitable.
+	 */
+	private static function decimales_declarees( array $field ): ?int {
+		if ( ! isset( $field['increment'] ) ) {
+			return null;
+		}
+
+		$pas = (float) $field['increment'];
+
+		// Un pas nul, négatif ou supérieur à l'unité ne décrit aucune précision
+		// fractionnaire : on s'en remet au défaut des mesures.
+		if ( $pas <= 0.0 || $pas >= 1.0 ) {
+			return null;
+		}
+
+		return (int) ceil( -log10( $pas ) );
+	}
+
 	private static function clean_decimal( array $field, $brut, string $name, array &$errors ): ?string {
 		$min = isset( $field['min'] ) ? (float) $field['min'] : null;
 		$max = isset( $field['max'] ) ? (float) $field['max'] : null;
@@ -305,14 +337,15 @@ final class Validator {
 		// que le second veut dire « je ne sais pas ».
 		$strict = ! empty( $field['strict_positif'] );
 
-		$issue = NombreLocalise::decimal( $brut, $min, $max, $strict );
+		$decimales = self::decimales_declarees( $field );
+		$issue     = NombreLocalise::decimal( $brut, $min, $max, $strict, $decimales );
 
 		switch ( $issue['etat'] ) {
 			case NombreLocalise::ABSENT:
 				return null;
 
 			case NombreLocalise::VALIDE:
-				return NombreLocalise::canonique( (float) $issue['valeur'] );
+				return NombreLocalise::canonique( (float) $issue['valeur'], $decimales );
 
 			case NombreLocalise::BORNE:
 				$errors[ $name ] = 'mesure_nulle' === $issue['raison'] ? 'mesure_nulle' : 'hors_bornes';

@@ -430,6 +430,12 @@ final class SubmissionController {
 		// d'abord et recopier ensuite est ce qui garantit qu'aucune valeur
 		// forgée ne se mêle à la copie — le navigateur n'envoie rien qui
 		// survive à cette étape.
+		// La décision est d'abord mise au clair : une case décochée laisse une
+		// liste vide dans la charge, qui ne dit rien et qu'un futur lecteur
+		// devrait réinterpréter. Après ceci, la clé porte « oui » ou n'existe
+		// pas.
+		$validation['clean'] = AdresseTerrain::normaliser_report( $validation['clean'] );
+
 		if ( AdresseTerrain::reportee( $validation['clean'] ) ) {
 			$reporte             = $declarant->exporter( $validation['clean'] );
 			$validation['clean'] = $terrain->purger( $validation['clean'], $ecartes );

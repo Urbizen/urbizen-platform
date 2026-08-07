@@ -400,12 +400,31 @@ verifier( 'la case absente ne coche pas', ! AdresseTerrain::reportee( array() ) 
 
 // Liste fermée, sans conversion permissive : une charge forgée qui tenterait
 // « 1 », « true » ou « on » ne doit pas déclencher la reconstruction.
-foreach ( array( '1', 1, 'true', true, 'on', 'yes', 'OUI', 'Oui', ' oui', 'non', '', null, array( 'oui' ) ) as $i => $valeur ) {
+foreach ( array( '1', 1, 'true', true, 'on', 'yes', 'OUI', 'Oui', ' oui', 'non', '', null ) as $i => $valeur ) {
 	verifier(
 		sprintf( 'la valeur non canonique #%d ne coche pas', $i ),
 		! AdresseTerrain::reportee( array( AdresseTerrain::REPORT => $valeur ) )
 	);
 }
+
+/*
+ * La forme que le serveur voit réellement est une LISTE : `clean_liste()`
+ * transforme tout champ `checkbox` en tableau, même à case unique. Ce banc
+ * exigeait autrefois qu'une liste ne coche jamais — il figeait la panne au lieu
+ * de la voir. Le vocabulaire complet des formes est éprouvé dans
+ * `test-report-adresse.php`, qui part d'un `$_POST` brut ; ici on garde le
+ * strict nécessaire pour que l'invariant ne se reperde pas.
+ */
+verifier( 'la liste canonique coche', AdresseTerrain::reportee( array( AdresseTerrain::REPORT => array( 'oui' ) ) ) );
+verifier( 'la liste vide ne coche pas', ! AdresseTerrain::reportee( array( AdresseTerrain::REPORT => array() ) ) );
+verifier( 'une liste contradictoire ne coche pas', ! AdresseTerrain::reportee( array( AdresseTerrain::REPORT => array( 'oui', 'non' ) ) ) );
+verifier( 'une liste non canonique ne coche pas', ! AdresseTerrain::reportee( array( AdresseTerrain::REPORT => array( '1' ) ) ) );
+
+// La normalisation tranche : « oui » en clair, ou rien du tout.
+verifier( 'normaliser rend la valeur canonique en clair',
+	'oui' === ( AdresseTerrain::normaliser_report( array( AdresseTerrain::REPORT => array( 'oui' ) ) )[ AdresseTerrain::REPORT ] ?? '' ) );
+verifier( 'et retire une liste vide',
+	! array_key_exists( AdresseTerrain::REPORT, AdresseTerrain::normaliser_report( array( AdresseTerrain::REPORT => array() ) ) ) );
 
 // L'export ne sort QUE le mode actif : c'est lui qui interdit qu'une charge
 // portant les deux modes laisse le mode abandonné alimenter la copie.

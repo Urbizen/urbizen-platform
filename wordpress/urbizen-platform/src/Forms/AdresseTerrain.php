@@ -253,17 +253,69 @@ final class AdresseTerrain {
 	/**
 	 * L'adresse du terrain est-elle reportée depuis celle du déclarant ?
 	 *
+	 * **Un champ `checkbox` arrive en LISTE**, même à case unique : le
+	 * navigateur envoie `terrain_meme_adresse_declarant=oui`, mais
+	 * {@see Validator::clean_liste()} rend `array( 'oui' )`. Lire un scalaire
+	 * ici ne lève aucune erreur — la condition est simplement toujours fausse,
+	 * et le report ne s'active jamais. C'est la panne qu'une recette de
+	 * production a révélée, et qu'aucun banc ne voyait parce que tous
+	 * injectaient un scalaire.
+	 *
+	 * La forme est donc lue comme {@see CustomerAcknowledgementRenderer} lit
+	 * ses options : liste ou scalaire, indifféremment. Le **contenu**, lui, est
+	 * plus strict que partout ailleurs, et délibérément : cette case décide que
+	 * le serveur écarte l'adresse du terrain reçue pour en fabriquer une autre.
+	 * Une liste qui porterait « oui » ET autre chose se contredit ; la retenir
+	 * reviendrait à trancher entre deux intentions que le demandeur n'a pas pu
+	 * exprimer. Une seule valeur, et c'est la valeur canonique.
+	 *
 	 * @param array<string, mixed> $charge Réponses nettoyées ou persistées.
 	 * @return bool
 	 */
 	public static function reportee( array $charge ): bool {
 		$brut = $charge[ self::REPORT ] ?? null;
 
-		if ( is_array( $brut ) || null === $brut ) {
+		if ( null === $brut ) {
 			return false;
 		}
 
-		return self::REPORT_VRAI === (string) $brut;
+		$valeurs = is_array( $brut ) ? array_values( $brut ) : array( $brut );
+
+		if ( 1 !== count( $valeurs ) ) {
+			return false;
+		}
+
+		$seule = $valeurs[0];
+
+		return is_scalar( $seule ) && self::REPORT_VRAI === (string) $seule;
+	}
+
+	/**
+	 * Écrit la décision de report sous une forme qui ne se relit pas de travers.
+	 *
+	 * Le socle conserve une **liste vide** pour une case décochée : la clé reste
+	 * dans la charge, sans rien dire. Persister cela laisse une valeur métier
+	 * ambiguë dans le dossier — et le prochain lecteur devra redécouvrir que le
+	 * vide veut dire non.
+	 *
+	 * On tranche donc à l'entrée : reportée, la clé porte la valeur canonique en
+	 * clair ; non reportée, elle disparaît. L'absence se lit « adresse du
+	 * terrain propre », comme l'absence d'un champ d'adresse se lit « non
+	 * renseigné » partout ailleurs dans cette classe.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, mixed>
+	 */
+	public static function normaliser_report( array $clean ): array {
+		if ( self::reportee( $clean ) ) {
+			$clean[ self::REPORT ] = self::REPORT_VRAI;
+
+			return $clean;
+		}
+
+		unset( $clean[ self::REPORT ] );
+
+		return $clean;
 	}
 
 	/**

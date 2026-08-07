@@ -49,13 +49,28 @@ final class NombreLocalise {
 	public const BORNE = 'borne';
 
 	/**
-	 * Décimales conservées à la persistance.
+	 * Décimales conservées à la persistance, par défaut.
 	 *
-	 * Deux suffisent à tout ce que ce formulaire mesure : un bassin au
+	 * Deux suffisent à tout ce que ce formulaire **mesure** : un bassin au
 	 * centimètre près, une surface au centième de mètre carré. Au-delà, on
 	 * persisterait du bruit de saisie en le faisant passer pour de la précision.
+	 *
+	 * **Mais tout nombre n'est pas une mesure.** Une latitude n'est pas une
+	 * longueur : deux décimales y valent environ un kilomètre, et arrondir
+	 * 48,8555 à 48,86 déplace le terrain de six cents mètres. Un champ dont le
+	 * contrat annonce un pas plus fin le dit déjà — c'est ce pas qui gouverne,
+	 * et cette constante n'est plus que le défaut de ceux qui n'en déclarent pas.
 	 */
 	public const DECIMALES = 2;
+
+	/**
+	 * Décimales acceptées au maximum.
+	 *
+	 * Six suffisent à une coordonnée : c'est le dixième de mètre, bien en deçà
+	 * de ce que la base officielle rend. Au-delà, on recopierait le bruit de la
+	 * représentation flottante en le faisant passer pour de la mesure.
+	 */
+	public const DECIMALES_MAX = 6;
 
 	/**
 	 * Normalise une mesure décimale.
@@ -66,9 +81,14 @@ final class NombreLocalise {
 	 * @param bool       $strict Refuser zéro : une mesure renseignée à 0 n'est
 	 *                           pas une mesure, c'est une case remplie par
 	 *                           habitude.
+	 * @param int|null   $decimales Décimales à conserver. Null retient
+	 *                              {@see self::DECIMALES} — le défaut des
+	 *                              mesures. Un champ qui a besoin de plus le
+	 *                              déclare, plutôt que de déplacer le défaut de
+	 *                              tous les autres.
 	 * @return array{etat:string,valeur:float|null,raison:string}
 	 */
-	public static function decimal( $brut, ?float $min = null, ?float $max = null, bool $strict = false ): array {
+	public static function decimal( $brut, ?float $min = null, ?float $max = null, bool $strict = false, ?int $decimales = null ): array {
 		$chaine = self::chaine( $brut );
 
 		if ( '' === $chaine ) {
@@ -87,7 +107,7 @@ final class NombreLocalise {
 			return self::issue( self::FORMAT, null, 'nombre_non_fini' );
 		}
 
-		$valeur = round( $valeur, self::DECIMALES );
+		$valeur = round( $valeur, self::bornerDecimales( $decimales ) );
 
 		if ( $strict && $valeur <= 0.0 ) {
 			return self::issue( self::BORNE, null, 'mesure_nulle' );
@@ -150,12 +170,29 @@ final class NombreLocalise {
 	 * @param float $valeur Valeur normalisée.
 	 * @return string
 	 */
-	public static function canonique( float $valeur ): string {
+	public static function canonique( float $valeur, ?int $decimales = null ): string {
 		// `rtrim` retire les zéros inutiles : 34.00 se persiste « 34 », pas
 		// « 34.00 » — une précision affichée qui n'existe pas est un mensonge.
-		$texte = number_format( $valeur, self::DECIMALES, '.', '' );
+		$texte = number_format( $valeur, self::bornerDecimales( $decimales ), '.', '' );
 
 		return str_contains( $texte, '.' ) ? rtrim( rtrim( $texte, '0' ), '.' ) : $texte;
+	}
+
+	/**
+	 * Ramène une demande de précision dans les bornes admises.
+	 *
+	 * Null vaut le défaut des mesures ; une demande négative n'a pas de sens ;
+	 * au-delà de {@see self::DECIMALES_MAX} on recopierait le bruit du flottant.
+	 *
+	 * @param int|null $decimales Précision demandée.
+	 * @return int
+	 */
+	private static function bornerDecimales( ?int $decimales ): int {
+		if ( null === $decimales ) {
+			return self::DECIMALES;
+		}
+
+		return max( 0, min( $decimales, self::DECIMALES_MAX ) );
 	}
 
 	/**

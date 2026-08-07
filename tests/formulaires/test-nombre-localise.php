@@ -162,6 +162,46 @@ verifier( '8,5 × 4 donne bien 34', 34.0 === round( $l['valeur'] * $g['valeur'],
 verifier( 'un transtypage PHP naïf aurait donné 32', 32.0 === round( (float) '8,5' * 4, 2 ) );
 verifier( 'le normaliseur, lui, donne 34', 34.0 === round( $l['valeur'] * $g['valeur'], 2 ) );
 
+echo "\n── Précision par champ : les coordonnées ne dégradent pas les mesures\n";
+
+/*
+ * Le défaut d'origine : `decimal()` arrondissait TOUT au centième. Juste pour un
+ * bassin, faux pour une latitude — 48,8555 devenait 48,86, soit six cents
+ * mètres plus loin. La précision est désormais demandée par le champ.
+ *
+ * Ce qui compte ici est autant ce qui change que ce qui NE change pas : le
+ * défaut reste le centième, et rien de ce qui se mesure n'a bougé.
+ */
+
+verifier( 'le défaut reste au centième', 2 === N::DECIMALES );
+verifier( 'le maximum admis est le millionième', 6 === N::DECIMALES_MAX );
+
+// Sans demande explicite : comportement d'avant, à l'identique.
+verifier( 'sans précision demandée, 48,8555 est ramené à 48,86', 48.86 === N::decimal( '48.8555' )['valeur'] );
+verifier( 'une surface garde ses deux décimales', 34.57 === N::decimal( '34.567' )['valeur'] );
+verifier( 'et sa forme canonique', '34.57' === N::canonique( 34.567 ) );
+
+// Précision demandée : la coordonnée survit.
+verifier( 'à six décimales, 48,8555 reste 48,8555', 48.8555 === N::decimal( '48.8555', null, null, false, 6 )['valeur'] );
+verifier( 'et 2,36041 reste 2,36041', 2.36041 === N::decimal( '2.36041', null, null, false, 6 )['valeur'] );
+verifier( 'la forme canonique ne tronque pas', '48.8555' === N::canonique( 48.8555, 6 ) );
+verifier( 'ni pour la longitude', '2.36041' === N::canonique( 2.36041, 6 ) );
+verifier( 'les zéros inutiles partent quand même', '48.8555' === N::canonique( 48.855500, 6 ) );
+verifier( 'un entier reste sans décimale', '48' === N::canonique( 48.0, 6 ) );
+
+// Les bornes sont demandées après l'arrondi : une précision plus fine ne doit
+// pas faire franchir une borne à une valeur qui la respectait.
+verifier( 'une latitude à la borne passe', 90.0 === N::decimal( '90', -90.0, 90.0, false, 6 )['valeur'] );
+verifier( 'au-delà, elle est refusée', N::BORNE === N::decimal( '90.000001', -90.0, 90.0, false, 6 )['etat'] );
+
+// Demandes aberrantes : ramenées dans les bornes, jamais honorées telles quelles.
+verifier( 'une précision négative vaut zéro décimale', 49.0 === N::decimal( '48.8555', null, null, false, -3 )['valeur'] );
+verifier( 'une précision démesurée est plafonnée', 48.8555 === N::decimal( '48.8555', null, null, false, 99 )['valeur'] );
+
+// La lecture localisée n'est pas affectée par la précision.
+verifier( 'la virgule reste lue à six décimales', 48.8555 === N::decimal( '48,8555', null, null, false, 6 )['valeur'] );
+verifier( 'et l’ambiguïté reste refusée', N::FORMAT === N::decimal( '48,85.55', null, null, false, 6 )['etat'] );
+
 printf( "\n%s\n", 0 === $echecs ? 'TOUS LES CONTROLES PASSENT' : sprintf( '%d CONTROLE(S) EN ECHEC', $echecs ) );
 
 exit( 0 === $echecs ? 0 : 1 );
