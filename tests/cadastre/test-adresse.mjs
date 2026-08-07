@@ -58,8 +58,8 @@ const ANTI_REBOND = 260;
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /** Monte le document DP et le module d'adresse, service simulé. */
-async function monter() {
-  const html = readFileSync(resolve(THEME, "assets/forms/dp-formulaire.html"), "utf8").replace(
+async function monter(FICHIER) {
+  const html = readFileSync(resolve(THEME, "assets/forms/" + FICHIER), "utf8").replace(
     /<script src="[^"]*urbizen-form-[a-z]+\.js[^"]*"><\/script>/g,
     ""
   );
@@ -154,7 +154,18 @@ async function monter() {
   return { dom, w, d, form, bloc, champ, val, chercher, propositions, retenir, basculerManuel, saisir, report, caseReport, cocher, envoyes, encadre, texteEncadre, noteEncadre };
 }
 
-const C = await monter();
+/* Les deux parcours portent le même composant : les éprouver par le même code
+ * est la seule façon de garantir qu'ils ne divergeront pas. Ce qui leur est
+ * propre — le nom du document, le libellé de la recherche — tient dans l'appel.
+ */
+const PARCOURS = [
+  { nom: "DP", fichier: "dp-formulaire.html" },
+  { nom: "PC", fichier: "pc-formulaire.html" },
+];
+
+async function eprouver(P) {
+console.log(`\n══════════ ${P.nom} — ${P.fichier} ══════════`);
+const C = await monter(P.fichier);
 
 /* ------------------------------------------------------------------ */
 titre("1. Deux composants montés en même temps");
@@ -342,15 +353,19 @@ titre("14. Lisibilité mobile (390 px)");
 
 /* jsdom ne calcule pas de mise en page : ce qui se vérifie ici est la règle
  * qui la produit. Le rendu réel à 390 px est contrôlé au navigateur. */
-const CSS = readFileSync(resolve(THEME, "assets/forms/dp-formulaire.html"), "utf8");
+const CSS = readFileSync(resolve(THEME, "assets/forms/" + P.fichier), "utf8");
 
 check("la cible tactile des cases fait au moins 44 px", /\.dp-adresse-bascule\s*\{[^}]*min-height:\s*44px/.test(CSS));
 check("l’encadré de report a son propre style", CSS.includes(".dp-report-encadre"));
 check("et un style d’erreur distinct", CSS.includes(".dp-report.is-error .dp-report-encadre"));
 check("le document déclare une grille repliable en mobile", /@media[^{]*max-width[^{]*\{[\s\S]*?grid-template-columns:\s*1fr/.test(CSS));
 
+C.dom.window.close();
+}
+
+for (const P of PARCOURS) await eprouver(P);
+
 /* ------------------------------------------------------------------ */
 console.log(`\n${0 === fail ? "TOUS LES CONTROLES PASSENT" : `${fail} CONTROLE(S) EN ECHEC`}`);
 
-C.dom.window.close();
 process.exit(0 === fail ? 0 : 1);

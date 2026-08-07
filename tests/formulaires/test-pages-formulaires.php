@@ -270,7 +270,7 @@ foreach ( array( 'declaration-prealable' => $dp, 'permis-de-construire' => $pc )
 //
 // Socle commun, sept : deux feuilles — tarifs, pièces — et cinq scripts —
 // tarifs, pièces, nombres, champs conditionnels, pont.
-$attendues = array( 'DP thème' => 8, 'DP maquette' => 8, 'PC thème' => 7, 'PC maquette' => 7 );
+$attendues = array( 'DP thème' => 8, 'DP maquette' => 8, 'PC thème' => 8, 'PC maquette' => 8 );
 
 foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	preg_match_all( '/urbizen-form-[a-z]+\.(?:js|css)\?v=([0-9.]+)/', $doc, $versions );
@@ -289,11 +289,12 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 	);
 }
 
-// Le module d'adresse n'est chargé que là où le balisage existe. Le charger
-// partout ne casserait rien — il ne s'initialise pas sans composant — mais
-// ferait télécharger un script inutile, et laisserait croire que le permis de
-// construire porte déjà l'adresse assistée.
-foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq ) as $nom => $doc ) {
+// Le module d'adresse n'est chargé que là où le balisage existe : il ne
+// s'initialise pas sans composant, mais le charger à vide ferait télécharger un
+// script inutile. Les deux parcours le portent désormais, et les mêmes
+// exigences valent pour l'un comme pour l'autre — les recopier aurait suffi à
+// les faire diverger.
+foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	verifier( sprintf( '%s : le module d’adresse est chargé', $nom ),
 		str_contains( $doc, 'urbizen-form-adresse.js?v=' . $version ) );
 	// Deux blocs, chacun nommant son rôle : le module ne connaît que des rôles,
@@ -351,9 +352,20 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq ) as $nom => $doc 
 		1 === substr_count( $doc, 'name="terrain_cp"' ) && 1 === substr_count( $doc, 'name="terrain_ville"' ) );
 }
 
+// Le titre de recherche nomme ce que chaque parcours cherche, sans jargon.
+verifier( 'DP : le titre de recherche du terrain est le bon',
+	str_contains( $dp, 'Rechercher l’adresse du terrain' ) );
+verifier( 'PC : le titre de recherche du demandeur est le bon',
+	str_contains( $pc, 'Rechercher l’adresse du demandeur' ) );
+
+// Le cadastre ne suit pas l'adresse : la case de report ne doit toucher qu'au
+// composant, et les champs de parcelle restent hors de tout bloc `data-adresse`.
 foreach ( array( 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
-	verifier( sprintf( '%s : le module d’adresse n’y est pas encore', $nom ),
-		! str_contains( $doc, 'urbizen-form-adresse.js' ) && ! str_contains( $doc, 'data-adresse>' ) && ! str_contains( $doc, 'data-adresse=' ) );
+	foreach ( array( 'cad_section', 'cad_numero', 'terrain_superficie', 'terrain_etat' ) as $champ ) {
+		verifier( sprintf( '%s : « %s » reste hors du composant d’adresse', $nom, $champ ),
+			1 === substr_count( $doc, 'name="' . $champ . '"' )
+			&& ! preg_match( '/data-adresse="terrain"[\s\S]{0,4000}?name="' . $champ . '"[\s\S]{0,600}?<\/div>\s*<div class="dp-field"><label for="t_sec"/', $doc ) );
+	}
 }
 
 /* ================================================================== *

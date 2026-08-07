@@ -672,22 +672,18 @@ preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette, $sd );
 preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette_pc, $sp );
 
 /*
- * Les deux maquettes restent interchangeables, à UNE exception nommée : le
- * report « même adresse que le déclarant » n'existe qu'en déclaration
- * préalable. L'exclure de la comparaison garde la garantie entière — aucune
- * AUTRE dérive n'est tolérée — tout en disant laquelle est voulue. Comparer
- * sans le dire aurait laissé croire à une parité que le document n'a plus.
+ * Les deux maquettes redeviennent strictement interchangeables.
  *
- * Le jour où le permis de construire portera le report, la première assertion
- * échouera d'elle-même et rappellera de supprimer l'exception.
+ * Le temps d'une tranche, le report « même adresse que le déclarant » n'a
+ * existé qu'en déclaration préalable, et cette comparaison portait une
+ * exception nommée pour ne pas laisser croire à une parité rompue. Le permis de
+ * construire porte le report à son tour : l'exception disparaît, et l'égalité
+ * stricte reprend ses droits. C'est l'assertion elle-même qui l'a rappelé en
+ * échouant — c'est ce qu'on lui demandait.
  */
-$sans_report = static fn( string $css ): string => (string) preg_replace( '/\s*#dp-app [^{}]*\.dp-report[^{}]*\{[^}]*\}/', '', $css );
-
-check(
-	'14 · le report est propre au DP',
-	str_contains( $sd[1] ?? '', '.dp-report-encadre' ) && ! str_contains( $sp[1] ?? '', '.dp-report' )
-);
-check( '14 · DP et PC portent le même CSS par ailleurs', $sans_report( $sd[1] ?? 'a' ) === $sans_report( $sp[1] ?? 'b' ) );
+check( '14 · le report existe des deux côtés',
+	str_contains( $sd[1] ?? '', '.dp-report-encadre' ) && str_contains( $sp[1] ?? '', '.dp-report-encadre' ) );
+check( '14 · DP et PC portent le même CSS', ( $sd[1] ?? 'a' ) === ( $sp[1] ?? 'b' ) );
 
 // ======================================================================
 // 11 · ÉCHAPPEMENT
