@@ -93,6 +93,39 @@ titre "Parcours de conception — DOM simulé"
 node test-conception.mjs
 verdict $? "test-conception.mjs"
 
+# Le moteur tarifaire partagé des formulaires DP et PCMI, éprouvé sur le HTML
+# réel des quatre documents (thème et maquettes) : barème, travaux
+# supplémentaires, suppléments, récapitulatif et parité des sources.
+titre "Tarification DP / PCMI — DOM simulé"
+node test-tarifs.mjs
+verdict $? "test-tarifs.mjs"
+
+# Les pièces du projet : message rassurant, report à plus tard, récapitulatif
+# « À transmettre ultérieurement » et absence de blocage à l'envoi.
+titre "Pièces du projet DP / PCMI — DOM simulé"
+node test-pieces.mjs
+verdict $? "test-pieces.mjs"
+
+# Pont sécurisé entre la page WordPress et les iframes DP et PC : ce qui protège
+# le nonce, et ce qui empêche qu'une erreur devienne un faux succès. Les deux
+# parcours passent par les mêmes contrôles, dans une seule boucle.
+# Les champs conditionnés par la nature : la matrice du serveur, appliquée par
+# le navigateur, et surtout ce qui part réellement dans le FormData.
+titre "Champs conditionnels DP / PC — DOM simulé"
+node test-champs.mjs
+verdict $? "test-champs.mjs"
+
+titre "Pont DP / PC — DOM simulé"
+node test-pont.mjs
+verdict $? "test-pont.mjs"
+
+# Deux adresses assistées sur une même page, et la case qui reporte celle du
+# déclarant sur le terrain : indépendance des instances, retrait effectif du
+# bloc terrain, et rien de masqué qui reste soumettable.
+titre "Adresses assistées DP — DOM simulé"
+node test-adresse.mjs
+verdict $? "test-adresse.mjs"
+
 titre "3/4 — Cadastre, rendu PHP"
 "$PHP_BIN" test-render.php
 verdict $? "test-render.php"
@@ -104,7 +137,7 @@ verdict $? "test-form-render.php"
 # --- Bilan ---
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 5 bancs passent.\033[0m\n'
+	printf '\033[32mLes 10 bancs passent.\033[0m\n'
 	exit 0
 fi
 

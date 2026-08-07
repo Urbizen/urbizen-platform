@@ -24,6 +24,8 @@
 
 namespace Urbizen\Platform\Files;
 
+use Urbizen\Platform\Forms\CatalogueRegistry;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -43,6 +45,34 @@ final class UploadProfileRegistry {
 				// Profil Conception, assemblé depuis les constantes historiques :
 				// mêmes blocs, formats, quantités et tailles, à l'octet près.
 				return UploadPolicy::conception_profile();
+
+			case 'declaration_prealable':
+			case 'permis_construire':
+				// Mêmes formats et mêmes tailles que Conception, sur les sept
+				// blocs du catalogue. Les blocs viennent du catalogue **du
+				// type** : un type de pièce ajouté à l'interface devient
+				// déposable sans seconde déclaration, et un champ fichier hors
+				// catalogue est refusé.
+				//
+				// Les deux parcours partagent la même liste de pièces et les
+				// mêmes plafonds. Déclarer deux profils identiques n'aurait rien
+				// prouvé et aurait laissé les deux dériver.
+				$catalogue = CatalogueRegistry::for_type( $type );
+
+				if ( null === $catalogue ) {
+					return null;
+				}
+
+				return new UploadProfile(
+					$type,
+					$catalogue::blocs(),
+					UploadPolicy::TYPES,
+					UploadPolicy::max_per_block(),
+					UploadPolicy::max_total(),
+					UploadPolicy::max_file_size(),
+					UploadPolicy::max_total_size(),
+					true,
+				);
 
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de profil.

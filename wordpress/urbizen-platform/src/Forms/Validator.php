@@ -235,7 +235,15 @@ final class Validator {
 		$valeur = str_replace( array( "\r", "\n" ), '', $valeur );
 		$valeur = strtolower( $valeur );
 
-		if ( ! filter_var( $valeur, FILTER_VALIDATE_EMAIL ) ) {
+		// `is_email()` est la référence de WordPress : elle refuse des adresses
+		// que `filter_var` accepte (TLD absent, point final, label vide). On
+		// l'utilise dès qu'elle est chargée, et on retombe sur le filtre PHP
+		// dans les bancs, qui s'exécutent sans WordPress.
+		$valide = function_exists( 'is_email' )
+			? (bool) is_email( $valeur )
+			: (bool) filter_var( $valeur, FILTER_VALIDATE_EMAIL );
+
+		if ( ! $valide ) {
 			$errors['email'] = 'email_invalide';
 		}
 
@@ -251,31 +259,137 @@ final class Validator {
 	 * @param array<string, string> $errors Erreurs, modifiées sur place.
 	 * @return int|null
 	 */
-	private static function clean_number( array $field, $brut, string $name, array &$errors ): ?int {
-		if ( null === $brut || '' === $brut || is_array( $brut ) ) {
+	private static function clean_number( array $field, $brut, string $name, array &$errors ) {
+		// Un champ dont le pas est fractionnaire mesure quelque chose : une
+		// longueur, une surface. Les autres comptent : des logements, des
+		// niveaux, des panneaux. Les deux ne se valident pas de la même façon,
+		// et confondre les deux est ce qui faisait rejeter « 8.5 » — le contrôle
+		// historique exigeait que la valeur soit égale à sa troncature entière.
+		$pas      = isset( $field['increment'] ) ? (float) $field['increment'] : 1.0;
+		$decimale = $pas > 0.0 && $pas < 1.0;
+
+		if ( ! $decimale ) {
+			return self::clean_entier( $field, $brut, $name, $errors );
+		}
+
+		return self::clean_decimal( $field, $brut, $name, $errors );
+	}
+
+	/**
+	 * Mesure décimale, telle qu'une personne l'écrit.
+	 *
+	 * Tout passe par {@see NombreLocalise} : c'est le seul chemin, et il rend un
+	 * verdict explicite plutôt qu'un nombre ou `false`. Un transtypage PHP
+	 * transformerait « 8,5 » en 8 sans rien signaler, et cette valeur-là finit
+	 * dans un CERFA.
+	 *
+	 * La valeur est persistée sous sa **forme canonique**, en chaîne : point
+	 * décimal, deux décimales au plus, sans zéro inutile. `8,50` devient `8.5`
+	 * et `34,00` devient `34`. Une chaîne et non un flottant, pour que ce qui
+	 * est relu soit exactement ce qui a été écrit — un flottant réintroduirait
+	 * les surprises de représentation que l'arrondi vient d'écarter.
+	 *
+	 * @param array<string, mixed>  $field  Déclaration.
+	 * @param mixed                 $brut   Valeur reçue.
+	 * @param string                $name   Nom du champ.
+	 * @param array<string, string> $errors Erreurs, modifiées sur place.
+	 * @return string|null
+	 */
+	/**
+	 * Décimales que le champ déclare, par son pas.
+	 *
+	 * **La précision est déjà dans le contrat.** Un champ qui annonce
+	 * `increment => 0.000001` dit qu'il compte au millionième ; en persister
+	 * deux décimales trahit sa propre déclaration. C'est ce qui plaçait une
+	 * latitude de 48,8555 à 48,86, soit six cents mètres plus loin.
+	 *
+	 * Aucun attribut nouveau n'est donc introduit : le pas suffisait, il n'était
+	 * pas lu. Les vingt-deux champs au centième gardent exactement leurs deux
+	 * décimales, et les champs au pas entier ne passent jamais par ici — ils
+	 * sont comptés, pas mesurés.
+	 *
+	 * @param array<string, mixed> $field Déclaration du champ.
+	 * @return int|null Null si le champ ne déclare rien d'exploitable.
+	 */
+	private static function decimales_declarees( array $field ): ?int {
+		if ( ! isset( $field['increment'] ) ) {
 			return null;
 		}
 
-		$valeur = is_string( $brut ) ? trim( $brut ) : $brut;
+		$pas = (float) $field['increment'];
 
-		if ( ! is_numeric( $valeur ) || (string) (int) $valeur !== (string) $valeur ) {
-			$errors[ $name ] = 'nombre_invalide';
+		// Un pas nul, négatif ou supérieur à l'unité ne décrit aucune précision
+		// fractionnaire : on s'en remet au défaut des mesures.
+		if ( $pas <= 0.0 || $pas >= 1.0 ) {
 			return null;
 		}
 
-		$entier = (int) $valeur;
+		return (int) ceil( -log10( $pas ) );
+	}
 
-		if ( isset( $field['min'] ) && $entier < (int) $field['min'] ) {
-			$errors[ $name ] = 'sous_le_minimum';
-			return null;
+	private static function clean_decimal( array $field, $brut, string $name, array &$errors ): ?string {
+		$min = isset( $field['min'] ) ? (float) $field['min'] : null;
+		$max = isset( $field['max'] ) ? (float) $field['max'] : null;
+
+		// `strict_positif` : une mesure renseignée vaut forcément plus que zéro.
+		// Un bassin de 0 m de long n'est pas une mesure, c'est une case remplie
+		// par habitude — et la distinguer d'un champ laissé vide compte, parce
+		// que le second veut dire « je ne sais pas ».
+		$strict = ! empty( $field['strict_positif'] );
+
+		$decimales = self::decimales_declarees( $field );
+		$issue     = NombreLocalise::decimal( $brut, $min, $max, $strict, $decimales );
+
+		switch ( $issue['etat'] ) {
+			case NombreLocalise::ABSENT:
+				return null;
+
+			case NombreLocalise::VALIDE:
+				return NombreLocalise::canonique( (float) $issue['valeur'], $decimales );
+
+			case NombreLocalise::BORNE:
+				$errors[ $name ] = 'mesure_nulle' === $issue['raison'] ? 'mesure_nulle' : 'hors_bornes';
+				return null;
+
+			default:
+				$errors[ $name ] = 'nombre_invalide';
+				return null;
 		}
+	}
 
-		if ( isset( $field['max'] ) && $entier > (int) $field['max'] ) {
-			$errors[ $name ] = 'au_dela_du_maximum';
-			return null;
+	/**
+	 * Comptage entier.
+	 *
+	 * `3,5` panneaux n'est pas une valeur à arrondir : c'est une saisie qui n'a
+	 * pas de sens, et l'arrondir inventerait une réponse.
+	 *
+	 * @param array<string, mixed>  $field  Déclaration.
+	 * @param mixed                 $brut   Valeur reçue.
+	 * @param string                $name   Nom du champ.
+	 * @param array<string, string> $errors Erreurs, modifiées sur place.
+	 * @return int|null
+	 */
+	private static function clean_entier( array $field, $brut, string $name, array &$errors ): ?int {
+		$min = isset( $field['min'] ) ? (int) $field['min'] : null;
+		$max = isset( $field['max'] ) ? (int) $field['max'] : null;
+
+		$issue = NombreLocalise::entier( $brut, $min, $max );
+
+		switch ( $issue['etat'] ) {
+			case NombreLocalise::ABSENT:
+				return null;
+
+			case NombreLocalise::VALIDE:
+				return (int) $issue['valeur'];
+
+			case NombreLocalise::BORNE:
+				$errors[ $name ] = 'sous_borne' === $issue['raison'] ? 'sous_le_minimum' : 'au_dela_du_maximum';
+				return null;
+
+			default:
+				$errors[ $name ] = 'nombre_invalide';
+				return null;
 		}
-
-		return $entier;
 	}
 
 	/**
@@ -392,6 +506,13 @@ final class Validator {
 			$notes[] = 'pricing_strategy_absente:' . $def->type();
 
 			return null;
+		}
+
+		// Une stratégie dont le socle dépend des réponses reçoit celles-ci —
+		// déjà nettoyées et bornées par les passes précédentes. Les autres
+		// gardent le contrat historique, inchangé.
+		if ( $strategie instanceof PricingStrategyContextuelle ) {
+			return $strategie->calculate_with_context( $selection, $clean );
 		}
 
 		$pricing = $strategie->calculate( $selection );

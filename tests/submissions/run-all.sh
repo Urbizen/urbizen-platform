@@ -41,6 +41,10 @@ titre "2/11 — Conservation : type de contenu privé et repository"
 "$PHP_BIN" test-storage.php
 verdict $? "test-storage.php"
 
+# Réponse JSON et négociation de contenu : la forme change, le pipeline non.
+"$PHP_BIN" test-reponse-json.php
+verdict $? "test-reponse-json.php"
+
 titre "3/11 — Contrôleur de soumission"
 "$PHP_BIN" test-controller.php
 verdict $? "test-controller.php"
@@ -92,6 +96,12 @@ verdict $? "test-corbeille.php"
 "$PHP_BIN" test-persistance.php
 verdict $? "test-persistance.php"
 
+"$PHP_BIN" test-creneaux.php
+verdict $? "test-creneaux.php"
+
+"$PHP_BIN" test-accuse-client.php
+verdict $? "test-accuse-client.php"
+
 "$PHP_BIN" test-courriel.php
 verdict $? "test-courriel.php"
 
@@ -121,7 +131,7 @@ verdict $? "test-mutation.php"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 23 bancs passent.\033[0m\n'
+	printf '\033[32mLes 25 bancs passent.\033[0m\n'
 	exit 0
 fi
 

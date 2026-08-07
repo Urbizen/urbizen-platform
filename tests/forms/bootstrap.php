@@ -25,6 +25,9 @@ if ( ! function_exists( '__' ) ) {
 require_once URBIZEN_PLATFORM_DIR . 'src/Support/Logger.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/FormDefinition.php';
 require_once URBIZEN_PLATFORM_DIR . 'src/Forms/FormRegistry.php';
+// Les définitions demandent à AdresseTerrain les noms canoniques de chaque rôle
+// d'adresse : sans autoloader, ce banc doit le charger lui-même.
+require_once URBIZEN_PLATFORM_DIR . 'src/Forms/AdresseTerrain.php';
 
 /**
  * Compteur d'échecs partagé.

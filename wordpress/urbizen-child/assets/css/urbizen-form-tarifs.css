@@ -1,0 +1,296 @@
+/**
+ * Styles partagés du bloc tarifaire des formulaires d'autorisation (DP, PCMI).
+ *
+ * Chargée par les quatre documents de formulaire — les deux maquettes de
+ * `frontend/formulaires/` et les deux copies servies par le thème — afin que
+ * l'étape « Travaux supplémentaires » et le récapitulatif n'existent qu'en un
+ * seul exemplaire. Les jetons (`--ink`, `--mint`, `--radius`…) sont ceux déjà
+ * déclarés par `#dp-app` dans chaque document : cette feuille n'en définit
+ * aucun et ne fonctionne que scopée à `#dp-app`.
+ */
+
+/* -------- Rappel du regroupement -------- */
+#dp-app .dp-regroupement {
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--cadastre);
+  background: var(--cadastre-sf);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#dp-app .dp-tarifs-principal {
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  margin: 0 0 18px;
+  max-width: 60ch;
+}
+
+/* -------- Répéteur de travaux -------- */
+#dp-app .dp-travaux {
+  display: grid;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+
+#dp-app .dp-travail {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+#dp-app .dp-travail-tete {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+#dp-app .dp-travail-num {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+#dp-app .dp-travail-prix {
+  margin-left: auto;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  color: var(--cadastre-dk);
+  white-space: nowrap;
+}
+
+/* Le bouton offre une cible d'au moins 44 px dans les deux dimensions, sans
+   paraître massif : le soulignement porte sur le mot, pas sur la zone. Les
+   marges négatives absorbent la hauteur ajoutée pour que la rangée ne grandisse
+   pas. */
+#dp-app .dp-travail-suppr {
+  font-family: inherit;
+  font-size: 12.5px;
+  color: var(--error);
+  background: none;
+  border: none;
+  padding: 0 10px;
+  margin: -12px -10px;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+#dp-app .dp-travail-suppr-txt {
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+
+#dp-app .dp-travail-suppr:hover,
+#dp-app .dp-travail-suppr:focus-visible {
+  color: var(--ink);
+}
+
+#dp-app .dp-travail-ajouter {
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--cadastre-dk);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  padding: 11px 16px;
+  width: 100%;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+
+#dp-app .dp-travail-ajouter:hover,
+#dp-app .dp-travail-ajouter:focus-visible {
+  border-color: var(--cadastre);
+  border-style: solid;
+  background: var(--cadastre-sf);
+}
+
+/* -------- Option de dépôt --------
+   `.dp-option` est le <label> lui-même : la case y est imbriquée, donc toute la
+   ligne — texte et montant compris — est cliquable, sans dépendre de la seule
+   liaison for/id. La hauteur minimale garantit une cible confortable au doigt. */
+#dp-app .dp-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 22px 0;
+  padding: 14px 16px;
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 400;
+  font-size: 13.5px;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+#dp-app .dp-option:hover,
+#dp-app .dp-option:focus-within {
+  border-color: var(--cadastre);
+}
+
+#dp-app .dp-option input {
+  flex: none;
+  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  accent-color: var(--cadastre);
+}
+
+#dp-app .dp-option .dp-option-texte {
+  font-weight: 400;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+#dp-app .dp-option .dp-option-prix {
+  font-family: "IBM Plex Mono", monospace;
+  color: var(--cadastre-dk);
+  white-space: nowrap;
+}
+
+/* -------- Récapitulatif -------- */
+#dp-app .dp-recap {
+  margin: 24px 0 0;
+  padding: 20px 22px;
+  border: 1px solid #9EDBBC;
+  border-radius: var(--radius);
+  background: var(--mint);
+  background: linear-gradient(180deg, #F0FBF5, #E4F5EC);
+}
+
+#dp-app .dp-recap-titre {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+
+#dp-app .dp-recap-lignes {
+  margin: 0;
+  padding: 0;
+}
+
+#dp-app .dp-recap-ligne {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 5px 0;
+}
+
+/* Le filet de conduite relie le libellé à son montant, façon nomenclature. */
+#dp-app .dp-recap-ligne::after {
+  content: "";
+  order: 1;
+  flex: 1 1 auto;
+  height: 0;
+  border-bottom: 1px dotted var(--line-strong);
+  transform: translateY(-3px);
+}
+
+#dp-app .dp-recap-ligne dt {
+  order: 0;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+#dp-app .dp-recap-ligne dd {
+  order: 2;
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13.5px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+#dp-app .dp-recap-ligne.is-detail {
+  padding-left: 18px;
+}
+
+#dp-app .dp-recap-ligne.is-detail dt,
+#dp-app .dp-recap-ligne.is-detail dd {
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+
+#dp-app .dp-recap-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid #9EDBBC;
+}
+
+#dp-app .dp-recap-total span {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#dp-app .dp-recap-total strong {
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(22px, 2.8vw, 30px);
+  line-height: 1.1;
+  white-space: nowrap;
+}
+
+#dp-app .dp-recap-mention {
+  margin: 12px 0 0;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+#dp-app .dp-recap-vide {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+}
+
+/* Sur l'écran de confirmation, le même composant en plus sobre. */
+#dp-app .dp-done .dp-recap {
+  margin: 26px 0;
+  text-align: left;
+}
+
+/* -------- Responsive -------- */
+@media (max-width: 720px) {
+  #dp-app .dp-travail-tete {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  #dp-app .dp-travail-prix {
+    margin-left: 0;
+  }
+
+  /* Le filet de conduite ne tient pas sur deux lignes : on l'escamote. */
+  #dp-app .dp-recap-ligne {
+    flex-wrap: wrap;
+    gap: 2px 12px;
+  }
+
+  #dp-app .dp-recap-ligne::after {
+    display: none;
+  }
+
+  #dp-app .dp-recap-ligne dd {
+    margin-left: auto;
+  }
+}

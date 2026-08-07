@@ -671,6 +671,18 @@ $maquette_pc = (string) file_get_contents( dirname( __DIR__, 2 ) . '/frontend/fo
 preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette, $sd );
 preg_match( '/<style[^>]*>(.*?)<\/style>/s', $maquette_pc, $sp );
 
+/*
+ * Les deux maquettes redeviennent strictement interchangeables.
+ *
+ * Le temps d'une tranche, le report « même adresse que le déclarant » n'a
+ * existé qu'en déclaration préalable, et cette comparaison portait une
+ * exception nommée pour ne pas laisser croire à une parité rompue. Le permis de
+ * construire porte le report à son tour : l'exception disparaît, et l'égalité
+ * stricte reprend ses droits. C'est l'assertion elle-même qui l'a rappelé en
+ * échouant — c'est ce qu'on lui demandait.
+ */
+check( '14 · le report existe des deux côtés',
+	str_contains( $sd[1] ?? '', '.dp-report-encadre' ) && str_contains( $sp[1] ?? '', '.dp-report-encadre' ) );
 check( '14 · DP et PC portent le même CSS', ( $sd[1] ?? 'a' ) === ( $sp[1] ?? 'b' ) );
 
 // ======================================================================

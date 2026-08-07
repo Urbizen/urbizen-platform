@@ -41,7 +41,28 @@ final class ValidationMessages {
 				return __( 'Cette adresse électronique n’est pas valide.', 'urbizen-platform' );
 
 			case 'nombre_invalide':
-				return __( 'Indiquez un nombre entier valide.', 'urbizen-platform' );
+				// « entier » n'était vrai que tant que tous les nombres l'étaient.
+				// Les mesures acceptent désormais la virgule, et le message doit
+				// le dire — sinon la personne corrige ce qui n'est pas en cause.
+				return __( 'Indiquez un nombre valide. La virgule et le point sont acceptés.', 'urbizen-platform' );
+
+			case 'mesure_nulle':
+				return __( 'Indiquez une mesure supérieure à zéro, ou laissez le champ vide.', 'urbizen-platform' );
+
+			// L'adresse arrive de deux façons ; sans savoir laquelle, on ne peut
+			// ni choisir ni deviner. Le message dit quoi faire, pas ce qui
+			// manque techniquement.
+			case 'adresse_mode_absent':
+				return __( 'Indiquez l’adresse du terrain, en la recherchant ou en la saisissant manuellement.', 'urbizen-platform' );
+
+			case 'adresse_mode_inconnu':
+				return __( 'Le mode de saisie de l’adresse n’est pas reconnu. Reprenez la saisie de l’adresse.', 'urbizen-platform' );
+
+			case 'coordonnee_orpheline':
+				return __( 'La position du terrain est incomplète. Sélectionnez à nouveau l’adresse.', 'urbizen-platform' );
+
+			case 'hors_bornes':
+				return __( 'Cette valeur est en dehors des limites autorisées.', 'urbizen-platform' );
 
 			case 'sous_le_minimum':
 				return __( 'La valeur est inférieure au minimum autorisé.', 'urbizen-platform' );
@@ -51,6 +72,21 @@ final class ValidationMessages {
 
 			case 'hors_liste':
 				return __( 'Cette valeur ne fait pas partie des choix proposés.', 'urbizen-platform' );
+
+			case 'projet_inconnu':
+				return __( 'Ce projet ne fait pas partie de ceux que nous pouvons traiter.', 'urbizen-platform' );
+
+			case 'projet_identique_au_principal':
+				return __( 'Ce projet est déjà votre projet principal. Choisissez-en un autre.', 'urbizen-platform' );
+
+			case 'projet_en_double':
+				return __( 'Ce projet figure deux fois. Chaque projet ne peut être ajouté qu’une seule fois.', 'urbizen-platform' );
+
+			case 'projets_trop_nombreux':
+				return __( 'Vous avez ajouté trop de projets pour un même dossier. Contactez-nous pour les répartir.', 'urbizen-platform' );
+
+			case 'projet_malforme':
+				return __( 'La liste des projets n’a pas pu être lue. Actualisez la page et réessayez.', 'urbizen-platform' );
 
 			case 'hors_bornes':
 				return __( 'La valeur est en dehors des limites autorisées.', 'urbizen-platform' );

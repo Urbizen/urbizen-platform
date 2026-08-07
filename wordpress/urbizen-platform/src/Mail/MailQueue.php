@@ -38,25 +38,30 @@ final class MailQueue {
 	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function create_pending( int $id, ?int $now = null ): bool {
+	public static function create_pending( int $id, ?int $now = null, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$now      = null === $now ? time() : $now;
-		$existant = (string) get_post_meta( $id, MailPolicy::META_ID, true );
+		$existant = (string) get_post_meta( $id, $slot->cle( MailPolicy::META_ID ), true );
 
 		if ( '' === $existant ) {
 			$existant = MailPolicy::new_notification_id();
 
-			if ( ! SubmissionRepository::persist_meta( $id, MailPolicy::META_ID, $existant ) ) {
+			if ( ! SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_ID ), $existant ) ) {
 				return false;
 			}
 		}
 
 		$ecritures = array(
-			MailPolicy::META_STATUS       => MailPolicy::PENDING,
-			MailPolicy::META_ATTEMPTS     => 0,
-			MailPolicy::META_NEXT_ATTEMPT => gmdate( 'Y-m-d H:i:s', $now ),
-			MailPolicy::META_LAST_ERROR   => '',
+			$slot->cle( MailPolicy::META_STATUS )       => MailPolicy::PENDING,
+			$slot->cle( MailPolicy::META_ATTEMPTS )     => 0,
+			$slot->cle( MailPolicy::META_NEXT_ATTEMPT ) => gmdate( 'Y-m-d H:i:s', $now ),
+			$slot->cle( MailPolicy::META_LAST_ERROR )   => '',
 		);
 
 		foreach ( $ecritures as $cle => $valeur ) {
@@ -72,17 +77,22 @@ final class MailQueue {
 	 * État complet d'une notification, sans aucune donnée personnelle.
 	 *
 	 * @param int $id Demande.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return array{status:string,notification_id:string,attempts:int,last_attempt:string,next_attempt:string,sent_at:string,last_error:string}
 	 */
-	public static function state( int $id ): array {
+	public static function state( int $id, ?NotificationSlot $slot = null ): array {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		return array(
-			'status'          => (string) get_post_meta( $id, MailPolicy::META_STATUS, true ),
-			'notification_id' => (string) get_post_meta( $id, MailPolicy::META_ID, true ),
-			'attempts'        => (int) get_post_meta( $id, MailPolicy::META_ATTEMPTS, true ),
-			'last_attempt'    => (string) get_post_meta( $id, MailPolicy::META_LAST_ATTEMPT, true ),
-			'next_attempt'    => (string) get_post_meta( $id, MailPolicy::META_NEXT_ATTEMPT, true ),
-			'sent_at'         => (string) get_post_meta( $id, MailPolicy::META_SENT_AT, true ),
-			'last_error'      => (string) get_post_meta( $id, MailPolicy::META_LAST_ERROR, true ),
+			'status'          => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_STATUS ), true ),
+			'notification_id' => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_ID ), true ),
+			'attempts'        => (int) get_post_meta( $id, $slot->cle( MailPolicy::META_ATTEMPTS ), true ),
+			'last_attempt'    => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_LAST_ATTEMPT ), true ),
+			'next_attempt'    => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_NEXT_ATTEMPT ), true ),
+			'sent_at'         => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_SENT_AT ), true ),
+			'last_error'      => (string) get_post_meta( $id, $slot->cle( MailPolicy::META_LAST_ERROR ), true ),
 		);
 	}
 
@@ -92,13 +102,18 @@ final class MailQueue {
 	 * @param int $id      Demande.
 	 * @param int $rang    Numéro de la tentative.
 	 * @param int $now     Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function mark_sending( int $id, int $rang, int $now ): bool {
+	public static function mark_sending( int $id, int $rang, int $now, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$ecritures = array(
-			MailPolicy::META_STATUS       => MailPolicy::SENDING,
-			MailPolicy::META_ATTEMPTS     => $rang,
-			MailPolicy::META_LAST_ATTEMPT => gmdate( 'Y-m-d H:i:s', $now ),
+			$slot->cle( MailPolicy::META_STATUS )       => MailPolicy::SENDING,
+			$slot->cle( MailPolicy::META_ATTEMPTS )     => $rang,
+			$slot->cle( MailPolicy::META_LAST_ATTEMPT ) => gmdate( 'Y-m-d H:i:s', $now ),
 		);
 
 		foreach ( $ecritures as $cle => $valeur ) {
@@ -119,13 +134,18 @@ final class MailQueue {
 	 *
 	 * @param int $id  Demande.
 	 * @param int $now Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function mark_sent( int $id, int $now ): bool {
+	public static function mark_sent( int $id, int $now, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$ecritures = array(
-			MailPolicy::META_STATUS      => MailPolicy::SENT,
-			MailPolicy::META_SENT_AT     => gmdate( 'Y-m-d H:i:s', $now ),
-			MailPolicy::META_LAST_ERROR  => '',
+			$slot->cle( MailPolicy::META_STATUS )      => MailPolicy::SENT,
+			$slot->cle( MailPolicy::META_SENT_AT )     => gmdate( 'Y-m-d H:i:s', $now ),
+			$slot->cle( MailPolicy::META_LAST_ERROR )  => '',
 		);
 
 		foreach ( $ecritures as $cle => $valeur ) {
@@ -134,7 +154,7 @@ final class MailQueue {
 			}
 		}
 
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_NEXT_ATTEMPT, '' );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_NEXT_ATTEMPT ), '' );
 
 		return true;
 	}
@@ -146,20 +166,25 @@ final class MailQueue {
 	 * @param int    $rang Tentative qui vient d'échouer.
 	 * @param string $code Code technique, sans donnée personnelle.
 	 * @param int    $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string État résultant.
 	 */
-	public static function mark_failure( int $id, int $rang, string $code, int $now ): string {
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_LAST_ERROR, $code );
+	public static function mark_failure( int $id, int $rang, string $code, int $now, ?NotificationSlot $slot = null ): string {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_LAST_ERROR ), $code );
 
 		if ( $rang >= MailPolicy::MAX_ATTEMPTS ) {
-			SubmissionRepository::persist_meta( $id, MailPolicy::META_STATUS, MailPolicy::FAILED );
-			SubmissionRepository::persist_meta( $id, MailPolicy::META_NEXT_ATTEMPT, '' );
+			SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_STATUS ), MailPolicy::FAILED );
+			SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_NEXT_ATTEMPT ), '' );
 
 			Logger::error(
 				sprintf(
 					'notification #%d [%s] : abandon après %d tentative(s) — %s',
 					$id,
-					MailPolicy::short_id( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ),
+					MailPolicy::short_id( (string) get_post_meta( $id, $slot->cle( MailPolicy::META_ID ), true ) ),
 					$rang,
 					$code
 				)
@@ -170,14 +195,14 @@ final class MailQueue {
 
 		$prochain = $now + MailPolicy::delay_for( $rang + 1 );
 
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_STATUS, MailPolicy::RETRY );
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_NEXT_ATTEMPT, gmdate( 'Y-m-d H:i:s', $prochain ) );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_STATUS ), MailPolicy::RETRY );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_NEXT_ATTEMPT ), gmdate( 'Y-m-d H:i:s', $prochain ) );
 
 		Logger::info(
 			sprintf(
 				'notification #%d [%s] : tentative %d en échec (%s), reprise programmée',
 				$id,
-				MailPolicy::short_id( (string) get_post_meta( $id, MailPolicy::META_ID, true ) ),
+				MailPolicy::short_id( (string) get_post_meta( $id, $slot->cle( MailPolicy::META_ID ), true ) ),
 				$rang,
 				$code
 			)
@@ -194,18 +219,23 @@ final class MailQueue {
 	 *
 	 * @param int    $id    Demande.
 	 * @param string $motif Code technique.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool Vrai si l'annulation a eu lieu.
 	 */
-	public static function cancel( int $id, string $motif ): bool {
-		$statut = (string) get_post_meta( $id, MailPolicy::META_STATUS, true );
+	public static function cancel( int $id, string $motif, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
+		$statut = (string) get_post_meta( $id, $slot->cle( MailPolicy::META_STATUS ), true );
 
 		if ( ! in_array( $statut, array( MailPolicy::PENDING, MailPolicy::RETRY, MailPolicy::SENDING ), true ) ) {
 			return false;
 		}
 
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_STATUS, MailPolicy::CANCELLED );
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_NEXT_ATTEMPT, '' );
-		SubmissionRepository::persist_meta( $id, MailPolicy::META_LAST_ERROR, $motif );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_STATUS ), MailPolicy::CANCELLED );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_NEXT_ATTEMPT ), '' );
+		SubmissionRepository::persist_meta( $id, $slot->cle( MailPolicy::META_LAST_ERROR ), $motif );
 
 		Logger::info( sprintf( 'notification #%d annulée : %s', $id, $motif ) );
 
@@ -220,11 +250,16 @@ final class MailQueue {
 	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function requeue( int $id, ?int $now = null ): bool {
+	public static function requeue( int $id, ?int $now = null, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$now    = null === $now ? time() : $now;
-		$statut = (string) get_post_meta( $id, MailPolicy::META_STATUS, true );
+		$statut = (string) get_post_meta( $id, $slot->cle( MailPolicy::META_STATUS ), true );
 
 		// Un envoi déjà accepté ne se rejoue jamais tout seul.
 		if ( MailPolicy::SENT === $statut ) {
@@ -232,10 +267,10 @@ final class MailQueue {
 		}
 
 		$ecritures = array(
-			MailPolicy::META_STATUS       => MailPolicy::PENDING,
-			MailPolicy::META_ATTEMPTS     => 0,
-			MailPolicy::META_NEXT_ATTEMPT => gmdate( 'Y-m-d H:i:s', $now ),
-			MailPolicy::META_LAST_ERROR   => '',
+			$slot->cle( MailPolicy::META_STATUS )       => MailPolicy::PENDING,
+			$slot->cle( MailPolicy::META_ATTEMPTS )     => 0,
+			$slot->cle( MailPolicy::META_NEXT_ATTEMPT ) => gmdate( 'Y-m-d H:i:s', $now ),
+			$slot->cle( MailPolicy::META_LAST_ERROR )   => '',
 		);
 
 		foreach ( $ecritures as $cle => $valeur ) {
@@ -264,11 +299,16 @@ final class MailQueue {
 	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string|null Jeton propriétaire, ou `null` si le verrou est pris.
 	 */
-	public static function acquire_lock( int $id, ?int $now = null ): ?string {
+	public static function acquire_lock( int $id, ?int $now = null, ?NotificationSlot $slot = null ): ?string {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$now      = null === $now ? time() : $now;
-		$cle      = MailPolicy::LOCK_PREFIX . $id;
+		$cle      = MailPolicy::LOCK_PREFIX . $slot->cle_verrou();
 		$existant = get_option( $cle, null );
 
 		if ( is_array( $existant ) ) {
@@ -298,11 +338,16 @@ final class MailQueue {
 	 * @param int      $id    Demande.
 	 * @param string   $jeton Jeton.
 	 * @param int|null $now   Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function owns_lock( int $id, string $jeton, ?int $now = null ): bool {
+	public static function owns_lock( int $id, string $jeton, ?int $now = null, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$now      = null === $now ? time() : $now;
-		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $slot->cle_verrou(), null );
 
 		if ( ! is_array( $existant ) || '' === $jeton ) {
 			return false;
@@ -320,10 +365,15 @@ final class MailQueue {
 	 *
 	 * @param int    $id    Demande.
 	 * @param string $jeton Jeton.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool Vrai si le verrou a bien été rendu par son propriétaire.
 	 */
-	public static function release_lock( int $id, string $jeton ): bool {
-		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+	public static function release_lock( int $id, string $jeton, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $slot->cle_verrou(), null );
 
 		if ( ! is_array( $existant ) || '' === $jeton ) {
 			return false;
@@ -334,7 +384,7 @@ final class MailQueue {
 			return false;
 		}
 
-		delete_option( MailPolicy::LOCK_PREFIX . $id );
+		delete_option( MailPolicy::LOCK_PREFIX . $slot->cle_verrou() );
 
 		return true;
 	}
@@ -359,11 +409,16 @@ final class MailQueue {
 	 * @param int      $id      Demande.
 	 * @param callable $travail Rappel, recevant la poignée.
 	 * @param int|null $now     Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return array{ok:bool,code:string,valeur:mixed}
 	 */
-	public static function with_process_lock( int $id, callable $travail, ?int $now = null ) {
+	public static function with_process_lock( int $id, callable $travail, ?int $now = null, ?NotificationSlot $slot = null ) {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$now     = null === $now ? time() : $now;
-		$poignee = MailProcessLock::acquire( $id );
+		$poignee = MailProcessLock::acquire( $id, $slot );
 
 		if ( null === $poignee ) {
 			return array( 'ok' => false, 'code' => 'mutex_indisponible', 'valeur' => null );
@@ -373,10 +428,10 @@ final class MailQueue {
 			// Le bail d'option est **réconcilié** sous le mutex : un bail périmé
 			// laissé par une tentative précédente n'appartient plus à personne,
 			// puisque personne ne détenait le mutex.
-			$jeton = self::acquire_lock( $id, $now );
+			$jeton = self::acquire_lock( $id, $now, $slot );
 
 			if ( null === $jeton ) {
-				$jeton = self::reconcile_lease( $id, $now );
+				$jeton = self::reconcile_lease( $id, $now, $slot );
 			}
 
 			if ( null === $jeton ) {
@@ -388,7 +443,7 @@ final class MailQueue {
 			try {
 				return array( 'ok' => true, 'code' => 'ok', 'valeur' => $travail( $poignee ) );
 			} finally {
-				self::release_lock( $id, $jeton );
+				self::release_lock( $id, $jeton, $slot );
 			}
 		} finally {
 			MailProcessLock::release( $poignee );
@@ -403,22 +458,24 @@ final class MailQueue {
 	 * le droit — et le devoir — de remettre son bail à jour avant d'écrire son
 	 * résultat.
 	 *
-	 * @param MailLockHandle $poignee Poignée détenue.
-	 * @param int            $now     Horodatage courant.
+	 * @param MailLockHandle        $poignee Poignée détenue.
+	 * @param int                   $now     Horodatage courant.
+	 * @param NotificationSlot|null $slot    Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function refresh_lease( MailLockHandle $poignee, int $now ): bool {
+	public static function refresh_lease( MailLockHandle $poignee, int $now, ?NotificationSlot $slot = null ): bool {
 		if ( ! $poignee->est_detenu() ) {
 			return false;
 		}
 
-		$id = $poignee->submission();
+		$id   = $poignee->submission();
+		$slot = $slot ?? NotificationSlot::admin( $id );
 
-		if ( self::owns_lock( $id, $poignee->jeton(), $now ) ) {
+		if ( self::owns_lock( $id, $poignee->jeton(), $now, $slot ) ) {
 			return true;
 		}
 
-		$jeton = self::reconcile_lease( $id, $now );
+		$jeton = self::reconcile_lease( $id, $now, $slot );
 
 		if ( null === $jeton ) {
 			return false;
@@ -436,14 +493,17 @@ final class MailQueue {
 	 * qui subsiste est donc celui d'un processus disparu, et peut être repris
 	 * quelle que soit son échéance.
 	 *
-	 * @param int $id  Demande.
-	 * @param int $now Horodatage courant.
+	 * @param int                   $id   Demande.
+	 * @param int                   $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string|null
 	 */
-	private static function reconcile_lease( int $id, int $now ): ?string {
-		delete_option( MailPolicy::LOCK_PREFIX . $id );
+	private static function reconcile_lease( int $id, int $now, ?NotificationSlot $slot = null ): ?string {
+		$slot = $slot ?? NotificationSlot::admin( $id );
 
-		return self::acquire_lock( $id, $now );
+		delete_option( MailPolicy::LOCK_PREFIX . $slot->cle_verrou() );
+
+		return self::acquire_lock( $id, $now, $slot );
 	}
 
 	/**
@@ -456,10 +516,11 @@ final class MailQueue {
 	 * @param int      $id      Demande.
 	 * @param callable $travail Rappel, recevant la poignée.
 	 * @param int|null $now     Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return array{ok:bool,code:string,valeur:mixed}
 	 */
-	public static function with_lock( int $id, callable $travail, ?int $now = null ) {
-		return self::with_process_lock( $id, $travail, $now );
+	public static function with_lock( int $id, callable $travail, ?int $now = null, ?NotificationSlot $slot = null ) {
+		return self::with_process_lock( $id, $travail, $now, $slot );
 	}
 
 	/**
@@ -471,17 +532,22 @@ final class MailQueue {
 	 *
 	 * @param int      $id  Demande.
 	 * @param int|null $now Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function is_locked( int $id, ?int $now = null ): bool {
+	public static function is_locked( int $id, ?int $now = null, ?NotificationSlot $slot = null ): bool {
+		// Sans créneau explicite, la file agit sur la notification interne :
+		// c'est le comportement historique, et tous les appelants existants en
+		// dépendent sans avoir à changer.
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		// **Le mutex fait autorité.** Un bail périmé ne prouve pas que son
 		// propriétaire est mort ; un mutex détenu prouve qu'il est vivant.
-		if ( MailProcessLock::is_held( $id ) ) {
+		if ( MailProcessLock::is_held( $id, $slot ) ) {
 			return true;
 		}
 
 		$now      = null === $now ? time() : $now;
-		$existant = get_option( MailPolicy::LOCK_PREFIX . $id, null );
+		$existant = get_option( MailPolicy::LOCK_PREFIX . $slot->cle_verrou(), null );
 
 		return is_array( $existant ) && $now < (int) ( $existant['expires'] ?? 0 );
 	}

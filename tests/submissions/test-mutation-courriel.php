@@ -182,19 +182,19 @@ $ms = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array(
-		"		\$motif = MailPolicy::blocker( \$id, \$now );
+		"		\$motif = MailPolicy::blocker( \$id, \$now, \$slot );
 
 		if ( null !== \$motif ) {
-			Logger::info( sprintf( 'notification #%d non envoyée : %s', \$id, \$motif ) );
+			Logger::info( sprintf( 'notification #%d [%s] non envoyée : %s', \$id, \$slot->type, \$motif ) );
 
 			return \$motif;
 		}" => '		// contrôle d\'éligibilité retiré.',
-		"		\$motif = MailPolicy::blocker( \$id, \$now );
+		"		\$motif = MailPolicy::blocker( \$id, \$now, \$slot );
 
 		if ( null !== \$motif ) {
 			return \$motif;
 		}" => '		// relecture sous verrou retirée.',
-		"		\$motif = MailPolicy::closed_blocker( \$id );
+		"		\$motif = MailPolicy::closed_blocker( \$id, \$slot );
 
 		if ( null !== \$motif ) {
 			// L'état est passé à fermé pendant la préparation : on ne consomme
@@ -203,7 +203,7 @@ $ms = mutant(
 
 			return \$motif;
 		}" => '		// ultime vérification retirée.',
-		"		\$ferme = MailPolicy::closed_blocker( \$id );
+		"		\$ferme = MailPolicy::closed_blocker( \$id, \$slot );
 
 		if ( null !== \$ferme ) {
 			Logger::error( sprintf( 'notification #%d : envoi accepté mais demande fermée entre-temps (%s)', \$id, \$ferme ) );
@@ -341,7 +341,7 @@ $mq_bail = mutant(
 	'MailQueue',
 	array( "		// **Le mutex fait autorité.** Un bail périmé ne prouve pas que son
 		// propriétaire est mort ; un mutex détenu prouve qu'il est vivant.
-		if ( MailProcessLock::is_held( \$id ) ) {
+		if ( MailProcessLock::is_held( \$id, \$slot ) ) {
 			return true;
 		}
 
@@ -382,7 +382,7 @@ $ms3 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array( "		if ( ! empty( \$resultat['ok'] ) ) {
-			MailQueue::mark_sent( \$id, \$now );" => "		if ( ! empty( \$resultat['ok'] ) ) {" )
+			MailQueue::mark_sent( \$id, \$now, \$slot );" => "		if ( ! empty( \$resultat['ok'] ) ) {" )
 );
 
 neuf();
@@ -404,8 +404,8 @@ $ms4 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
 	array( "		if ( ! empty( \$resultat['ok'] ) ) {
-			MailQueue::mark_sent( \$id, \$now );" => "		if ( true ) {
-			MailQueue::mark_sent( \$id, \$now );" )
+			MailQueue::mark_sent( \$id, \$now, \$slot );" => "		if ( true ) {
+			MailQueue::mark_sent( \$id, \$now, \$slot );" )
 );
 
 neuf();
@@ -672,8 +672,8 @@ check( '21 · un verrou appartenant à autrui n’est pas volé',
 $tg = mutant(
 	'src/Submissions/TrashGuard.php',
 	'TrashGuard',
-	array( "				MailQueue::cancel( \$id, 'demande_en_corbeille' );
-				MailScheduler::unschedule_all( \$id );" => '				// annulation de la notification retirée.' )
+	array( "					MailQueue::cancel( \$id, 'demande_en_corbeille', \$slot );
+					MailScheduler::unschedule_all( \$id, \$slot );" => '					// annulation de la notification retirée.' )
 );
 
 neuf();
@@ -737,11 +737,11 @@ $tg25 = mutant(
 	'src/Submissions/TrashGuard.php',
 	'TrashGuard',
 	array(
-		"		if ( MailQueue::is_locked( \$id ) ) {
-			Logger::error( sprintf( 'corbeille différée pour #%d : notification en cours d’envoi', \$id ) );
+		"			if ( null !== \$slot && MailQueue::is_locked( \$id, null, \$slot ) ) {
+				Logger::error( sprintf( 'corbeille différée pour #%d : notification [%s] en cours d’envoi', \$id, \$type ) );
 
-			return false;
-		}" => '		// refus pendant un envoi retiré.',
+				return false;
+			}" => '		// refus pendant un envoi retiré.',
 	)
 );
 
@@ -770,11 +770,11 @@ check( '25 · verrou rendu, la Corbeille aboutit', false !== wp_trash_post( $d['
 $fc = mutant(
 	'src/Files/FileCleaner.php',
 	'FileCleaner',
-	array( "		if ( MailQueue::is_locked( \$id ) ) {
-			Logger::error( sprintf( 'suppression bloquée pour #%d : notification en cours d’envoi', \$id ) );
+	array( "			if ( null !== \$slot && MailQueue::is_locked( \$id, null, \$slot ) ) {
+				Logger::error( sprintf( 'suppression bloquée pour #%d : notification [%s] en cours d’envoi', \$id, \$type ) );
 
-			return false;
-		}" => '		// refus pendant un envoi retiré.' )
+				return false;
+			}" => '		// refus pendant un envoi retiré.' )
 );
 
 neuf();
@@ -799,7 +799,7 @@ delete_option( MailPolicy::LOCK_PREFIX . $d['id'] );
 $ms27 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
-	array( "		\$motif = MailPolicy::closed_blocker( \$id );
+	array( "		\$motif = MailPolicy::closed_blocker( \$id, \$slot );
 
 		if ( null !== \$motif ) {
 			// L'état est passé à fermé pendant la préparation : on ne consomme
@@ -887,7 +887,7 @@ check( '28 · et sent_at est conservé', '' !== get_post_meta( $d['id'], MailPol
 $ms29 = mutant(
 	'src/Mail/MailScheduler.php',
 	'MailScheduler',
-	array( "		\$ferme = MailPolicy::closed_blocker( \$id );
+	array( "		\$ferme = MailPolicy::closed_blocker( \$id, \$slot );
 
 		if ( null !== \$ferme ) {
 			Logger::error( sprintf( 'notification #%d : envoi accepté mais demande fermée entre-temps (%s)', \$id, \$ferme ) );
@@ -1011,12 +1011,13 @@ $ms32 = mutant(
 	'MailScheduler',
 	array( "		\$resultat = MailQueue::with_lock(
 			\$id,
-			static fn( MailLockHandle \$poignee ) => self::poser_evenement( \$id, \$now ),
-			\$now
+			static fn( MailLockHandle \$poignee ) => self::poser_evenement( \$now, \$slot ),
+			\$now,
+			\$slot
 		);
 
 		return ! empty( \$resultat['ok'] ) && true === \$resultat['valeur'];" =>
-		"		return self::poser_evenement( \$id, \$now );" )
+		"		return self::poser_evenement( \$now, \$slot );" )
 );
 
 neuf();
@@ -1064,13 +1065,13 @@ $tg34 = mutant(
 	'src/Submissions/TrashGuard.php',
 	'TrashGuard',
 	array(
-		"				if ( MailPolicy::CANCELLED !== (string) get_post_meta( \$id, MailPolicy::META_STATUS, true ) ) {
-					return false;
-				}
+		"					if ( MailPolicy::CANCELLED !== (string) get_post_meta( \$id, \$slot->cle( MailPolicy::META_STATUS ), true ) ) {
+						return false;
+					}
 
-				if ( '' !== (string) get_post_meta( \$id, MailPolicy::META_SENT_AT, true ) ) {
-					return false;
-				}" => '				// gardes du sent retirées.',
+					if ( '' !== (string) get_post_meta( \$id, \$slot->cle( MailPolicy::META_SENT_AT ), true ) ) {
+						return false;
+					}" => '					// gardes du sent retirées.',
 		'MailQueue::requeue(' => $mq34 . '::requeue(',
 	)
 );
@@ -1138,7 +1139,7 @@ check( '35 · le code ne référence aucune clé générique',
 
 
 // ====== 36 · FileCleaner ne consulte plus le mutex =======================
-$mq36 = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( "		if ( MailProcessLock::is_held( \$id ) ) {
+$mq36 = mutant( 'src/Mail/MailQueue.php', 'MailQueue', array( "		if ( MailProcessLock::is_held( \$id, \$slot ) ) {
 			return true;
 		}
 
@@ -1174,14 +1175,14 @@ $mq37 = mutant(
 	array( "			try {
 				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
 			} finally {
-				self::release_lock( \$id, \$jeton );
+				self::release_lock( \$id, \$jeton, \$slot );
 			}" =>
 		"			MailProcessLock::release( \$poignee );
 
 			try {
 				return array( 'ok' => true, 'code' => 'ok', 'valeur' => \$travail( \$poignee ) );
 			} finally {
-				self::release_lock( \$id, \$jeton );
+				self::release_lock( \$id, \$jeton, \$slot );
 			}" )
 );
 

@@ -2664,3 +2664,436 @@ réception par courriel au demandeur.
 - Banc dédié `tests/submissions/test-feedback.php` : succès réel, erreur réelle, absence de feedback,
   URL forgée, jeton altéré/expiré/d'un autre formulaire, échappement, et **aucune PII dans l'URL**.
 - Rendu Conception **inchangé** en l'absence de feedback (parité octet pour octet préservée).
+
+## D-053 — Estimation tarifaire affichée dans les formulaires DP et PCMI
+
+**Statut.** Adoptée — prototype d'interface réalisé, non publié. Ne concerne **que** les parcours
+DP et PCMI ; le formulaire Conception, déjà en production, garde son estimation propre.
+
+**Contexte.** Les formulaires DP et PCMI affichaient déjà un tarif de base calculé côté navigateur.
+Deux besoins s'y ajoutent : un client regroupe souvent plusieurs travaux dans un même dossier, et
+il demande parfois à Urbizen de déposer le dossier à sa place sur le guichet numérique de la
+commune. Aucun des deux n'était chiffré, alors que l'un et l'autre changent le prix. Par ailleurs
+le barème vivait en **quatre exemplaires** inline — deux maquettes, deux copies servies par le
+thème — sans source de vérité : la dérive n'était qu'une question de temps.
+
+**Décision.**
+
+- **Le prix reste affiché pendant la saisie et sur l'écran de confirmation.** Le visiteur qui
+  remplit un formulaire est en phase de décision : lui cacher l'ordre de grandeur ne le protège de
+  rien et le pousse à abandonner. Ce qui est affiché est une **estimation**, jamais un engagement.
+- **Formule unique.**
+  `total = tarif du projet principal + 100 € × travaux supplémentaires + 80 € si ABF + 30 € si dépôt`.
+  Les barèmes existants ne changent pas : DP 189 / 249 / 549 €, PCMI 449 / 649 / 849 €.
+- **Le projet principal est un choix unique.** L'étape « Projet » passe des cases à cocher aux
+  boutons radio. Une nature multiple rendait le tarif de base dépendant de l'ordre de sélection —
+  le même dossier pouvait coûter 300 € de moins selon la case cochée en premier. Le choix unique
+  supprime l'ambiguïté à la racine plutôt que de l'arbitrer.
+- **Les travaux supplémentaires ont leur propre étape**, placée avant l'envoi. Chacun coûte 100 €.
+  Le projet principal n'est **jamais** compté comme travail supplémentaire.
+- **Le doublon est rendu impossible, pas signalé.** Une nature déjà retenue — par le projet
+  principal ou par une autre ligne — n'est tout simplement pas proposée dans les listes. Si le
+  client change de projet principal pour une nature déjà en ligne, cette ligne est **vidée**, non
+  supprimée en silence : il doit voir qu'il a un choix à refaire.
+- **Le regroupement reste soumis à vérification humaine.** Le formulaire l'énonce : mêmes
+  demandeur, adresse et parcelle, et compatibilité dans un dossier administratif unique. Urbizen
+  vérifie après réception. Le formulaire ne prétend pas trancher une question juridique.
+- **Option de dépôt, décochée par défaut.** « Je souhaite qu'Urbizen dépose mon dossier sur le
+  guichet numérique de la commune : +30 € ». Une option payante ne se pré-coche pas.
+- **Le récapitulatif détaille chaque poste** — principal, travaux, ABF, dépôt, total. Une ligne à
+  zéro est **absente**, jamais affichée à « 0 € » : le client ne lit que ce qu'il a choisi.
+- **Mention imposée sous le total**, reproduite au caractère près : « Estimation indicative. Le
+  tarif définitif sera confirmé par Urbizen après vérification de votre projet, avant toute
+  commande. »
+- **« Autre » en PCMI n'est pas chiffré.** Le total affiche « Tarif sur étude ». Les suppléments
+  restent détaillés ligne à ligne, mais on n'additionne pas des suppléments à un socle inconnu
+  pour en tirer un chiffre qui aurait l'air d'un prix.
+
+**Réserve d'architecture — le calcul est client, il n'engage rien.** `PricingStrategyRegistry`
+n'expose **aucune** stratégie pour DP ni PCMI, et n'en invente pas : un type sans stratégie vaut
+`null`, sans repli sur Conception (D-050). Les formulaires ne postent nulle part
+(`ENDPOINT = ""`). Le montant affiché n'est donc, à ce stade, qu'une commodité d'interface — et il
+n'est **volontairement pas sérialisé** dans la charge envoyée. Le jour où DP et PCMI passeront par
+`SubmissionController`, le barème devra exister **côté serveur**, comme `Forms\Pricing` pour la
+conception, et le montant reçu du navigateur ne devra jamais être cru.
+
+**Hors de cette décision.** Le sort de l'estimation du formulaire Conception, qui suit ses propres
+règles et son propre catalogue serveur ; l'enregistrement réel des demandes DP/PCMI ; le
+rattachement d'une demande à un compte.
+
+**Conséquences.**
+- Source unique : `wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js` porte **tout** le
+  calcul, le répéteur, l'anti-doublon et le rendu du récapitulatif ; `assets/css/urbizen-form-tarifs.css`
+  porte la présentation. Les quatre documents de formulaire chargent **ces mêmes fichiers** et ne
+  déclarent plus qu'un barème d'une dizaine de lignes. Les natures sont lues **dans le formulaire**,
+  pas configurées en double.
+- Aucune mise en file WordPress n'a été nécessaire : les formulaires sont servis en `iframe` depuis
+  un document autonome, les chemins relatifs suffisent.
+- Banc `tests/cadastre/test-tarifs.mjs`, exécuté sur le **HTML réel** des quatre documents :
+  barèmes, choix unique, suppléments et cumuls, répéteur, doublon impossible, cas « sur étude »,
+  masquage des lignes à zéro, mention au caractère près, écran final, sérialisation sans montant,
+  et **parité maquette ≡ thème**.
+- La duplication `frontend/formulaires/` ↔ `wordpress/urbizen-child/assets/forms/` subsiste pour le
+  balisage, mais elle est désormais **testée** : elle rejoint la dette documentée en D-048 au lieu
+  de rester tacite.
+
+**Mise à jour — Garage et Carport, natures propres en DP.** « Abri, annexe » servait de fourre-tout
+à trois projets que le client distingue parfaitement : l'abri de jardin, le garage et le carport.
+Un demandeur qui cherche « garage » et ne trouve qu'« annexe » doute d'être au bon endroit. Deux
+natures sont donc ajoutées au formulaire DP — `Garage` et `Carport / abri de voiture`, **249 €**
+chacune — et « Abri, annexe » demeure pour les annexes qui ne sont ni l'un ni l'autre. Leur tarif
+est déclaré **explicitement** au barème alors que `__defaut` vaut déjà 249 : c'est une décision
+produit, pas un repli, et un futur changement de `__defaut` ne doit pas les emporter en silence.
+Le tunnel d'accueil route désormais `garage` vers la nature `Garage` (et `carport`, prévu) au lieu
+de `Abri / annexe`. Aucun autre tarif n'est modifié.
+
+**Mise à jour — « projets supplémentaires », et des cibles tactiles utilisables.** Le parcours
+disait « travaux supplémentaires » ; le client, lui, raisonne en projets — c'est le mot employé
+partout ailleurs dans le formulaire (« projet principal », « Votre projet est prêt à être étudié »).
+L'interface est donc harmonisée : étape « Projets supplémentaires », bouton « + Ajouter un projet »,
+en-tête « Projet supplémentaire 1 », récapitulatif « Projets supplémentaires (n) » avec un détail
+« Projet supplémentaire — [nature] : +100 € ». La légende du rail devient « Autres projets » plutôt
+que « Projets », qui aurait voisiné avec l'étape « Projet ». Le mot « travaux » reste réservé à
+l'objet même de la déclaration — « déclaration préalable de travaux », « nature des travaux » — où
+il est juridiquement exact. Les identifiants internes (`dp-travail-*`, `this.travaux`) ne sont pas
+renommés : invisibles du client, leur renommage n'apporterait qu'un risque.
+
+Deux cibles tactiles étaient trop petites au doigt. La case « dépôt sur le guichet numérique »
+mesurait 13 px : l'`<input>` n'était pas imbriqué dans son `<label>`, seule la case était cliquable.
+Le `<label>` enveloppe désormais la case et le texte, et porte une hauteur minimale de 44 px — toute
+la ligne, montant compris, est cliquable. Le lien « Supprimer », déjà un `<button type="button">`,
+mesurait 19 px de haut : il offre maintenant 44 × 44 px, absorbés par des marges négatives pour que
+la rangée ne grandisse pas, le soulignement portant sur le mot et non sur la zone. Son `aria-label`
+nomme la ligne visée : « Supprimer le projet supplémentaire 1 ».
+
+**Mise à jour — les surfaces ne conditionnent pas la demande initiale.** Six champs de surface
+étaient déclarés, dont un obligatoire. Or cinq des douze natures DP — clôture, panneaux solaires,
+modification de façade, ravalement, toiture — ne créent **aucune** surface : exiger des mètres
+carrés y rejetait des dossiers parfaitement recevables. Et pour une extension, un garage ou une
+piscine, un demandeur qui n'a pas encore mesuré doit pouvoir envoyer sa demande ; Urbizen réclame
+les cotes après étude. Aucune surface n'est donc obligatoire au stade de la demande initiale. Une
+absence reste une **absence** : elle n'est jamais remplacée par un `0`, qui se lirait comme une
+mesure prise et fausserait l'instruction. Une matrice de banc éprouve les douze natures, chacune
+sans aucun champ de surface.
+
+**Mise à jour — la cohérence entre champs est une étape, pas un effet de bord.** Une définition
+juge chaque champ isolément : type, longueur, appartenance à une liste fermée. Elle ne peut rien
+dire de ce qui lie deux champs. Un projet supplémentaire répétant le projet principal, un doublon
+ou une liste forgée passaient donc la validation de forme, et le catalogue tarifaire se contentait
+de ne pas les facturer — la demande était **acceptée** avec un contenu incohérent. Un calcul
+prudent ne vaut pas acceptation.
+
+`Forms\ValidationMetier` et son registre introduisent donc une étape dédiée, résolue depuis le
+**type serveur** comme les registres tarifaire et d'upload, et intercalée dans
+`SubmissionController` **avant** le calcul du prix et avant toute écriture. Elle refuse la nature
+principale inconnue, le projet supplémentaire inconnu, celui qui répète le principal, le doublon,
+la liste malformée et la liste trop longue — avec des messages destinés à une personne, jamais un
+code interne. Le refus est corrigeable : ni jeton, ni créneau de débit, ni référence ne sont
+consommés. Le catalogue tarifaire reste défensif de son côté, mais cette défense n'est plus la
+seule ligne.
+
+**La limite de projets supplémentaires n'est pas un chiffre choisi**, elle découle du catalogue :
+`count(NATURES) - 1`, soit **11**. Les doublons étant interdits et le projet principal exclu des
+suppléments, un dossier ne peut pas réunir plus de natures distinctes qu'il n'en existe. Toute
+liste plus longue est nécessairement forgée. La dériver plutôt que l'écrire évite qu'une nature
+ajoutée un jour laisse derrière elle un plafond devenu faux — et un banc vérifie cette dérivation.
+
+## D-054 — Une pièce manquante ne bloque pas l'envoi d'une demande
+
+**Statut.** Adoptée — appliquée aux formulaires DP et PCMI, thème et maquettes.
+
+**Contexte.** L'étape « Documents » demande sept familles de pièces : photos du terrain, vues depuis
+la rue, façades, croquis, plans possédés, relevés, autres documents. Aucune n'était techniquement
+obligatoire, mais rien ne le disait. Un client qui n'a pas encore photographié sa façade lit une
+liste de sept demandes et en conclut qu'il doit tout réunir avant d'écrire — donc il repousse, et
+souvent il ne revient pas. Le formulaire perdait des demandes sur un malentendu, pas sur un refus.
+
+**Décision.**
+
+- **Aucune pièce de cette étape ne conditionne l'envoi.** Ce sont des aides à l'étude, pas les
+  pièces réglementaires du dossier. Le message d'ouverture le dit explicitement, et précise que
+  seuls les champs marqués d'un astérisque aux étapes précédentes sont obligatoires.
+- **Les informations réellement indispensables restent obligatoires** — identité du demandeur,
+  terrain, nature du projet principal. Le report ne s'applique qu'aux documents.
+- **Le report est déclaré, pas subi.** Chaque pièce porte une case « Je transmettrai ce document
+  ultérieurement ». Cocher cette case vaut engagement explicite et fait apparaître la pièce dans le
+  récapitulatif sous « À transmettre ultérieurement » — une information utile à Urbizen, là où un
+  champ resté vide n'en est pas une.
+- **L'explication vit dans l'encadré d'ouverture, et nulle part ailleurs.** Une première version
+  répétait « Vous pourrez nous transmettre cet élément plus tard. » sous chacune des sept pièces :
+  à l'écran, ces sept lignes concurrençaient l'encadré au lieu de le renforcer, et alourdissaient
+  une étape que l'on veut légère. Chaque rangée se limite donc au **document demandé**, au
+  **bouton de dépôt** et à la **case de report**.
+- **Aucun vocabulaire d'erreur.** Un report n'est ni un manque, ni un défaut, ni une alerte : ni
+  rouge, ni « obligatoire », ni « incomplet ». Un banc le vérifie sur le texte rendu.
+- **Aucune promesse de dispense.** Le texte rassure sur le *moment* de la transmission, jamais sur
+  la nécessité. Un dossier déposé en mairie exige ses pièces réglementaires, et rien ici ne laisse
+  entendre le contraire — un banc contrôle l'absence de formulations de ce type.
+- **Un fichier déposé prime sur le report.** Déposer un document décoche automatiquement la case :
+  « fourni » et « à transmettre » ne peuvent pas coexister sur la même pièce.
+
+**Mise à jour — les références cadastrales deviennent facultatives.** Section cadastrale, numéro de
+parcelle et superficie étaient obligatoires. Or ces trois valeurs ne figurent que sur l'acte de
+propriété : le client qui ne l'a pas sous la main se heurtait à un mur au deuxième écran, alors même
+que la localisation cartographique sait les renseigner et qu'Urbizen peut les vérifier après
+réception. Elles perdent donc leur astérisque — c'est ce marqueur, et lui seul, que `validateStep()`
+inspecte — et le groupe reçoit une case « Je ne connais pas ces informations. », décochée par
+défaut. Cocher vide et neutralise les trois champs, sans les présenter comme en erreur ; décocher
+les rend. Le client peut aussi n'en renseigner qu'un : les trois ne forment pas un tout indivisible.
+Une valeur déjà détectée par la localisation cadastrale est **conservée**, et la case n'est jamais
+cochée d'office ; à l'inverse, saisir une valeur alors qu'elle est cochée lève la déclaration, car
+les deux ne peuvent pas être vraies en même temps. Le récapitulatif porte alors « Informations
+cadastrales : à compléter ultérieurement », et la charge envoyée gagne `informations_differees` —
+sans quoi Urbizen ne distinguerait pas « le client ne sait pas » de « le client n'a rien saisi »,
+les champs désactivés ne voyageant pas dans le `FormData`. Adresse, code postal et commune restent
+obligatoires : identifier le terrain demeure indispensable.
+
+**Conséquences.**
+- `wordpress/urbizen-child/assets/js/urbizen-form-pieces.js` et
+  `assets/css/urbizen-form-pieces.css` : source unique du rendu de l'étape. Les quatre documents
+  chargent ces fichiers ; le rendu inline des pièces, jusqu'ici dupliqué quatre fois, est supprimé.
+  Le module porte aussi les groupes d'informations déclarables inconnus, afin que le récapitulatif
+  « À transmettre ultérieurement » reste tenu par un seul endroit.
+- La charge envoyée gagne `pieces_differees` — la liste lisible des codes reportés — en plus des
+  cases `piece_later_*`.
+- Banc `tests/cadastre/test-pieces.mjs` sur le HTML réel : présence et conformité du message,
+  mention contextuelle, récapitulatif, absence de champ obligatoire dans l'étape, atteinte de
+  l'écran final sans aucun fichier, sérialisation, priorité du fichier sur le report, parité
+  maquette ≡ thème.
+
+---
+
+## D-055 — La file de courriels s'adresse par créneau de notification
+
+**Contexte.** La file ne connaissait qu'un message par demande : la notification interne à Urbizen.
+Ses états — statut, identifiant, tentatives, dernière tentative, prochaine tentative, envoi,
+dernière erreur — vivaient dans sept clés de méta fixes, son bail dans une option nommée d'après
+l'identifiant de la demande, son mutex dans un fichier dérivé du même identifiant, et son événement
+cron portait ce seul identifiant en argument. Tout cela suppose **un** message, et ne le dit nulle
+part parce que la question ne se posait pas.
+
+L'accusé de réception adressé au demandeur est un second message. Il a son propre destinataire, son
+propre contenu et son propre sort : il peut échouer quand l'autre réussit, il doit pouvoir être
+retenté seul, et son annulation ne doit pas emporter celle de l'autre.
+
+**Décision.** La file est paramétrée par un **créneau** — le couple (demande, type de notification)
+— porté par `Mail\NotificationSlot`. Toute la mécanique d'états, de verrous, de tentatives et de
+réconciliation reste unique ; seules les clés d'adressage changent. Deux types existent :
+`admin_notification` et `customer_acknowledgement`. Un type hors liste ne produit aucun créneau, et
+`pour()` rend `null` plutôt que de retomber sur l'administratif : un type inconnu doit se voir, pas
+écrire dans le créneau d'un autre.
+
+**Le créneau administratif conserve exactement les clés historiques.** Clés de méta sans suffixe,
+option de verrou nommée par le seul identifiant, chemin de mutex dérivé du seul identifiant,
+événement cron à un seul argument. Ce n'est pas une coquetterie de compatibilité, c'est ce qui
+permet de livrer **sans reprise de données** : les demandes déjà enregistrées restent lisibles,
+l'écran d'administration, la garde de corbeille et le rendu du courriel continuent de fonctionner
+sans être touchés, et les verrous comme les événements en cours au moment du déploiement restent
+reconnus. Les migrer n'apporterait qu'une symétrie de façade, au prix d'un risque de régression sur
+du code qui marche.
+
+Le point le plus coûteux à manquer est l'événement cron. WordPress identifie un événement par son
+couple (hook, arguments) : ajouter un second argument au créneau historique rendrait invisibles tous
+les événements déjà inscrits, `wp_next_scheduled()` conclurait à tort qu'il n'y en a pas, en
+poserait un second, et la notification partirait **deux fois**. Les créneaux non administratifs, eux,
+portent leur type en second argument. Symétriquement, un événement reçu sans type — ou avec un type
+corrompu — est traité comme administratif plutôt qu'abandonné.
+
+**Les verrous sont indépendants, aux deux couches.** Le bail d'option est une option globale : sa
+clé porte l'identifiant **et** le type, sans quoi deux demandes partageraient le même verrou. Le
+mutex de processus reçoit lui aussi son propre fichier par créneau. Sans cela, l'accusé client et la
+notification interne d'une même demande s'attendraient l'un l'autre alors qu'ils n'écrivent nulle
+part au même endroit — une sérialisation gratuite, et une source d'échecs `mutex_indisponible` que
+rien ne justifierait.
+
+**L'idempotence est adressée par référence, pas par identifiant de post** : `<référence>:<type>`.
+La référence est ce qui identifie la demande pour un humain, et elle ne change jamais ; deux
+exécutions du même travail produisent donc la même clé, et un second accusé ne peut pas naître d'une
+reprise. Les clés de stockage, elles, restent adressées par identifiant interne — le verrou existe
+avant que la référence ne soit confirmée.
+
+**Ce qui n'est volontairement pas fait dans cette passe.** `MailScheduler::reconcile()` balaie les
+demandes par la clé d'état historique, donc par le seul créneau administratif. Un créneau
+supplémentaire devra recevoir sa propre passe ; le laisser croire couvert serait pire que de
+l'écrire, et c'est écrit dans son docblock. De même, la mise à la Corbeille n'annule aujourd'hui que
+le créneau administratif : le jour où un second créneau existe, cette annulation doit les balayer
+tous — un accusé de réception laissé en file partirait vers une personne réelle alors que son
+dossier a été retiré.
+
+**Conséquences.**
+- `src/Mail/NotificationSlot.php` : `cle()`, `cle_verrou()`, `args_cron()`, `idempotence()`,
+  `depuis_cron()`, `pour()`. Source unique du suffixe.
+- `src/Mail/MailQueue.php` : les treize méthodes publiques prennent un créneau facultatif en dernier
+  paramètre ; sans lui, la file agit sur la notification interne. Aucune clé n'y est plus composée
+  en direct — le banc l'éprouve sur la source.
+- `src/Mail/MailProcessLock.php` : `acquire()`, `is_held()` et `chemin()` acceptent un créneau. Le
+  nom dérivé reste un HMAC, et celui du créneau administratif est inchangé au caractère près.
+- `src/Mail/MailScheduler.php` : `schedule()`, `schedule_unique()`, `unschedule()`,
+  `unschedule_all()`, `process()` et la séquence d'envoi acceptent un créneau ; `handle_event()`
+  reçoit deux arguments et résout le créneau depuis ce que le cron lui transmet.
+- Banc `tests/submissions/test-creneaux.php`, 63 contrôles : adressage historique préservé, liste
+  blanche des types, événements anciens traitables, états indépendants, baux indépendants, mutex
+  indépendants, sections critiques imbriquées sans interblocage, source unique des clés.
+
+---
+
+## D-056 — Accusé de réception adressé au demandeur
+
+**Contexte.** Jusqu'ici, une soumission produisait un seul message, interne à Urbizen. Le client
+voyait sa confirmation à l'écran, et rien d'autre : aucune trace écrite, aucune référence qu'il
+puisse retrouver le lendemain. C'est le second créneau de notification ouvert par [D-055].
+
+**Décision.** Un accusé de réception part vers le demandeur, dans son propre créneau
+(`customer_acknowledgement`), avec son propre état, son propre verrou, son propre événement et sa
+propre reprise. Il est **le premier message qu'Urbizen adresse à une personne extérieure**, et tout
+ce qui suit découle de là.
+
+**Le destinataire ne vient que de l'adresse validée puis persistée.** Une seule clé est lue —
+`email` — et elle est revalidée à la lecture, retours chariot retirés d'abord. Ni `$_POST`, ni un
+`recipient`, `notification_email`, `to`, `cc`, `bcc`, `from` ou `reply_to` glissé dans la requête
+n'a de chemin jusqu'à cette décision. Sans cette règle, un tiers ferait envoyer par Urbizen, depuis
+le domaine d'Urbizen, un message de confirmation à l'adresse de son choix. Sans adresse exploitable,
+il n'y a pas d'accusé — et surtout pas de repli sur l'adresse administrative, qui recevrait un
+message écrit pour quelqu'un d'autre.
+
+**Le contenu est pauvre, délibérément.** Aucun lien signé : les liens de téléchargement sont
+temporaires mais réels, et les envoyer dans un message qui traverse des boîtes tierces, est archivé,
+transféré et indexé reviendrait à publier les pièces du dossier. Aucune réponse recopiée : le
+demandeur sait ce qu'il a écrit, le lui renvoyer multiplie les endroits où ses données existent.
+Aucun état technique : ni identifiant de post, ni statut interne, ni code d'erreur, ni nom de
+fichier. Restent la référence, le projet sous ses libellés client, l'estimation, ce qui reste à
+transmettre, et une phrase pour dire la suite.
+
+**Le tarif est repris tel que le serveur l'a calculé et persisté**, jamais recalculé, jamais repris
+du navigateur. Un total absent n'est pas un zéro : c'est un tarif sur étude, et il se dit ainsi —
+afficher « 0 € » serait un engagement, et un engagement faux. La mention imposée est reproduite au
+caractère près : « Estimation indicative. Le tarif définitif sera confirmé par Urbizen après
+vérification de votre projet, avant toute commande. » Elle seule empêche une estimation d'être lue
+comme un devis, et un banc en vérifie l'exactitude littérale.
+
+**Sujet** : `Votre demande Urbizen a bien été reçue — {RÉFÉRENCE}`. Il porte la référence et rien
+d'autre — un sujet est visible dans une liste de messages, parfois sur un écran verrouillé.
+
+**Liste blanche par type de formulaire.** `NotificationStrategyRegistry::for_slot()` résout le
+couple (type, créneau). Seule la déclaration préalable prévoit un accusé ; tout autre type n'envoie
+rien à qui que ce soit. Écrire à une personne doit être une décision explicite, prise type par type,
+pas un drapeau qu'on oublie d'éteindre.
+
+**Le créneau est ouvert après le point de non-retour, et son échec ne remonte pas.** La demande est
+reçue ; qu'un message de courtoisie ne parte pas est fâcheux, mais annuler pour autant un dossier
+déjà enregistré serait absurde — et le client a bien vu sa confirmation à l'écran. C'est l'exact
+inverse de la notification interne, dont l'absence signifierait qu'un dossier est arrivé sans que
+personne ne le sache, et dont l'échec fait donc échouer la finalisation.
+
+**L'idempotence est adressée par `<référence>:<type>`.** Une reprise ne peut pas faire naître un
+second accusé.
+
+**Conséquences sur l'existant.** Un second créneau existant désormais, les traitements qui
+supposaient un message unique ont été étendus à tous les créneaux, chacun sous son propre verrou :
+- `MailScheduler::reconcile()` fait une passe par créneau — une passe unique n'aurait rattrapé que
+  la notification interne, laissant un accusé coincé indéfiniment.
+- `TrashGuard` annule **tous** les créneaux à la mise à la Corbeille, et les fait tous reprendre à
+  la restauration. Un accusé laissé en file partirait vers une personne réelle alors que son dossier
+  vient d'être retiré : c'est le message le plus embarrassant que la plateforme puisse produire.
+- `TrashGuard::guard_trash()` et `FileCleaner` diffèrent leur travail si **n'importe lequel** des
+  créneaux est en cours d'envoi, et `FileCleaner` nettoie le fichier technique de chaque créneau.
+- `MailPolicy::blocker()`, `closed_blocker()` et `sending_is_stale()` prennent un créneau. En
+  particulier, le contrôle de destinataire porte sur celui du créneau : une adresse administrative
+  absente ne bloque plus un accusé, et un demandeur sans courriel exploitable ne bloque plus la
+  notification interne.
+
+**Conséquences.**
+- `src/Mail/CustomerAcknowledgementRenderer.php` : sujet, corps, en-têtes, mention.
+- `src/Mail/CustomerAcknowledgementStrategy.php` : adaptateur mince sur le contrat existant.
+- `src/Mail/MailPolicy.php` : `recipient_for()`, `customer_recipient()`.
+- `src/Mail/NotificationStrategyRegistry.php` : `for_slot()`, `has_customer_acknowledgement()`.
+- `src/Submissions/SubmissionRepository.php` : ouverture du créneau après persistance.
+- Banc `tests/submissions/test-accuse-client.php`, 52 contrôles : destinataire incorruptible,
+  sujet exact, contenu présent, contenu interdit, échappement, tarif sur étude, en-têtes, résolution
+  par créneau, idempotence, indépendance des deux messages.
+
+---
+
+## D-057 — Le permis de construire réutilise le socle, et introduit le tarif sur étude
+
+**Contexte.** La déclaration préalable avait été raccordée en premier, et son implémentation
+portait des choses qui n'avaient rien de propre à elle : la façon de nommer un projet devant un
+humain, le calcul des suppléments, les règles de cohérence inter-champs, le profil de dépôt, le
+pont iframe. Raccorder le permis de construire en recopiant ce code aurait produit deux
+implémentations jumelles — et garanti qu'un correctif finisse par n'être appliqué qu'à l'une des
+deux, sur le parcours le moins souvent relu.
+
+**Décision.** Ce qui était propre à la DP devient paramétré par type de formulaire :
+
+- `CatalogueProjets` porte les pièces, les préfixes et tous les helpers ; chaque parcours ne
+  déclare que sa table de natures. Les pièces sont **communes**, parce que ce sont réellement les
+  mêmes dans les deux formulaires.
+- `PricingProjets` porte le calcul, les suppléments, l'ordre du récapitulatif et le plafond dérivé
+  de projets supplémentaires ; chaque barème ne déclare que ses socles.
+- `ValidationMetierProjets` porte les règles de cohérence ; chaque validateur ne désigne que son
+  catalogue et son barème.
+- `CatalogueRegistry` résout le catalogue **depuis le type de la demande**. Sans lui, la réponse
+  JSON et l'accusé client nommaient la DP en dur : un projet `maison_individuelle` aurait disparu
+  du récapitulatif sans rien signaler, puisque `libelle_nature()` rend `null` hors catalogue.
+- Le profil d'upload, le pont iframe et le banc du pont sont uniques et paramétrés.
+
+**Les identifiants PC sont canoniques** : `maison_individuelle`, `extension`, `surelevation`,
+`changement_destination`, `annexe_garage`, `autre`. Les libellés lus par le client sont inchangés —
+« Maison neuve » reste « Maison neuve » sous l'identifiant `maison_individuelle`, ce qui est
+précisément ce que permet la séparation entre identifiant et libellé. Les valeurs techniques
+françaises qui subsistaient dans les listes déroulantes du PC (qualité du déclarant, raccordements)
+sont remplacées, pas doublées : une seule convention subsiste, et un banc l'exige.
+
+**Barème.** Maison neuve 849 €, extension 649 €, surélévation 649 €, changement de destination
+649 €, annexe/garage 449 €. Suppléments inchangés : +100 € par projet supplémentaire, +80 € en
+secteur ABF, +30 € pour le dépôt sur le guichet numérique.
+
+**Le tarif sur étude, et pourquoi il est traité par le mécanisme.** « Autre » recouvre au permis de
+construire des projets dont l'ampleur n'est pas bornée — un bâtiment d'activité, une opération
+mixte. Annoncer un prix avant examen serait un engagement en l'air. Son socle vaut donc `null`, et
+le calcul commun en tire :
+
+- `base` et `total` nuls, **mais les deux clés présentes**. Un total absent et un total
+  volontairement non chiffré ne veulent pas dire la même chose : le premier est une anomalie, le
+  second une décision. Les gardes emploient donc `array_key_exists()` et non `isset()` — sans quoi
+  le contrôleur aurait refusé tout dossier sur étude.
+- `pricing_status = sur_etude`, persisté. Le déduire de la nullité du total à chaque lecture aurait
+  obligé chaque consommateur à redeviner l'intention.
+- Les suppléments restent **listés et chiffrés**, parce qu'ils sont connus. Ce qui ne peut pas
+  l'être, c'est leur somme avec un socle qui n'existe pas encore : additionner les seuls
+  suppléments produirait un « total » de 180 € pour un dossier qui en coûtera plusieurs centaines.
+  Un chiffre faux est pire qu'une absence de chiffre.
+- `normalize_pricing()` ne transtype plus `null` en `0`. C'était le défaut le plus coûteux du
+  chemin existant : un dossier sur étude aurait été persisté à zéro euro, et tout ce qui lit le
+  tarif — réponse JSON, écran d'administration, accusé client — aurait annoncé la gratuité.
+- `accepts_base()` accepte `null`, mais **seulement d'un barème qui comporte réellement une nature
+  sur étude**. Sinon un tarif absent passerait pour légitime là où il trahirait un calcul
+  défaillant.
+
+**Le repli d'aperçu disparaît.** Le formulaire PC portait `if ( ! ENDPOINT ) { showDone( true ); }` :
+un écran de réussite complet s'affichait sans le moindre envoi. L'écran final n'apparaît désormais
+qu'après un HTTP valide, un JSON valide, `success: true` et une référence réelle, et il est bâti
+exclusivement à partir de ce que le serveur a enregistré.
+
+**Une action de nonce par parcours.** `urbizen_permis_construire_submit` est distincte de celle de
+la DP. Un nonce est lié à son action : les partager laisserait un nonce émis pour une déclaration
+préalable autoriser l'envoi d'un permis de construire — deux barèmes, deux profils de dépôt.
+
+**Notifications.** Les deux créneaux de [D-055] et [D-056] s'appliquent tels quels. L'accusé nomme
+la démarche telle qu'elle se dit — « Permis de construire », jamais `permis_construire` — et un
+dossier sur étude y affiche « Tarif sur étude ». La mention imposée est reproduite au caractère
+près, et rien ne présente le message comme une facture, un devis accepté ou une commande confirmée.
+
+**Conséquences.**
+- `src/Forms/` : `CatalogueProjets`, `CataloguePermisConstruire`, `CatalogueRegistry`,
+  `PricingProjets`, `PricingPermisConstruire`, `ProjetsPricingStrategy`,
+  `PermisConstruirePricingStrategy`, `ValidationMetierProjets`, `ValidationMetierPermisConstruire`,
+  `definitions/permis_construire.php`.
+- `src/Mail/PermisConstruireNotificationStrategy.php` ; `CustomerAcknowledgementRenderer` et
+  `SubmissionJsonResponse` résolus par type.
+- `SubmissionController` : route PC, garde tarifaire en `array_key_exists()`.
+- `SubmissionRepository` : `pricing_status` persisté, montants nuls conservés.
+- Bancs : `tests/formulaires/test-contrat-pc.php` (129 contrôles),
+  `tests/cadastre/test-pont.mjs` (179, les deux parcours),
+  `tests/submissions/test-accuse-client.php` (82, les deux parcours),
+  `tests/submissions/test-compat.php` remis à jour.

@@ -186,6 +186,9 @@
     border-radius: var(--radius);
     padding: 9px 11px;
     width: 100%;
+    /* Cible tactile : 44 px, seuil retenu pour tout le parcours. Le
+       remplissage seul laissait les listes déroulantes à 41 px. */
+    min-height: 44px;
     transition: border-color .15s, box-shadow .15s;
   }
   /* champs "mesure" : mono, façon relevé cadastral */
@@ -271,6 +274,8 @@
   #dp-app button.dp-btn {
     font-family: "Space Grotesk", sans-serif; font-weight: 500; font-size: 14px;
     padding: 10px 20px; border-radius: var(--radius); cursor: pointer; border: 1px solid transparent;
+    /* Même seuil que les champs : au doigt, 40 px se rate. */
+    min-height: 44px;
     transition: background .15s, border-color .15s, transform .05s;
   }
   #dp-app button.dp-btn:active { transform: translateY(1px); }
@@ -284,20 +289,24 @@
   #dp-app .dp-err { color: var(--error); font-size: 12.5px; margin-top: 8px; min-height: 1em; }
 
   /* -------- écran de confirmation -------- */
-  #dp-app .dp-done { text-align: center; padding: 40px 20px; display: none; }
+  #dp-app .dp-done { text-align: left; padding: clamp(34px, 5vw, 58px); display: none; }
   #dp-app .dp-done.show { display: block; }
   #dp-app .dp-done .mark {
-    width: 54px; height: 54px; margin: 0 auto 18px; border-radius: 50%;
-    background: var(--ok); color: #fff; display: grid; place-items: center; font-size: 26px;
+    width: 48px; height: 48px; margin: 0 0 18px; border-radius: 50%;
+    background: var(--mint); color: var(--ink); display: grid; place-items: center; font-size: 23px; font-weight: 700;
   }
-  #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: 22px; margin: 0 0 8px; }
-  #dp-app .dp-done p { color: var(--ink-soft); max-width: 44ch; margin: 0 auto; }
-  #dp-app .dp-debug {
-    text-align: left; margin: 22px auto 0; max-width: 640px;
-    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--ink-soft);
-    background: #0F1620; color: #C9D3DD; border-radius: var(--radius); padding: 14px; overflow: auto;
-    white-space: pre-wrap; word-break: break-word;
-  }
+  #dp-app .dp-done-kicker { margin: 0 0 8px; color: var(--cadastre); font-family: "IBM Plex Mono", monospace; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  #dp-app .dp-done h3 { font-family: "Space Grotesk", sans-serif; font-size: clamp(25px, 3vw, 34px); line-height: 1.15; margin: 0 0 12px; }
+  #dp-app .dp-done > p { color: var(--ink-soft); max-width: 62ch; margin: 0; }
+  /* Le bloc tarifaire (répéteur de projets, options, récapitulatif) est stylé
+     par assets/css/urbizen-form-tarifs.css, partagé par les formulaires DP et PCMI. */
+  #dp-app .dp-next-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; counter-reset: confirmation; }
+  #dp-app .dp-next-steps li { position: relative; min-height: 98px; padding: 18px 16px 16px 48px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: var(--ink); font-weight: 600; }
+  #dp-app .dp-next-steps li::before { counter-increment: confirmation; content: counter(confirmation); position: absolute; left: 16px; top: 17px; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+  #dp-app .dp-next-steps span { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 12.5px; font-weight: 400; line-height: 1.45; }
+  #dp-app .dp-preview-note { margin-top: 20px !important; padding: 12px 14px; border-left: 3px solid var(--cadastre); background: var(--surface-2); font-size: 12.5px; }
+  #dp-app .dp-reference { margin: 18px 0 0; font-size: 14px; }
+  #dp-app .dp-reference strong { font-family: "IBM Plex Mono", monospace; font-size: 16px; letter-spacing: .04em; }
 
   /* -------- responsive -------- */
   @media (max-width: 720px) {
@@ -310,6 +319,7 @@
     #dp-app .dp-legend li { flex-direction: column; text-align: center; gap: 5px; padding: 4px 6px; font-size: 11px; min-width: 62px; }
     #dp-app .dp-legend li::before { display: none; }
     #dp-app .dp-grid { grid-template-columns: 1fr; }
+    #dp-app .dp-next-steps { grid-template-columns: 1fr; }
     #dp-app .dp-seg { display: flex; width: 100%; }
     #dp-app .dp-seg label { flex: 1 1 0; text-align: center; padding-left: 10px; padding-right: 10px; }
   }
@@ -325,6 +335,91 @@
   #dp-app .dp-locate:hover { background: var(--cadastre-sf); }
   #dp-app .dp-locate.loading { opacity: .6; pointer-events: none; }
   #dp-app .dp-map-wrap { margin-top: 12px; }
+  /* `hidden` doit l'emporter sur toute règle d'affichage. Les groupes de champs
+     déclarent `display: flex`, ce qui bat la règle du navigateur : un champ
+     écarté par la matrice restait désactivé — donc jamais envoyé — mais
+     toujours à l'écran. Un formulaire qui montre ce qu'il n'attend pas se lit
+     comme un formulaire en panne. */
+  #dp-app [hidden] { display: none !important; }
+
+  /* -- Cibles tactiles --
+     44 px, pas 40 : c'est la largeur d'un doigt adulte, et c'est le seuil
+     retenu partout dans le parcours. La zone utile compte, pas le dessin —
+     une case à cocher de 16 px reste une case de 16 px, mais la ligne
+     entière la commande.
+     Les règles sont groupées ici plutôt que dispersées dans chaque
+     composant : c'est une exigence transverse, et un banc doit pouvoir la
+     lire d'un seul endroit. */
+  #dp-app .dp-seg label,
+  #dp-app .dp-check,
+  #dp-app .dp-locate,
+  #dp-app .dp-map-toggle,
+  #dp-app .dp-parcel-ok,
+  #dp-app .dp-cadastre-inconnu,
+  #dp-app .dp-attest label[for],
+  #dp-app .dp-file-btn,
+  #dp-app .dp-travail-ajouter,
+  #dp-app .dp-travail-suppr,
+  #dp-app button.dp-btn { min-height: 44px; }
+  #dp-app .dp-file-btn { display: inline-flex; align-items: center; justify-content: center; }
+
+  /* -- Adresse assistée --
+     La liste se superpose au reste : elle doit passer AU-DESSUS du bloc
+     suivant, sinon les propositions se lisent à moitié. */
+  #dp-app .dp-adresse { position: relative; }
+  #dp-app .dp-adresse-liste {
+    list-style: none; margin: 4px 0 0; padding: 4px;
+    position: absolute; z-index: 20; left: 0; right: 0;
+    max-height: 280px; overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--line-strong);
+    border-radius: var(--radius); box-shadow: 0 8px 24px rgba(18,35,59,.12);
+  }
+  #dp-app .dp-adresse-liste li {
+    /* 44 px au doigt, et le texte long revient à la ligne plutôt que d'être
+       coupé : une adresse tronquée ne se choisit pas en confiance. */
+    min-height: 44px; display: flex; align-items: center;
+    padding: 8px 12px; border-radius: 6px; cursor: pointer;
+    font-size: 13.5px; line-height: 1.35; overflow-wrap: anywhere;
+  }
+  #dp-app .dp-adresse-liste li:hover { background: var(--cadastre-sf); }
+  /* L'option active se distingue par le fond ET par la barre : la couleur
+     seule exclurait qui ne la perçoit pas. */
+  #dp-app .dp-adresse-liste li[aria-selected="true"] {
+    background: var(--cadastre-sf); box-shadow: inset 3px 0 0 var(--cadastre);
+  }
+  #dp-app .dp-adresse-etat {
+    margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  #dp-app .dp-adresse-bascule {
+    display: flex; align-items: center; gap: 9px; min-height: 44px;
+    margin-top: 6px; font-size: 13.5px; font-weight: 400; cursor: pointer;
+  }
+  #dp-app .dp-adresse-bascule input { accent-color: var(--cadastre); width: 18px; height: 18px; flex: none; }
+  #dp-app .dp-facultatif { font-weight: 400; color: var(--ink-faint); }
+  #dp-app [data-adresse-groupe-manuel] { margin-top: 10px; }
+  #dp-app .dp-report-encadre {
+    margin-top: 10px; padding: 12px 14px; border: 1px solid var(--line);
+    border-left: 3px solid var(--cadastre); border-radius: var(--radius);
+    background: var(--cadastre-sf);
+  }
+  #dp-app .dp-report.is-error .dp-report-encadre { border-left-color: var(--error); background: #FDF3F3; }
+  #dp-app .dp-report-titre { margin: 0 0 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .04em; }
+  #dp-app .dp-report-adresse { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+  #dp-app .dp-report-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-soft); }
+  #dp-app .dp-report.is-error .dp-report-note { color: var(--error); font-weight: 600; }
+  #dp-app [data-adresse-groupe-commun] { margin-top: 10px; }
+  #dp-app [data-adresse-groupe-commun] input[readonly] { background: var(--cadastre-sf); }
+  #dp-app .dp-seg label { display: flex; align-items: center; justify-content: center; }
+  #dp-app .dp-locate,
+  #dp-app .dp-map-toggle,
+  #dp-app .dp-parcel-ok { display: inline-flex; align-items: center; gap: 8px; }
+  #dp-app .dp-cadastre-inconnu { display: flex; align-items: center; gap: 9px; }
+  /* Le libellé d'une attestation couvre toute sa ligne, case comprise :
+     viser 16 px de côté au doigt est une invitation à se tromper. */
+  #dp-app .dp-attest { position: relative; }
+  #dp-app .dp-attest label[for] { display: flex; align-items: center; }
+  #dp-app .dp-attest label[for]::before { content: ""; position: absolute; inset: 0; }
   #dp-app .dp-map-tools { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
   #dp-app .dp-map-hint { font-size: 12.5px; color: var(--ink-soft); }
   #dp-app .dp-map-toggle {
@@ -349,6 +444,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-tarifs.css?v=0.2.7" />
+<link rel="stylesheet" href="../../wordpress/urbizen-child/assets/css/urbizen-form-pieces.css?v=0.2.7" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -393,17 +490,53 @@
                 <label>Qualité du demandeur <span class="req">*</span></label>
                 <select name="qualite">
                   <option value="">— sélectionner —</option>
-                  <option>Propriétaire</option>
-                  <option>Mandataire du propriétaire</option>
-                  <option>Futur acquéreur (avec accord)</option>
-                  <option>Autre</option>
+                  <option value="proprietaire">Propriétaire</option>
+                  <option value="mandataire">Mandataire du propriétaire</option>
+                  <option value="futur_acquereur">Futur acquéreur (avec accord)</option>
+                  <option value="autre">Autre</option>
                 </select>
               </div>
               <div class="dp-field"><label for="f_email">E-mail <span class="req">*</span></label><input type="email" id="f_email" name="email" autocomplete="email"></div>
               <div class="dp-field"><label for="f_tel">Téléphone <span class="req">*</span></label><input type="tel" id="f_tel" name="telephone" autocomplete="tel"></div>
-              <div class="dp-field col-2"><label for="f_adr">Adresse postale du demandeur <span class="req">*</span></label><input type="text" id="f_adr" name="adresse_declarant" autocomplete="street-address"></div>
-              <div class="dp-field"><label for="f_cp">Code postal <span class="req">*</span></label><input type="text" id="f_cp" name="cp_declarant" class="measure" inputmode="numeric" autocomplete="postal-code"></div>
-              <div class="dp-field"><label for="f_ville">Commune <span class="req">*</span></label><input type="text" id="f_ville" name="ville_declarant" autocomplete="address-level2"></div>
+              <!-- Adresse du demandeur : le composant partagé, monté sur ses
+                   propres noms canoniques. Les trois champs historiques —
+                   adresse_declarant, cp_declarant, ville_declarant — sont
+                   conservés tels quels ; seuls les rôles techniques changent. -->
+              <div class="dp-field col-2 dp-adresse" data-adresse="declarant">
+                <div data-adresse-groupe-auto>
+                  <label for="d_rech">Rechercher l’adresse du demandeur <span class="req">*</span></label>
+                  <!-- Sans `name` : ce champ pilote la recherche, il n'est pas
+                       l'adresse. Tant qu'aucune proposition n'est retenue, il
+                       n'y a pas d'adresse, et rien ne doit partir. -->
+                  <input type="text" id="d_rech" data-adresse-recherche autocomplete="off"
+                         placeholder="Commencez à taper, puis choisissez dans la liste">
+                  <ul class="dp-adresse-liste" role="listbox" aria-label="Adresses proposées"
+                      data-adresse-propositions hidden></ul>
+                  <!-- Les champs canoniques vivent DANS le groupe automatique :
+                       en mode manuel le groupe est désactivé, donc ils quittent
+                       le FormData. -->
+                  <input type="hidden" name="adresse_declarant" data-adresse-champ="adresse">
+                  <input type="hidden" name="insee_declarant" data-adresse-champ="insee">
+                  <input type="hidden" name="lat_declarant" data-adresse-champ="lat">
+                  <input type="hidden" name="lon_declarant" data-adresse-champ="lon">
+                </div>
+                <p class="dp-adresse-etat" role="status" aria-live="polite" data-adresse-etat hidden></p>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" data-adresse-manuel> Je renseigne l’adresse manuellement
+                </label>
+                <!-- Le mode canonique, jamais montré, et jamais désactivé. -->
+                <input type="hidden" name="mode_adresse_declarant" value="automatique" data-adresse-champ="mode">
+                <div class="dp-grid" data-adresse-groupe-manuel hidden>
+                  <div class="dp-field col-2"><label for="d_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="d_voie" name="voie_declarant" data-adresse-champ="voie" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="d_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="d_comp" name="complement_declarant" data-adresse-champ="complement" autocomplete="off"></div>
+                </div>
+                <!-- Code postal et commune : UN seul jeu, partagé par les deux
+                     modes, et les noms historiques du demandeur. -->
+                <div class="dp-grid" data-adresse-groupe-commun>
+                  <div class="dp-field"><label for="f_cp">Code postal <span class="req">*</span></label><input type="text" id="f_cp" name="cp_declarant" class="measure" inputmode="numeric" data-adresse-champ="cp" autocomplete="off"></div>
+                  <div class="dp-field"><label for="f_ville">Commune <span class="req">*</span></label><input type="text" id="f_ville" name="ville_declarant" data-adresse-champ="ville" autocomplete="off"></div>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -413,12 +546,56 @@
             <h2 class="dp-step-title">Le terrain</h2>
             <p class="dp-step-hint">Références cadastrales sur <span style="font-family:'IBM Plex Mono',monospace">cadastre.gouv.fr</span>. La description de l’état actuel nourrit la notice du permis.</p>
             <div class="dp-grid">
-              <div class="dp-field col-2"><label for="t_adr">Adresse du terrain <span class="req">*</span></label><input type="text" id="t_adr" name="terrain_adresse"></div>
-              <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric"></div>
-              <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville"></div>
-              <div class="dp-field"><label for="t_sec">Section cadastrale <span class="req">*</span></label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. ZC"></div>
-              <div class="dp-field"><label for="t_num">N° de parcelle <span class="req">*</span></label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 88"></div>
-              <div class="dp-field col-2"><label for="t_sup">Superficie totale du terrain <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="t_sup" name="terrain_superficie" class="measure" min="0" step="1"><span class="unit">m²</span></div></div>
+              <!-- Le report. Cochée, la case retire du formulaire le SEUL bloc
+                   d'adresse du terrain : le serveur reconstruira l'adresse depuis
+                   le demandeur qu'il aura lui-même validé. Les références
+                   cadastrales, la superficie et l'état du terrain décrivent la
+                   parcelle, pas le lieu où l'on reçoit son courrier — ils restent
+                   saisis, quoi qu'il arrive. `value="oui"` est la SEULE valeur qui
+                   coche, celle déjà retenue en déclaration préalable. -->
+              <div class="dp-field col-2 dp-report" data-adresse-report>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" name="terrain_meme_adresse_declarant" value="oui" data-adresse-report-case>
+                  L’adresse du terrain est la même que celle du déclarant
+                </label>
+                <div class="dp-report-encadre" role="status" aria-live="polite" data-adresse-report-encadre hidden>
+                  <p class="dp-report-titre">Adresse retenue pour le terrain</p>
+                  <p class="dp-report-adresse" data-adresse-report-adresse></p>
+                  <p class="dp-report-note" data-adresse-report-note></p>
+                </div>
+              </div>
+              <div class="dp-field col-2 dp-adresse" data-adresse="terrain">
+                <div data-adresse-groupe-auto>
+                  <label for="t_rech">Rechercher l’adresse du terrain <span class="req">*</span></label>
+                  <input type="text" id="t_rech" data-adresse-recherche autocomplete="off"
+                         placeholder="Commencez à taper, puis choisissez dans la liste">
+                  <ul class="dp-adresse-liste" role="listbox" aria-label="Adresses proposées"
+                      data-adresse-propositions hidden></ul>
+                  <input type="hidden" name="terrain_adresse" data-adresse-champ="adresse">
+                  <input type="hidden" name="terrain_insee" data-adresse-champ="insee">
+                  <input type="hidden" name="terrain_lat" data-adresse-champ="lat">
+                  <input type="hidden" name="terrain_lon" data-adresse-champ="lon">
+                </div>
+                <p class="dp-adresse-etat" role="status" aria-live="polite" data-adresse-etat hidden></p>
+                <label class="dp-adresse-bascule">
+                  <input type="checkbox" data-adresse-manuel> Je renseigne l’adresse manuellement
+                </label>
+                <input type="hidden" name="mode_adresse" value="automatique" data-adresse-champ="mode">
+                <div class="dp-grid" data-adresse-groupe-manuel hidden>
+                  <div class="dp-field col-2"><label for="t_voie">Numéro et voie <span class="req">*</span></label><input type="text" id="t_voie" name="terrain_voie" data-adresse-champ="voie" autocomplete="off"></div>
+                  <div class="dp-field col-2"><label for="t_comp">Complément d’adresse <span class="dp-facultatif">— facultatif</span></label><input type="text" id="t_comp" name="terrain_complement" data-adresse-champ="complement" autocomplete="off"></div>
+                </div>
+                <div class="dp-grid" data-adresse-groupe-commun>
+                  <div class="dp-field"><label for="t_cp">Code postal <span class="req">*</span></label><input type="text" id="t_cp" name="terrain_cp" class="measure" inputmode="numeric" data-adresse-champ="cp" autocomplete="off"></div>
+                  <div class="dp-field"><label for="t_ville">Commune <span class="req">*</span></label><input type="text" id="t_ville" name="terrain_ville" data-adresse-champ="ville" autocomplete="off"></div>
+                </div>
+              </div>
+              <div class="dp-field"><label for="t_sec">Section cadastrale</label><input type="text" id="t_sec" name="cad_section" class="measure" placeholder="ex. ZC"></div>
+              <div class="dp-field"><label for="t_num">N° de parcelle</label><input type="text" id="t_num" name="cad_numero" class="measure" inputmode="numeric" placeholder="ex. 88"></div>
+              <div class="dp-field col-2"><label for="t_sup">Superficie totale du terrain</label><div class="dp-suffix"><input type="number" id="t_sup" name="terrain_superficie" class="measure" min="0" step="1"><span class="unit">m²</span></div></div>
+              <div class="dp-field col-2">
+                <label class="dp-cadastre-inconnu"><input type="checkbox" id="informations_cadastrales_differees" name="informations_cadastrales_differees" value="oui"> Je ne connais pas ces informations cadastrales.</label>
+              </div>
               <div class="dp-field col-2"><label for="t_etat">État actuel du terrain</label><textarea id="t_etat" name="terrain_etat" style="min-height:70px" placeholder="Ex. : terrain nu en légère pente, exposé sud, accès par la voie communale ; quelques arbres en limite est."></textarea></div>
             </div>
                         <div class="dp-field col-2">
@@ -447,12 +624,12 @@
             <div class="dp-field col-2" style="margin-bottom:16px">
               <label>Nature <span class="req">*</span></label>
               <div class="dp-checks" id="nature">
-                <label class="dp-check"><input type="checkbox" name="nature" value="Construction d’une maison individuelle"> Maison neuve</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Extension"> Extension</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Annexe (garage, dépendance)"> Annexe / garage</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Surélévation"> Surélévation</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Changement de destination"> Changement de destination</label>
-                <label class="dp-check"><input type="checkbox" name="nature" value="Autre"> Autre</label>
+                <label class="dp-check"><input type="radio" name="nature" value="maison_individuelle"> Maison neuve</label>
+                <label class="dp-check"><input type="radio" name="nature" value="extension"> Extension</label>
+                <label class="dp-check"><input type="radio" name="nature" value="annexe_garage"> Annexe / garage</label>
+                <label class="dp-check"><input type="radio" name="nature" value="surelevation"> Surélévation</label>
+                <label class="dp-check"><input type="radio" name="nature" value="changement_destination"> Changement de destination</label>
+                <label class="dp-check"><input type="radio" name="nature" value="autre"> Autre</label>
               </div>
             </div>
             <div class="dp-grid">
@@ -463,7 +640,7 @@
                   <input type="radio" id="i_exist" name="intervention" value="existant"><label for="i_exist">Sur l’existant</label>
                 </div>
               </div>
-              <div class="dp-field"><label for="p_log">Nombre de logements créés</label><input type="number" id="p_log" name="nb_logements" class="measure" min="0" step="1" value="1"></div>
+              <div class="dp-field" data-champ="nb_logements"><label for="p_log">Nombre de logements créés</label><input type="number" id="p_log" name="nb_logements" class="measure" min="0" step="1" value="1"></div>
               <div class="dp-field col-2"><label for="p_desc">Description du projet <span class="req">*</span></label><textarea id="p_desc" name="description" placeholder="Ex. : maison de plain-pied de 132 m² de surface de plancher, toiture à deux pans, garage attenant de 20 m²."></textarea></div>
               <div class="dp-field col-2"><label for="p_ins">Insertion et parti architectural</label><textarea id="p_ins" name="insertion" style="min-height:70px" placeholder="Ex. : volumétrie basse s’inscrivant dans la pente, teintes claires en harmonie avec le bâti voisin, haie conservée en limite."></textarea></div>
               <div class="dp-field col-2"><label for="p_mat">Matériaux et couleurs</label><input type="text" id="p_mat" name="materiaux" placeholder="Ex. : enduit ton sable · tuiles terre cuite · menuiseries alu RAL 7016"></div>
@@ -476,11 +653,11 @@
             <h2 class="dp-step-title">Surfaces</h2>
             <p class="dp-step-hint">Au-delà de 150 m² de surface de plancher, le recours à un architecte est obligatoire (rubrique « Réseaux &amp; intervenants »).</p>
             <div class="dp-grid">
-              <div class="dp-field"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_existante"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_creee"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_totale"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="emprise_avant"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="emprise_creee"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
             </div>
             <div class="dp-attest" id="archi-flag" style="border-left-color:var(--cadastre);margin-top:18px;display:none">
               <span aria-hidden="true" style="font-family:'IBM Plex Mono',monospace;color:var(--cadastre)">!</span>
@@ -495,11 +672,11 @@
             <p class="dp-step-hint">Raccordements du projet et, le cas échéant, l’architecte.</p>
             <div class="dp-grid">
               <div class="dp-field"><label for="r_eau">Eau potable</label>
-                <select id="r_eau" name="raccord_eau"><option value="">— non précisé —</option><option>Réseau public</option><option>Captage privé</option></select></div>
+                <select id="r_eau" name="raccord_eau"><option value="">— non précisé —</option><option value="reseau_public">Réseau public</option><option value="captage_prive">Captage privé</option></select></div>
               <div class="dp-field"><label for="r_ass">Assainissement</label>
-                <select id="r_ass" name="raccord_assainissement"><option value="">— non précisé —</option><option>Collectif (tout-à-l’égout)</option><option>Individuel (ANC)</option></select></div>
+                <select id="r_ass" name="raccord_assainissement"><option value="">— non précisé —</option><option value="collectif">Collectif (tout-à-l’égout)</option><option value="individuel">Individuel (ANC)</option></select></div>
               <div class="dp-field col-2"><label for="r_elec">Électricité</label>
-                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option>Réseau public</option><option>Autre</option></select></div>
+                <select id="r_elec" name="raccord_elec"><option value="">— non précisé —</option><option value="reseau_public">Réseau public</option><option value="autre">Autre</option></select></div>
               <div class="dp-field"><label for="a_nom">Architecte — nom</label><input type="text" id="a_nom" name="architecte_nom"></div>
               <div class="dp-field"><label for="a_ord">N° au Conseil de l’Ordre</label><input type="text" id="a_ord" name="architecte_ordre" class="measure"></div>
             </div>
@@ -511,9 +688,23 @@
             <h2 class="dp-step-title">Éléments de calcul des taxes</h2>
             <p class="dp-step-hint">Servent au calcul de la taxe d’aménagement. Laissez 0 si non concerné.</p>
             <div class="dp-grid">
-              <div class="dp-field"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
-              <div class="dp-field"><label for="x_pis">Bassin de piscine</label><div class="dp-suffix"><input type="number" id="x_pis" name="piscine_m2" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="surface_taxable"><label for="x_tax">Surface taxable créée</label><div class="dp-suffix"><input type="number" id="x_tax" name="surface_taxable" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="nb_stationnement"><label for="x_sta">Places de stationnement extérieures</label><input type="number" id="x_sta" name="nb_stationnement" class="measure" min="0" step="1" value="0"></div>
+              <div class="dp-field col-2" data-champ="piscine_prevue"><label>Une piscine est-elle prévue dans le projet&nbsp;?</label><div class="dp-seg" role="radiogroup" aria-label="Une piscine est-elle prévue dans le projet ?">
+                  <input type="radio" id="pp_o" name="piscine_prevue" value="oui"><label for="pp_o">Oui</label>
+                  <input type="radio" id="pp_n" name="piscine_prevue" value="non"><label for="pp_n">Non</label>
+                  <input type="radio" id="pp_i" name="piscine_prevue" value="inconnu"><label for="pp_i">Je ne sais pas</label>
+                </div></div>
+              <div class="dp-field" data-champ="longueur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_lon">Longueur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lon" name="longueur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="longueur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="largeur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_lar">Largeur approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_lar" name="largeur_bassin_m" class="measure" data-min="0" data-max="100" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="largeur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="surface_bassin_m2" data-visible-si="piscine_prevue=oui"><label for="b_sur">Surface approximative du bassin</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_sur" name="surface_bassin_m2" class="measure" data-min="0" data-max="5000" data-step="0.01" data-bassin-surface data-bassin-longueur="longueur_bassin_m" data-bassin-largeur="largeur_bassin_m" data-mesure><span class="unit">m²</span></div><p class="dp-hint" data-bassin-note hidden></p><button type="button" class="dp-btn dp-btn-lien" data-bassin-recalculer hidden>Recalculer à partir de la longueur et de la largeur</button><p class="dp-err" data-erreur-pour="surface_bassin_m2" role="alert" hidden></p></div>
+              <div class="dp-field" data-champ="profondeur_bassin_m" data-visible-si="piscine_prevue=oui"><label for="b_pro">Profondeur approximative</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_pro" name="profondeur_bassin_m" class="measure" data-min="0" data-max="20" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="profondeur_bassin_m" role="alert" hidden></p></div>
+              <div class="dp-field col-2" data-champ="presence_abri_piscine" data-visible-si="piscine_prevue=oui"><label>Abri de piscine</label><div class="dp-seg" role="radiogroup" aria-label="Abri de piscine">
+                  <input type="radio" id="ab_o" name="presence_abri_piscine" value="oui"><label for="ab_o">Oui</label>
+                  <input type="radio" id="ab_n" name="presence_abri_piscine" value="non"><label for="ab_n">Non</label>
+                  <input type="radio" id="ab_i" name="presence_abri_piscine" value="inconnu"><label for="ab_i">Je ne sais pas</label>
+                </div></div>
+              <div class="dp-field" data-champ="hauteur_abri_m" data-visible-si="presence_abri_piscine=oui"><label for="b_hab">Hauteur approximative de l’abri</label><div class="dp-suffix"><input type="text" inputmode="decimal" autocomplete="off" id="b_hab" name="hauteur_abri_m" class="measure" data-min="0" data-max="20" data-step="0.01" data-mesure><span class="unit">m</span></div><p class="dp-err" data-erreur-pour="hauteur_abri_m" role="alert" hidden></p></div>
               <div class="dp-field col-2" style="margin-top:6px">
                 <label>Le terrain est-il en secteur protégé (ABF)&nbsp;?</label>
                 <div class="dp-seg" role="radiogroup">
@@ -532,17 +723,37 @@
             </div>
           </section>
 
-          <!-- 7 — Pièces -->
+          <!-- 7 — Documents utiles -->
           <section class="dp-step" data-step="6">
-            <p class="dp-step-kicker">Pièces graphiques · PCMI</p>
-            <h2 class="dp-step-title">Vos plans et photos</h2>
-            <p class="dp-step-hint">La notice (PCMI4) est rédigée automatiquement. Joignez le reste ; ce qui manque, je le réalise. PDF, JPG ou PNG.</p>
+            <p class="dp-step-kicker">Documents utiles à votre projet</p>
+            <h2 class="dp-step-title">Photos, croquis et plans disponibles</h2>
+            <p class="dp-step-hint">Joignez uniquement ce que vous avez déjà. Les pièces administratives et graphiques du dossier seront réalisées par Urbizen.</p>
             <div id="pieces"></div>
           </section>
 
-          <!-- 8 — Envoi -->
+          <!-- 8 — Projets supplémentaires -->
           <section class="dp-step" data-step="7">
-            <p class="dp-step-kicker">Cadre 8 · Engagement</p>
+            <p class="dp-step-kicker">Cadre 8 · Projets supplémentaires</p>
+            <h2 class="dp-step-title">Souhaitez-vous ajouter d’autres projets à ce dossier&nbsp;?</h2>
+            <p class="dp-tarifs-principal" data-tarifs-principal></p>
+            <p class="dp-regroupement">Les projets supplémentaires doivent concerner le même demandeur, la même adresse et la même parcelle, et pouvoir être regroupés dans un même dossier administratif. Urbizen vérifiera leur compatibilité après réception de la demande.</p>
+
+            <div class="dp-travaux" data-tarifs-travaux></div>
+            <button type="button" class="dp-travail-ajouter" data-tarifs-ajouter>+ Ajouter un projet</button>
+
+            <label class="dp-option" for="depot_guichet">
+              <input type="checkbox" id="depot_guichet" name="depot_guichet" value="oui">
+              <span class="dp-option-texte">Je souhaite qu’Urbizen dépose mon dossier sur le guichet numérique de la commune : <span class="dp-option-prix">+30 €</span></span>
+            </label>
+
+            <div data-tarifs-recap></div>
+            <div data-pieces-recap></div>
+            <div class="dp-err" id="dp-travaux-err" role="alert"></div>
+          </section>
+
+          <!-- 9 — Envoi -->
+          <section class="dp-step" data-step="8">
+            <p class="dp-step-kicker">Cadre 9 · Engagement</p>
             <h2 class="dp-step-title">Vérification et envoi</h2>
             <p class="dp-step-hint">Le dépôt sur le guichet dématérialisé se fait après votre validation du dossier.</p>
             <div class="dp-attest"><input type="checkbox" id="a1" name="attest_exact"><label for="a1">Je certifie exactes les informations fournies et j’ai qualité pour demander ce permis.</label></div>
@@ -551,7 +762,7 @@
           </section>
 
           <footer class="dp-foot">
-            <span class="dp-count" id="dp-count">Rubrique 1 / 8</span>
+            <span class="dp-count" id="dp-count">Rubrique 1 / 9</span>
             <div class="dp-btns">
               <button type="button" class="dp-btn dp-back" id="dp-back" hidden>Précédent</button>
               <button type="button" class="dp-btn dp-next" id="dp-next">Continuer</button>
@@ -562,36 +773,122 @@
 
         <div class="dp-done" id="dp-done" aria-live="polite">
           <div class="mark">✓</div>
-          <h3>Demande envoyée</h3>
-          <p>Merci. Votre dossier de permis est en cours de constitution — vous recevrez un récapitulatif par e-mail.</p>
-          <pre class="dp-debug" id="dp-debug" hidden></pre>
+          <p class="dp-done-kicker">Votre demande d’urbanisme</p>
+          <h3>Votre demande a bien été enregistrée.</h3>
+          <p>Un interlocuteur Urbizen va vérifier les informations transmises et prendra contact avec vous sous 24 heures ouvrées afin de confirmer votre besoin, les éventuelles pièces complémentaires et le tarif définitif avant toute commande.</p>
+          <p class="dp-reference">Référence de votre demande : <strong id="dp-reference"></strong></p>
+          <div data-tarifs-recap-final aria-label="Estimation tarifaire"></div>
+          <div data-pieces-recap-final></div>
+          <ol class="dp-next-steps" aria-label="Prochaines étapes">
+            <li>Vérification de la demande<span>Urbizen contrôle la nature du projet et les informations reçues.</span></li>
+            <li>Confirmation du tarif<span>Vous recevez le montant définitif avant tout engagement.</span></li>
+            <li>Ouverture de votre espace client<span>Votre dossier, son avancement et vos échanges seront centralisés.</span></li>
+          </ol>
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-tarifs.js?v=0.2.7"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-pieces.js?v=0.2.7"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-nombres.js?v=0.2.7"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-adresse.js?v=0.2.7"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-champs.js?v=0.2.7"></script>
+<script src="../../wordpress/urbizen-child/assets/js/urbizen-form-bridge.js?v=0.2.7"></script>
 <script>
 (function () {
   "use strict";
-  var ENDPOINT = ""; // ex. "https://api.votresite.fr/api/dp"  (laisser vide = mode démo)
 
   var app = document.getElementById("dp-app");
   var form = document.getElementById("dp-form");
   var steps = Array.prototype.slice.call(form.querySelectorAll(".dp-step"));
-  var legendData = ["Demandeur","Terrain","Projet","Surfaces","Réseaux","Fiscalité","Pièces","Envoi"];
+  var legendData = ["Demandeur","Terrain","Projet","Surfaces","Réseaux","Fiscalité","Documents","Autres projets","Envoi"];
   var PIECES = [
-    ["PCMI1","Plan de situation du terrain"],
-    ["PCMI2","Plan de masse coté (3D)"],
-    ["PCMI3","Plan en coupe"],
-    ["PCMI5","Plan des façades et toitures"],
-    ["PCMI6","Insertion (3D / perspective)"],
-    ["PCMI7","Photo environnement proche"],
-    ["PCMI8","Photo environnement lointain"],
-    ["PCMI14-1","Attestation RE2020 (si construction neuve)"],
-    ["PCMI-SOL","Étude de sol (si zone argileuse)"]
+    ["photo", "Photos du terrain et de la maison existante"],
+    ["rue", "Photos prises depuis la rue et de l’accès"],
+    ["facades", "Photos des façades concernées"],
+    ["croquis", "Croquis du projet, même à main levée"],
+    ["plans", "Plans existants en votre possession"],
+    ["mesures", "Relevés de dimensions ou mesures utiles"],
+    ["autres", "Autres documents utiles : devis, matériaux, étude de sol…"]
   ];
   var current = 0;
+
+  /* =========================================================
+     Tarification — configuration propre au permis de construire.
+     Le calcul, le répéteur de projets et le récapitulatif vivent dans
+     urbizen-form-tarifs.js : seuls le barème et les montants de supplément
+     sont déclarés ici. Aucun autre endroit du dépôt ne porte ces valeurs.
+     ========================================================= */
+  var tarifs = UrbizenTarifs.init({
+    form: form,
+    libelleType: "Permis de construire",
+    bareme: {
+      "maison_individuelle": 849,
+      "extension": 649,
+      "surelevation": 649,
+      "changement_destination": 649,
+      "annexe_garage": 449,
+      "__defaut": 449
+    },
+    categories: {
+      "maison_individuelle": "Projet important",
+      "extension": "Projet standard",
+      "surelevation": "Projet standard",
+      "changement_destination": "Projet standard",
+      "autre": "Projet à étudier",
+      "__defaut": "Projet simple"
+    },
+    // « Autre » n'est pas chiffrable : on n'annonce pas de total sur un projet
+    // qui n'a précisément pas été qualifié. Les suppléments restent détaillés.
+    surEtude: ["autre"],
+    supplements: { abf: 80, depot: 30, travail: 100 }
+  });
+
+  /* ----- reprise du tunnel d'orientation de l'accueil ----- */
+  function prefillFromHomepage() {
+    var contract = null, project = "";
+
+    try {
+      var raw = sessionStorage.getItem("urbizen:accueil");
+      contract = raw ? JSON.parse(raw) : null;
+      project = sessionStorage.getItem("urbizen:projet") || "";
+    } catch (e) {
+      return;
+    }
+
+    function setIfEmpty(id, value) {
+      var field = document.getElementById(id);
+      if (!field || field.value || value === null || value === undefined || value === "") return;
+      field.value = String(value);
+    }
+
+    if (contract && contract.address && contract.parcel) {
+      setIfEmpty("t_adr", contract.address.label);
+      setIfEmpty("t_cp", contract.address.postcode);
+      setIfEmpty("t_ville", contract.address.city);
+      setIfEmpty("t_sec", contract.parcel.section);
+      setIfEmpty("t_num", contract.parcel.number);
+      setIfEmpty("t_sup", contract.parcel.surfaceM2);
+    }
+
+    var projectNature = {
+      maison: "maison_individuelle",
+      extension: "extension",
+      garage: "annexe_garage"
+    };
+    var expected = projectNature[project];
+    if (!expected) return;
+
+    Array.prototype.forEach.call(form.querySelectorAll('input[name="nature"]'), function (input) {
+      if (input.value === expected) {
+        input.checked = true;
+        var card = input.closest(".dp-check");
+        if (card) card.classList.add("on");
+      }
+    });
+  }
 
   var legendEl = document.getElementById("dp-legend");
   legendData.forEach(function (label, i) {
@@ -601,22 +898,13 @@
     legendEl.appendChild(li);
   });
 
-  var piecesEl = document.getElementById("pieces");
-  PIECES.forEach(function (p) {
-    var row = document.createElement("div");
-    row.className = "dp-piece";
-    var id = "file_" + p[0];
-    row.innerHTML =
-      '<span class="lab"><b>' + p[0] + "</b>" + p[1] + "</span>" +
-      '<span style="display:flex;align-items:center;gap:10px"><span class="picked" data-picked></span>' +
-      '<label class="dp-file-btn" for="' + id + '">Choisir un fichier</label></span>' +
-      '<input type="file" id="' + id + '" name="piece_' + p[0] + '" accept=".pdf,.jpg,.jpeg,.png" multiple>';
-    piecesEl.appendChild(row);
-    var input = row.querySelector("input[type=file]");
-    var picked = row.querySelector("[data-picked]");
-    input.addEventListener("change", function () {
-      picked.textContent = input.files.length ? input.files.length + " fichier" + (input.files.length > 1 ? "s" : "") + " ✓" : "";
-    });
+  /* ----- pièces du projet : module partagé -----
+     Le rendu, le message rassurant, l'option de report et le récapitulatif
+     des pièces différées vivent dans urbizen-form-pieces.js. */
+  var pieces = UrbizenPieces.init({
+    form: form,
+    conteneur: document.getElementById("pieces"),
+    pieces: PIECES
   });
 
   function refreshConditionals() {
@@ -664,6 +952,23 @@
       else if (req) el.style.borderColor = "";
     });
     if (current === 2 && !form.querySelector('input[name="nature"]:checked')) ok = false;
+    // projets supplémentaires : aucune ligne laissée sans nature choisie
+    if (current === 7) {
+      var errTravaux = document.getElementById("dp-travaux-err");
+      if (!tarifs.estValide()) {
+        ok = false;
+        errTravaux.textContent = "Choisissez la nature de chaque projet ajouté, ou supprimez la ligne inutile.";
+      } else {
+        errTravaux.textContent = "";
+      }
+    }
+    // Le bloc terrain retiré par « même adresse » échappe à la boucle ci-dessus :
+    // masqué, il n'a plus de champ visible à exiger. C'est alors la validité de
+    // l'adresse du demandeur qui conditionne la progression — sans quoi une
+    // demande partirait sans adresse de terrain du tout.
+    if (window.UrbizenAdresse && UrbizenAdresse.reportPret && !UrbizenAdresse.reportPret(form)) {
+      ok = false;
+    }
     if (firstBad) firstBad.focus();
     return ok;
   }
@@ -671,32 +976,88 @@
   nextBtn.addEventListener("click", function () { if (validateStep() && current < steps.length - 1) { current++; render(); } });
   backBtn.addEventListener("click", function () { if (current > 0) { current--; render(); } });
 
-  form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var err = document.getElementById("dp-final-err");
-    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
-      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi."; return;
-    }
-    err.textContent = ""; sendBtn.disabled = true; sendBtn.textContent = "Envoi…";
-    var fd = new FormData(form);
-    fd.set("nature", Array.prototype.map.call(form.querySelectorAll('input[name="nature"]:checked'), function (n) { return n.value; }).join(", "));
-    if (!ENDPOINT) {
-      var obj = {}; fd.forEach(function (v, k) { if (v instanceof File) { if (v.name) obj[k] = "[fichier] " + v.name; } else obj[k] = v; });
-      showDone(JSON.stringify(obj, null, 2)); return;
-    }
-    fetch(ENDPOINT, { method: "POST", body: fd })
-      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.text(); })
-      .then(function () { showDone(null); })
-      .catch(function () { sendBtn.disabled = false; sendBtn.textContent = "Envoyer ma demande"; err.textContent = "L’envoi a échoué. Réessayez ou contactez-moi directement."; });
-  });
-
-  function showDone(debug) {
-    form.style.display = "none";
-    document.getElementById("dp-done").classList.add("show");
-    if (debug) { var d = document.getElementById("dp-debug"); d.hidden = false; d.textContent = "Données collectées (mode démo) :\n\n" + debug; }
+  // Le pont est le même module que celui de la déclaration préalable : il
+  // réclame sa configuration à la page parente, garde le bouton désactivé tant
+  // qu'il ne l'a pas reçue, et n'affiche l'écran final que sur un succès réel.
+  // Le type de formulaire et l'action viennent de cette configuration — le
+  // document ne les connaît pas, et ne peut donc pas se tromper de route.
+  // Les champs conditionnés par la nature. La matrice vient du serveur, par le
+  // pont : ce module ne fait que l'appliquer.
+  UrbizenNombres.surveiller(form);
+  // Une seule initialisation, et seulement si le balisage est là : un document
+  // sans bloc d'adresse ne doit produire ni erreur ni instance.
+  if (window.UrbizenAdresse && form.querySelector("[data-adresse]")) {
+    UrbizenAdresse.surveiller(form);
   }
 
-  refreshConditionals(); render();
+  var champs = UrbizenChamps.init({
+    form: form,
+    surNature: function () {
+      var choisi = form.querySelector('input[name="nature"]:checked');
+      return choisi ? choisi.value : "";
+    }
+  });
+
+  var pont = UrbizenPont.init({
+    form: form,
+    surMatrice: function (matrice, conditionnels) {
+      champs.appliquerMatrice(matrice, conditionnels);
+    },
+    bouton: sendBtn,
+    erreur: document.getElementById("dp-final-err"),
+    serialiser: function (fd) {
+      // « nature » est un choix unique : FormData porte déjà la bonne valeur.
+      // Les modules y ajoutent les projets répétés, leurs descriptions, les
+      // pièces différées et le report cadastral. Aucun montant n'est émis.
+      tarifs.serialiser(fd);
+      pieces.serialiser(fd);
+    },
+    afficherSucces: showDone
+  });
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+
+    var err = document.getElementById("dp-final-err");
+
+    if (!form.querySelector("#a1").checked || !form.querySelector("#a2").checked) {
+      err.textContent = "Merci de cocher les deux cases d’engagement avant l’envoi.";
+      err.setAttribute("tabindex", "-1");
+      err.focus();
+      return;
+    }
+
+    pont.envoyer();
+  });
+
+  /**
+   * Écran final, bâti exclusivement à partir de la réponse du serveur.
+   *
+   * Aucune valeur n'est reprise de l'estimation affichée pendant la saisie :
+   * la référence, le tarif et les libellés viennent de ce qui a été
+   * effectivement enregistré. Un projet sur étude n'y reçoit aucun total.
+   */
+  function showDone(reponse) {
+    form.style.display = "none";
+
+    var done = document.getElementById("dp-done");
+
+    document.getElementById("dp-reference").textContent = reponse.reference;
+
+    UrbizenPont.rendreConfirmation(document.querySelector("[data-tarifs-recap-final]"), reponse);
+    UrbizenPont.rendreDifferes(document.querySelector("[data-pieces-recap-final]"), reponse);
+
+    done.classList.add("show");
+    done.setAttribute("tabindex", "-1");
+    done.focus();
+  }
+
+  prefillFromHomepage();
+  refreshConditionals();
+  // Le tunnel d'accueil a pu présélectionner la nature : le récapitulatif doit
+  // en tenir compte avant le premier affichage.
+  tarifs.rafraichir();
+  render();
 })();
 </script>
 <script>
@@ -714,8 +1075,8 @@
   function fieldVal(id){ var e = $(id); return e ? e.value.trim() : ""; }
   function buildQuery(){ return [fieldVal("t_adr"), fieldVal("t_cp"), fieldVal("t_ville")].filter(Boolean).join(" "); }
 
-  function initMap(lon, lat){
-    map = L.map("cad-map").setView([lat, lon], 18);
+  function initMap(lon, lat, zoom){
+    map = L.map("cad-map").setView([lat, lon], zoom || 18);
     ortho = L.tileLayer(tile("ORTHOIMAGERY.ORTHOPHOTOS","image/jpeg"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" }).addTo(map);
     plan  = L.tileLayer(tile("GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2","image/png"), { maxZoom: 20, attribution: "\u00A9 IGN/G\u00E9oplateforme" });
     cadastre = L.tileLayer(tile("CADASTRALPARCELS.PARCELLAIRE_EXPRESS","image/png"), { maxZoom: 20, opacity: 0.9 }).addTo(map);
@@ -730,7 +1091,7 @@
   function geocodeAndLocate(){
     if (!fieldVal("t_adr") || !fieldVal("t_ville")) { wrap.hidden = false; hint.textContent = "Renseignez d\u2019abord l\u2019adresse et la commune ci-dessus."; return; }
     locateBtn.classList.add("loading");
-    fetch("https://api-adresse.data.gouv.fr/search/?limit=1&q=" + encodeURIComponent(buildQuery()))
+    fetch("https://data.geopf.fr/geocodage/search?q=" + encodeURIComponent(buildQuery()) + "&limit=1&index=address")
       .then(function(r){ return r.json(); })
       .then(function(d){
         locateBtn.classList.remove("loading");
@@ -747,7 +1108,13 @@
         marker = L.circleMarker([c[1], c[0]], { radius: 7, color: "#14233B", weight: 2, fillColor: "#54CF99", fillOpacity: 1 }).addTo(map);
         queryParcel(c[0], c[1]);
       })
-      .catch(function(){ locateBtn.classList.remove("loading"); wrap.hidden = false; hint.textContent = "La localisation a \u00E9chou\u00E9. Cliquez sur votre parcelle."; });
+      .catch(function(){
+        locateBtn.classList.remove("loading");
+        wrap.hidden = false;
+        hint.textContent = "La recherche automatique est momentan\u00E9ment indisponible. Zoomez vers votre terrain ou v\u00E9rifiez l\u2019adresse puis r\u00E9essayez.";
+        if (!map) initMap(1.9, 46.8, 6);
+        setTimeout(function(){ map.invalidateSize(); }, 60);
+      });
   }
   function queryParcel(lon, lat){
     var geom = encodeURIComponent(JSON.stringify({ type: "Point", coordinates: [lon, lat] }));

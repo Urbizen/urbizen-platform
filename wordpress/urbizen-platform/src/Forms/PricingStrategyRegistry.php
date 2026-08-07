@@ -36,6 +36,12 @@ final class PricingStrategyRegistry {
 			case 'conception':
 				return new ConceptionPricingStrategy();
 
+			case 'declaration_prealable':
+				return new DeclarationPrealablePricingStrategy();
+
+			case 'permis_construire':
+				return new PermisConstruirePricingStrategy();
+
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de stratégie.
 				return null;

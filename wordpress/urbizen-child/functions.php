@@ -188,11 +188,226 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
  * l'accueil, sans écrire de CSS propre. On n'y inscrit un slug que lorsque son
  * gabarit existe réellement dans le thème.
  */
+/**
+ * Version du lot de ressources des formulaires.
+ *
+ * Une seule valeur pour trois endroits : l'URL du cadre produite par cette page,
+ * les feuilles et scripts que les documents DP et PC chargent, et les bancs de
+ * contrat. Les faire diverger reviendrait à servir un document neuf qui appelle
+ * d'anciens scripts, ou l'inverse — précisément la panne que le versionnement
+ * doit fermer.
+ *
+ * À incrémenter à chaque changement d'un de ces fichiers. Un paramètre tiré au
+ * hasard à chaque affichage invaliderait le cache en permanence : ce n'est pas
+ * une invalidation, c'est une suppression.
+ */
+const URBIZEN_CHILD_FORMS_VERSION = '0.2.7';
+
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
 	'page-permis-de-construire',
 	'page-conception',
+	'page-formulaire-declaration-prealable',
+	'page-formulaire-permis-de-construire',
 );
+
+/**
+ * La page affichée est-elle l'un des deux formulaires d'autorisation ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_formulaire_autorisation() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return in_array(
+		get_page_template_slug( $id ),
+		array( 'page-formulaire-declaration-prealable', 'page-formulaire-permis-de-construire' ),
+		true
+	);
+}
+
+/**
+ * Origine du site, au sens exact que le navigateur donne à ce mot.
+ *
+ * Une origine est un triplet — schéma, hôte, **port**. Composer seulement le
+ * schéma et l'hôte donne la bonne valeur tant que le port est celui par défaut,
+ * et une valeur fausse dès qu'il ne l'est pas. Le pont compare cette chaîne à
+ * `window.location.origin` au caractère près : un port omis fait rejeter la
+ * configuration, et le bouton d'envoi ne se déverrouille jamais.
+ *
+ * Le défaut ne se voyait pas en production — `urbizen.fr` répond en HTTPS sur
+ * 443, que le navigateur n'écrit pas. Il s'est révélé au premier essai intégré
+ * local, sur un serveur écoutant sur un autre port.
+ *
+ * @return string Origine complète, sans barre oblique finale.
+ */
+function urbizen_child_origine_site() {
+	$parties = wp_parse_url( home_url() );
+
+	if ( ! is_array( $parties ) || empty( $parties['scheme'] ) || empty( $parties['host'] ) ) {
+		return '';
+	}
+
+	$origine = $parties['scheme'] . '://' . $parties['host'];
+
+	// Les ports par défaut ne figurent pas dans `location.origin` : les ajouter
+	// produirait la même divergence, en sens inverse.
+	$defaut = array( 'http' => 80, 'https' => 443 );
+	$port   = isset( $parties['port'] ) ? (int) $parties['port'] : 0;
+
+	if ( $port > 0 && ( $defaut[ $parties['scheme'] ] ?? 0 ) !== $port ) {
+		$origine .= ':' . $port;
+	}
+
+	return $origine;
+}
+
+/**
+ * Interdit la mise en cache d'une page qui porte un secret à usage unique.
+ *
+ * Le défaut que cette fonction ferme s'est produit en production, et il était
+ * silencieux : LiteSpeed servait la page de formulaire depuis son cache, donc
+ * **le même jeton anti-robot à tous les visiteurs**. Ce jeton est à usage
+ * unique — `AntiSpam::reserve_token()` refuse un jeton déjà réservé. Le premier
+ * visiteur qui envoyait sa demande le consommait ; tous les suivants étaient
+ * refusés, avec un message d'erreur générique, jusqu'à expiration du cache.
+ *
+ * Une exclusion existe dans la configuration de LiteSpeed. Elle est nécessaire
+ * mais fragile : elle vit dans un réglage, qu'une réinstallation, une
+ * restauration ou une migration efface sans bruit. La règle doit voyager avec
+ * le code qui crée le problème.
+ *
+ * Deux mécanismes, parce qu'ils ne couvrent pas la même chose : `nocache_headers()`
+ * s'adresse aux caches HTTP en aval, `litespeed_control_set_nocache` au cache
+ * de pages de LiteSpeed, qui décide avant d'émettre le moindre en-tête.
+ *
+ * **Seule la page est visée.** Les feuilles, scripts et images gardent leur
+ * cache : ils portent une version dans leur URL, ce qui est précisément la
+ * bonne façon de les invalider. Les rendre non cacheables ferait payer à chaque
+ * visiteur un défaut qui ne les concerne pas.
+ *
+ * @return void
+ */
+function urbizen_child_interdire_cache_formulaire() {
+	if ( ! urbizen_child_est_page_formulaire_autorisation() ) {
+		return;
+	}
+
+	// Le cache de pages de LiteSpeed, avec un motif lisible dans ses journaux.
+	do_action( 'litespeed_control_set_nocache', 'page portant un jeton de formulaire à usage unique' );
+
+	// Les caches HTTP en aval — proxy, navigateur — pour la page seule.
+	if ( ! headers_sent() ) {
+		nocache_headers();
+	}
+}
+add_action( 'template_redirect', 'urbizen_child_interdire_cache_formulaire' );
+
+/**
+ * Configuration de soumission du formulaire affiché.
+ *
+ * Le nonce est émis ici, dans la page parente, et non dans le document servi en
+ * iframe : ce dernier est un fichier statique du thème, qu'aucun PHP ne rend.
+ * C'est précisément pour cela que le pont `postMessage` existe.
+ *
+ * Rien de ce tableau n'est décidé par le navigateur. L'action et le type sont
+ * dérivés du **gabarit de la page**, donc d'une valeur serveur ; l'origine
+ * autorisée vient de `home_url()`, jamais d'un en-tête de requête.
+ *
+ * @return array<string, string>
+ */
+function urbizen_child_configuration_formulaire() {
+	// Une entrée par parcours raccordé. Le gabarit de la page détermine la
+	// route : c'est le serveur qui décide, jamais un attribut du document servi
+	// en iframe. Un nonce est lié à son action, et chaque parcours a la sienne —
+	// partager une action laisserait un nonce émis pour une DP autoriser l'envoi
+	// d'un permis de construire.
+	$gabarits = array(
+		'page-formulaire-declaration-prealable' => array(
+			'action' => 'urbizen_declaration_prealable',
+			'nonce'  => 'urbizen_declaration_prealable_submit',
+			'type'   => 'declaration_prealable',
+			'frame'  => 'dp-formulaire.html',
+		),
+		'page-formulaire-permis-de-construire'  => array(
+			'action' => 'urbizen_permis_construire',
+			'nonce'  => 'urbizen_permis_construire_submit',
+			'type'   => 'permis_construire',
+			'frame'  => 'pc-formulaire.html',
+		),
+	);
+
+	if ( ! is_singular() ) {
+		return array();
+	}
+
+	$slug = get_page_template_slug( get_queried_object_id() );
+
+	if ( ! isset( $gabarits[ $slug ] ) ) {
+		// Un gabarit absent de la table ne reçoit aucune configuration : son
+		// formulaire reste inerte, plutôt que d'hériter d'une route qui n'est
+		// pas la sienne.
+		return array();
+	}
+
+	$route = $gabarits[ $slug ];
+
+	// Le jeton anti-robot est émis ici pour la même raison que le nonce : il est
+	// signé et horodaté côté serveur, et le document servi en iframe est un
+	// fichier statique qu'aucun PHP ne rend. Sans lui, la route refuse toute
+	// soumission — `invalid_antispam_token` — et aucun envoi depuis un
+	// navigateur ne peut aboutir. Les bancs ne le voyaient pas : ils
+	// fabriquaient le jeton eux-mêmes.
+	$jeton = class_exists( '\\Urbizen\\Platform\\Security\\AntiSpam' )
+		? \Urbizen\Platform\Security\AntiSpam::issue_token()
+		: '';
+
+	// Le greffon est la source de vérité métier. Absent — désactivé, en cours de
+	// mise à jour — le formulaire n'affiche aucun champ conditionnel plutôt que
+	// de tous les afficher : mieux vaut demander trop peu que demander une
+	// surface de plancher pour une piscine.
+	$matrice       = array();
+	$conditionnels = array();
+
+	if ( class_exists( '\\Urbizen\\Platform\\Forms\\MatriceChamps' ) ) {
+		$matrice       = (array) ( \Urbizen\Platform\Forms\MatriceChamps::pour_type( $route['type'] ) ?? array() );
+		$conditionnels = \Urbizen\Platform\Forms\MatriceChamps::CONDITIONNELS;
+	}
+
+	return array(
+		'action'         => $route['action'],
+		'formType'       => $route['type'],
+		'nonceField'     => 'urbizen_conception_nonce',
+		'nonce'          => wp_create_nonce( $route['nonce'] ),
+		'tokenField'     => 'urbizen_token',
+		'token'          => $jeton,
+		'honeypotField'  => 'company_website',
+		// La matrice métier voyage telle quelle depuis le greffon : le
+		// navigateur n'en tient pas une seconde copie. Une liste recopiée à la
+		// main dériverait, et l'interface finirait par proposer un champ que le
+		// serveur écarte — ou l'inverse, plus grave : masquer un champ que le
+		// serveur attend.
+		'matrice'        => $matrice,
+		'champsConditionnels' => $conditionnels,
+		'submitUrl'      => admin_url( 'admin-post.php' ),
+		'origin'         => urbizen_child_origine_site(),
+		// **Sans version.** Le gabarit porte `?v=…` sur le cadre ; la comparaison
+		// côté parent est un `indexOf`, donc un préfixe suffit. Y mettre la
+		// version obligerait les deux à rester synchrones au caractère près, et
+		// une divergence ferait échouer la vérification de source — le
+		// formulaire deviendrait inerte pour une raison invisible.
+		'frameSource'    => '/wp-content/themes/urbizen-child/assets/forms/' . $route['frame'],
+		'assetsVersion'  => URBIZEN_CHILD_FORMS_VERSION,
+	);
+}
 
 /**
  * La page affichée utilise-t-elle un gabarit Urbizen — accueil ou page interne ?
@@ -342,6 +557,37 @@ function urbizen_child_enqueue_accueil() {
 
 		if ( file_exists( $dir . $conception_js ) ) {
 			wp_enqueue_script( 'urbizen-conception-gallery', $uri . $conception_js, array(), (string) filemtime( $dir . $conception_js ), true );
+		}
+	}
+
+	// Formulaires DP et PC : la coque WordPress garde l'en-tête et le pied de
+	// page du site ; l'iframe, de même origine, est redimensionnée à son contenu.
+	if ( urbizen_child_est_page_formulaire_autorisation() ) {
+		$form_page_css = '/assets/css/urbizen-form-page.css';
+
+		if ( file_exists( $dir . $form_page_css ) ) {
+			wp_enqueue_style( 'urbizen-form-page', $uri . $form_page_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $form_page_css ) );
+		}
+
+		$form_page_js = '/assets/js/urbizen-form-page.js';
+
+		if ( file_exists( $dir . $form_page_js ) ) {
+			wp_enqueue_script( 'urbizen-form-page', $uri . $form_page_js, array(), (string) filemtime( $dir . $form_page_js ), true );
+
+			// La configuration de soumission est émise **côté serveur**, sur la
+			// page parente, et transmise à l'iframe par `postMessage`. Elle ne
+			// passe jamais par l'URL du cadre : un nonce dans une query string
+			// se retrouverait dans l'historique, les journaux d'accès et tout
+			// en-tête `Referer` sortant.
+			$config = urbizen_child_configuration_formulaire();
+
+			if ( array() !== $config ) {
+				wp_add_inline_script(
+					'urbizen-form-page',
+					'window.urbizenFormConfig = ' . wp_json_encode( $config ) . ';',
+					'before'
+				);
+			}
 		}
 	}
 

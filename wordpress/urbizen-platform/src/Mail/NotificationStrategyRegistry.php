@@ -27,7 +27,54 @@ defined( 'ABSPATH' ) || exit;
 final class NotificationStrategyRegistry {
 
 	/**
-	 * Stratégie autorisée pour un type, ou null si le type n'en a aucune.
+	 * Types de formulaire dont le demandeur reçoit un accusé de réception.
+	 *
+	 * Liste blanche, et non un drapeau par formulaire : écrire à une personne
+	 * doit être une décision explicite, prise ici, type par type. Un formulaire
+	 * absent de cette liste n'envoie rien à qui que ce soit — c'est le défaut,
+	 * et c'est le bon défaut.
+	 *
+	 * @var array<int, string>
+	 */
+	private const ACCUSE_CLIENT = array( 'declaration_prealable', 'permis_construire' );
+
+	/**
+	 * Stratégie autorisée pour un couple (type, créneau).
+	 *
+	 * C'est ici que se joue la séparation entre les deux messages d'une même
+	 * demande : le créneau administratif reçoit la stratégie interne du type, le
+	 * créneau client reçoit l'accusé — et seulement si le type y a droit. Sans
+	 * stratégie, le planificateur n'envoie rien et le dit ; il ne retombe jamais
+	 * sur l'autre créneau.
+	 *
+	 * @param string           $type Type de formulaire, résolu côté serveur.
+	 * @param NotificationSlot $slot Créneau visé.
+	 * @return NotificationStrategy|null
+	 */
+	public static function for_slot( string $type, NotificationSlot $slot ): ?NotificationStrategy {
+		if ( $slot->est_admin() ) {
+			return self::for_type( $type );
+		}
+
+		if ( NotificationSlot::CLIENT === $slot->type && in_array( $type, self::ACCUSE_CLIENT, true ) ) {
+			return new CustomerAcknowledgementStrategy();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Un type prévoit-il un accusé de réception pour le demandeur ?
+	 *
+	 * @param string $type Type de formulaire.
+	 * @return bool
+	 */
+	public static function has_customer_acknowledgement( string $type ): bool {
+		return in_array( $type, self::ACCUSE_CLIENT, true );
+	}
+
+	/**
+	 * Stratégie interne autorisée pour un type, ou null si le type n'en a aucune.
 	 *
 	 * @param string $type Type de formulaire, résolu côté serveur.
 	 * @return NotificationStrategy|null
@@ -36,6 +83,12 @@ final class NotificationStrategyRegistry {
 		switch ( $type ) {
 			case 'conception':
 				return new ConceptionNotificationStrategy();
+
+			case 'declaration_prealable':
+				return new DeclarationPrealableNotificationStrategy();
+
+			case 'permis_construire':
+				return new PermisConstruireNotificationStrategy();
 
 			default:
 				// Tout autre type — dont « localisation » — n'a pas de stratégie.

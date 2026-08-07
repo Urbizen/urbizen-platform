@@ -30,6 +30,7 @@ use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailProcessLock;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Mail\NotificationSlot;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -104,32 +105,52 @@ final class FileCleaner {
 		// Un envoi est en vol. Supprimer maintenant retirerait sous ses pieds
 		// le contenu, les fichiers et les métadonnées qu'il est en train de
 		// lire. On refuse ; la suppression reste possible ensuite.
-		if ( MailQueue::is_locked( $id ) ) {
-			Logger::error( sprintf( 'suppression bloquée pour #%d : notification en cours d’envoi', $id ) );
+		// **Tout créneau** en cours d'envoi bloque : la suppression va retirer
+		// sous ses pieds le contenu, les fichiers et les métadonnées.
+		foreach ( NotificationSlot::TYPES as $type ) {
+			$slot = NotificationSlot::pour( $id, $type );
 
-			return false;
+			if ( null !== $slot && MailQueue::is_locked( $id, null, $slot ) ) {
+				Logger::error( sprintf( 'suppression bloquée pour #%d : notification [%s] en cours d’envoi', $id, $type ) );
+
+				return false;
+			}
 		}
 
 		// Sous le verrou commun : on ferme l'éligibilité de la notification et
 		// on retire tout événement résiduel **avant** de toucher aux fichiers.
 		// Un envoi ultérieur relira cet état et ne fera rien.
-		MailQueue::with_lock(
-			$id,
-			static function ( MailLockHandle $poignee ) use ( $id ) {
-				// `sent` est une preuve historique : elle n'est pas effacée.
-				MailQueue::cancel( $id, 'demande_supprimee' );
-				MailScheduler::unschedule_all( $id );
+		// Chaque créneau a son état, son événement et son fichier technique : ce
+		// qui suit doit donc être fait pour chacun, sans quoi une suppression
+		// laisserait derrière elle un verrou orphelin et un accusé encore en
+		// file — pour un dossier qui n'existe plus.
+		foreach ( NotificationSlot::TYPES as $type ) {
+			$slot = NotificationSlot::pour( $id, $type );
 
-				// Le fichier technique de verrou n'est supprimé qu'ici, et
-				// seulement parce que nous venons d'obtenir le mutex : aucun
-				// autre processus ne le détient ni ne l'attend. Le supprimer à
-				// chaud, après un simple `LOCK_UN`, donnerait deux verrous
-				// indépendants portant le même nom.
-				MailProcessLock::discard( $poignee );
-
-				return true;
+			if ( null === $slot ) {
+				continue;
 			}
-		);
+
+			MailQueue::with_lock(
+				$id,
+				static function ( MailLockHandle $poignee ) use ( $id, $slot ) {
+					// `sent` est une preuve historique : elle n'est pas effacée.
+					MailQueue::cancel( $id, 'demande_supprimee', $slot );
+					MailScheduler::unschedule_all( $id, $slot );
+
+					// Le fichier technique de verrou n'est supprimé qu'ici, et
+					// seulement parce que nous venons d'obtenir le mutex : aucun
+					// autre processus ne le détient ni ne l'attend. Le supprimer à
+					// chaud, après un simple `LOCK_UN`, donnerait deux verrous
+					// indépendants portant le même nom.
+					MailProcessLock::discard( $poignee );
+
+					return true;
+				},
+				null,
+				$slot
+			);
+		}
 
 		$reference = (string) get_post_meta( $id, '_urbizen_reference', true );
 

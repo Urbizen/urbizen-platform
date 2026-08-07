@@ -20,7 +20,10 @@ use Urbizen\Platform\Mail\MailLockHandle;
 use Urbizen\Platform\Mail\MailPolicy;
 use Urbizen\Platform\Mail\MailQueue;
 use Urbizen\Platform\Mail\MailScheduler;
+use Urbizen\Platform\Forms\AdresseTerrain;
+use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionPostType;
+use Urbizen\Platform\Submissions\SubmissionRepository;
 use Urbizen\Platform\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -46,6 +49,12 @@ final class SubmissionsAdmin {
 			10,
 			2
 		);
+
+		// La fiche de demande n'affichait rien : le type de contenu ne déclare
+		// que `title`. Une métaboîte est le seul endroit où montrer ce qui a été
+		// reçu sans rendre le contenu modifiable — un dossier se lit, il ne se
+		// réécrit pas à la main.
+		add_action( 'add_meta_boxes', array( self::class, 'enregistrer_metaboite' ) );
 
 		// L'action de reprise est une écriture : elle passe par POST, un nonce
 		// et un contrôle de capacité. Elle ne fait que replacer la notification
@@ -282,6 +291,11 @@ final class SubmissionsAdmin {
 				// Un état, un décompte, une date d'envoi. Jamais le
 				// destinataire, jamais le corps, jamais un lien signé, jamais
 				// le détail d'une erreur technique.
+				//
+				// La colonne rend l'état du créneau de la notification interne :
+				// c'est celui qui intéresse l'administration. Un second créneau
+				// aura sa propre lecture, plutôt qu'un état agrégé qui ne dirait
+				// plus lequel des deux messages a échoué.
 				$etat        = MailQueue::state( $post_id );
 				$affichage   = self::mail_label( $etat['status'] );
 				$tentatives  = (int) $etat['attempts'];
@@ -355,5 +369,115 @@ final class SubmissionsAdmin {
 		);
 
 		return $libelles[ $status ] ?? $status;
+	}
+
+	/**
+	 * Déclare la fiche de lecture d'une demande.
+	 *
+	 * @return void
+	 */
+	public static function enregistrer_metaboite(): void {
+		add_meta_box(
+			'urbizen-precisions-projet',
+			__( 'Précisions sur le projet', 'urbizen-platform' ),
+			array( self::class, 'rendre_metaboite' ),
+			SubmissionPostType::POST_TYPE,
+			'normal',
+			'high'
+		);
+	}
+
+	/**
+	 * Rend les précisions renseignées, et la note interne s'il y en a une.
+	 *
+	 * Lecture seule, et **rien que ce qui est renseigné** : une rubrique
+	 * constellée de tirets se lit moins bien qu'une rubrique courte. Tout est
+	 * échappé — ces valeurs viennent d'un formulaire public.
+	 *
+	 * @param \WP_Post $post Demande affichée.
+	 * @return void
+	 */
+	public static function rendre_metaboite( $post ): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$demande = SubmissionRepository::get( (int) $post->ID );
+		$charge  = is_array( $demande ) && is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
+		// Les adresses d'abord : c'est ce qu'on cherche en ouvrant un dossier.
+		// Le déclarant, puis le terrain — la personne, puis le lieu.
+		foreach ( AdresseTerrain::toutes() as $adresse ) {
+			if ( ! $adresse->existe( $charge ) ) {
+				continue;
+			}
+
+			echo '<h4>' . esc_html( $adresse->rubrique() ) . '</h4>';
+			// Chaque ligne est échappée AVANT d'être jointe : le séparateur est
+			// du balisage voulu, tout le reste vient du formulaire. `printf` et
+			// non `echo` : la sortie porte alors visiblement son échappement,
+			// ce que le banc de compatibilité vérifie à la lecture.
+			$lignes_adresse = array();
+
+			foreach ( $adresse->lignes_adresse( $charge ) as $ligne ) {
+				$lignes_adresse[] = esc_html( $ligne );
+			}
+
+			printf( '<p>%s</p>', implode( '<br>', $lignes_adresse ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- lignes échappées ci-dessus.
+
+			// Un terrain reporté le dit ici. Deux rubriques identiques sans
+			// cette mention laisseraient croire à deux saisies distinctes, donc
+			// à une concordance vérifiée par le demandeur — elle ne l'est pas,
+			// elle est le fait du serveur.
+			$provenance = AdresseTerrain::TERRAIN === $adresse->role() && AdresseTerrain::reportee( $charge )
+				? 'Même adresse que le déclarant'
+				: $adresse->provenance( $charge );
+
+			if ( '' !== $provenance ) {
+				echo '<p class="description"><strong>' . esc_html( $provenance ) . '</strong></p>';
+			}
+
+			// Code commune et coordonnées : utiles à l'instruction, sans intérêt
+			// pour le demandeur. Ils ne sortent donc que sur cet écran.
+			$reperes = $adresse->reperes( $charge );
+
+			if ( array() !== $reperes ) {
+				$bouts = array();
+
+				foreach ( $reperes as $libelle => $valeur ) {
+					$bouts[] = esc_html( $libelle ) . ' : ' . esc_html( $valeur );
+				}
+
+				printf( '<p class="description">%s</p>', implode( ' · ', $bouts ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- bouts échappés ci-dessus.
+			}
+		}
+
+		$lignes = PrecisionsProjet::lignes( $charge );
+
+		if ( array() === $lignes ) {
+			echo '<h4>' . esc_html( PrecisionsProjet::RUBRIQUE ) . '</h4>';
+			echo '<p>' . esc_html__( 'Aucune précision n’a été renseignée pour ce projet.', 'urbizen-platform' ) . '</p>';
+		} else {
+			echo '<h4>' . esc_html( PrecisionsProjet::RUBRIQUE ) . '</h4>';
+			echo '<table class="widefat striped"><tbody>';
+
+			foreach ( $lignes as $libelle => $valeur ) {
+				printf(
+					'<tr><th scope="row" style="width:16em">%s</th><td>%s</td></tr>',
+					esc_html( $libelle ),
+					esc_html( $valeur )
+				);
+			}
+
+			echo '</tbody></table>';
+		}
+
+		// La note interne, quand elle existe. Elle n'est jamais reprise dans un
+		// courriel : elle s'adresse à Urbizen, pas au demandeur.
+		$note = (string) get_post_meta( (int) $post->ID, '_urbizen_note_interne', true );
+
+		if ( '' !== $note ) {
+			echo '<h4>' . esc_html__( 'Note interne', 'urbizen-platform' ) . '</h4>';
+			echo '<p class="description">' . esc_html( $note ) . '</p>';
+		}
 	}
 }

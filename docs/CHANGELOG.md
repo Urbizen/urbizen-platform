@@ -5,6 +5,164 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.14.0] — Déclaration préalable et permis de construire raccordés
+
+Les deux parcours postent réellement. Le serveur recalcule tout ce qui engage
+Urbizen, chaque demande produit une notification interne et un accusé de
+réception client, et le permis de construire admet un tarif sur étude.
+
+Le détail des arbitrages est consigné dans `DECISIONS.md` : D-055 (créneaux de
+notification), D-056 (accusé de réception client), D-057 (socle partagé DP/PC et
+tarif sur étude).
+
+### Ajouté
+
+- **Permis de construire** : définition serveur, catalogue de six natures sous
+  identifiants canoniques, barème — maison neuve 849 €, extension 649 €,
+  surélévation 649 €, changement de destination 649 €, annexe/garage 449 € —
+  validation métier, profil de dépôt et notifications.
+- **Tarif sur étude** pour la nature « Autre » du permis de construire :
+  `base` et `total` valent `null`, la clé `total` **existe**, `pricing_status`
+  vaut `sur_etude` et les suppléments restent chiffrés séparément. Aucun total
+  n'est fabriqué depuis eux, et aucun zéro n'est affiché.
+- **Créneaux de notification** : chaque demande ouvre deux messages
+  indépendants — notification interne et accusé client — avec leurs propres
+  états, verrous, reprises et clés d'idempotence.
+- **Accusé de réception client** : destinataire lu uniquement dans l'adresse
+  validée puis persistée, contenu sans lien signé ni donnée technique, mention
+  tarifaire au caractère près.
+- **Réponses JSON** par négociation de contenu, sans aucune donnée technique.
+- **Pont iframe sécurisé** : nonce et jeton anti-robot émis par la page parente,
+  vérification stricte de l'origine et de la source aux deux extrémités,
+  répétition bornée des demandes et accusé de réception.
+- **Formats de dépôt annoncés au client** : « Formats acceptés : PDF, JPG, JPEG,
+  PNG et WEBP — 10 Mo maximum par fichier. », énoncée une seule fois en tête
+  d'étape et comparée au profil serveur par un banc.
+
+### Modifié
+
+- Les mécanismes propres à la déclaration préalable deviennent **paramétrés par
+  type** : `CatalogueProjets`, `PricingProjets`, `ValidationMetierProjets`,
+  `CatalogueRegistry`. Chaque parcours ne déclare que sa table de natures et ses
+  socles.
+- `normalize_pricing()` ne transtype plus `null` en `0` : un dossier sur étude
+  aurait été persisté à zéro euro.
+- Version du lot de ressources des formulaires : **0.2.4**, portée par l'URL du
+  cadre, les cinq références CSS/JS des documents et les bancs de contrat.
+
+### Corrigé
+
+- Le jeton anti-robot n'atteignait pas le document servi en iframe : la route
+  refusait **toute** soumission réelle. Les deux formulaires étaient
+  inutilisables depuis un navigateur.
+- L'origine composée par le thème omettait le port, ce qui faisait rejeter la
+  configuration sur tout serveur n'écoutant pas sur 80 ou 443.
+- Le premier message d'initialisation pouvait se perdre sans recours.
+- Le projet supplémentaire s'affichait deux fois sur l'écran final.
+- Deux cibles tactiles restaient sous 44 px.
+- L'annonce des formats acceptés était périmée — « PDF, JPG, PNG » — alors que
+  le serveur accepte aussi JPEG et WEBP, et plafonne à 10 Mo par fichier.
+
+---
+
+## [Non publié — formulaires Déclaration préalable et Permis de construire]
+
+### Ajouté
+
+- **Deux pages de formulaire dédiées** : « Déclaration préalable » et « Permis
+  de construire », déclarées comme gabarits du thème enfant et servies dans une
+  iframe de même origine, redimensionnée à son contenu. L’en-tête et le pied de
+  page du site restent en place autour du parcours.
+- **Formulaires DP et PCMI multi-étapes** : déclarant, terrain avec
+  localisation cadastrale, projet, surfaces, contexte, documents et envoi.
+  La cartographie s’appuie sur la Géoplateforme ; le cartouche de confirmation
+  reste masqué tant qu’aucune parcelle réelle n’a été sélectionnée.
+- **Documents demandés au client clarifiés** : photos du terrain et de
+  l’existant, vues depuis la rue, façades, croquis, plans possédés, mesures et
+  autres documents utiles. Les pièces réglementaires du dossier restent
+  produites par Urbizen et ne sont pas demandées au client.
+- Feuille `assets/css/urbizen-form-page.css` et script
+  `assets/js/urbizen-form-page.js` pour la coque des deux pages.
+- **Estimation tarifaire pendant la saisie** (D-053) : barème du projet
+  principal, supplément Secteur Bâtiments de France à +80 €, option de dépôt
+  sur le guichet numérique à +30 € décochée par défaut, et récapitulatif
+  détaillé poste par poste. Une ligne à zéro n’est pas affichée. La mention
+  « Estimation indicative. Le tarif définitif sera confirmé par Urbizen après
+  vérification de votre projet, avant toute commande. » accompagne le total.
+- **Étape « Projets supplémentaires »** : plusieurs projets peuvent être
+  regroupés dans un même dossier, à +100 € chacun, avec ajout, description,
+  modification et suppression. Un même type ne peut pas être ajouté deux fois.
+  Le regroupement suppose le même demandeur, la même adresse et la même
+  parcelle, et reste vérifié par Urbizen après réception.
+- **DP : Garage et Carport comme natures propres**, à 249 € chacune.
+  « Abri, annexe » demeure pour les annexes qui ne sont ni l’un ni l’autre.
+- **Documents transmissibles ultérieurement** (D-054) : l’étape s’ouvre sur un
+  message explicite et chaque pièce porte une case « Je transmettrai ce
+  document ultérieurement ». Les pièces ainsi déclarées sont reprises sous
+  « À transmettre ultérieurement ». Aucune pièce ne bloque l’envoi.
+- **Références cadastrales facultatives** : section, parcelle et superficie ne
+  sont plus obligatoires ; une case « Je ne connais pas ces informations
+  cadastrales. » les neutralise et le récapitulatif porte « Informations
+  cadastrales : à compléter ultérieurement ». Adresse, code postal et commune
+  restent obligatoires.
+- **Modules partagés** `assets/js/urbizen-form-tarifs.js` et
+  `urbizen-form-pieces.js`, avec leurs feuilles : le calcul, le répéteur et le
+  rendu des pièces n’existent qu’en un exemplaire pour les quatre documents.
+- **Précisions du bassin** : longueur, largeur, surface, profondeur, présence
+  d’un abri et hauteur de l’abri, toutes facultatives. La surface est proposée
+  depuis longueur × largeur en écriture française ; dès qu’elle est corrigée,
+  l’état « Surface personnalisée » s’affiche et un bouton rend la main au
+  calcul. La hauteur d’abri n’apparaît qu’à la réponse « oui ». Un champ laissé
+  vide reste inconnu : il n’est pas persisté et ne devient jamais zéro ; une
+  mesure renseignée doit valoir plus que zéro.
+- **Nombres écrits à la française** : `8,5` est accepté partout, côté serveur
+  comme côté navigateur, par un normaliseur unique à verdict explicite
+  (`NombreLocalise`, `urbizen-form-nombres.js`). Les écritures ambiguës —
+  `8,5,2`, `8,5.2`, `1e3` — sont refusées, jamais devinées.
+- **Rubrique « Précisions sur le projet »** dans l’écran d’administration, la
+  notification interne et, en une phrase, l’accusé client. Une seule classe
+  (`PrecisionsProjet`) sait comment une précision se dit.
+
+- **Une piscine dans un permis de maison individuelle passe par une question**
+  — « Une piscine est-elle prévue dans le projet ? », à trois réponses fermées
+  (`piscine_prevue`). Sans un « oui », aucune mesure n’est demandée, envoyée ni
+  enregistrée ; « je ne sais pas » se conserve comme réponse. Une DP dont le
+  projet **est** une piscine n’a pas cette porte : les mesures s’y posent
+  d’emblée. La règle est déclarative — un sous-champ dont le pilote n’est pas
+  posé par la nature n’est conditionné par rien — et la fermeture se propage
+  d’elle-même le long de la chaîne piscine → abri → hauteur.
+
+### Corrigé
+
+- **Les mesures paraissaient deux fois dans la notification interne** : en forme
+  canonique dans le tableau générique des réponses, en français dans la rubrique
+  dédiée. Deux écritures d’un même nombre dans un même message donnent à douter
+  des deux. `PrecisionsProjet` déclare désormais ce qu’elle assume, et le rendu
+  générique s’en abstient — aucune liste n’est recopiée dans le renderer.
+- **Cibles tactiles portées à 44 px** sur les choix segmentés, les cartes à
+  cocher, les boutons de dépôt, d’ajout de projet, de localisation et de
+  navigation, ainsi que sur les libellés d’attestation, dont la ligne entière
+  commande désormais la case.
+- **Zones d’erreur croisées dans la déclaration préalable** : le message de la
+  surface s’affichait sous la profondeur, et celui de la profondeur sous le
+  bloc « abri ». `aria-describedby` restait juste — un lecteur d’écran
+  annonçait le bon message — mais l’œil lisait l’erreur au mauvais endroit.
+- **Le masquage d’un champ était sans effet visuel.** `#dp-app .dp-field`
+  déclare `display: flex`, ce qui l’emporte sur l’attribut `hidden` : une
+  piscine affichait encore six champs de surface de plancher. Les contrôles
+  étaient bien désactivés — rien n’a jamais été envoyé ni enregistré hors
+  contexte — mais le formulaire montrait ce qu’il n’attendait pas. Les quatre
+  documents portent désormais `#dp-app [hidden] { display: none !important; }`,
+  et un banc l’exige.
+
+### Modifié
+
+- **La nature du projet devient un choix unique.** En sélection multiple, le
+  tarif de base dépendait de l’ordre de clic.
+- **Accessibilité mobile** : la case de dépôt est imbriquée dans son libellé —
+  toute la ligne est cliquable sur 44 px — et le bouton « Supprimer » offre une
+  cible de 44 × 44 px avec un `aria-label` nommant le projet visé.
+
 ## [0.13.1] - 2026-07-29
 
 ### Corrigé (cache) — avant publication de Conception

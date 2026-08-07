@@ -185,8 +185,12 @@ check( 'le total est celui recalculé par Pricing', Pricing::compute( array( 'fa
 check( 'les options stockées sont façades et masse', array( 'facades', 'masse' ) === array_column( $p['options'], 'id' ) );
 check( 'la prestation sur devis est stockée à part', array( 'insertion3d' ) === $p['sur_devis'] );
 check( 'l’indicateur de devis est levé', true === $p['devis_requis'] );
-check( 'le pricing ne porte que les cinq clés prévues',
-	array( 'base', 'options', 'sur_devis', 'total', 'devis_requis' ) === array_keys( $p ) );
+// Le statut rejoint les clés persistées : sans lui, un dossier sur étude ne se
+// distinguerait d'un dossier à zéro euro que par la nullité de son total, et
+// tout lecteur devrait redéduire l'intention au lieu de la lire.
+check( 'le pricing ne porte que les six clés prévues',
+	array( 'base', 'options', 'sur_devis', 'total', 'pricing_status', 'devis_requis' ) === array_keys( $p ) );
+check( 'un tarif chiffré est marqué comme estimé', 'estime' === $p['pricing_status'] );
 
 // --- références successives et collisions ---
 $deux = SubmissionRepository::create( $validation['clean'], $validation['pricing'], array( 'now' => wpd_now() ) );

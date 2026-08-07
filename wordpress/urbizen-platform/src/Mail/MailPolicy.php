@@ -214,6 +214,61 @@ final class MailPolicy {
 	}
 
 	/**
+	 * Destinataire d'un créneau.
+	 *
+	 * Le créneau administratif s'adresse à Urbizen ; le créneau client s'adresse
+	 * au demandeur. Ce sont deux chemins entièrement disjoints, et c'est
+	 * volontaire : une indisponibilité de l'adresse administrative ne doit pas
+	 * empêcher un accusé de réception de partir, et réciproquement.
+	 *
+	 * @param int              $id   Demande.
+	 * @param NotificationSlot $slot Créneau visé.
+	 * @return string Adresse valide, ou chaîne vide.
+	 */
+	public static function recipient_for( int $id, NotificationSlot $slot ): string {
+		return $slot->est_admin() ? self::recipient() : self::customer_recipient( $id );
+	}
+
+	/**
+	 * Adresse du demandeur, telle qu'elle a été **validée puis persistée**.
+	 *
+	 * Une seule clé est lue : `email`, celle que le validateur du formulaire a
+	 * acceptée. Rien d'autre n'est consulté — ni `$_POST`, ni un éventuel
+	 * `recipient`, `notification_email`, `to`, `cc` ou `bcc` glissé dans la
+	 * requête. Ce n'est pas de la prudence rituelle : sans cette règle, un tiers
+	 * pourrait faire adresser par Urbizen, depuis le domaine d'Urbizen, un
+	 * message de confirmation à l'adresse de son choix.
+	 *
+	 * L'adresse est revalidée à la lecture. Le validateur l'a déjà contrôlée à
+	 * l'entrée, mais la relire sans la contrôler ferait dépendre la sûreté de
+	 * l'envoi d'une écriture passée plutôt que de ce qui est réellement là.
+	 *
+	 * @param int $id Demande.
+	 * @return string Adresse valide, ou chaîne vide.
+	 */
+	public static function customer_recipient( int $id ): string {
+		$demande = SubmissionRepository::get( $id );
+
+		if ( null === $demande ) {
+			return '';
+		}
+
+		$charge = is_array( $demande['payload'] ?? null ) ? $demande['payload'] : array();
+		$email  = $charge['email'] ?? '';
+
+		if ( ! is_string( $email ) ) {
+			return '';
+		}
+
+		// Retours chariot retirés avant tout : une adresse multiligne permettrait
+		// d'injecter un en-tête. `is_email()` la rejetterait, mais l'ordre compte
+		// — on ne veut pas dépendre de ce qu'un validateur tiers refuse.
+		$email = trim( (string) preg_replace( '/[\r\n]+/', '', $email ) );
+
+		return is_email( $email ) ? $email : '';
+	}
+
+	/**
 	 * Fabrique un identifiant de notification.
 	 *
 	 * Généré côté serveur, aléatoire, sans aucune donnée personnelle, et
@@ -258,19 +313,21 @@ final class MailPolicy {
 	 * jamais une donnée personnelle. Aucun lien signé n'est fabriqué avant que
 	 * cette fonction ait rendu `null`.
 	 *
-	 * @param int      $id  Demande.
-	 * @param int|null $now Horodatage courant.
+	 * @param int                   $id   Demande.
+	 * @param int|null              $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string|null Code technique, ou `null` si l'envoi est permis.
 	 */
-	public static function blocker( int $id, ?int $now = null ): ?string {
+	public static function blocker( int $id, ?int $now = null, ?NotificationSlot $slot = null ): ?string {
 		$now   = null === $now ? time() : $now;
-		$ferme = self::closed_blocker( $id );
+		$slot  = $slot ?? NotificationSlot::admin( $id );
+		$ferme = self::closed_blocker( $id, $slot );
 
 		if ( null !== $ferme ) {
 			return $ferme;
 		}
 
-		$mail = (string) get_post_meta( $id, self::META_STATUS, true );
+		$mail = (string) get_post_meta( $id, $slot->cle( self::META_STATUS ), true );
 
 		if ( in_array( $mail, self::sendable_statuses(), true ) ) {
 			return null;
@@ -278,7 +335,7 @@ final class MailPolicy {
 
 		// Un `sending` périmé est repris : c'est la trace d'une requête tuée en
 		// plein envoi. Voir la politique « au moins une fois ».
-		if ( self::SENDING === $mail && self::sending_is_stale( $id, $now ) ) {
+		if ( self::SENDING === $mail && self::sending_is_stale( $id, $now, $slot ) ) {
 			return null;
 		}
 
@@ -295,10 +352,12 @@ final class MailPolicy {
 	 * particulier le statut natif, qu'une mise à la Corbeille concurrente a pu
 	 * changer.
 	 *
-	 * @param int $id Demande.
+	 * @param int                   $id   Demande.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return string|null
 	 */
-	public static function closed_blocker( int $id ): ?string {
+	public static function closed_blocker( int $id, ?NotificationSlot $slot = null ): ?string {
+		$slot = $slot ?? NotificationSlot::admin( $id );
 		$post = get_post( $id );
 
 		if ( ! $post || SubmissionPostType::POST_TYPE !== $post->post_type ) {
@@ -360,7 +419,10 @@ final class MailPolicy {
 			return 'metadonnees_incompletes';
 		}
 
-		if ( '' === self::recipient() ) {
+		// Le destinataire est celui du créneau : l'accusé client n'est pas bloqué
+		// par une adresse administrative absente, et la notification interne
+		// n'est pas bloquée par un demandeur sans courriel exploitable.
+		if ( '' === self::recipient_for( $id, $slot ) ) {
 			return 'recipient_unavailable';
 		}
 
@@ -370,12 +432,14 @@ final class MailPolicy {
 	/**
 	 * Un état `sending` est-il abandonné ?
 	 *
-	 * @param int $id  Demande.
-	 * @param int $now Horodatage courant.
+	 * @param int                   $id   Demande.
+	 * @param int                   $now  Horodatage courant.
+	 * @param NotificationSlot|null $slot Créneau visé ; à défaut, la notification interne.
 	 * @return bool
 	 */
-	public static function sending_is_stale( int $id, int $now ): bool {
-		$depuis = (string) get_post_meta( $id, self::META_LAST_ATTEMPT, true );
+	public static function sending_is_stale( int $id, int $now, ?NotificationSlot $slot = null ): bool {
+		$slot   = $slot ?? NotificationSlot::admin( $id );
+		$depuis = (string) get_post_meta( $id, $slot->cle( self::META_LAST_ATTEMPT ), true );
 
 		if ( '' === $depuis ) {
 			return true;

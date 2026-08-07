@@ -92,6 +92,20 @@
       "postTypes": [
         "page"
       ]
+    },
+    {
+      "name": "page-formulaire-declaration-prealable",
+      "title": "Formulaire de déclaration préalable",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-formulaire-permis-de-construire",
+      "title": "Formulaire de permis de construire",
+      "postTypes": [
+        "page"
+      ]
     }
   ],
   "templateParts": [

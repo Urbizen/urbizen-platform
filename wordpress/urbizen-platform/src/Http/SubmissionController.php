@@ -27,6 +27,10 @@ use Urbizen\Platform\Files\UploadManifest;
 use Urbizen\Platform\Files\UploadNormalizer;
 use Urbizen\Platform\Files\UploadPolicy;
 use Urbizen\Platform\Forms\FormRegistry;
+use Urbizen\Platform\Forms\PricingStrategyContextuelle;
+use Urbizen\Platform\Forms\AdresseTerrain;
+use Urbizen\Platform\Forms\MatriceChamps;
+use Urbizen\Platform\Forms\ValidationMetierRegistry;
 use Urbizen\Platform\Forms\PricingStrategyRegistry;
 use Urbizen\Platform\Forms\Validator;
 use Urbizen\Platform\Security\AntiSpam;
@@ -83,24 +87,68 @@ final class SubmissionController {
 	public const FORM_TYPE = 'conception';
 
 	/**
+	 * Action `admin-post` de la déclaration préalable.
+	 */
+	public const ACTION_DP = 'urbizen_declaration_prealable';
+
+	/**
+	 * Action du nonce de la déclaration préalable.
+	 */
+	public const NONCE_ACTION_DP = 'urbizen_declaration_prealable_submit';
+
+	/**
+	 * Identifiant serveur du formulaire de déclaration préalable.
+	 */
+	public const FORM_TYPE_DP = 'declaration_prealable';
+
+	/**
+	 * Action `admin-post` du permis de construire.
+	 */
+	public const ACTION_PC = 'urbizen_permis_construire';
+
+	/**
+	 * Action du nonce du permis de construire.
+	 *
+	 * **Distincte de celle de la DP**, et pas par symétrie : un nonce est lié à
+	 * son action. Les partager laisserait un nonce émis pour une DP autoriser
+	 * l'envoi d'un permis de construire — deux parcours, deux barèmes, deux
+	 * profils de dépôt.
+	 */
+	public const NONCE_ACTION_PC = 'urbizen_permis_construire_submit';
+
+	/**
+	 * Identifiant serveur du formulaire de permis de construire.
+	 */
+	public const FORM_TYPE_PC = 'permis_construire';
+
+	/**
 	 * Configuration serveur des routes : action → { type de formulaire, action de
 	 * nonce }. Résolue EXCLUSIVEMENT côté serveur (la clé est l'action du hook) ;
 	 * le navigateur ne choisit jamais la route. Un champ POST ne sert qu'à un
 	 * contrôle de cohérence, après que la route serveur a déjà été choisie. Une
-	 * seule route réelle aujourd'hui ; DP/PC/CERFA ne sont pas anticipés.
+	 * route par parcours livré — Conception, déclaration préalable, permis de
+	 * construire. Le CERFA n'est pas anticipé.
 	 * Décision : docs/DECISIONS.md D-050 (B).
 	 *
 	 * @var array<string, array{form_type: string, nonce_action: string}>
 	 */
 	private const ROUTES = array(
-		self::ACTION => array(
+		self::ACTION    => array(
 			'form_type'    => self::FORM_TYPE,
 			'nonce_action' => self::NONCE_ACTION,
+		),
+		self::ACTION_DP => array(
+			'form_type'    => self::FORM_TYPE_DP,
+			'nonce_action' => self::NONCE_ACTION_DP,
+		),
+		self::ACTION_PC => array(
+			'form_type'    => self::FORM_TYPE_PC,
+			'nonce_action' => self::NONCE_ACTION_PC,
 		),
 	);
 
 	/**
-	 * Accroche les deux points d'entrée.
+	 * Accroche les points d'entrée de chaque route.
 	 *
 	 * `nopriv` sert les visiteurs, l'autre les personnes connectées : un client
 	 * qui a un compte doit pouvoir soumettre comme les autres.
@@ -108,8 +156,17 @@ final class SubmissionController {
 	 * @return void
 	 */
 	public static function register(): void {
-		add_action( 'admin_post_nopriv_' . self::ACTION, array( self::class, 'handle' ) );
-		add_action( 'admin_post_' . self::ACTION, array( self::class, 'handle' ) );
+		foreach ( array_keys( self::ROUTES ) as $action ) {
+			// Le gestionnaire est lié à l'action : c'est le HOOK qui portera la
+			// route, jamais une valeur de requête. Une closure par action évite
+			// de relire $_POST pour savoir quel formulaire répond.
+			$gestionnaire = static function () use ( $action ): void {
+				self::handle( (string) $action );
+			};
+
+			add_action( 'admin_post_nopriv_' . $action, $gestionnaire );
+			add_action( 'admin_post_' . $action, $gestionnaire );
+		}
 	}
 
 	/**
@@ -117,7 +174,7 @@ final class SubmissionController {
 	 *
 	 * @return void
 	 */
-	public static function handle(): void {
+	public static function handle( string $action = self::ACTION ): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- le nonce est vérifié dans process().
 		$post   = wp_unslash( $_POST );
 		$files  = isset( $_FILES ) ? (array) $_FILES : array();
@@ -126,7 +183,7 @@ final class SubmissionController {
 
 		// La route est choisie par le HOOK, via une valeur LITTÉRALE liée à
 		// l'action enregistrée ({@see self::register()}) — jamais depuis $_POST.
-		$route  = self::route_for_action( self::ACTION );
+		$route  = self::route_for_action( $action );
 		$result = self::process(
 			is_array( $post ) ? $post : array(),
 			$files,
@@ -138,8 +195,41 @@ final class SubmissionController {
 		// Le type porté par le retour provient de la ROUTE serveur, jamais du POST.
 		$type = null === $route ? self::FORM_TYPE : $route['form_type'];
 
+		// Négociation de contenu : le MÊME traitement vient de s'exécuter, avec
+		// les mêmes contrôles. Seule la forme de la réponse change. L'en-tête ne
+		// prouve rien et n'autorise rien — un client qui le forge obtient du JSON,
+		// pas un passe-droit.
+		if ( AcceptNegotiation::veut_json( $server ) ) {
+			self::repondre_json( $result );
+
+			return;
+		}
+
 		wp_safe_redirect( self::redirect_url( $result, is_array( $post ) ? $post : array(), $type ) );
 		exit;
+	}
+
+	/**
+	 * Émet la réponse JSON d'une soumission déjà traitée.
+	 *
+	 * Ne décide de rien : elle met en forme une issue produite par le pipeline.
+	 *
+	 * @param SubmissionResult $result Issue du traitement.
+	 * @return void
+	 */
+	private static function repondre_json( SubmissionResult $result ): void {
+		if ( $result->is_success() ) {
+			wp_send_json( SubmissionJsonResponse::succes( $result ), 201 );
+
+			return;
+		}
+
+		$categorie = self::categorie_publique( $result->code() );
+
+		wp_send_json(
+			SubmissionJsonResponse::echec( $categorie, $result->errors() ),
+			SubmissionJsonResponse::statut_http( $categorie )
+		);
 	}
 
 	/**
@@ -303,10 +393,115 @@ final class SubmissionController {
 			return $renoncer( SubmissionResult::VALIDATION_FAILED, $validation['errors'] )->with_recovery( $reprise_id );
 		}
 
+		// --- 8 bis · les adresses, dans l'ordre où elles se décident ---
+		// L'ordre n'est pas indifférent. Le mode du déclarant tranche AVANT tout
+		// le reste : une charge portant à la fois ses champs automatiques et ses
+		// champs manuels ne doit jamais laisser le mode inactif alimenter la
+		// copie faite plus bas.
+		$ecartes = array();
+
+		$declarant = AdresseTerrain::pour( AdresseTerrain::DECLARANT );
+		$terrain   = AdresseTerrain::pour( AdresseTerrain::TERRAIN );
+
+		$validation['clean'] = $declarant->filtrer( $validation['clean'], $ecartes );
+
+		// L'adresse du déclarant est jugée seule, et son échec s'arrête ici. En
+		// laissant la suite se dérouler, le terrain — pas encore reconstruit —
+		// signalerait les mêmes manques sous d'autres noms : la personne lirait
+		// deux fois la même erreur sans savoir laquelle corriger.
+		//
+		// C'est la définition, et non la charge, qui dit si le parcours pose une
+		// adresse de déclarant : une charge forgée peut retirer le mode, pas
+		// changer ce que le formulaire déclare.
+		$erreurs_adresse = $declarant->verifier(
+			$validation['clean'],
+			null !== $definition->field( $declarant->nom( 'mode' ) )
+		);
+
+		if ( array() !== $erreurs_adresse ) {
+			$reprise    = SubmissionRecovery::from_validation( $type, $definition, $validation['clean'], $erreurs_adresse );
+			$reprise_id = SubmissionRecoveryStore::store( $reprise );
+
+			return $renoncer( SubmissionResult::VALIDATION_FAILED, $erreurs_adresse )->with_recovery( $reprise_id );
+		}
+
+		// Case cochée : le terrain reçu est intégralement écarté, puis
+		// reconstruit depuis le déclarant qui vient d'être validé. Purger
+		// d'abord et recopier ensuite est ce qui garantit qu'aucune valeur
+		// forgée ne se mêle à la copie — le navigateur n'envoie rien qui
+		// survive à cette étape.
+		// La décision est d'abord mise au clair : une case décochée laisse une
+		// liste vide dans la charge, qui ne dit rien et qu'un futur lecteur
+		// devrait réinterpréter. Après ceci, la clé porte « oui » ou n'existe
+		// pas.
+		$validation['clean'] = AdresseTerrain::normaliser_report( $validation['clean'] );
+
+		if ( AdresseTerrain::reportee( $validation['clean'] ) ) {
+			$reporte             = $declarant->exporter( $validation['clean'] );
+			$validation['clean'] = $terrain->purger( $validation['clean'], $ecartes );
+			$validation['clean'] = $terrain->importer( $validation['clean'], $reporte );
+		}
+
+		// --- 8 ter · cohérence métier ---
+		// La définition a jugé chaque champ isolément ; elle ne peut rien dire de
+		// ce qui les lie. Un doublon de projet, un supplément identique au projet
+		// principal ou une liste forgée passeraient la validation de forme, et le
+		// catalogue tarifaire se contenterait de ne pas les facturer — la demande
+		// serait acceptée avec un contenu incohérent. Le refus intervient donc ici,
+		// AVANT tout calcul et toute écriture, et reste corrigeable.
+		$metier = ValidationMetierRegistry::for_type( $type );
+
+		if ( null !== $metier ) {
+			$erreurs_metier = $metier->valider( $validation['clean'] );
+
+			if ( array() !== $erreurs_metier ) {
+				$reprise    = SubmissionRecovery::from_validation( $type, $definition, $validation['clean'], $erreurs_metier );
+				$reprise_id = SubmissionRecoveryStore::store( $reprise );
+
+				return $renoncer( SubmissionResult::VALIDATION_FAILED, $erreurs_metier )->with_recovery( $reprise_id );
+			}
+		}
+
+		// --- 8 quater · champs que la nature ne justifie pas ---
+		// La définition a jugé chaque champ, la cohérence métier les a jugés
+		// ensemble ; reste ce qu'aucune des deux ne voit — un champ parfaitement
+		// valide mais sans objet pour ce projet. Une surface de plancher sur une
+		// piscine n'est pas une donnée inutile, c'est une donnée FAUSSE : elle
+		// finirait dans le CERFA.
+		//
+		// L'écart est retiré, pas refusé. C'est le plus souvent le reliquat d'une
+		// nature changée en cours de saisie, et faire échouer la demande pour
+		// cela serait disproportionné. Le masquage côté navigateur reste une
+		// politesse ; ce filtrage-ci est la règle.
+		$validation['clean'] = MatriceChamps::filtrer( $type, $validation['clean'], $ecartes );
+
+		// --- 8 quinquies · l'adresse du mode inactif ---
+		// Une demande ne porte qu'une adresse par rôle. Le navigateur désactive
+		// les contrôles du mode abandonné, donc ils ne partent pas ; mais une
+		// charge forgée les enverrait tous, et deux adresses contradictoires
+		// arriveraient dans le même dossier. Le mode retenu tranche, ici, avant
+		// toute persistance. Le déclarant a déjà été filtré plus haut, avant de
+		// servir de source à la recopie.
+		$validation['clean'] = $terrain->filtrer( $validation['clean'], $ecartes );
+
+		if ( array() !== $ecartes ) {
+			Logger::info(
+				sprintf(
+					'soumission %s : %d champ(s) sans objet pour la nature ou le mode déclaré, écarté(s) : %s',
+					$type,
+					count( $ecartes ),
+					implode( ', ', $ecartes )
+				)
+			);
+		}
+
 		// --- 9 · prix, recalculé côté serveur ---
 		$pricing = $validation['pricing'];
 
-		if ( ! is_array( $pricing ) || ! isset( $pricing['total'], $pricing['base'] ) ) {
+		// `array_key_exists` et non `isset` : un socle et un total volontairement
+		// non chiffrés valent `null`, et doivent se distinguer d'un calcul qui
+		// n'a rien produit. Confondre les deux refuserait tout dossier sur étude.
+		if ( ! is_array( $pricing ) || ! array_key_exists( 'total', $pricing ) || ! array_key_exists( 'base', $pricing ) ) {
 			Logger::error( 'soumission : calcul tarifaire indisponible' );
 
 			return $renoncer( SubmissionResult::PRICING_FAILED );
@@ -317,7 +512,21 @@ final class SubmissionController {
 		// un type sans stratégie, ou un socle divergent, est refusé.
 		$strategie_prix = PricingStrategyRegistry::for_type( $type );
 
-		if ( null === $strategie_prix || (int) $pricing['base'] !== $strategie_prix->base() ) {
+		// Un socle unique ne vaut que pour les stratégies à tarif fixe. Celles
+		// dont le socle dépend des réponses répondent elles-mêmes de la valeur
+		// calculée : la garde reste entière, elle change d'interlocuteur.
+		// `null` est transmis tel quel à la stratégie : c'est un socle sur étude,
+		// et seule une stratégie qui en produit réellement doit l'accepter. Le
+		// convertir en `0` par un transtypage ferait passer un tarif absent pour
+		// un tarif nul, que le catalogue Conception accepterait à tort.
+		$socle = null === $pricing['base'] ? null : (int) $pricing['base'];
+
+		$socle_incoherent = null === $strategie_prix
+			|| ( $strategie_prix instanceof PricingStrategyContextuelle
+				? ! $strategie_prix->accepts_base( $socle )
+				: null === $socle || $socle !== $strategie_prix->base() );
+
+		if ( $socle_incoherent ) {
 			Logger::error( 'soumission : prix de base incohérent avec la stratégie du type' );
 
 			return $renoncer( SubmissionResult::PRICING_FAILED );

@@ -20,7 +20,9 @@
 namespace Urbizen\Platform\Mail;
 
 use Urbizen\Platform\Files\SignedLink;
+use Urbizen\Platform\Forms\AdresseTerrain;
 use Urbizen\Platform\Forms\FormRegistry;
+use Urbizen\Platform\Forms\PrecisionsProjet;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -78,6 +80,8 @@ final class MailRenderer {
 			return null;
 		}
 
+		// L'identifiant technique lu ici est celui du créneau de la notification
+		// interne — le seul message que ce rendu compose.
 		$reference    = (string) $demande['reference'];
 		$notification = (string) get_post_meta( $id, MailPolicy::META_ID, true );
 
@@ -156,6 +160,44 @@ final class MailRenderer {
 		$html[] = self::titre( 'Réponses' );
 		$html[] = self::table( self::reponses( $demande ) );
 
+		// --- Adresse du terrain ---
+		// Avant les précisions : on lit d'abord où, puis quoi. La rubrique
+		// n'apparaît que si le parcours en pose une.
+		$charge = is_array( $demande['payload'] ) ? $demande['payload'] : array();
+
+		foreach ( AdresseTerrain::toutes() as $adresse ) {
+			if ( ! $adresse->existe( $charge ) ) {
+				continue;
+			}
+
+			$lignes = array(
+				'Adresse'    => implode( ', ', $adresse->lignes_adresse( $charge ) ),
+				'Provenance' => $adresse->provenance( $charge ),
+			);
+
+			// L'interlocuteur interne doit voir que le terrain n'a pas été
+			// saisi mais reporté : sans cette mention, deux rubriques
+			// identiques donneraient à croire à une saisie deux fois faite,
+			// donc deux fois vérifiée.
+			if ( AdresseTerrain::TERRAIN === $adresse->role() && AdresseTerrain::reportee( $charge ) ) {
+				$lignes['Provenance'] = 'Même adresse que le déclarant';
+			}
+
+			$html[] = self::titre( $adresse->rubrique() );
+			$html[] = self::table( $lignes + $adresse->reperes( $charge ) );
+		}
+
+		// --- Précisions du projet ---
+		// Rendues avant le tarif : l'interlocuteur qui rappelle le prospect a
+		// besoin des dimensions, pas du montant. La rubrique n'apparaît que si
+		// quelque chose a été renseigné.
+		$precisions = PrecisionsProjet::lignes( is_array( $demande['payload'] ) ? $demande['payload'] : array() );
+
+		if ( array() !== $precisions ) {
+			$html[] = self::titre( PrecisionsProjet::RUBRIQUE );
+			$html[] = self::table( $precisions );
+		}
+
 		// --- Tarification ---
 		$html[] = self::titre( 'Tarification' );
 		$html[] = self::tarification( $demande['pricing'] );
@@ -188,6 +230,15 @@ final class MailRenderer {
 			$nom = (string) $nom;
 
 			if ( in_array( $nom, self::CHAMPS_EXCLUS, true ) ) {
+				continue;
+			}
+
+			// Un champ qui dispose d'un rendu métier dédié n'est pas répété ici.
+			// Il n'est pas perdu pour autant : la rubrique correspondante le
+			// montre plus bas, avec son libellé client et son écriture
+			// française. Le montrer deux fois, une fois en `8.5` et une fois en
+			// « 8,5 m », donnerait à douter des deux.
+			if ( PrecisionsProjet::porte( $nom ) || AdresseTerrain::porte( $nom ) ) {
 				continue;
 			}
 
