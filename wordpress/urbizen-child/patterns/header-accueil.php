@@ -44,7 +44,6 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
-      <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -53,7 +52,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <button type="button" class="icon-btn link-login" aria-label="Espace client (bientôt disponible)" title="Espace client — bientôt disponible" aria-disabled="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
       </button>
-      <a class="btn btn-primary btn-sm js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
+      <a class="btn btn-primary btn-sm js-start" href="<?php echo $pfx; ?>#localisation" aria-label="Démarrer mon projet"><span class="nav-cta-long">Démarrer mon projet</span><span class="nav-cta-short" aria-hidden="true">Démarrer</span></a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
@@ -82,12 +81,6 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
         </li>
         <li class="contact-ch is-soon">
           <span class="contact-ch-link" role="button" aria-disabled="true">
-            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
-          <span class="contact-ch-txt"><span class="contact-ch-title">Demander à être rappelé</span><span class="contact-ch-sub">Bientôt disponible</span></span>
-          </span>
-        </li>
-        <li class="contact-ch is-soon">
-          <span class="contact-ch-link" role="button" aria-disabled="true">
             <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
           <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
           </span>
@@ -102,7 +95,6 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
-      <a href="<?php echo $pfx; ?>#faq">Questions fréquentes</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
   </div>

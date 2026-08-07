@@ -23,16 +23,16 @@ function check( $label, $cond ) {
 
 /** Les dix cartes, dans l'ordre, telles qu'elles existent sur main. */
 $attendu = array(
-	'piscine'   => array( 'Piscine',                    'Déclaration préalable souvent nécessaire' ),
-	'extension' => array( 'Extension',                  'Étude du projet nécessaire' ),
-	'garage'    => array( 'Garage',                     'Déclaration ou permis selon surface' ),
-	'abri'      => array( 'Abri de jardin',             'Déclaration préalable souvent nécessaire' ),
-	'pergola'   => array( 'Pergola',                    'Déclaration préalable souvent nécessaire' ),
-	'facade'    => array( 'Modification de façade',     'Déclaration préalable souvent nécessaire' ),
-	'toiture'   => array( 'Toiture / fenêtres de toit', 'Déclaration préalable souvent nécessaire' ),
-	'solaire'   => array( 'Panneaux solaires',          'Déclaration préalable souvent nécessaire' ),
-	'maison'    => array( 'Maison individuelle',        'Permis de construire souvent nécessaire' ),
-	'autre'     => array( 'Autre projet',               'Étude du projet nécessaire' ),
+	'piscine'   => 'Piscine',
+	'extension' => 'Extension',
+	'garage'    => 'Garage',
+	'abri'      => 'Abri de jardin',
+	'pergola'   => 'Pergola',
+	'facade'    => 'Modification de façade',
+	'toiture'   => 'Toiture / fenêtres de toit',
+	'solaire'   => 'Panneaux solaires',
+	'maison'    => 'Maison individuelle',
+	'autre'     => 'Autre projet',
 );
 
 $sources = array(
@@ -110,17 +110,26 @@ foreach ( $sources as $nom => $chemin ) {
 	$ecarts = array();
 	$i      = 0;
 
-	foreach ( $attendu as $projet => $textes ) {
+	foreach ( $attendu as $projet => $titre ) {
 		$c = $cartes[ $i ];
 
 		if ( ! str_contains( $c, 'data-projet="' . $projet . '"' ) ) { $ecarts[] = "ordre/data-projet #$i"; }
-		if ( ! str_contains( $c, '<span class="pcard-t">' . $textes[0] . '</span>' ) ) { $ecarts[] = "titre $projet"; }
-		if ( ! str_contains( $c, '<span class="pcard-d">' . $textes[1] . '</span>' ) ) { $ecarts[] = "description $projet"; }
+		if ( ! str_contains( $c, '<span class="pcard-t">' . $titre . '</span>' ) ) { $ecarts[] = "titre $projet"; }
 
 		$i++;
 	}
 
-	check( "[$nom] les 10 data-projet, titres et descriptions sont inchangés", array() === $ecarts );
+	check( "[$nom] les 10 data-projet et leurs titres, dans l'ordre", array() === $ecarts );
+
+	/*
+	 * La carte se réduit à une icône et un titre. Une refonte antérieure
+	 * (`ee1415c`) y ajoutait une ligne de description — « Déclaration préalable
+	 * souvent nécessaire » — qui promettait un verdict réglementaire avant
+	 * toute étude. L'accueil retenu ne la porte pas, et ce banc empêche qu'elle
+	 * revienne par une régénération.
+	 */
+	check( "[$nom] aucune carte ne porte de description réglementaire",
+		! str_contains( $h, 'pcard-d' ) && ! str_contains( $h, 'souvent nécessaire' ) );
 
 	if ( array() !== $ecarts ) { echo '    écart : ' . implode( ' | ', $ecarts ) . "\n"; }
 
@@ -178,14 +187,30 @@ check( 'Empreintes SHA-256 identiques', hash( 'sha256', $src ) === hash( 'sha256
 foreach ( $sources as $nom => $chemin ) {
 	$h = file_get_contents( $chemin );
 
+	// La planche du hero voisine ne doit pas être emportée par une retouche des
+	// cartes : on vérifie qu'elle est là, entière, avec ses quatre vignettes.
 	check( "[$nom] la planche du hero est intacte",
-		str_contains( $h, 'M320 246 L360 252' ) && str_contains( $h, '<rect x="234" y="290" width="190" height="52"' ) );
-	check( "[$nom] les illustrations « Exemples » sont intactes",
-		4 === substr_count( $h, 'class="exemple-img"' ) && str_contains( $h, 'M74 45 L74 32' ) );
-	check( "[$nom] les 5 tarifs sont intacts",
-		1 === substr_count( $h, '149&nbsp;€' ) && 1 === substr_count( $h, '249&nbsp;€' )
-		&& 1 === substr_count( $h, '449&nbsp;€' ) && 1 === substr_count( $h, '649&nbsp;€' )
-		&& 1 === substr_count( $h, '849&nbsp;€' ) );
+		1 === substr_count( $h, 'class="hero-board"' )
+		&& 4 === preg_match_all( '#class="hp-fade hp-d[1-4]"#', $h )
+		&& str_contains( $h, '>DP2 · PLAN DE MASSE</text>' ) );
+	// Les dix planches de « Votre dossier peut comprendre » sont le pendant
+	// documentaire des cartes : même section, même risque de retouche.
+	check( "[$nom] les dix planches du dossier sont intactes",
+		10 === substr_count( $h, 'class="planche-item"' )
+		&& 10 === substr_count( $h, 'class="planche-fig"' )
+		&& str_contains( $h, '>DP1 · PCMI1</span>' )
+		&& str_contains( $h, '>Bordereau des pièces</span>' ) );
+	// Trois parcours tarifaires, un par prestation, chacun vers sa page.
+	check( "[$nom] les trois parcours de prestation sont intacts",
+		3 === substr_count( $h, 'class="service-route"' )
+		&& 7 === substr_count( $h, 'class="tarif-price"' )
+		&& str_contains( $h, 'href="https://urbizen.fr/declarations-prealables/"' )
+		&& str_contains( $h, 'href="https://urbizen.fr/permis-de-construire/"' )
+		&& str_contains( $h, 'href="https://urbizen.fr/conception/"' ) );
+	// Et les blocs abandonnés de ee1415c ne reviennent pas.
+	check( "[$nom] ni section #exemples ni planche .hero-plan",
+		! str_contains( $h, 'id="exemples"' ) && ! str_contains( $h, 'class="hero-plan"' )
+		&& ! str_contains( $h, 'class="exemple-img"' ) );
 }
 
 echo "\n";

@@ -124,17 +124,24 @@ check( 'En-tête : espace client = contrôle honnête (bouton aria-disabled, san
 check( 'En-tête : icône téléphone « Nous contacter » pilotant le panneau de contact',
 	str_contains( $entete_rendu, 'aria-label="Nous contacter"' )
 	&& str_contains( $entete_rendu, 'aria-controls="contact-panel"' ) );
-check( 'Centre de contact : panneau unique « Parlons de votre projet » avec ses quatre canaux',
+check( 'Centre de contact : panneau unique « Parlons de votre projet » avec ses trois canaux',
 	1 === substr_count( $entete_rendu, 'id="contact-panel"' )
 	&& str_contains( $entete_rendu, 'Parlons de votre projet' )
 	&& str_contains( $entete_rendu, 'Appeler maintenant' )
 	&& str_contains( $entete_rendu, 'Réserver un appel' )
-	&& str_contains( $entete_rendu, 'Demander à être rappelé' )
 	&& str_contains( $entete_rendu, 'Écrire à Urbizen' ) );
-check( 'Centre de contact : « Appeler » = numéro réel de la charte, 3 canaux honnêtement « bientôt »',
+check( 'Centre de contact : « Appeler » = numéro réel de la charte, 2 canaux honnêtement « bientôt »',
 	str_contains( $entete_rendu, 'href="tel:+33664895815"' )
-	&& 3 === substr_count( $entete_rendu, 'contact-ch is-soon' )
-	&& 3 === substr_count( $entete_rendu, 'Bientôt disponible' ) );
+	&& 2 === substr_count( $entete_rendu, 'contact-ch is-soon' )
+	&& 2 === substr_count( $entete_rendu, 'Bientôt disponible' ) );
+// Le CTA de l'en-tête porte deux libellés — long sur grand écran, court sur
+// mobile — et son intitulé accessible ne dépend donc pas de celui qui est
+// affiché. Sans `aria-label`, un lecteur d'écran n'annoncerait que « Démarrer ».
+check( 'En-tête : CTA responsive à deux libellés et intitulé accessible stable',
+	str_contains( $entete_rendu, 'class="nav-cta-long"' )
+	&& str_contains( $entete_rendu, 'class="nav-cta-short"' )
+	&& str_contains( $entete_rendu, 'aria-label="Démarrer mon projet"' )
+	&& str_contains( $entete_rendu, 'aria-hidden="true"' ) );
 check( 'En-tête : burger mobile et ses attributs ARIA conservés',
 	str_contains( $entete_rendu, 'class="burger"' )
 	&& str_contains( $entete_rendu, 'aria-expanded="false"' )
@@ -207,7 +214,7 @@ check( 'Corps : les 13 sections identiques à la maquette', $corps_rendu === $co
 
 check( 'Corps : SVG du hero inline et inchangé',
 	substr_count( $gabarit, '<svg' ) === substr_count( $corps_ref, '<svg' )
-	&& str_contains( $gabarit, 'DP6 · INSERTION 3D' ) );
+	&& str_contains( $gabarit, 'DP4 · FAÇADES' ) );
 
 // ------------------------------------------------------------ ressources ---
 foreach ( array(
@@ -288,10 +295,9 @@ check( 'theme.json : seules customTemplates et templateParts ont été ajoutées
 // ------------------------------------ centre de contact : visibilité & ordre ---
 // Ordre des quatre canaux, du haut vers le bas.
 $pos = static function ( $s ) use ( $entete_rendu ) { return strpos( $entete_rendu, $s ); };
-check( 'Centre de contact : les quatre canaux dans l\'ordre (Appeler → Réserver → Rappelé → Écrire)',
+check( 'Centre de contact : les trois canaux dans l\'ordre (Appeler → Réserver → Écrire)',
 	$pos( 'Appeler maintenant' ) < $pos( 'Réserver un appel' )
-	&& $pos( 'Réserver un appel' ) < $pos( 'Demander à être rappelé' )
-	&& $pos( 'Demander à être rappelé' ) < $pos( 'Écrire à Urbizen' ) );
+	&& $pos( 'Réserver un appel' ) < $pos( 'Écrire à Urbizen' ) );
 check( 'Centre de contact : titre + première action avant la dernière (pas de troncature « Écrire » en tête)',
 	$pos( 'Parlons de votre projet' ) < $pos( 'Appeler maintenant' )
 	&& $pos( 'Appeler maintenant' ) < $pos( 'Écrire à Urbizen' ) );
@@ -311,9 +317,24 @@ check( 'JavaScript : fermeture Échap, focus restitué sans saut (preventScroll)
 
 // ------------------------------------------------- hero : texte avant image ---
 check( 'Hero : le texte précède l\'illustration dans le DOM (empilé = texte puis planche)',
-	strpos( $corps_ref, 'class="hero-text"' ) < strpos( $corps_ref, 'class="hero-plan"' ) );
+	strpos( $corps_ref, 'class="hero-copy"' ) < strpos( $corps_ref, 'class="hero-board"' ) );
 check( 'Hero : aucun ordre CSS ne remonte l\'illustration au-dessus du titre',
-	! (bool) preg_match( '/\.hero-plan[^{]*\{[^}]*order:\s*-1/', $css ) );
+	! (bool) preg_match( '/\.hero-board[^{]*\{[^}]*order:\s*-1/', $css ) );
+
+/*
+ * Non-régression : l'accueil retenu est celui qui est servi en production. Une
+ * refonte antérieure (`ee1415c`) vivait dans le dépôt sans avoir jamais été
+ * déployée ; son historique reste dans Git, mais son markup n'est plus la
+ * référence. Ces quelques absences suffisent à ce qu'une régénération ne le
+ * réintroduise pas en silence — il ne s'agit pas d'éprouver chaque absence,
+ * mais de repérer un retour en masse.
+ */
+foreach ( array( 'id="exemples"', 'class="hero-plan"', 'DP6 · INSERTION 3D' ) as $abandonne ) {
+	check(
+		sprintf( 'Référence : « %s » n\'est pas réintroduit', $abandonne ),
+		! str_contains( $gabarit, $abandonne ) && ! str_contains( $corps_ref, $abandonne )
+	);
+}
 
 echo "\n", 0 === $fail ? "TOUS LES CONTROLES PASSENT\n" : "$fail CONTROLE(S) EN ECHEC\n";
 exit( 0 === $fail ? 0 : 1 );
