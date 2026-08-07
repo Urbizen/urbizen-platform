@@ -88,10 +88,19 @@ check( 'front-page : panneau « Espace Urbizen » présent une seule fois',
 	1 === substr_count( $front, 'class="espace-band"' ) );
 check( 'front-page : SVG animé du hero — quatre tracés hp-draw',
 	4 === substr_count( $front, 'hp-draw' ) );
-check( 'front-page : huit mini-illustrations de pièces du dossier',
-	8 === substr_count( $front, 'class="planche-fig"' ) );
-check( 'front-page : carte CERFA mise en avant, statut honnête',
-	str_contains( $front, 'parcours-card featured' ) && str_contains( $front, 'Votre CERFA, gratuitement' ) );
+/*
+ * Le contenu du dossier est décrit par dix planches, et le CERFA y figure comme
+ * l'une d'elles. Une refonte antérieure (`ee1415c`) en faisait une carte mise
+ * en avant promettant « Votre CERFA, gratuitement » ; l'accueil retenu ne porte
+ * pas cette promesse, et le banc vérifie qu'elle ne revient pas.
+ */
+check( 'front-page : dix mini-illustrations de pièces du dossier',
+	10 === substr_count( $front, 'class="planche-fig"' ) );
+check( 'front-page : le CERFA est une pièce du dossier, sans promesse de gratuité',
+	str_contains( $front, '>CERFA</span>' )
+	&& str_contains( $front, '>Formulaire officiel</span>' )
+	&& ! str_contains( $front, 'parcours-card featured' )
+	&& ! str_contains( $front, 'Votre CERFA, gratuitement' ) );
 
 $css_accueil = file_get_contents( $theme . '/assets/css/urbizen-homepage.css' );
 $css_source  = file_get_contents( dirname( __DIR__, 2 ) . '/frontend/homepage/homepage.css' );

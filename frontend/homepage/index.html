@@ -85,7 +85,6 @@
       <a href="#prestations">Nos prestations</a>
       <a href="#methode">Comment ça marche</a>
       <a href="#tarifs">Tarifs</a>
-      <a href="#faq">Questions fréquentes</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -94,7 +93,7 @@
       <button type="button" class="icon-btn link-login" aria-label="Espace client (bientôt disponible)" title="Espace client — bientôt disponible" aria-disabled="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
       </button>
-      <a class="btn btn-primary btn-sm js-start" href="#localisation">Démarrer mon projet</a>
+      <a class="btn btn-primary btn-sm js-start" href="#localisation" aria-label="Démarrer mon projet"><span class="nav-cta-long">Démarrer mon projet</span><span class="nav-cta-short" aria-hidden="true">Démarrer</span></a>
       <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
@@ -123,12 +122,6 @@
         </li>
         <li class="contact-ch is-soon">
           <span class="contact-ch-link" role="button" aria-disabled="true">
-            <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
-          <span class="contact-ch-txt"><span class="contact-ch-title">Demander à être rappelé</span><span class="contact-ch-sub">Bientôt disponible</span></span>
-          </span>
-        </li>
-        <li class="contact-ch is-soon">
-          <span class="contact-ch-link" role="button" aria-disabled="true">
             <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
           <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
           </span>
@@ -143,7 +136,6 @@
       <a href="#prestations">Nos prestations</a>
       <a href="#methode">Comment ça marche</a>
       <a href="#tarifs">Tarifs</a>
-      <a href="#faq">Questions fréquentes</a>
       <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
     </div>
   </div>
@@ -152,157 +144,161 @@
 <main>
 
 <!-- ===== Section 2 — Hero ===== -->
-<section class="hero" id="accueil">
-  <div class="wrap hero-grid">
-    <div class="hero-text">
-      <span class="eyebrow">Plateforme d'urbanisme en ligne</span>
-      <h1>Vos démarches d'urbanisme, simplement et entièrement en ligne.</h1>
-      <p class="lead">Déclaration préalable, permis de construire ou conception de plans&nbsp;: Urbizen prépare votre dossier à distance et vous accompagne à chaque étape.</p>
-      <p class="hero-note">Le remplissage gratuit de votre CERFA et les espaces client et professionnel arrivent prochainement sur la plateforme.</p>
-      <div class="hero-cta">
-        <a class="btn btn-primary js-start" href="#localisation">Confier mon projet à Urbizen</a>
-        <a class="btn btn-ghost" href="#services">Découvrir les services</a>
+<section class="hero hero-v7" id="accueil" aria-labelledby="hero-title">
+  <div class="wrap hero-main">
+    <div class="hero-copy">
+      <span class="eyebrow"><span class="eyebrow-text">Plateforme d’urbanisme en ligne</span></span>
+      <h1 id="hero-title">Vos démarches d’urbanisme, <em>simplement.</em></h1>
+      <p class="lead">Urbizen conçoit vos plans et prépare les pièces de vos dossiers d’urbanisme, entièrement à distance, avec un accompagnement humain à chaque étape.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+        <button class="btn btn-secondary js-open-contact" type="button" aria-label="Nous contacter et réserver un rendez-vous" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.5 21A13.5 13.5 0 0 1 3 8.5 2 2 0 0 1 5 6.4h2.2a1.4 1.4 0 0 1 1.4 1.2c.1.9.3 1.8.6 2.6a1.4 1.4 0 0 1-.32 1.5l-1 1a11 11 0 0 0 4.9 4.9l1-1a1.4 1.4 0 0 1 1.5-.32c.8.3 1.7.5 2.6.6a1.4 1.4 0 0 1 1.2 1.42V19a2 2 0 0 1-2.1 2z"/></svg>
+          Réserver un RDV
+        </button>
       </div>
-      <p class="hero-soon"><span class="soon-badge">Bientôt disponible</span> CERFA gratuit</p>
-      <ul class="hero-reassure">
-        <li>Service 100&nbsp;% à distance</li>
-        <li>Accompagnement humain</li>
-        <li><b>Dossier adapté à votre projet</b></li>
-      </ul>
+      <div class="hero-service-cards" aria-label="Types de prestations Urbizen">
+        <a class="hero-service-card" href="https://urbizen.fr/permis-de-construire/">
+          <span class="hero-service-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 10 3l7 6.5V17H3z"/><path d="M8 17v-5h4v5"/></svg>
+          </span>
+          <span class="hero-service-title">Permis de construire</span>
+        </a>
+        <a class="hero-service-card" href="https://urbizen.fr/declarations-prealables/">
+          <span class="hero-service-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h6l4 4V18H5z"/><path d="M11 2.5v4h4"/><path d="m7.5 12 1.8 1.8 3.7-4"/></svg>
+          </span>
+          <span class="hero-service-title">Déclaration préalable</span>
+        </a>
+        <a class="hero-service-card" href="https://urbizen.fr/conception/">
+          <span class="hero-service-icon" aria-hidden="true">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h14v14H3z"/><path d="M8 3v6h9M3 12h7v5M13 12h4v5h-4z"/></svg>
+          </span>
+          <span class="hero-service-title">Plans sur mesure</span>
+        </a>
+      </div>
     </div>
 
-    <!-- Composition technique (plan / cadastre / cartouche) -->
-    <div class="hero-plan" aria-hidden="true">
-      <span class="hero-plan-tag">PIÈCES DU DOSSIER</span>
-      <svg viewBox="0 0 440 360" xmlns="http://www.w3.org/2000/svg">
+    <div class="hero-board" role="img" aria-label="Exemples animés de quatre pièces d’un dossier d’urbanisme : plan de masse, façades, coupe et insertion graphique">
+      <span class="board-tag">Illustration des pièces</span>
+      <svg viewBox="0 0 440 360" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs>
-          <pattern id="hg" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M20 0H0V20" fill="none" stroke="#DCE3EA" stroke-width="1"/>
-          </pattern>
+          <pattern id="board-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="#9fadbc" stroke-width=".5"/></pattern>
+          <pattern id="board-existing" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="5" stroke="#c9d3dd" stroke-width=".5"/></pattern>
+          <marker id="board-tick" markerWidth="6" markerHeight="7" refX="3" refY="3.5" orient="auto"><line x1="3" y1=".6" x2="3" y2="6.4" stroke="#14233b" stroke-width=".8"/></marker>
         </defs>
-        <rect width="440" height="360" fill="url(#hg)"/>
-        <!-- Planche : 4 pièces, chacune se dessine (contour) puis se remplit -->
-        <rect class="hp-fade hp-d1" x="8"   y="8"   width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
-        <rect class="hp-fade hp-d2" x="226" y="8"   width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
-        <rect class="hp-fade hp-d3" x="8"   y="190" width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
-        <rect class="hp-fade hp-d4" x="226" y="190" width="206" height="162" rx="3" fill="#FBFCFD" stroke="#C9D3DD"/>
+        <rect width="440" height="360" fill="#cae6d4"/>
+        <rect class="hp-fade hp-d1" x="8" y="8" width="206" height="162" rx="3" fill="#fbfcfd" stroke="#c9d3dd"/>
+        <rect class="hp-fade hp-d2" x="226" y="8" width="206" height="162" rx="3" fill="#fbfcfd" stroke="#c9d3dd"/>
+        <rect class="hp-fade hp-d3" x="8" y="190" width="206" height="162" rx="3" fill="#fbfcfd" stroke="#c9d3dd"/>
+        <rect class="hp-fade hp-d4" x="226" y="190" width="206" height="162" rx="3" fill="#fbfcfd" stroke="#c9d3dd"/>
 
-        <!-- DP2 · Plan de masse -->
-        <g class="hp-fade hp-fd1">
-          <text x="20" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP2 · MASSE</text>
-          <path d="M36 56 L188 46 L198 150 L44 158 Z" fill="#54CF99" fill-opacity="0.14" stroke="none"/>
-          <rect x="86" y="80" width="64" height="46" rx="1.5" fill="#14233B" fill-opacity="0.9"/>
-          <path d="M104 126 L126 126 L124 154 L102 155 Z" fill="#9FADBC" fill-opacity="0.26" stroke="none"/>
-          <line x1="44" y1="150" x2="198" y2="146" stroke="#128A5A" stroke-width="1" stroke-dasharray="3 3"/>
+        <g>
+          <text x="20" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128a5a">DP2 · PLAN DE MASSE</text>
+          <svg x="14" y="34" width="194" height="128" viewBox="40 18 380 265" preserveAspectRatio="xMidYMid meet">
+            <g class="hp-fade hp-fd1">
+            <rect x="56" y="30" width="348" height="240" rx="2" fill="none" stroke="#9fadbc" stroke-width="1" stroke-dasharray="6 4"/>
+            <rect x="112" y="96" width="94" height="96" fill="url(#board-existing)" stroke="#9fadbc" stroke-width="1.2"/>
+            <text x="118" y="150" font-family="IBM Plex Mono, monospace" font-size="7.5" fill="#9fadbc">EXIST.</text>
+            <rect x="206" y="112" width="104" height="88" fill="#14233b" fill-opacity=".05" stroke="#14233b" stroke-width="1.6"/>
+            <rect x="310" y="140" width="46" height="60" fill="#128a5a" fill-opacity=".1" stroke="#14233b" stroke-width="1.1"/>
+            <text x="315" y="174" font-family="IBM Plex Mono, monospace" font-size="6.5" fill="#128a5a">TERR.</text>
+            <path d="M258 200V270" stroke="#128a5a" stroke-width="1.4"/>
+            <g transform="translate(378,58)"><circle r="9" fill="none" stroke="#9fadbc" stroke-width=".9"/><path d="M0 6.4V-6.4M-2.6-2.4 0-6.4 2.6-2.4" fill="none" stroke="#14233b" stroke-width="1.1"/><text x="-3" y="-11" font-family="IBM Plex Mono, monospace" font-size="9" fill="#14233b">N</text></g>
+            <line x1="56" y1="150" x2="112" y2="150" stroke="#14233b" stroke-width=".7" marker-start="url(#board-tick)" marker-end="url(#board-tick)"/><text x="66" y="147" font-family="IBM Plex Mono, monospace" font-size="7" fill="#14233b">3.00</text>
+            <line x1="206" y1="212" x2="310" y2="212" stroke="#14233b" stroke-width=".8" marker-start="url(#board-tick)" marker-end="url(#board-tick)"/><text x="244" y="209" font-family="IBM Plex Mono, monospace" font-size="7.5" fill="#14233b">8.00</text>
+            </g>
+            <path class="hp-draw hp-dr1" pathLength="1" d="M206 112H310V200H206Z" fill="none" stroke="#128a5a" stroke-width="2"/>
+          </svg>
         </g>
-        <path class="hp-draw hp-dr1" pathLength="1" d="M36 56 L188 46 L198 150 L44 158 Z" fill="none" stroke="#128A5A" stroke-width="2"/>
 
-        <!-- DP4 · Façades -->
-        <g class="hp-fade hp-fd2">
-          <text x="238" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP4 · FA&#199;ADES</text>
-          <line x1="246" y1="152" x2="414" y2="152" stroke="#9FADBC" stroke-width="1"/>
-          <path d="M290 94 L334 62 L378 94 Z" fill="#54CF99" fill-opacity="0.4" stroke="none"/>
-          <rect x="326" y="120" width="16" height="32" fill="#14233B" fill-opacity="0.85"/>
-          <rect x="306" y="104" width="14" height="14" fill="none" stroke="#14233B" stroke-width="1.4"/>
-          <rect x="348" y="104" width="14" height="14" fill="none" stroke="#14233B" stroke-width="1.4"/>
+        <g>
+          <text x="238" y="27" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128a5a">DP4 · FAÇADES</text>
+          <svg x="232" y="34" width="194" height="128" viewBox="54 116 350 150" preserveAspectRatio="xMidYMid meet">
+            <g class="hp-fade hp-fd2">
+            <line x1="72" y1="246" x2="392" y2="246" stroke="#14233b" stroke-width="1.4"/>
+            <path d="M112 246V176H196V246" fill="url(#board-existing)" stroke="#9fadbc" stroke-width="1.2"/>
+            <path d="M108 176 154 150 200 176" fill="none" stroke="#9fadbc" stroke-width="1.2"/>
+            <rect x="196" y="156" width="150" height="90" fill="#14233b" fill-opacity=".04" stroke="#14233b" stroke-width="1.7"/>
+            <path d="M346 156V132" stroke="#14233b" stroke-width="1"/>
+            <rect x="196" y="156" width="150" height="13" fill="url(#board-hatch)" opacity=".5"/>
+            <rect x="214" y="184" width="66" height="62" fill="#128a5a" fill-opacity=".1" stroke="#14233b" stroke-width="1.1"/>
+            <path d="M247 184V246M214 214H280" stroke="#14233b" stroke-width=".7"/>
+            <rect x="298" y="200" width="34" height="46" fill="#14233b" fill-opacity=".06" stroke="#14233b" stroke-width="1.1"/>
+            <line x1="196" y1="252" x2="346" y2="252" stroke="#14233b" stroke-width="2.2"/>
+            <line x1="366" y1="132" x2="366" y2="246" stroke="#14233b" stroke-width=".7" marker-start="url(#board-tick)" marker-end="url(#board-tick)"/><text x="370" y="192" font-family="IBM Plex Mono, monospace" font-size="7" fill="#14233b">3.60</text>
+            </g>
+            <path class="hp-draw hp-dr2" pathLength="1" d="M196 246V156H346V246M188 156 354 132" fill="none" stroke="#128a5a" stroke-width="2"/>
+          </svg>
         </g>
-        <path class="hp-draw hp-dr2" pathLength="1" d="M298 152 L298 94 L290 94 L334 62 L378 94 L370 94 L370 152" fill="none" stroke="#14233B" stroke-width="1.5"/>
 
-        <!-- DP3 · Coupe -->
-        <g class="hp-fade hp-fd3">
-          <text x="20" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP3 · COUPE</text>
-          <rect x="20" y="302" width="190" height="40" fill="#E4F5EC"/>
-          <path d="M66 252 L112 226 L158 252 Z" fill="#54CF99" fill-opacity="0.35" stroke="none"/>
-          <rect x="66" y="252" width="5" height="50" fill="#14233B" fill-opacity="0.85"/>
-          <rect x="153" y="252" width="5" height="50" fill="#14233B" fill-opacity="0.85"/>
-          <rect x="62" y="302" width="100" height="5" fill="#14233B" fill-opacity="0.85"/>
-          <line x1="71" y1="276" x2="153" y2="276" stroke="#9FADBC" stroke-width="1" stroke-dasharray="3 3"/>
-          <line x1="32" y1="314" x2="42" y2="324" stroke="#9FADBC" stroke-width="1"/>
-          <line x1="56" y1="314" x2="66" y2="324" stroke="#9FADBC" stroke-width="1"/>
-          <line x1="80" y1="314" x2="90" y2="324" stroke="#9FADBC" stroke-width="1"/>
+        <g>
+          <text x="20" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128a5a">DP3 · PLAN EN COUPE</text>
+          <svg x="14" y="216" width="194" height="128" viewBox="50 112 365 150" preserveAspectRatio="xMidYMid meet">
+            <g class="hp-fade hp-fd3">
+            <path d="M64 240H200L360 226H400" fill="none" stroke="#9fadbc" stroke-width=".9" stroke-dasharray="5 3"/>
+            <line x1="64" y1="240" x2="400" y2="240" stroke="#14233b" stroke-width="1.5"/>
+            <path d="M118 240V168H200V240" fill="url(#board-existing)" stroke="#9fadbc" stroke-width="1.2"/>
+            <path d="M200 240V150L336 130V240" fill="#14233b" fill-opacity=".04" stroke="#14233b" stroke-width="1.6"/>
+            <rect x="192" y="240" width="152" height="7" fill="url(#board-hatch)"/>
+            <rect x="224" y="184" width="56" height="56" fill="#128a5a" fill-opacity=".09" stroke="#14233b" stroke-width="1"/>
+            <line x1="204" y1="206" x2="332" y2="206" stroke="#9fadbc" stroke-width=".6" stroke-dasharray="3 2"/>
+            <line x1="360" y1="130" x2="360" y2="240" stroke="#14233b" stroke-width=".8" marker-start="url(#board-tick)" marker-end="url(#board-tick)"/><text x="364" y="188" font-family="IBM Plex Mono, monospace" font-size="7.5" fill="#14233b">3.60</text>
+            <text x="66" y="253" font-family="IBM Plex Mono, monospace" font-size="7" fill="#9fadbc">TN</text>
+            </g>
+            <path class="hp-draw hp-dr3" pathLength="1" d="M200 240V150L336 130V240" fill="none" stroke="#128a5a" stroke-width="2"/>
+          </svg>
         </g>
-        <path class="hp-draw hp-dr3" pathLength="1" d="M20 302 L210 302 M66 302 L66 252 L112 226 L158 252 L158 302" fill="none" stroke="#14233B" stroke-width="1.4"/>
 
-        <!-- DP6 · Insertion 3D -->
-        <g class="hp-fade hp-fd4">
-          <text x="238" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128A5A">DP6 · INSERTION 3D</text>
-          <rect x="234" y="290" width="190" height="52" fill="#E4F5EC"/>
-          <ellipse cx="330" cy="303" rx="42" ry="5" fill="#14233B" fill-opacity="0.07"/>
-          <path d="M300 264 L340 264 L340 302 L300 302 Z" fill="#14233B" fill-opacity="0.88"/>
-          <path d="M340 264 L360 252 L360 290 L340 302 Z" fill="#14233B" fill-opacity="0.62"/>
-          <path d="M296 264 L320 246 L344 264 Z" fill="#54CF99" fill-opacity="0.5" stroke="none"/>
-          <path d="M344 264 L320 246 L360 252 Z" fill="#54CF99" fill-opacity="0.3" stroke="none"/>
-          <rect x="310" y="282" width="14" height="20" fill="#FBFCFD" fill-opacity="0.9"/>
-          <rect x="328" y="272" width="9" height="9" fill="#FBFCFD" fill-opacity="0.8"/>
-          <!-- petit arbre à côté de la maison -->
-          <circle cx="386" cy="278" r="13" fill="#54CF99" fill-opacity="0.55"/>
-          <rect x="383" y="285" width="6" height="17" rx="1" fill="#14233B" fill-opacity="0.85"/>
+        <g>
+          <text x="238" y="209" font-family="IBM Plex Mono, monospace" font-size="9" fill="#128a5a">DP6 · INSERTION</text>
+          <svg x="232" y="216" width="194" height="128" viewBox="48 112 365 165" preserveAspectRatio="xMidYMid meet">
+            <g class="hp-fade hp-fd4">
+            <path d="M60 252Q210 244 356 236L400 244" fill="none" stroke="#9fadbc" stroke-width=".9"/>
+            <path d="M60 252 142 244 356 236 400 244 350 274 94 274Z" fill="#128a5a" fill-opacity=".045" stroke="#9fadbc" stroke-width=".75"/>
+            <path d="M60 252 94 274M142 244 158 274M400 244 350 274" fill="none" stroke="#9fadbc" stroke-width=".65"/>
+            <path d="M94 266Q214 253 370 258" fill="none" stroke="#9fadbc" stroke-width=".6" stroke-dasharray="4 3"/>
+            <line x1="60" y1="252" x2="400" y2="252" stroke="#14233b" stroke-width=".9"/>
+            <path d="M120 252V186L186 178V252Z" fill="url(#board-existing)" stroke="#9fadbc" stroke-width="1"/>
+            <path d="M120 186 150 172 214 166 186 178Z" fill="#9fadbc" fill-opacity=".12" stroke="#9fadbc" stroke-width=".9"/>
+            <path d="M186 252V150L316 138V252Z" fill="#14233b" fill-opacity=".05" stroke="#14233b" stroke-width="1.6"/>
+            <path d="M316 138 356 124V236L316 252Z" fill="#14233b" fill-opacity=".12" stroke="#14233b" stroke-width="1.1"/>
+            <path d="M186 150 226 136 356 124 316 138Z" fill="#128a5a" fill-opacity=".1" stroke="#14233b" stroke-width="1.1"/>
+            <rect x="208" y="176" width="74" height="64" fill="#128a5a" fill-opacity=".1" stroke="#14233b" stroke-width="1"/><path d="M245 176V240M208 208H282" stroke="#14233b" stroke-width=".6"/>
+            <path d="M186 252 214 264H344L316 252" fill="#14233b" fill-opacity=".045" stroke="#14233b" stroke-width=".7"/>
+            <path d="M316 252 344 264 370 274H330Z" fill="#14233b" fill-opacity=".045" stroke="#9fadbc" stroke-width=".6"/>
+            <path d="M372 252V226M378 252V232M366 252V234M96 252V232M102 252V238" stroke="#128a5a" stroke-width="1.3"/>
+            </g>
+            <path class="hp-draw hp-dr4" pathLength="1" d="M186 252V150L316 138V252M316 138 356 124V236L316 252" fill="none" stroke="#128a5a" stroke-width="2"/>
+          </svg>
         </g>
-        <path class="hp-draw hp-dr4" pathLength="1" d="M300 302 L300 264 L340 264 L340 302 M340 264 L360 252 L360 290 M296 264 L320 246 L344 264 M344 264 L360 252 M320 246 L360 252 M373 279 a13 13 0 1 0 26 0 a13 13 0 1 0 -26 0" fill="none" stroke="#14233B" stroke-width="1.2"/>
       </svg>
     </div>
   </div>
 </section>
 
-<!-- Bandeau réassurance -->
-<div class="trust">
-  <div class="wrap">
-    <span class="trust-item"><span class="trust-dot"></span><b>Plans et pièces graphiques réalisés par nos soins</b></span>
-    <span class="trust-item"><span class="trust-dot"></span>France métropolitaine</span>
-    <span class="trust-item"><span class="trust-dot"></span>Un interlocuteur dédié</span>
-    <span class="trust-item"><span class="trust-dot"></span>Devis et étude gratuits</span>
-  </div>
-</div>
+<aside class="trust" aria-label="Garanties Urbizen">
+  <ul class="wrap trust-list">
+    <li>Plans et pièces graphiques réalisés par nos soins</li>
+    <li>Service 100&nbsp;% à distance</li>
+    <li>Un interlocuteur dédié</li>
+    <li>Devis et étude gratuits</li>
+  </ul>
+</aside>
 
-<!-- ===== Trois parcours ===== -->
-<section class="parcours" id="parcours">
+<!-- ===== Comment ça marche ===== -->
+<section class="methode" id="methode">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Trois parcours</span>
-      <h2>Un parcours adapté à votre besoin</h2>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Comment ça marche</span></span>
+      <h2>Votre dossier en quatre étapes</h2>
     </div>
-    <div class="parcours-grid">
-      <article class="parcours-card">
-        <span class="parcours-k">Particulier</span>
-        <h3>Je prépare mon projet</h3>
-        <p>Piscine, extension, garage, pergola, façade, toiture ou maison individuelle.</p>
-        <a class="btn btn-ghost btn-sm" href="#services">Découvrir les prestations</a>
-      </article>
-      <article class="parcours-card">
-        <span class="parcours-k">Professionnel</span>
-        <h3>Je gère des dossiers clients</h3>
-        <p>Un futur espace pour centraliser vos commandes, documents et échanges.</p>
-        <span class="soon-badge">Bientôt disponible</span>
-      </article>
-      <article class="parcours-card featured">
-        <div class="parcours-top">
-          <span class="parcours-k">CERFA gratuit</span>
-          <span class="soon-badge">Bientôt disponible</span>
-        </div>
-        <h3>Votre CERFA, gratuitement</h3>
-        <p>Bientôt, un parcours guidé pour compléter et télécharger gratuitement votre formulaire administratif.</p>
-        <span class="parcours-fig" aria-hidden="true"><svg viewBox="0 0 92 64" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="4" width="52" height="56" rx="2.5" fill="#fff" stroke="currentColor" stroke-width="1.4"/><path d="M27 13 H57" stroke="#128A5A" stroke-width="2"/><rect x="27" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="42" width="7.5" height="7.5" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M28.6 45.8 L30.8 48 L33.9 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M39 46 H65" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="27" y="52" width="7.5" height="7.5" fill="none" stroke="currentColor" stroke-width="1"/><path d="M39 56 H65" stroke="currentColor" stroke-width="1" opacity=".55"/><circle cx="72" cy="12" r="7" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M69 12 L71.4 14.4 L75.2 10.4" stroke="#128A5A" stroke-width="1.4" fill="none"/></svg></span>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- ===== Conception de plans sur mesure — accès depuis l'accueil ===== -->
-<section class="accueil-conception" id="conception-accueil">
-  <div class="wrap">
-    <article class="cnx-card">
-      <div class="cnx-media">
-        <img src="/wp-content/themes/urbizen-child/assets/images/conception/conception-maison-contemporaine-parement-pierre-card.webp"
-             width="800" height="450" loading="lazy" decoding="async" draggable="false"
-             alt="Rendu 3D d'une maison contemporaine avec parement pierre, pergolas et piscine.">
-      </div>
-      <div class="cnx-body">
-        <span class="parcours-k">Nouveau</span>
-        <h2>Conception de plans sur mesure</h2>
-        <p>Maison, extension ou aménagement&nbsp;: décrivez votre projet et recevez une proposition adaptée à vos besoins.</p>
-        <a class="btn btn-primary" href="/conception/">Démarrer mon projet</a>
-      </div>
-    </article>
+    <ol class="steps">
+      <li class="step"><span class="step-n">1</span><h3>Vous décrivez votre projet</h3></li>
+      <li class="step"><span class="step-n">2</span><h3>Vous transmettez les documents disponibles</h3></li>
+      <li class="step"><span class="step-n">3</span><h3>Urbizen prépare et vérifie votre dossier</h3></li>
+      <li class="step"><span class="step-n">4</span><h3>Vous recevez les documents prêts à être déposés</h3></li>
+    </ol>
   </div>
 </section>
 
@@ -310,7 +306,7 @@
 <section class="locate" id="localisation">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Étape 1</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Lieu de ma demande de travaux</span></span>
       <h2>Commencez par localiser votre projet</h2>
       <p>Indiquez l'adresse du terrain pour retrouver la parcelle cadastrale et préparer les premières informations de votre dossier.</p>
     </div>
@@ -325,21 +321,21 @@
 <section class="projet" id="projet">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Étape 2</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Type de travaux concernés par la demande</span></span>
       <h2>Quel est votre projet&nbsp;?</h2>
       <p>Sélectionnez la nature de votre projet. Nous confirmons la démarche adaptée après étude.</p>
     </div>
     <div class="projet-grid" role="group" aria-label="Type de projet">
-      <button type="button" class="pcard" data-projet="piscine"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="7.5" width="19" height="11" rx="3"/><path d="M6 12.2q1.6-1.3 3.2 0t3.2 0"/><path d="M6 15.4q1.6-1.3 3.2 0t3.2 0"/><path d="M16.8 5.5v7"/><path d="M19.6 5.5v7"/><path d="M16.8 8h2.8"/><path d="M16.8 10.4h2.8"/></svg></span><span class="pcard-t">Piscine</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="extension"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 19.5v-8l4.5-3.5 4.5 3.5v8"/><path d="M11.5 19.5v-6.6h9v6.6z" fill="#54CF99" fill-opacity=".45"/><path d="M10.3 12.9L16 9.7l5.7 3.2"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Extension</span><span class="pcard-d">Étude du projet nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="garage"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 19.5v-8l8.5-4.5 8.5 4.5v8"/><rect x="7.5" y="13" width="9" height="6.5"/><path d="M7.5 15.2h9"/><path d="M7.5 17.3h9"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Garage</span><span class="pcard-d">Déclaration ou permis selon surface</span></button>
-      <button type="button" class="pcard" data-projet="abri"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6.5 19.5V11.2"/><path d="M17.5 19.5V13.4"/><path d="M5 10.8L19 13.8"/><rect x="9.3" y="14.6" width="4.2" height="4.9"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Abri de jardin</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="pergola"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 20V8.5"/><path d="M19 20V8.5"/><path d="M3 8.5h18"/><path d="M7.5 8.5V5.5"/><path d="M10.5 8.5V5.5"/><path d="M13.5 8.5V5.5"/><path d="M16.5 8.5V5.5"/><path d="M4.5 5.5h15"/></svg></span><span class="pcard-t">Pergola</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="facade"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="6" width="16" height="13.5"/><rect x="6.8" y="13" width="4.2" height="6.5"/><rect x="13.6" y="9.4" width="4.4" height="4.4" fill="#54CF99" fill-opacity=".35"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Modification de façade</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="toiture"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 16.5L12 6l9.5 10.5"/><path d="M4.6 16.5h14.8"/><path d="M4.9 14.2L8.2 10.5l2.5 2.3-3.4 3.7z" fill="#54CF99" fill-opacity=".45"/></svg></span><span class="pcard-t">Toiture / fenêtres de toit</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="solaire"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 17.5l3.2-9h13.6l-3.2 9z"/><path d="M5.2 14h13.2"/><path d="M10.9 8.5L8.6 17.5"/><path d="M15.3 8.5L13 17.5"/></svg></span><span class="pcard-t">Panneaux solaires</span><span class="pcard-d">Déclaration préalable souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="maison"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 11L12 4.5 21.5 11"/><path d="M5 11v8.5h14V11"/><rect x="10.3" y="14.2" width="3.4" height="5.3"/><rect x="6.8" y="12.6" width="2.6" height="2.6"/><rect x="14.6" y="12.6" width="2.6" height="2.6"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Maison individuelle</span><span class="pcard-d">Permis de construire souvent nécessaire</span></button>
-      <button type="button" class="pcard" data-projet="autre"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20l1.2-4.2L16.4 4.6l3 3L8.2 18.8z"/><path d="M14.3 6.7l3 3"/><path d="M5.2 15.8l3 3"/></svg></span><span class="pcard-t">Autre projet</span><span class="pcard-d">Étude du projet nécessaire</span></button>
+      <button type="button" class="pcard" data-projet="piscine"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.5" y="7.5" width="19" height="11" rx="3"/><path d="M6 12.2q1.6-1.3 3.2 0t3.2 0"/><path d="M6 15.4q1.6-1.3 3.2 0t3.2 0"/><path d="M16.8 5.5v7"/><path d="M19.6 5.5v7"/><path d="M16.8 8h2.8"/><path d="M16.8 10.4h2.8"/></svg></span><span class="pcard-t">Piscine</span></button>
+      <button type="button" class="pcard" data-projet="extension"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 19.5v-8l4.5-3.5 4.5 3.5v8"/><path d="M11.5 19.5v-6.6h9v6.6z" fill="#54CF99" fill-opacity=".45"/><path d="M10.3 12.9L16 9.7l5.7 3.2"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Extension</span></button>
+      <button type="button" class="pcard" data-projet="garage"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3.5 19.5v-8l8.5-4.5 8.5 4.5v8"/><rect x="7.5" y="13" width="9" height="6.5"/><path d="M7.5 15.2h9"/><path d="M7.5 17.3h9"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Garage</span></button>
+      <button type="button" class="pcard" data-projet="abri"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6.5 19.5V11.2"/><path d="M17.5 19.5V13.4"/><path d="M5 10.8L19 13.8"/><rect x="9.3" y="14.6" width="4.2" height="4.9"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Abri de jardin</span></button>
+      <button type="button" class="pcard" data-projet="pergola"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 20V8.5"/><path d="M19 20V8.5"/><path d="M3 8.5h18"/><path d="M7.5 8.5V5.5"/><path d="M10.5 8.5V5.5"/><path d="M13.5 8.5V5.5"/><path d="M16.5 8.5V5.5"/><path d="M4.5 5.5h15"/></svg></span><span class="pcard-t">Pergola</span></button>
+      <button type="button" class="pcard" data-projet="facade"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="4" y="6" width="16" height="13.5"/><rect x="6.8" y="13" width="4.2" height="6.5"/><rect x="13.6" y="9.4" width="4.4" height="4.4" fill="#54CF99" fill-opacity=".35"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Modification de façade</span></button>
+      <button type="button" class="pcard" data-projet="toiture"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 16.5L12 6l9.5 10.5"/><path d="M4.6 16.5h14.8"/><path d="M4.9 14.2L8.2 10.5l2.5 2.3-3.4 3.7z" fill="#54CF99" fill-opacity=".45"/></svg></span><span class="pcard-t">Toiture / fenêtres de toit</span></button>
+      <button type="button" class="pcard" data-projet="solaire"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 17.5l3.2-9h13.6l-3.2 9z"/><path d="M5.2 14h13.2"/><path d="M10.9 8.5L8.6 17.5"/><path d="M15.3 8.5L13 17.5"/></svg></span><span class="pcard-t">Panneaux solaires</span></button>
+      <button type="button" class="pcard" data-projet="maison"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M2.5 11L12 4.5 21.5 11"/><path d="M5 11v8.5h14V11"/><rect x="10.3" y="14.2" width="3.4" height="5.3"/><rect x="6.8" y="12.6" width="2.6" height="2.6"/><rect x="14.6" y="12.6" width="2.6" height="2.6"/><path d="M1.5 19.5h21"/></svg></span><span class="pcard-t">Maison individuelle</span></button>
+      <button type="button" class="pcard" data-projet="autre"><span class="pcard-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 20l1.2-4.2L16.4 4.6l3 3L8.2 18.8z"/><path d="M14.3 6.7l3 3"/><path d="M5.2 15.8l3 3"/></svg></span><span class="pcard-t">Autre projet</span></button>
     </div>
     <div class="projet-continue">
       <button type="button" class="btn btn-primary" id="js-continue" disabled>Continuer vers ma demande</button>
@@ -348,31 +344,42 @@
   </div>
 </section>
 
-<!-- ===== Section 5 — Comment ça marche ===== -->
-<section class="methode" id="methode">
+<!-- ===== Section 6 — Services et contenu du dossier ===== -->
+<section class="dossier dossier-services" id="services">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Comment ça marche</span>
-      <h2>Votre dossier en quatre étapes</h2>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Nos services</span></span>
+      <h2>Une prestation adaptée, un dossier complet</h2>
+      <p>Vous choisissez l'accompagnement adapté à votre projet. Urbizen prépare ensuite les plans et les pièces nécessaires à votre demande.</p>
     </div>
-    <ol class="steps">
-      <li class="step"><span class="step-n">01</span><h3>Vous décrivez votre projet</h3><p>Adresse, dimensions, photos et caractéristiques.</p></li>
-      <li class="step"><span class="step-n">02</span><h3>Vous transmettez les documents disponibles</h3><p>Photos de l'existant, croquis, matériaux et informations utiles.</p></li>
-      <li class="step"><span class="step-n">03</span><h3>Urbizen prépare et vérifie votre dossier</h3><p>Formulaire, plans, notice, insertion et pièces nécessaires.</p></li>
-      <li class="step"><span class="step-n">04</span><h3>Vous recevez les documents prêts à être déposés</h3><p>Un dossier clair et structuré, prêt à transmettre à la mairie.</p></li>
-    </ol>
-  </div>
-</section>
 
-<!-- ===== Section 6 — Contenu d'un dossier ===== -->
-<section class="dossier" id="dossier">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Contenu d'un dossier</span>
-      <h2>Un dossier complet, pas seulement un formulaire</h2>
-      <p>Les pièces sont adaptées à la nature de chaque projet et aux exigences applicables.</p>
+    <div class="service-route-grid" aria-label="Prestations Urbizen">
+      <a class="service-route" href="https://urbizen.fr/declarations-prealables/">
+        <span class="service-route-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h7l5 5V21H6z"/><path d="M13 3.5v5h5"/><path d="m9 14 2 2 4-4"/></svg></span>
+        <span class="service-route-copy"><span class="service-route-kicker">Dossier d'urbanisme</span><strong>Déclaration préalable</strong><span>Piscine, extension, garage, façade, clôture…</span></span>
+        <span class="service-route-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="service-route" href="https://urbizen.fr/permis-de-construire/">
+        <span class="service-route-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 3.5l8.5 7.5V21h-17z"/><path d="M9 21v-6h6v6"/></svg></span>
+        <span class="service-route-copy"><span class="service-route-kicker">Dossier d'urbanisme</span><strong>Permis de construire</strong><span>Maison individuelle ou agrandissement.</span></span>
+        <span class="service-route-arrow" aria-hidden="true">→</span>
+      </a>
+      <a class="service-route" href="https://urbizen.fr/conception/">
+        <span class="service-route-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h17v17h-17z"/><path d="M10 3.5V11h10.5M3.5 15h9v5.5M16 15h4.5v5.5H16z"/></svg></span>
+        <span class="service-route-copy"><span class="service-route-kicker">Conception personnalisée</span><strong>Plans sur mesure</strong><span>Des plans adaptés à votre terrain et à vos besoins.</span></span>
+        <span class="service-route-arrow" aria-hidden="true">→</span>
+      </a>
     </div>
-    <div class="planche">
+
+    <div class="dossier-panel" id="dossier">
+      <div class="dossier-panel-head">
+        <div>
+          <span class="code">CONTENU DU DOSSIER</span>
+          <h3>Votre dossier peut comprendre</h3>
+        </div>
+        <p>Les pièces sont sélectionnées selon la nature de votre projet et les exigences applicables.</p>
+      </div>
+      <div class="planche">
       <div class="planche-item"><span class="code">DP1 · PCMI1</span><span class="planche-t">Plan de situation</span>
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 42 L92 28" stroke="currentColor" stroke-width="1.3" opacity=".55"/><path d="M36 64 L50 6" stroke="currentColor" stroke-width="1.3" opacity=".55"/><rect x="56" y="30" width="26" height="20" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M18 16 a8 8 0 1 1 16 0 c0 7 -8 15 -8 15 c0 0 -8 -8 -8 -15 z" fill="#54CF99" stroke="#14233B" stroke-width="1.2"/><circle cx="26" cy="16" r="2.6" fill="#fff"/></svg></span></div>
       <div class="planche-item"><span class="code">DP2 · PCMI2</span><span class="planche-t">Plan de masse</span>
@@ -383,55 +390,106 @@
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 56 L18 30 L47 13 L76 30 L76 56 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M14 32 L47 13 L80 32" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><rect x="30" y="40" width="13" height="16" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="52" y="38" width="13" height="11" fill="#54CF99" fill-opacity=".25" stroke="currentColor" stroke-width="1.3"/><path d="M58.5 38 L58.5 49 M52 43.5 L65 43.5" stroke="currentColor" stroke-width="1"/></svg></span></div>
       <div class="planche-item"><span class="code">DP6 · PCMI6</span><span class="planche-t">Insertion graphique</span>
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="15" r="6" fill="none" stroke="#54CF99" stroke-width="1.2" opacity=".7"/><path d="M2 52 L92 52" stroke="currentColor" stroke-width="1.4"/><path d="M2 52 q22 -7 46 -5 q26 2 44 -3" fill="none" stroke="#128A5A" stroke-width="1.2" opacity=".55"/><path d="M30 52 L30 33 L45 23 L60 33 L60 52 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M30 33 L45 23 L60 33" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.3"/><rect x="40" y="42" width="9" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="76" cy="40" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.3"/><path d="M76 48 L76 52" stroke="currentColor" stroke-width="1.3"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP7 · PCMI7</span><span class="planche-t">Photographie de l'environnement proche</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><path d="M8 45 q15 -9 30 -5 q17 4 48 -5 V59 H8 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.1"/><path d="M29 43 V29 H47 V43" fill="#FBFCFD" stroke="currentColor" stroke-width="1.3"/><path d="M25 29 38 19 51 29" stroke="#128A5A" stroke-width="1.4"/><circle cx="68" cy="25" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.2"/><path d="M68 33 V44" stroke="currentColor" stroke-width="1.2"/><path d="M14 13 h12 M14 13 v8 M80 13 H68 M80 13 v8 M14 53 h12 M14 53 v-8 M80 53 H68 M80 53 v-8" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
+      <div class="planche-item"><span class="code">DP8 · PCMI8</span><span class="planche-t">Photographie du paysage lointain</span>
+        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="80" height="50" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="72" cy="20" r="6" fill="#54CF99" fill-opacity=".35" stroke="#128A5A" stroke-width="1"/><path d="M8 43 25 29 38 39 52 24 86 48" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.2"/><path d="M8 49 q19 -8 37 -3 q18 5 41 -2 V58 H8 Z" fill="#14233B" fill-opacity=".06" stroke="currentColor" stroke-width="1"/><path d="M39 49 V39 H51 V49 M36 39 45 32 54 39" fill="#FBFCFD" stroke="currentColor" stroke-width="1.1"/><path d="M15 15 h11 M15 15 v7 M79 15 H68 M79 15 v7" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
       <div class="planche-item"><span class="code">PCMI4</span><span class="planche-t">Notice descriptive</span>
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="4" width="46" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><rect x="30" y="10" width="24" height="8" fill="#E4F5EC" stroke="#128A5A" stroke-width="1"/><path d="M30 27 H64 M30 33 H64 M30 39 H58 M30 45 H64 M30 51 H52" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="58" cy="51" r="4.5" fill="none" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
       <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span>
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="4" width="50" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M28 13 H66" stroke="#128A5A" stroke-width="1.8"/><rect x="28" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="42" width="7" height="7" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M29.5 45.6 L31.5 47.6 L34.5 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M40 46 H66" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="52" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M40 56 H66" stroke="currentColor" stroke-width="1" opacity=".55"/></svg></span></div>
       <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span>
         <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="6" width="58" height="54" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M25 17 L27.5 19.5 L32 14.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 17 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 28 L27.5 30.5 L32 25.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 28 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 39 L27.5 41.5 L32 36.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 39 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 50 L27.5 52.5 L32 47.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 50 H63" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg></span></div>
+      </div>
     </div>
-  </div>
-</section>
 
-<!-- ===== Section 7 — Prestations + tarifs réels ===== -->
-<section class="prestations" id="services">
-  <div class="wrap">
-    <div class="sec-head">
-      <span class="eyebrow">Nos services</span>
-      <h2>Ce qu'Urbizen prépare pour vous</h2>
-    </div>
-    <div class="presta-grid presta-grid-4">
-      <article class="presta">
-        <h3>Déclaration préalable</h3>
-        <p>Dossier adapté à votre projet avec les plans, documents et pièces nécessaires.</p>
-        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/declarations-prealables/">Découvrir la déclaration préalable</a>
-      </article>
-      <article class="presta featured">
-        <h3>Permis de construire</h3>
-        <p>Préparation du dossier pour une maison individuelle ou un projet soumis à permis.</p>
-        <a class="btn btn-primary btn-sm" href="https://urbizen.fr/permis-de-construire/">Découvrir le permis de construire</a>
-      </article>
-      <article class="presta">
-        <h3>Conception de plans</h3>
-        <p>Avant-projet personnalisé&nbsp;: plans, dimensions, organisation des espaces et modifications prévues dans l'offre.</p>
-        <a class="btn btn-ghost btn-sm" href="https://urbizen.fr/commander-un-dossier/">Faire concevoir mes plans</a>
-      </article>
-      <article class="presta">
-        <h3>Dépôt dématérialisé</h3>
-        <p>Dépôt en ligne proposé en option lorsque la commune dispose d'un guichet numérique compatible.</p>
-        <p class="presta-price"><b>En option</b></p>
-      </article>
-    </div>
+    <aside class="depot-option">
+      <span class="depot-option-check" aria-hidden="true">✓</span>
+      <div><strong>Dépôt dématérialisé en option</strong><span>Urbizen peut aussi déposer votre dossier en ligne lorsque la commune dispose d'un guichet numérique compatible.</span></div>
+    </aside>
 
     <!-- Forfaits réels (repris du site, non inventés) -->
-    <div id="tarifs" class="tarifs">
-      <div class="tarif"><span class="tarif-badge">Déclaration préalable</span><h3>Panneaux solaires</h3><div class="tarif-price">149&nbsp;€</div></div>
-      <div class="tarif featured"><span class="tarif-badge">Le plus demandé</span><h3>Projet standard</h3><div class="tarif-price">249&nbsp;€</div></div>
-      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Projets simples</h3><div class="tarif-price">449&nbsp;€</div></div>
-      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Extension / agrandissement</h3><div class="tarif-price">649&nbsp;€</div></div>
-      <div class="tarif"><span class="tarif-badge">Permis de construire</span><h3>Maison individuelle</h3><div class="tarif-price">849&nbsp;€</div></div>
+    <div class="tarifs-zone">
+    <div class="tarifs-head">
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Tarifs</span></span>
+      <h3>Des forfaits clairs selon votre projet</h3>
+      <p>Le tarif adapté à votre demande vous est confirmé avant toute commande.</p>
     </div>
-    <p class="tarif-note">Tarifs maison individuelle et extension indiqués hors étude BBIO, hors étude thermique / RE2020, hors mission d'architecte, et sous réserve que le projet ne nécessite pas le recours obligatoire à un architecte (généralement au-delà de 150&nbsp;m² de surface de plancher après travaux). Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables.</p>
+    <div id="tarifs" class="tarif-groups">
+      <section class="tarif-group tarif-group-dp" aria-labelledby="tarifs-dp-title">
+        <header class="tarif-group-head">
+          <span class="tarif-group-ref">DP</span>
+          <div><h4 id="tarifs-dp-title">Déclaration préalable</h4><p>Pour les travaux et aménagements, panneaux solaires compris.</p></div>
+        </header>
+        <div class="tarif-offers tarif-offers-3">
+          <article class="tarif">
+            <h4>Projet simple</h4>
+            <span class="tarif-detail">Clôtures, panneaux solaires</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>189&nbsp;€</div>
+          </article>
+          <article class="tarif featured">
+            <span class="tarif-popular">Le plus demandé</span>
+            <h4>Projet standard</h4>
+            <span class="tarif-detail">Autres projets</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>249&nbsp;€</div>
+          </article>
+          <article class="tarif">
+            <h4>Projet important</h4>
+            <span class="tarif-detail">Extension, agrandissement, surélévation</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>549&nbsp;€</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tarif-group tarif-group-pc" aria-labelledby="tarifs-pc-title">
+        <header class="tarif-group-head">
+          <span class="tarif-group-ref">PC</span>
+          <div><h4 id="tarifs-pc-title">Permis de construire</h4><p>Pour les constructions et agrandissements nécessitant un permis.</p></div>
+        </header>
+        <div class="tarif-offers tarif-offers-3">
+          <article class="tarif">
+            <h4>Projet simple</h4>
+            <span class="tarif-detail">Garage, carport…</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>449&nbsp;€</div>
+          </article>
+          <article class="tarif">
+            <h4>Projet standard</h4>
+            <span class="tarif-detail">Extension, agrandissement, surélévation</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>649&nbsp;€</div>
+          </article>
+          <article class="tarif">
+            <h4>Projet important</h4>
+            <span class="tarif-detail">Maison individuelle</span>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>849&nbsp;€</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tarif-group tarif-group-plans" aria-labelledby="tarifs-plans-title">
+        <header class="tarif-group-head">
+          <span class="tarif-group-ref">PS</span>
+          <div><h4 id="tarifs-plans-title">Plans sur mesure</h4><p>Pour concevoir un projet adapté à votre terrain et à vos besoins.</p></div>
+        </header>
+        <div class="tarif-offers tarif-offers-1">
+          <article class="tarif">
+            <h4>Conception personnalisée</h4>
+            <div class="tarif-price"><span class="tarif-from">À partir de</span>249&nbsp;€</div>
+            <span class="tarif-detail">Estimation ajustée dans le formulaire selon les options choisies.</span>
+            <a class="tarif-form-link" href="https://urbizen.fr/conception/">Estimer mon projet <span aria-hidden="true">→</span></a>
+          </article>
+        </div>
+      </section>
+    </div>
+    <aside class="tarif-supplement-global">
+      <span class="tarif-supplement-mark" aria-hidden="true">ABF</span>
+      <div><strong>Secteur Bâtiments de France</strong><span>Supplément applicable aux déclarations préalables et aux permis de construire.</span></div>
+      <b>+80&nbsp;€</b>
+    </aside>
+    <details class="tarif-conditions">
+      <summary>Ce que comprennent les forfaits et conditions</summary>
+      <p>Tarifs maison individuelle et extension indiqués hors étude BBIO, hors étude thermique / RE2020, hors mission d'architecte, et sous réserve que le projet ne nécessite pas le recours obligatoire à un architecte (généralement au-delà de 150&nbsp;m² de surface de plancher après travaux). Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables.</p>
+    </details>
+    </div>
   </div>
 </section>
 
@@ -439,23 +497,21 @@
 <section class="pourquoi-wrap" id="pourquoi">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Pourquoi Urbizen</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Pourquoi Urbizen</span></span>
       <h2>Pourquoi choisir Urbizen&nbsp;?</h2>
       <p>Une prestation claire, humaine et cadrée, du premier échange à la remise de votre dossier.</p>
     </div>
     <div class="espace-band">
       <span class="soon-badge soon-badge-light">Bientôt disponible</span>
       <h2>Tous vos projets réunis dans votre espace Urbizen</h2>
-      <p>Un espace personnel et professionnel est en cours de préparation pour suivre et centraliser vos démarches.</p>
       <ul class="espace-list">
-        <li>Suivi des commandes</li>
-        <li>Documents centralisés</li>
-        <li>Historique des dossiers</li>
-        <li>Échanges avec Urbizen</li>
-        <li>Espace professionnel</li>
-        <li>Formulaires CERFA guidés</li>
+        <li>Un espace dédié aux particuliers</li>
+        <li>Un tableau de bord clair</li>
+        <li>Toutes les informations du projet réunies</li>
+        <li>Un espace pensé pour les professionnels</li>
+        <li>Le suivi de chaque étape du dossier</li>
+        <li>Des échanges centralisés avec Urbizen</li>
       </ul>
-      <p class="espace-note">Ces fonctionnalités ne sont pas encore disponibles&nbsp;: aucune inscription n'est requise pour le moment.</p>
     </div>
     <div class="atouts-grid">
       <div class="atout">
@@ -492,19 +548,69 @@
   </div>
 </section>
 
-<!-- ===== Section 9 — Exemples de dossiers (démonstrations) ===== -->
-<section class="exemples" id="exemples">
+<!-- ===== Section 9 — Futurs guides du blog ===== -->
+<section class="blog-preview" id="conseils">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Exemples de dossiers</span>
-      <h2>À quoi ressemble un dossier préparé</h2>
-      <p>Exemples de démonstration, présentés à titre illustratif.</p>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Le blog Urbizen</span></span>
+      <h2>Comprendre l'urbanisme, simplement</h2>
+      <p>Des guides pratiques pour préparer votre projet et mieux comprendre les démarches à prévoir.</p>
     </div>
-    <div class="exemple-grid">
-      <article class="exemple"><div class="exemple-txt"><span class="demo-flag">Démonstration</span><h3>Projet : piscine</h3><p class="mono">Type : déclaration préalable</p><p class="mono">Pièces : DP1, DP2, DP3, DP6</p></div><div class="exemple-img" aria-hidden="true"><svg viewBox="0 0 104 80" xmlns="http://www.w3.org/2000/svg"><rect x="12" y="26" width="80" height="40" rx="10" fill="none" stroke="#9FADBC" stroke-width="1.2"/><rect x="18" y="30" width="68" height="32" rx="8" fill="#54CF99" fill-opacity="0.45" stroke="#128A5A" stroke-width="1.8"/><path d="M26 42 q6 -3 12 0 t12 0 t12 0" fill="none" stroke="#14233B" stroke-width="1" opacity="0.5"/><path d="M26 50 q6 -3 12 0 t12 0 t12 0" fill="none" stroke="#14233B" stroke-width="1" opacity="0.4"/><path d="M74 45 L74 32 q0 -5 5 -5" fill="none" stroke="#14233B" stroke-width="1.4" stroke-linecap="round"/><path d="M82 45 L82 32 q0 -5 5 -5" fill="none" stroke="#14233B" stroke-width="1.4" stroke-linecap="round"/><line x1="74" y1="34" x2="82" y2="34" stroke="#14233B" stroke-width="1.2"/><line x1="74" y1="38" x2="82" y2="38" stroke="#14233B" stroke-width="1.2"/><line x1="74" y1="42" x2="82" y2="42" stroke="#14233B" stroke-width="1.2"/></svg></div></article>
-      <article class="exemple"><div class="exemple-txt"><span class="demo-flag">Démonstration</span><h3>Projet : façade &amp; toiture</h3><p class="mono">Type : déclaration préalable</p><p class="mono">Pièces : DP1, DP2, DP4</p></div><div class="exemple-img" aria-hidden="true"><svg viewBox="0 0 104 80" xmlns="http://www.w3.org/2000/svg"><line x1="8" y1="66" x2="96" y2="66" stroke="#9FADBC" stroke-width="1.2"/><rect x="28" y="34" width="48" height="32" fill="#FBFCFD" stroke="#14233B" stroke-width="1.5"/><path d="M22 34 L52 14 L82 34 Z" fill="#54CF99" fill-opacity="0.45" stroke="#14233B" stroke-width="1.5"/><rect x="46" y="50" width="12" height="16" fill="#14233B" fill-opacity="0.85"/><rect x="33" y="40" width="10" height="9" fill="none" stroke="#14233B" stroke-width="1.2"/><rect x="61" y="40" width="10" height="9" fill="none" stroke="#14233B" stroke-width="1.2"/></svg></div></article>
-      <article class="exemple"><div class="exemple-txt"><span class="demo-flag">Démonstration</span><h3>Projet : extension</h3><p class="mono">Type : DP ou permis selon surface</p><p class="mono">Pièces : DP1, DP2, DP3, DP4, DP6</p></div><div class="exemple-img" aria-hidden="true"><svg viewBox="0 0 104 80" xmlns="http://www.w3.org/2000/svg"><line x1="6" y1="66" x2="98" y2="66" stroke="#9FADBC" stroke-width="1.2"/><rect x="18" y="34" width="36" height="32" fill="#FBFCFD" stroke="#14233B" stroke-width="1.5"/><path d="M13 34 L36 16 L59 34 Z" fill="none" stroke="#14233B" stroke-width="1.4"/><rect x="30" y="50" width="11" height="16" fill="#14233B" fill-opacity="0.8"/><rect x="54" y="44" width="32" height="22" fill="#54CF99" fill-opacity="0.4" stroke="#128A5A" stroke-width="1.8"/><path d="M52 44 L70 34 L88 44" fill="none" stroke="#128A5A" stroke-width="1.6"/></svg></div></article>
-      <article class="exemple"><div class="exemple-txt"><span class="demo-flag">Démonstration</span><h3>Projet : maison individuelle</h3><p class="mono">Type : permis de construire</p><p class="mono">Pièces : PCMI1 à PCMI6 + notice</p></div><div class="exemple-img" aria-hidden="true"><svg viewBox="0 0 104 80" xmlns="http://www.w3.org/2000/svg"><line x1="6" y1="64" x2="98" y2="64" stroke="#9FADBC" stroke-width="1.2"/><path d="M64 38 L80 30 L80 56 L64 64 Z" fill="#14233B" fill-opacity="0.12" stroke="#14233B" stroke-width="1.4"/><rect x="30" y="38" width="34" height="26" fill="#FBFCFD" stroke="#14233B" stroke-width="1.5"/><path d="M26 38 L47 22 L68 38 Z" fill="#54CF99" fill-opacity="0.5" stroke="#14233B" stroke-width="1.4"/><path d="M68 38 L47 22 L80 30 Z" fill="#54CF99" fill-opacity="0.3" stroke="#14233B" stroke-width="1.4"/><rect x="56" y="18" width="6" height="12" fill="#14233B" fill-opacity="0.8"/><rect x="41" y="50" width="10" height="14" fill="#14233B" fill-opacity="0.85"/><rect x="33" y="43" width="8" height="7" fill="none" stroke="#14233B" stroke-width="1.2"/></svg></div></article>
+    <div class="blog-preview-grid" aria-label="Prochains guides Urbizen">
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/autorisation-dp-permis.webp" alt="Maquette de maison et plans d'architecte" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Autorisations</span><b>01</b></div>
+          <h3>DP ou permis de construire&nbsp;: lequel faut-il pour votre projet&nbsp;?</h3>
+        </div>
+      </article>
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/extension-maison.webp" alt="Extension contemporaine reliée à une maison en pierre" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Extension de maison</span><b>02</b></div>
+          <h3>Extension de maison&nbsp;: 5 vérifications avant de dessiner les plans</h3>
+        </div>
+      </article>
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/piscine-garage-carport.webp" alt="Piscine et carport d'une maison individuelle" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Piscine, garage &amp; carport</span><b>03</b></div>
+          <h3>Piscine, garage, carport&nbsp;: les seuils qui changent votre autorisation</h3>
+        </div>
+      </article>
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/plu-terrain.webp" alt="Vue aérienne d'un terrain situé dans une zone résidentielle" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Règles d'urbanisme</span><b>04</b></div>
+          <h3>PLU&nbsp;: ce que vous pouvez vraiment construire sur votre terrain</h3>
+        </div>
+      </article>
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/erreurs-dossier-urbanisme.webp" alt="Vérification attentive d'un dossier et de plans d'urbanisme" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Conseils pratiques</span><b>05</b></div>
+          <h3>Dossier d'urbanisme&nbsp;: 7 erreurs qui peuvent retarder l'accord</h3>
+        </div>
+      </article>
+      <article class="blog-preview-card">
+        <figure class="blog-preview-media">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/delais-urbanisme.webp" alt="Calendrier, horloge et dossier de projet architectural" loading="lazy" decoding="async">
+        </figure>
+        <div class="blog-preview-content">
+          <div class="blog-preview-meta"><span>Délais &amp; démarches</span><b>06</b></div>
+          <h3>Délais d'urbanisme&nbsp;: quand pouvez-vous vraiment commencer les travaux&nbsp;?</h3>
+        </div>
+      </article>
     </div>
   </div>
 </section>
@@ -524,34 +630,33 @@
   </div>
 </section>
 
-<!-- ===== Section 11 — FAQ ===== -->
-<section class="faq-wrap" id="faq">
-  <div class="wrap">
-    <div class="sec-head center">
-      <span class="eyebrow">Questions fréquentes</span>
-      <h2>Vos questions les plus courantes</h2>
-    </div>
-    <div class="faq">
-      <details><summary>Ai-je besoin d'une déclaration préalable ou d'un permis&nbsp;?</summary><div class="a">Cela dépend de la nature du projet, des surfaces créées, de l'aspect extérieur et des règles d'urbanisme de votre commune. Nous étudions votre projet pour vous indiquer la démarche adaptée.</div></details>
-      <details><summary>Quels documents dois-je fournir&nbsp;?</summary><div class="a">En général : adresse du terrain, photos de l'existant, dimensions du projet, implantation souhaitée, croquis éventuel, matériaux et aspect extérieur prévus.</div></details>
-      <details><summary>Travaillez-vous partout en France&nbsp;?</summary><div class="a">Le service est proposé à distance partout en France métropolitaine.</div></details>
-      <details><summary>Le service est-il entièrement à distance&nbsp;?</summary><div class="a">Oui. Vous transmettez les informations, photos, dimensions et documents utiles en ligne, et le dossier est préparé à distance.</div></details>
-      <details><summary>Réalisez-vous les plans&nbsp;?</summary><div class="a">Oui, les plans et pièces graphiques du dossier standard sont réalisés par Urbizen dans le cadre d'une mission administrative et graphique, hors maîtrise d'œuvre.</div></details>
-      <details><summary>Le dépôt en mairie est-il inclus&nbsp;?</summary><div class="a">Vous recevez un dossier prêt à déposer. Le dépôt s'effectue de votre côté, sur le guichet dématérialisé ou en mairie.</div></details>
-      <details><summary>Que se passe-t-il si la mairie demande une pièce complémentaire&nbsp;?</summary><div class="a">Les demandes de pièces complémentaires liées au dossier préparé sont traitées jusqu'à l'accord du dossier.</div></details>
-      <details><summary>L'accord de la mairie est-il garanti&nbsp;?</summary><div class="a">Non. L'accord dépend de l'instruction de la mairie et des règles d'urbanisme applicables à votre terrain.</div></details>
-    </div>
-  </div>
-</section>
-
-<!-- ===== Section 12 — CTA final ===== -->
+<!-- ===== Section 11 — CTA final ===== -->
 <section class="cta-final">
   <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Parlons de votre projet</span></span>
+    </div>
     <div class="cta-band">
       <h2>Prêt à faire avancer votre projet&nbsp;?</h2>
       <p>Présentez-nous votre projet et recevez une réponse adaptée à votre démarche.</p>
-      <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
-      <p class="cta-soon">CERFA gratuit et espaces personnels prochainement disponibles.</p>
+      <div class="cta-actions">
+        <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+        <button class="btn btn-contact js-toggle-inquiry" type="button" aria-expanded="false" aria-controls="cta-inquiry-form">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5.5h16v13H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          <span>Demander des renseignements</span>
+        </button>
+      </div>
+      <div id="cta-inquiry-form" class="cta-inquiry-panel" hidden>
+        <div class="cta-inquiry-head">
+          <h3>Votre demande de renseignements</h3>
+          <p>Posez votre question&nbsp;: Urbizen vous répond sous 24&nbsp;heures ouvrées.</p>
+        </div>
+<!-- /wp:html -->
+
+<!-- wp:fluentfom/guten-block {"formId":"5"} /-->
+
+<!-- wp:html -->
+      </div>
     </div>
   </div>
 </section>
