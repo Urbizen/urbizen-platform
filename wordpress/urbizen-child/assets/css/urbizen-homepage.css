@@ -611,7 +611,19 @@ html { scroll-behavior: smooth; }
    341–369 px déborder. */
 @media (max-width: 380px) {
   .urbizen-accueil .nav-right { display: contents; }
-  .urbizen-accueil .nav { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; }
+  /* La barre porte deux hauteurs fixes selon la largeur — 70px en général,
+     62px sous 420px. Une hauteur fixe et un retour à la ligne s'excluent : la
+     seconde ligne sortait de la boîte de l'en-tête et venait recouvrir ce qui
+     se trouvait dessous, jusqu'au lanceur de chat. Défaut trouvé en recette de
+     production, et présent de longue date à 320 et 340 px.
+     Dans ce seul palier, la hauteur revient donc au contenu : deux rangées de
+     44px et 6px d'interligne, soit 94px. `header.site` n'a pas de hauteur
+     propre — il suit, et le contenu de la page avec lui.
+     La `min-height` est un plancher de sûreté, pas une contrainte active : le
+     CTA occupant toujours sa propre ligne ici, le contenu fait 94px et ne passe
+     jamais sous 62. Elle ne servirait qu'à une mise en page future revenue à
+     une seule rangée. */
+.urbizen-accueil .nav { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; height: auto; min-height: 62px; }
   .urbizen-accueil .nav .logo { order: 1; }
   .urbizen-accueil .nav-right .link-tel { order: 2; }
   .urbizen-accueil .nav-right .link-login { order: 3; }

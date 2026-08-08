@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc de géométrie de l'en-tête</title>
+<!--
+  Page de mesure, chargée par `test-geometrie-entete.py` dans un Chrome sans
+  interface. Elle charge la maquette réelle dans une iframe de même origine,
+  lui impose une largeur, puis relève des rectangles réels via
+  `getBoundingClientRect()`. Le résultat est écrit dans `#resultat`, d'où le
+  banc l'extrait après `--dump-dom`.
+
+  Elle ne décide de rien : elle mesure. Les verdicts sont dans le banc Python.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style>
+</head>
+<body>
+<pre id="resultat">EN COURS</pre>
+<script>
+const VIEWPORTS = [320, 340, 341, 360, 375, 379, 380, 381, 390, 430, 1100, 1101, 1280];
+
+/** Sélecteur de tout ce qui peut recevoir un doigt ou le focus. */
+const INTERACTIFS = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+
+const rect = ( el ) => {
+	const r = el.getBoundingClientRect();
+	return { x: +r.left.toFixed(1), y: +r.top.toFixed(1), w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+		bas: +(r.top + r.height).toFixed(1), droite: +(r.left + r.width).toFixed(1) };
+};
+
+const visible = ( el, vue ) => {
+	const s = vue.getComputedStyle( el );
+	if ( 'none' === s.display || 'hidden' === s.visibility || '0' === s.opacity ) { return false; }
+	const r = el.getBoundingClientRect();
+	return r.width > 0 && r.height > 0;
+};
+
+const croise = ( a, b ) => ! ( a.droite <= b.x + 0.01 || b.droite <= a.x + 0.01
+	|| a.bas <= b.y + 0.01 || b.bas <= a.y + 0.01 );
+
+/** Étiquette lisible d'un élément, pour que l'échec se lise sans ouvrir le DOM. */
+const nom = ( el ) => {
+	const cl = ( el.className || '' ).toString().trim().split( /\s+/ ).filter( Boolean ).slice( 0, 2 ).join( '.' );
+	return el.tagName.toLowerCase() + ( cl ? '.' + cl : '' );
+};
+
+/**
+ * Mesure la maquette, servie soit par sa feuille source, soit par l'artefact
+ * porté que WordPress déploie réellement.
+ *
+ * Les deux doivent donner le même résultat : `scope-css.py` ne fait que
+ * préfixer. Mesurer les deux évite qu'une correction vraie dans la source et
+ * absente du généré — ou l'inverse — passe inaperçue. C'est le fichier porté
+ * que la production sert.
+ */
+async function mesurer( feuillePortee ) {
+	const f = document.createElement( 'iframe' );
+	f.style.cssText = 'position:fixed;left:-20000px;top:0;height:900px;border:0;';
+	f.src = '/frontend/homepage/index.html';
+	document.body.appendChild( f );
+
+	await new Promise( ( r ) => f.addEventListener( 'load', r, { once: true } ) );
+
+	const d = f.contentDocument, vue = f.contentWindow;
+
+	if ( feuillePortee ) {
+		const lien = [ ...d.querySelectorAll( 'link[rel=stylesheet]' ) ]
+			.find( ( l ) => l.getAttribute( 'href' ).endsWith( 'homepage.css' ) );
+		if ( ! lien ) { throw new Error( 'feuille homepage.css introuvable dans la maquette' ); }
+		lien.href = '/wordpress/urbizen-child/assets/css/urbizen-homepage.css';
+		d.body.classList.add( 'urbizen-accueil' );
+		await new Promise( ( r ) => { lien.addEventListener( 'load', r, { once: true } ); setTimeout( r, 3000 ); } );
+	}
+
+	// Les polices distantes changent la largeur du CTA. On les attend, sans en
+	// dépendre : les invariants mesurés sont verticaux et topologiques.
+	await Promise.race( [ d.fonts.ready, new Promise( ( r ) => setTimeout( r, 4000 ) ) ] );
+
+	const sortie = { polices: d.fonts.status, portee: !! feuillePortee, viewports: [] };
+
+	// Le lanceur de chat est injecté par un tiers, après chargement. Il n'existe
+	// pas dans le dépôt : on constate son absence plutôt que de la supposer.
+	const chat = d.querySelector( '[class*="launcher"], [id*="launcher"], [class*="chat-widget"]' );
+	sortie.chat = chat ? nom( chat ) : null;
+
+	for ( const largeur of VIEWPORTS ) {
+		f.style.width = largeur + 'px';
+		d.documentElement.offsetHeight; // provoque le recalcul
+
+		const entete = d.querySelector( 'header.site' );
+		const nav    = d.querySelector( '.nav' );
+		const hero   = d.querySelector( '.hero' ) || d.querySelector( 'main' );
+
+		const cibles = {
+			'téléphone':     d.querySelector( '.link-tel' ),
+			'Espace client': d.querySelector( '.link-login' ),
+			'CTA':           d.querySelector( '.nav-right .js-start' ),
+			'burger':        d.querySelector( '.burger' ),
+		};
+
+		const rEntete = rect( entete );
+		const rNav    = rect( nav );
+
+		const mesures = {}, hors = [], invisibles = [];
+
+		for ( const [ etiquette, el ] of Object.entries( cibles ) ) {
+			if ( ! el ) { invisibles.push( etiquette ); continue; }
+			const vu = visible( el, vue );
+			const r  = rect( el );
+			mesures[ etiquette ] = Object.assign( { visible: vu }, r );
+
+			// Une cible qui dépasse le bas de la boîte de l'en-tête déborde sur la
+			// page : c'est le défaut trouvé en recette de production.
+			if ( vu && r.bas > rEntete.bas + 0.5 ) {
+				hors.push( { cible: etiquette, depasse: +( r.bas - rEntete.bas ).toFixed(1) } );
+			}
+		}
+
+		// Chevauchements entre les contrôles de l'en-tête.
+		const entreCibles = [];
+		const listeVues = Object.entries( mesures ).filter( ( [ , m ] ) => m.visible );
+		for ( let i = 0; i < listeVues.length; i++ ) {
+			for ( let j = i + 1; j < listeVues.length; j++ ) {
+				if ( croise( listeVues[ i ][ 1 ], listeVues[ j ][ 1 ] ) ) {
+					entreCibles.push( listeVues[ i ][ 0 ] + ' ∩ ' + listeVues[ j ][ 0 ] );
+				}
+			}
+		}
+
+		// Chevauchements entre un contrôle de l'en-tête et tout autre élément
+		// interactif visible de la page.
+		const autres = [ ...d.querySelectorAll( INTERACTIFS ) ]
+			.filter( ( el ) => ! entete.contains( el ) && visible( el, vue ) );
+
+		const avecPage = [];
+		for ( const [ etiquette, m ] of listeVues ) {
+			for ( const el of autres ) {
+				if ( croise( m, rect( el ) ) ) {
+					avecPage.push( etiquette + ' ∩ ' + nom( el ) );
+				}
+			}
+		}
+
+		sortie.viewports.push( {
+			largeur,
+			entete: rEntete,
+			nav: rNav,
+			navHauteurCalculee: vue.getComputedStyle( nav ).height,
+			navMinHeight: vue.getComputedStyle( nav ).minHeight,
+			navFlexWrap: vue.getComputedStyle( nav ).flexWrap,
+			enteteDepasseParNav: +( rNav.bas - rEntete.bas ).toFixed(1),
+			suivant: hero ? rect( hero ) : null,
+			cibles: mesures,
+			horsEntete: hors,
+			chevauchementsCibles: entreCibles,
+			chevauchementsPage: [ ...new Set( avecPage ) ],
+			manquantes: invisibles,
+			clientWidth: d.documentElement.clientWidth,
+			scrollWidth: d.documentElement.scrollWidth,
+		} );
+	}
+
+	f.remove();
+
+	return sortie;
+}
+
+( async () => {
+	const source = await mesurer( false );
+	const portee = await mesurer( true );
+	document.getElementById( 'resultat' ).textContent =
+		'JSON:' + JSON.stringify( { source: source, portee: portee } );
+} )().catch( ( e ) => {
+	document.getElementById( 'resultat' ).textContent = 'ERREUR:' + ( e && e.message ? e.message : e );
+} );
+</script>
+</body>
+</html>

@@ -57,7 +57,7 @@ titre "2/7 — En-tête et centre de contact"
 "$PHP_BIN" test-entete.php
 verdict $? "test-entete.php"
 
-titre "3/7 — Cibles tactiles de l'en-tête mobile"
+titre "3/7 — Cibles tactiles de l'en-tête mobile (cascade CSS)"
 "$PHP_BIN" test-cibles-tactiles.php
 verdict $? "test-cibles-tactiles.php"
 
@@ -84,9 +84,28 @@ titre "Portage CSS — scope-css.py"
 "$PY_BIN" test-scope-css.py
 verdict $? "test-scope-css.py"
 
+# La cascade CSS ne dit pas tout. Une règle peut viser le bon sélecteur dans le
+# bon palier et le résultat visuel rester faux, parce que la mise en page dépend
+# de hauteurs et de positions qu'aucune lecture de feuille ne donne. C'est ainsi
+# qu'un CTA replié est sorti de l'en-tête et est venu recouvrir le lanceur de
+# chat, en production, avec 428 contrôles au vert. Ce banc mesure pour de bon.
+titre "Géométrie de l'en-tête — mesure dans un moteur de rendu"
+"$PY_BIN" test-geometrie-entete.py
+code_geometrie=$?
+if [ "$code_geometrie" -eq 2 ]; then
+	printf '\033[33m⚠ test-geometrie-entete.py NON EXÉCUTÉ (Chrome absent) — ce n'"'"'est pas un succès\033[0m\n'
+	prerequis_absents=1
+else
+	verdict $code_geometrie "test-geometrie-entete.py"
+fi
+
 printf '\n'
+if [ "${prerequis_absents:-0}" -eq 1 ] && [ "$echecs" -eq 0 ]; then
+	printf '\033[33m8 bancs passent, 1 banc NON EXÉCUTÉ (prérequis absent).\033[0m\n'
+	exit 2
+fi
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 8 bancs passent.\033[0m\n'
+	printf '\033[32mLes 9 bancs passent.\033[0m\n'
 	exit 0
 fi
 
