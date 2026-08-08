@@ -58,6 +58,15 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 	protected const BAREME = PricingProjets::class;
 
 	/**
+	 * Régime d'autorisation servi par ce parcours, au sens de
+	 * {@see QualificationUrbanisme}. Chaîne vide : le parcours ne sert aucun
+	 * régime — la conception, par exemple — et ne peut donc rien contredire.
+	 *
+	 * @var string
+	 */
+	protected const REGIME = '';
+
+	/**
 	 * Les adresses que ce parcours exige, par rôle.
 	 *
 	 * Vide par défaut : un parcours qui ne dit rien n'exige rien, et une adresse
@@ -152,7 +161,101 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 			$vus[ $nature ] = true;
 		}
 
+		$erreurs += $this->regime_incompatible( $clean );
+
 		return $erreurs;
+	}
+
+	/**
+	 * Le régime déclaré est-il manifestement incompatible avec le projet décrit ?
+	 *
+	 * Le navigateur n'est pas une barrière. Avant ce contrôle, une extension de
+	 * soixante mètres carrés traversait tout le formulaire de déclaration
+	 * préalable sans qu'une seule vérification ne s'y oppose — `sp_creee` n'avait
+	 * qu'un `min: 0`, et aucune règle métier ne regardait les surfaces. Le
+	 * dossier partait en mairie sous un régime que le Code de l'urbanisme ne
+	 * permettait pas.
+	 *
+	 * Ce contrôle ne rejette QUE ce qui est certain. `QualificationUrbanisme`
+	 * distingue une conclusion d'une hypothèse : tant qu'une donnée manque, elle
+	 * rend « à confirmer », et rien n'est bloqué. Seule une conclusion opposée au
+	 * régime du formulaire arrête la soumission. Douter n'est pas refuser.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, string>
+	 */
+	private function regime_incompatible( array $clean ): array {
+		$regime = static::REGIME;
+
+		if ( '' === $regime ) {
+			return array();
+		}
+
+		$verdict = QualificationUrbanisme::qualifier( $this->donnees_qualification( $clean ) );
+
+		if ( QualificationUrbanisme::DP !== $verdict['status'] && QualificationUrbanisme::PCMI !== $verdict['status'] ) {
+			// « à confirmer », « aucune formalité » ou « conception » : le moteur
+			// n'a pas conclu contre ce formulaire, il n'a pas conclu du tout.
+			return array();
+		}
+
+		if ( $verdict['status'] === $regime ) {
+			return array();
+		}
+
+		$vers = QualificationUrbanisme::PCMI === $verdict['status']
+			? __( 'un permis de construire', 'urbizen-platform' )
+			: __( 'une déclaration préalable', 'urbizen-platform' );
+
+		return array(
+			'regime' => sprintf(
+				/* translators: 1: régime déterminé, 2: motif, 3: article du code de l'urbanisme */
+				__( 'D’après les surfaces indiquées, ce projet relève %1$s. %2$s (%3$s) Urbizen reprend contact pour vous orienter vers le bon dossier.', 'urbizen-platform' ),
+				$vers,
+				$verdict['reason'],
+				(string) $verdict['rule']
+			),
+		);
+	}
+
+	/**
+	 * Traduit une charge de formulaire en données de qualification.
+	 *
+	 * Les noms diffèrent de part et d'autre : le formulaire parle de `nature`,
+	 * le moteur de `projet`. Cette table est le seul endroit qui les rapproche.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, mixed>
+	 */
+	private function donnees_qualification( array $clean ): array {
+		$natures = array(
+			'extension'           => 'extension',
+			'garage'              => 'garage',
+			'annexe_garage'       => 'garage',
+			'abri_annexe'         => 'abri',
+			'piscine'             => 'piscine',
+			'maison_individuelle' => 'maison',
+		);
+
+		$nature = $this->chaine( $clean['nature_projet'] ?? '' );
+
+		if ( ! isset( $natures[ $nature ] ) ) {
+			return array();
+		}
+
+		$donnees = array( 'projet' => $natures[ $nature ] );
+
+		foreach ( array( 'sp_creee', 'sp_totale', 'emprise_creee' ) as $champ ) {
+			if ( isset( $clean[ $champ ] ) && '' !== $clean[ $champ ] ) {
+				$donnees[ $champ ] = $clean[ $champ ];
+			}
+		}
+
+		if ( isset( $clean['bassin_surface'] ) && '' !== $clean['bassin_surface'] ) {
+			$donnees['bassin_m2'] = $clean['bassin_surface'];
+		}
+
+		return $donnees;
 	}
 
 	/**
