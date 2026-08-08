@@ -16,6 +16,7 @@ set -uo pipefail
 cd "$(dirname "$0")"
 
 PHP_BIN="${PHP_BIN:-php}"
+PY_BIN="${PY_BIN:-python3}"
 NODE_BIN="${NODE_BIN:-node}"
 echecs=0
 
@@ -28,15 +29,31 @@ verdict() {
 command -v "$PHP_BIN" >/dev/null 2>&1 || { echo "PHP introuvable (PHP_BIN=$PHP_BIN)."; exit 2; }
 command -v "$NODE_BIN" >/dev/null 2>&1 || { echo "Node introuvable (NODE_BIN=$NODE_BIN)."; exit 2; }
 
-titre "1/2 — Moteur serveur"
+titre "1/3 — Moteur serveur"
 "$PHP_BIN" test-qualification.php
 verdict $? "test-qualification.php"
 
-titre "2/2 — Moteur navigateur, et son équivalence avec le serveur"
+titre "2/3 — Moteur navigateur, et son équivalence avec le serveur"
 "$NODE_BIN" test-qualification.mjs
 verdict $? "test-qualification.mjs"
 
+# Le moteur peut être juste et le tunnel décider quand même trop tôt : c'est
+# exactement la lacune qui a produit le défaut de la PR #56. Ce banc rejoue
+# l'enchaînement réel des questions dans un moteur de rendu.
+titre "3/3 — Tunnel de qualification, rejoué dans un navigateur"
+"$PY_BIN" test-tunnel.py
+code_tunnel=$?
+if [ "$code_tunnel" -eq 2 ]; then
+	printf '\033[33m⚠ test-tunnel.py NON EXÉCUTÉ (Chrome absent) — ce n'"'"'est pas un succès\033[0m\n'
+	prerequis_absents=1
+else
+	verdict $code_tunnel "test-tunnel.py"
+fi
+
 printf '\n'
-if [ "$echecs" -eq 0 ]; then printf '\033[32mLes 2 bancs passent.\033[0m\n'; exit 0; fi
+if [ "${prerequis_absents:-0}" -eq 1 ] && [ "$echecs" -eq 0 ]; then
+	printf '\033[33m2 bancs passent, 1 banc NON EXÉCUTÉ (prérequis absent).\033[0m\n'; exit 2
+fi
+if [ "$echecs" -eq 0 ]; then printf '\033[32mLes 3 bancs passent.\033[0m\n'; exit 0; fi
 printf '\033[31m%s banc(s) en échec.\033[0m\n' "$echecs"
 exit 1

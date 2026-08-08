@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc du tunnel de qualification</title>
+<!--
+  Page de mesure chargée par `test-tunnel.py` dans un Chrome sans interface.
+
+  Le moteur est couvert hors navigateur, et son équivalence serveur prouvée.
+  Ce qui ne l'était pas, c'est l'orchestration : l'enchaînement réel des
+  questions, et surtout l'absence de redirection avant conclusion. C'est
+  exactement le type de lacune qui a produit le défaut de la PR #56 — des
+  règles justes, une orchestration non mesurée.
+
+  On ne suit jamais la redirection : on lit `data-statut` et l'état du bouton.
+  Suivre le lien ferait quitter la page et perdrait la mesure.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style>
+</head>
+<body>
+<pre id="resultat">EN COURS</pre>
+<script>
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function page() {
+	const f = document.createElement("iframe");
+	f.style.cssText = "position:fixed;left:-20000px;top:0;width:390px;height:900px;border:0;";
+	f.src = "/frontend/homepage/index.html";
+	document.body.appendChild(f);
+	await new Promise((r) => f.addEventListener("load", r, { once: true }));
+	const d = f.contentDocument;
+	await Promise.race([d.fonts.ready, attendre(3000)]);
+	f.contentWindow.__err = [];
+	f.contentWindow.addEventListener("error", (e) => f.contentWindow.__err.push(e.message));
+	/* Aucune navigation ne doit partir avant conclusion : on intercepte pour
+	   l'observer plutôt que de la subir. */
+	f.contentWindow.__nav = [];
+	return f;
+}
+
+function etat(f) {
+	const d = f.contentDocument;
+	const btn = d.getElementById("js-continue");
+	const zone = d.getElementById("js-qualification");
+	const q = zone && !zone.hidden ? zone.querySelector(".qualif-libelle") : null;
+	return {
+		statut: btn.getAttribute("data-statut"),
+		bouton: btn.textContent.trim(),
+		desactive: btn.disabled,
+		message: (d.getElementById("js-continue-hint") || {}).textContent || "",
+		question: q ? q.textContent.trim() : null,
+		questionVisible: !!(zone && !zone.hidden),
+		navigations: f.contentWindow.__nav.slice(),
+		erreurs: f.contentWindow.__err.slice()
+	};
+}
+
+/** Choisit un projet, puis répond aux questions selon un scénario. */
+async function jouer(f, projet, reponses) {
+	const d = f.contentDocument;
+	const carte = d.querySelector('.pcard[data-projet="' + projet + '"]');
+	if (!carte) { return { absente: true }; }
+	carte.click();
+	await attendre(60);
+
+	const posees = [];
+	for (let i = 0; i < 12; i++) {
+		const e = etat(f);
+		if (!e.questionVisible) { break; }
+		const zone = d.getElementById("js-qualification");
+		const libelle = zone.querySelector(".qualif-libelle").textContent.trim();
+		posees.push(libelle);
+
+		/* On répond par le libellé du bouton, ou par la valeur saisie : le
+		   scénario ignore les noms de champs internes, comme un visiteur. */
+		const rep = reponses[posees.length - 1];
+		if (rep === undefined) { break; }
+
+		const boutons = [...zone.querySelectorAll(".qualif-choix .btn")];
+		if (boutons.length) {
+			const cible = boutons.find((b) => b.textContent.trim() === rep) || boutons[0];
+			cible.click();
+		} else {
+			const champ = zone.querySelector(".qualif-champ");
+			champ.value = String(rep);
+			zone.querySelector(".btn").click();
+		}
+		await attendre(60);
+	}
+
+	return Object.assign(etat(f), { posees: posees });
+}
+
+(async () => {
+	const sortie = { scenarios: [] };
+	const f = await page();
+
+	const scenarios = [
+		{ nom: "extension DP certaine", projet: "extension", reponses: ["15"] },
+		{ nom: "extension PC certaine", projet: "extension", reponses: ["60"] },
+		{ nom: "extension zone U inconnue", projet: "extension", reponses: ["30", "Je ne sais pas"] },
+		{ nom: "garage accolé", projet: "garage", reponses: ["Accolée", "15", "Non"] },
+		{ nom: "garage indépendant sans formalité", projet: "garage", reponses: ["Indépendante", "4", "Non", "2.5"] },
+		{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "Non", "2.5"] },
+		{ nom: "garage indépendant PC", projet: "garage", reponses: ["Indépendante", "30"] },
+		{ nom: "abri secteur inconnu", projet: "abri", reponses: ["Indépendante", "12", "Je ne sais pas"] },
+		{ nom: "abri sans formalité", projet: "abri", reponses: ["Indépendante", "4", "Non", "2"] },
+		{ nom: "abri PC", projet: "abri", reponses: ["Indépendante", "25"] },
+		{ nom: "piscine sans formalité", projet: "piscine", reponses: ["8", "Non", "Non"] },
+		{ nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"] },
+		{ nom: "piscine PC", projet: "piscine", reponses: ["120"] },
+		{ nom: "pergola autonome", projet: "pergola", reponses: ["Indépendante", "12", "Non", "2.4"] },
+		{ nom: "transformation garage en pièce", projet: "transformation",
+		  reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison", "Non"] },
+		{ nom: "autre projet", projet: "autre", reponses: ["Véranda sur terrasse existante"] }
+	];
+
+	for (const s of scenarios) {
+		const r = await jouer(f, s.projet, s.reponses);
+		sortie.scenarios.push(Object.assign({ nom: s.nom, projet: s.projet }, r));
+	}
+
+	/* Le tunnel expose-t-il ce qu'il a recueilli, pour que le formulaire n'ait
+	   pas à le redemander ? */
+	let transmis = null;
+	try { transmis = JSON.parse(f.contentWindow.sessionStorage.getItem("urbizen:qualification")); } catch (e) {}
+	sortie.transmis = transmis;
+
+	sortie.cartes = [...f.contentDocument.querySelectorAll(".pcard")].map((c) => c.getAttribute("data-projet"));
+
+	f.remove();
+	document.getElementById("resultat").textContent = "JSON:" + JSON.stringify(sortie);
+})().catch((e) => {
+	document.getElementById("resultat").textContent = "ERREUR:" + (e && e.message ? e.message : e);
+});
+</script>
+</body>
+</html>
