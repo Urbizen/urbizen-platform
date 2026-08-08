@@ -300,18 +300,54 @@
     { champ: "sp_totale", libelle: "Quelle sera la surface habitable totale après travaux ?",
       aide: "La surface actuelle de la maison, plus celle que vous créez.", unite: "m²" },
 
-    /* La zone urbaine décide du seuil de 20 ou 40 m². Personne ne connaît son
-       zonage de tête : « je ne sais pas » est une réponse légitime, et mène à
-       une vérification plutôt qu'à une supposition. */
-    { champ: "zone_u", libelle: "Votre terrain est-il situé dans la partie déjà urbanisée de la commune ?",
-      aide: "En clair : dans un secteur bâti desservi par les réseaux, et non en zone agricole ou naturelle. En cas de doute, choisissez « je ne sais pas » — nous vérifierons.",
+    /* La zone urbaine décide du seuil de 20 ou 40 m². Attention à ce que la
+       question demande : R.421-14 b) vise le CLASSEMENT en zone urbaine d'un
+       PLU ou d'un document en tenant lieu, pas l'impression d'être « dans un
+       secteur déjà bâti ». Un terrain construit peut être classé en zone
+       agricole ou naturelle ; l'apparence n'est pas le zonage. Demander l'un
+       pour l'autre produirait des permis manqués.
+       Personne ne connaît son zonage de tête : « je ne sais pas » est une
+       réponse légitime, et mène à une vérification, jamais à une supposition. */
+    { champ: "zone_u", libelle: "Votre terrain est-il classé en zone U (zone urbaine) du PLU ?",
+      aide: "Cette information figure sur le plan de zonage de votre commune, ou sur le document d'urbanisme qui en tient lieu. Si vous ne la connaissez pas, choisissez « Je ne sais pas » : nous la vérifierons.",
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
 
     { champ: "secteur_protege", libelle: "Votre terrain est-il dans un secteur protégé ?",
       aide: "Abords d'un monument historique, site classé, secteur patrimonial remarquable. En cas de doute, « je ne sais pas ».",
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
 
-    { champ: "changement_destination", libelle: "L'usage du local va-t-il changer ?",
+    /* Les questions de la transformation évitent le vocabulaire du code. On ne
+       demande pas « cette surface est-elle comprise dans la surface de
+       plancher ? » : on demande ce que le propriétaire sait — quel espace, est-il
+       fermé, quelle hauteur — et le moteur en tire la donnée réglementaire.
+       On ne demande pas non plus « l'usage va-t-il changer ? » : un garage de
+       maison a déjà la destination du logement, et la question induirait un
+       changement de destination qui n'existe pas. */
+    { champ: "local_actuel", libelle: "Quel espace allez-vous transformer ?",
+      choix: [ { v: "garage", t: "Un garage" }, { v: "combles", t: "Des combles" },
+               { v: "sous_sol", t: "Un sous-sol ou une cave" }, { v: "dependance", t: "Une dépendance" } ] },
+
+    { champ: "ferme_couvert", libelle: "Cet espace est-il aujourd'hui fermé et couvert ?",
+      aide: "Des murs et un toit, même sans chauffage ni isolation.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "local_rattache", libelle: "Cet espace fait-il partie de votre maison, ou est-ce un bâtiment séparé ?",
+      aide: "Un garage attenant fait partie de la maison. Un bâtiment isolé sur le terrain est séparé.",
+      choix: [ { v: "maison", t: "Il fait partie de la maison" }, { v: "batiment_separe", t: "C'est un bâtiment séparé" } ] },
+
+    { champ: "destination_actuelle", libelle: "À quoi sert aujourd'hui ce bâtiment séparé ?",
+      aide: "Sa destination actuelle décide s'il y a changement de destination au sens du code.",
+      choix: [ { v: "habitation", t: "À l'habitation" }, { v: "autres_activites", t: "À autre chose (atelier, remise, activité…)" } ] },
+
+    { champ: "hauteur_sup_180", libelle: "La hauteur sous plafond dépasse-t-elle 1,80 m ?",
+      aide: "En dessous de 1,80 m, l'espace ne compte pas dans la surface habitable ; le régime n'est pas le même.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "modifie_aspect_exterieur", libelle: "L'aspect extérieur va-t-il changer ?",
+      aide: "Par exemple une porte de garage remplacée par une fenêtre ou une baie, ou une fenêtre de toit ajoutée.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "changement_destination", libelle: "L'usage du bâtiment va-t-il changer ?",
       aide: "Par exemple un local commercial transformé en logement.",
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
 
@@ -355,11 +391,23 @@
     return null;
   }
 
-  /* Une seule question à la fois : la première que le moteur réclame et pour
-     laquelle nous savons formuler une phrase compréhensible. */
+  /* Une seule question à la fois : la première que le moteur réclame, pour
+     laquelle nous savons formuler une phrase compréhensible, et à laquelle le
+     visiteur n'a pas DÉJÀ répondu.
+
+     Cette dernière condition n'est pas un détail. « Je ne sais pas » est une
+     réponse légitime — c'est même celle qu'on attend de la plupart des gens sur
+     le zonage. Mais le moteur continue alors de réclamer la donnée, puisqu'elle
+     lui manque toujours. Sans cette garde, la question revenait indéfiniment et
+     le tunnel ne concluait jamais : une impasse, découverte par le banc du
+     tunnel. Une réponse donnée ne se redemande pas ; si tout ce qui manque a
+     déjà été demandé, on conclut « à confirmer ». */
   function prochaineQuestion(manquantes) {
     for (var i = 0; i < QUESTIONS.length; i++) {
-      if (manquantes.indexOf(QUESTIONS[i].champ) !== -1) { return QUESTIONS[i]; }
+      var q = QUESTIONS[i];
+      if (manquantes.indexOf(q.champ) === -1) { continue; }
+      if (Object.prototype.hasOwnProperty.call(reponses, q.champ)) { continue; }
+      return q;
     }
     return null;
   }

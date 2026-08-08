@@ -48,6 +48,26 @@ check(
   !/\|\|\s*["']dp["']/.test(accueil),
   "le défaut qui envoyait tout projet non mappé en déclaration préalable"
 );
+/* La zone urbaine du PLU est un CLASSEMENT, pas une impression. Un terrain
+   entouré de maisons peut être classé en zone agricole ou naturelle : demander
+   « êtes-vous dans la partie déjà urbanisée ? » et en déduire `zone_u` ferait
+   appliquer le seuil de 40 m² à des projets qui relèvent de celui de 20, donc
+   manquer des permis. La question doit nommer le classement. */
+const questionZoneU = (accueil.match(/champ:\s*"zone_u"[\s\S]{0,400}/) || [""])[0];
+check(
+  "La question de zone U nomme le classement au PLU, pas une apparence",
+  /zone U/.test(questionZoneU) && /PLU/.test(questionZoneU)
+);
+check(
+  "Aucun proxy « partie déjà urbanisée » ne détermine zone_u",
+  !/partie déjà urbanisée|secteur bâti|déjà bâti/i.test(questionZoneU),
+  "l'apparence d'un secteur bâti n'est pas un classement en zone U"
+);
+check(
+  "« Je ne sais pas » reste une réponse offerte",
+  /Je ne sais pas/.test(questionZoneU)
+);
+
 check(
   "L'accueil ne réimplémente aucun seuil réglementaire",
   !/\b(20|40|150)\s*\)?\s*(?:m²)?\s*(?:>|<|>=|<=)/.test(accueil) && !accueil.includes("R.421-"),
