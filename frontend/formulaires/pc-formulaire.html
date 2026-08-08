@@ -873,11 +873,107 @@
       setIfEmpty("t_sup", contract.parcel.surfaceM2);
     }
 
+    /* ----- reprise des réponses de qualification -----
+       Le tunnel de l'accueil a déjà posé les questions nécessaires à la
+       QUALIFICATION ; ce formulaire collecte celles du DOSSIER. Redemander ce
+       qui vient d'être répondu serait un second formulaire complet, pas un
+       parcours.
+
+       Trois natures de données, traitées différemment :
+
+         A. ce que le client a fourni — surfaces : on préremplit le champ ;
+         B. ce qui n'a pas de champ ici — implantation, hauteur, zonage,
+            secteur protégé, nature du local transformé : on le conserve en
+            métadonnée, lisible par Urbizen, sans inventer dix champs visibles ;
+         C. le verdict du moteur : conservé pour information, JAMAIS autoritaire.
+            Le serveur le recalcule ; un paramètre venu du navigateur ne
+            contourne aucun contrôle.
+
+       `setIfEmpty` garantit qu'une saisie du client n'est jamais écrasée. */
+    var qualif = null;
+    try {
+      var brut = sessionStorage.getItem("urbizen:qualification");
+      qualif = brut ? JSON.parse(brut) : null;
+    } catch (e) { qualif = null; }
+
+    var reponses = (qualif && qualif.donnees) ? qualif.donnees : {};
+
+    /* A — les surfaces ont leur champ.
+
+       `setIfEmpty` refuse d'écraser une valeur existante, et ces champs
+       naissent à « 0 ». Un zéro de départ n'est pas une mesure prise : le
+       reprendre pour tel laissait le formulaire afficher 0 m² là où le client
+       venait de saisir 18. On ne remplace donc QUE le zéro initial, jamais un
+       chiffre saisi. */
+    function reprendreSurface(id, valeur) {
+      if (valeur === null || valeur === undefined || valeur === "") { return; }
+      var champ = document.getElementById(id);
+      if (!champ) { return; }
+      var actuel = String(champ.value).trim().replace(",", ".");
+      if (actuel !== "" && parseFloat(actuel) !== 0) { return; }
+      champ.value = String(valeur);
+      champ.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    reprendreSurface("s_pc", reponses.sp_creee);
+    reprendreSurface("s_pt", reponses.sp_totale);
+    reprendreSurface("s_ep", reponses.emprise_creee);
+
+    // B et C — tout le reste part en métadonnée, sous une forme lisible.
+    if (qualif) {
+      var libelles = {
+        implantation: { accole: "accolé à une construction existante", independant: "indépendant" },
+        local_actuel: { garage: "un garage", combles: "des combles", sous_sol: "un sous-sol ou une cave", dependance: "une dépendance" },
+        local_rattache: { maison: "rattaché à la maison", batiment_separe: "bâtiment séparé" },
+        zone_u: { "true": "en zone U du PLU", "false": "hors zone U", unknown: "zonage inconnu" },
+        secteur_protege: { "true": "en secteur protégé", "false": "hors secteur protégé", unknown: "secteur protégé inconnu" },
+        modifie_aspect_exterieur: { "true": "avec modification extérieure", "false": "sans modification extérieure" },
+        ferme_couvert: { "true": "espace fermé et couvert", "false": "espace non fermé" },
+        hauteur_sup_180: { "true": "hauteur sous plafond supérieure à 1,80 m", "false": "hauteur sous plafond inférieure à 1,80 m" }
+      };
+
+      var lisible = [];
+      Object.keys(libelles).forEach(function (cle) {
+        if (reponses[cle] === undefined || reponses[cle] === null) { return; }
+        var table = libelles[cle];
+        var mot = table[String(reponses[cle])];
+        if (mot) { lisible.push(mot); }
+      });
+      if (reponses.hauteur_m !== undefined) { lisible.push("hauteur " + reponses.hauteur_m + " m"); }
+      if (reponses.bassin_m2 !== undefined) { lisible.push("bassin de " + reponses.bassin_m2 + " m²"); }
+
+      var champ = document.createElement("input");
+      champ.type = "hidden";
+      champ.name = "qualification_contexte";
+      champ.value = JSON.stringify({
+        projet: reponses.projet || null,
+        resume: lisible.join(", "),
+        reponses: reponses,
+        verdict: qualif.verdict || null
+      });
+      form.appendChild(champ);
+    }
+
+    /* Un permis n'est pas forcément une maison neuve : une extension de plus de
+       vingt mètres carrés en relève aussi, et confondre les deux ferait remplir
+       le mauvais dossier. La nature vient donc du projet qualifié, jamais du
+       régime.
+
+       `transformation` : voir le formulaire de déclaration préalable — la
+       nature n'est présélectionnée que si un changement de destination a été
+       réellement établi. */
     var projectNature = {
       maison: "maison_individuelle",
       extension: "extension",
-      garage: "annexe_garage"
+      garage: "annexe_garage",
+      abri: "annexe_garage"
     };
+
+    if (project === "transformation") {
+      var separe = reponses.local_rattache === "batiment_separe";
+      var autreDestination = reponses.destination_actuelle && reponses.destination_actuelle !== "habitation";
+      if (separe && autreDestination) { projectNature.transformation = "changement_destination"; }
+    }
     var expected = projectNature[project];
     if (!expected) return;
 

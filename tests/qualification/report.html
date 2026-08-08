@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Banc du report tunnel → formulaire</title>
+<!--
+  Le tunnel dépose ; ce banc vérifie que le destinataire ramasse.
+
+  On fait le trajet complet dans une même iframe : qualification sur l'accueil,
+  puis navigation vers le formulaire. `sessionStorage` est partagé par l'origine,
+  exactement comme pour un visiteur.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style></head>
+<body><pre id="resultat">EN COURS</pre>
+<script>
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function charger(f, url) {
+  f.src = url;
+  await new Promise((r) => f.addEventListener("load", r, { once: true }));
+  await Promise.race([f.contentDocument.fonts.ready, attendre(2500)]);
+  await attendre(300);
+}
+
+async function qualifier(f, projet, reponses) {
+  await charger(f, "/frontend/homepage/index.html");
+  const d = f.contentDocument;
+  d.querySelector('.pcard[data-projet="' + projet + '"]').click();
+  await attendre(60);
+  for (let i = 0; i < 12; i++) {
+    const zone = d.getElementById("js-qualification");
+    if (!zone || zone.hidden) break;
+    const rep = reponses[i];
+    if (rep === undefined) break;
+    const boutons = [...zone.querySelectorAll(".qualif-choix .btn")];
+    if (boutons.length) { (boutons.find((b) => b.textContent.trim() === rep) || boutons[0]).click(); }
+    else { zone.querySelector(".qualif-champ").value = String(rep); zone.querySelector(".btn").click(); }
+    await attendre(60);
+  }
+  return f.contentDocument.getElementById("js-continue").getAttribute("data-statut");
+}
+
+function lire(f) {
+  const d = f.contentDocument;
+  const v = (id) => { const e = d.getElementById(id); return e ? e.value : null; };
+  const nature = d.querySelector('input[name="nature"]:checked');
+  const meta = d.querySelector('input[name="qualification_contexte"]');
+  let contexte = null;
+  try { contexte = meta ? JSON.parse(meta.value) : null; } catch (e) {}
+  return { sp_creee: v("s_pc"), sp_totale: v("s_pt"), emprise_creee: v("s_ep"),
+           nature: nature ? nature.value : null, contexte: contexte };
+}
+
+(async () => {
+  const sortie = { cas: [] };
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;left:-20000px;top:0;width:390px;height:900px;border:0;";
+  document.body.appendChild(f);
+
+  const scenarios = [
+    { nom: "extension DP", projet: "extension", reponses: ["15"], form: "dp" },
+    { nom: "extension PC", projet: "extension", reponses: ["60"], form: "pc" },
+    { nom: "garage accolé", projet: "garage", reponses: ["Accolée", "15", "Non"], form: "dp" },
+    { nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "Non", "2.5"], form: "dp" },
+    { nom: "abri DP", projet: "abri", reponses: ["Indépendante", "12", "Non", "2"], form: "dp" },
+    { nom: "abri PC", projet: "abri", reponses: ["Indépendante", "25"], form: "pc" },
+    { nom: "transformation garage habitable", projet: "transformation",
+      reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison", "Non"], form: "dp" },
+    { nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"], form: "dp" },
+    { nom: "pergola DP", projet: "pergola", reponses: ["Indépendante", "12", "Non", "2.4"], form: "dp" }
+  ];
+
+  for (const s of scenarios) {
+    try { f.contentWindow.sessionStorage.clear(); } catch (e) {}
+    const statut = await qualifier(f, s.projet, s.reponses);
+    await charger(f, "/frontend/formulaires/" + s.form + "-formulaire.html");
+    sortie.cas.push(Object.assign({ nom: s.nom, projet: s.projet, statut: statut, form: s.form }, lire(f)));
+  }
+
+  f.remove();
+  document.getElementById("resultat").textContent = "JSON:" + JSON.stringify(sortie);
+})().catch((e) => {
+  document.getElementById("resultat").textContent = "ERREUR:" + (e && e.message ? e.message : e);
+});
+</script></body></html>

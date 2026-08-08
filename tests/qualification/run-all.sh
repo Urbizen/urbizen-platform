@@ -29,18 +29,18 @@ verdict() {
 command -v "$PHP_BIN" >/dev/null 2>&1 || { echo "PHP introuvable (PHP_BIN=$PHP_BIN)."; exit 2; }
 command -v "$NODE_BIN" >/dev/null 2>&1 || { echo "Node introuvable (NODE_BIN=$NODE_BIN)."; exit 2; }
 
-titre "1/3 — Moteur serveur"
+titre "1/4 — Moteur serveur"
 "$PHP_BIN" test-qualification.php
 verdict $? "test-qualification.php"
 
-titre "2/3 — Moteur navigateur, et son équivalence avec le serveur"
+titre "2/4 — Moteur navigateur, et son équivalence avec le serveur"
 "$NODE_BIN" test-qualification.mjs
 verdict $? "test-qualification.mjs"
 
 # Le moteur peut être juste et le tunnel décider quand même trop tôt : c'est
 # exactement la lacune qui a produit le défaut de la PR #56. Ce banc rejoue
 # l'enchaînement réel des questions dans un moteur de rendu.
-titre "3/3 — Tunnel de qualification, rejoué dans un navigateur"
+titre "3/4 — Tunnel de qualification, rejoué dans un navigateur"
 "$PY_BIN" test-tunnel.py
 code_tunnel=$?
 if [ "$code_tunnel" -eq 2 ]; then
@@ -50,10 +50,22 @@ else
 	verdict $code_tunnel "test-tunnel.py"
 fi
 
+# Le tunnel peut poser les bonnes questions et le formulaire les redemander
+# toutes : la qualification serait alors un questionnaire jeté.
+titre "4/4 — Report des réponses vers les formulaires DP et PC"
+"$PY_BIN" test-report.py
+code_report=$?
+if [ "$code_report" -eq 2 ]; then
+	printf '\033[33m⚠ test-report.py NON EXÉCUTÉ (Chrome absent) — ce n'"'"'est pas un succès\033[0m\n'
+	prerequis_absents=1
+else
+	verdict $code_report "test-report.py"
+fi
+
 printf '\n'
 if [ "${prerequis_absents:-0}" -eq 1 ] && [ "$echecs" -eq 0 ]; then
-	printf '\033[33m2 bancs passent, 1 banc NON EXÉCUTÉ (prérequis absent).\033[0m\n'; exit 2
+	printf '\033[33mbancs passés, au moins un NON EXÉCUTÉ (prérequis absent).\033[0m\n'; exit 2
 fi
-if [ "$echecs" -eq 0 ]; then printf '\033[32mLes 3 bancs passent.\033[0m\n'; exit 0; fi
+if [ "$echecs" -eq 0 ]; then printf '\033[32mLes 4 bancs passent.\033[0m\n'; exit 0; fi
 printf '\033[31m%s banc(s) en échec.\033[0m\n' "$echecs"
 exit 1
