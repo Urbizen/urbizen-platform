@@ -68,7 +68,11 @@ header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,25
 /* Espace client provisoire : contrôle clairement désactivé (pas de faux lien). */
 .link-login[aria-disabled="true"] { color: var(--u-ink-faint); cursor: not-allowed; }
 .link-login[aria-disabled="true"]:hover { color: var(--u-ink-faint); background: none; }
-.burger { display: none; background: none; border: none; cursor: pointer; padding: 6px; flex: none; }
+/* Burger — cible tactile 44×44 comme les icônes voisines. La boîte est en
+   `border-box` : 44 − 2×11 de remplissage laisse exactement les 22×22 qu'occupaient
+   déjà les trois traits. L'icône est donc inchangée au pixel ; seule la zone
+   cliquable grandit. */
+.burger { display: none; background: none; border: none; cursor: pointer; width: 44px; height: 44px; padding: 11px; flex: none; }
 .burger span { display: block; width: 22px; height: 2px; background: var(--u-ink); margin: 4px 0; transition: .2s; }
 .mmenu { border-top: 1px solid var(--u-line); background: var(--u-surface); }
 .mmenu .wrap { display: grid; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
@@ -78,9 +82,13 @@ header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,25
      visibles dans le header (logo | icône compte | Démarrer mon projet | burger). */
 .nav-links { display: none; }
   .burger { display: block; }
+  /* Le CTA devient une cible tactile à part entière dès que le header passe en
+     mode mobile. Borné à ce palier : au-delà, le CTA long garde sa hauteur. */
+  .nav-right .js-start { min-height: 44px; }
 }
-/* En-tête mobile compact : tout tient sans débordement ni retour à la ligne,
-   dès 320 px. On resserre progressivement gaps, CTA et logo. */
+/* En-tête mobile compact : on resserre progressivement gaps, CTA et logo, sans
+   jamais descendre une cible tactile sous 44×44. Sous 380 px la place manque :
+   le repli d'en-dessous prend le relais. */
 @media (max-width: 560px) {
   .nav { gap: 10px; }
   .nav-right { gap: 8px; }
@@ -93,8 +101,9 @@ header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,25
   .nav-right { gap: 6px; }
   .nav-right .js-start { padding: 8px 11px; font-size: 12.5px; }
   .nav .logo img { height: 26px; }
-  .link-login { width: 40px; height: 40px; }
-  .burger { padding: 6px 2px; }
+  /* Ni `.link-login` ni `.burger` ne sont rétrécis ici : ces deux réductions
+     (40×40 et un remplissage de 2 px) gagnaient 22 px de largeur au prix de la
+     cible tactile. La place se gagne désormais par le repli sous 380 px. */
 }
 
 /* --- Sections génériques --- */
@@ -578,9 +587,15 @@ a.contact-ch-link:hover { border-color: var(--u-brand); background: var(--u-bran
   .contact-head h2 { font-size: 18px; }
 }
 
-/* En-tête très étroit (< 340px) : le CTA passe sur une 2e ligne compacte, sans
-   masquer téléphone/compte/burger et sans tronquer « Démarrer mon projet ». */
-@media (max-width: 340px) {
+/* En-tête étroit : le CTA passe sur une 2e ligne compacte, sans masquer
+   téléphone/compte/burger et sans tronquer « Démarrer mon projet ».
+   Le seuil est mesuré, non choisi : avec les quatre cibles à 44×44 et les
+   espacements réels, la barre réclame exactement 370 px. En dessous, elle
+   déborde. Le repli est donc armé à 380 px — 10 px de marge — ce qui place
+   375 px (iPhone SE / mini / 13 mini) franchement du côté replié plutôt qu'à
+   cinq pixels de la rupture. Auparavant fixé à 340 px, il laissait la bande
+   341–369 px déborder. */
+@media (max-width: 380px) {
   .nav-right { display: contents; }
   .nav { flex-wrap: wrap; row-gap: 6px; column-gap: 8px; }
   .nav .logo { order: 1; }

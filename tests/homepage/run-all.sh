@@ -49,27 +49,31 @@ command -v "$PY_BIN" >/dev/null 2>&1 || {
 # L'ordre va du plus structurel au plus fin : la fidélité du portage d'abord,
 # puis chaque section. Un échec de fidélité explique souvent les suivants.
 
-titre "1/6 — Fidélité du portage WordPress"
+titre "1/7 — Fidélité du portage WordPress"
 "$PHP_BIN" test-fidelite.php
 verdict $? "test-fidelite.php"
 
-titre "2/6 — En-tête et centre de contact"
+titre "2/7 — En-tête et centre de contact"
 "$PHP_BIN" test-entete.php
 verdict $? "test-entete.php"
 
-titre "3/6 — Planche du hero et sa séquence d'animation"
+titre "3/7 — Cibles tactiles de l'en-tête mobile"
+"$PHP_BIN" test-cibles-tactiles.php
+verdict $? "test-cibles-tactiles.php"
+
+titre "4/7 — Planche du hero et sa séquence d'animation"
 "$PHP_BIN" test-hero.php
 verdict $? "test-hero.php"
 
-titre "4/6 — Section « Nos services » : prestations et contenu du dossier"
+titre "5/7 — Section « Nos services » : prestations et contenu du dossier"
 "$PHP_BIN" test-services.php
 verdict $? "test-services.php"
 
-titre "5/6 — Icônes et cartes de type de projet"
+titre "6/7 — Icônes et cartes de type de projet"
 "$PHP_BIN" test-icones-projet.php
 verdict $? "test-icones-projet.php"
 
-titre "6/6 — Gabarit front-page et sa parité"
+titre "7/7 — Gabarit front-page et sa parité"
 "$PHP_BIN" test-front-page.php
 verdict $? "test-front-page.php"
 
@@ -82,7 +86,7 @@ verdict $? "test-scope-css.py"
 
 printf '\n'
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 7 bancs passent.\033[0m\n'
+	printf '\033[32mLes 8 bancs passent.\033[0m\n'
 	exit 0
 fi
 
