@@ -130,10 +130,16 @@ check( 'Centre de contact : panneau unique « Parlons de votre projet » avec se
 	&& str_contains( $entete_rendu, 'Appeler maintenant' )
 	&& str_contains( $entete_rendu, 'Réserver un appel' )
 	&& str_contains( $entete_rendu, 'Écrire à Urbizen' ) );
-check( 'Centre de contact : « Appeler » = numéro réel de la charte, 2 canaux honnêtement « bientôt »',
+// « Écrire à Urbizen » n'est plus une promesse : il mène au formulaire de
+// renseignements. Il ne reste donc qu'un seul canal honnêtement « bientôt »,
+// « Réserver un appel » — et il doit le rester tant que la prise de rendez-vous
+// n'existe pas. Annoncer disponible ce qui ne l'est pas serait pire que de le
+// taire.
+check( 'Centre de contact : « Appeler » = numéro réel de la charte, 1 seul canal encore « bientôt »',
 	str_contains( $entete_rendu, 'href="tel:+33664895815"' )
-	&& 2 === substr_count( $entete_rendu, 'contact-ch is-soon' )
-	&& 2 === substr_count( $entete_rendu, 'Bientôt disponible' ) );
+	&& 1 === substr_count( $entete_rendu, 'contact-ch is-soon' )
+	&& 1 === substr_count( $entete_rendu, 'Bientôt disponible' )
+	&& str_contains( $entete_rendu, 'Réserver un appel' ) );
 // Le CTA de l'en-tête porte deux libellés — long sur grand écran, court sur
 // mobile — et son intitulé accessible ne dépend donc pas de celui qui est
 // affiché. Sans `aria-label`, un lecteur d'écran n'annoncerait que « Démarrer ».

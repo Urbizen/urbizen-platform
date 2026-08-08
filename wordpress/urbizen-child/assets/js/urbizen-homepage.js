@@ -10,17 +10,38 @@
 (function () {
   "use strict";
 
-  /* ----- Menu mobile ----- */
+  /* Une seule lecture de la préférence de mouvement, partagée par tous les
+     défilements de cette feuille. Déclarée ici parce que le chemin « Écrire à
+     Urbizen » s'en sert bien avant l'animation du hero. */
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var glissement = function () { return reduceMotion ? "auto" : "smooth"; };
+  /* Donne le focus sans faire défiler la page : le défilement est piloté
+     séparément, et un focus qui saute annulerait le mouvement en cours. */
+  var focusSafe = function (el) { if (!el) return; try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } };
+
+  /* ----- Menu mobile -----
+     `closeMobileMenu` est extraite parce que deux chemins la demandent : un lien
+     ordinaire du menu, et « Écrire à Urbizen » qui doit refermer le menu avant
+     de déplier le formulaire. Une seule fonction touche `hidden` et
+     `aria-expanded` — les laisser diverger était le risque. */
   var burger = document.querySelector(".burger");
   var mmenu = document.getElementById("mmenu");
+  var closeMobileMenu = function () {};
   if (burger && mmenu) {
+    closeMobileMenu = function () {
+      if (mmenu.hidden) { return; }
+      mmenu.hidden = true;
+      burger.setAttribute("aria-expanded", "false");
+    };
     burger.addEventListener("click", function () {
       var open = mmenu.hidden;
       mmenu.hidden = !open;
       burger.setAttribute("aria-expanded", open ? "true" : "false");
     });
+    // `closest` plutôt que `tagName` : un lien du menu peut contenir du balisage,
+    // et le clic atterrir sur un enfant. Le lien restait alors ouvert derrière.
     mmenu.addEventListener("click", function (e) {
-      if (e.target.tagName === "A") { mmenu.hidden = true; burger.setAttribute("aria-expanded", "false"); }
+      if (e.target.closest && e.target.closest("a")) { closeMobileMenu(); }
     });
   }
 
@@ -49,7 +70,6 @@
     var prevOverflow = "";
     var backdrop = null;
     var moved = false;
-    var focusSafe = function (el) { if (!el) return; try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } };
     var onKeydown = function (e) {
       if (e.key === "Escape" || e.key === "Esc") { closeContact(true); return; }
       if (e.key !== "Tab") return;
@@ -97,23 +117,65 @@
     if (closeBtn) closeBtn.addEventListener("click", function () { closeContact(true); });
   }
 
-  /* ----- Formulaire de renseignements dépliant ----- */
+  /* ----- Formulaire de renseignements dépliant -----
+     `setInquiry` est le seul endroit qui touche à l'état du bloc : sa visibilité,
+     l'`aria-expanded` du bouton et son libellé. `openInquiry` en dérive et
+     garantit l'ouverture sans jamais refermer — un second « Écrire à Urbizen »
+     sur un bloc déjà ouvert le laisserait ouvert, là où un basculement l'aurait
+     refermé sous le doigt de quelqu'un qui venait justement l'atteindre. */
   var inquiryToggle = document.querySelector(".js-toggle-inquiry");
   var inquiryPanel = document.getElementById("cta-inquiry-form");
+  var inquirySection = document.getElementById("demander-des-renseignements");
+  var inquiryTitle = document.getElementById("titre-renseignements");
+  var setInquiry = function () {};
+  var openInquiry = function () {};
   if (inquiryToggle && inquiryPanel) {
-    inquiryToggle.addEventListener("click", function () {
-      var open = inquiryPanel.hidden;
+    setInquiry = function (open) {
       inquiryPanel.hidden = !open;
       inquiryToggle.setAttribute("aria-expanded", open ? "true" : "false");
       var label = inquiryToggle.querySelector("span");
-      if (label) label.textContent = open ? "Fermer le formulaire" : "Demander des renseignements";
-      if (open) inquiryPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      if (label) { label.textContent = open ? "Fermer le formulaire" : "Demander des renseignements"; }
+    };
+    openInquiry = function () {
+      if (inquiryPanel.hidden) { setInquiry(true); }
+    };
+    inquiryToggle.addEventListener("click", function () {
+      var ouvre = inquiryPanel.hidden;
+      setInquiry(ouvre);
+      if (ouvre) { inquiryPanel.scrollIntoView({ behavior: glissement(), block: "nearest" }); }
+    });
+  }
+
+  /* ----- « Écrire à Urbizen » → formulaire de renseignements -----
+     Deux accès, un seul chemin : le canal du panneau « Parlons de votre projet »
+     et l'entrée du menu mobile portent la même classe. Les deux sont de vrais
+     liens vers l'ancre : sans JavaScript, la page descend quand même au bon
+     endroit ; le script n'ajoute que le dépliage, la fermeture des surfaces
+     ouvertes et le placement du focus.
+
+     L'ordre compte. `closeContact(false)` d'abord : il rend le défilement du
+     document, que le dialogue verrouille — sans cela, aucun défilement ne serait
+     possible. `false` évite de renvoyer le focus sur l'icône qu'on quitte.
+     Le focus va sur le titre du bloc, jamais dans un champ : viser le premier
+     champ du formulaire lèverait le clavier virtuel sur téléphone, en masquant
+     la moitié de ce qu'on vient d'ouvrir. */
+  var inquiryLinks = document.querySelectorAll(".js-open-inquiry");
+  if (inquiryLinks.length && inquiryPanel && inquirySection) {
+    inquiryLinks.forEach(function (link) {
+      link.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (typeof closeContact === "function") { closeContact(false); }
+        closeMobileMenu();
+        openInquiry();
+        inquirySection.scrollIntoView({ behavior: glissement(), block: "start" });
+        // `preventScroll` : le focus ne doit pas court-circuiter le défilement.
+        focusSafe(inquiryTitle || inquiryPanel);
+      });
     });
   }
 
   /* ----- Planche du HERO : animation au moment où elle devient visible ----- */
   var heroBoard = document.querySelector(".hero-v7 .hero-board");
-  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (heroBoard && !reduceMotion) {
     var startHeroBoardAnimation = function () {
       if (!heroBoard.classList.contains("is-animated")) {

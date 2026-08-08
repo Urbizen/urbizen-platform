@@ -120,11 +120,11 @@
           <span class="contact-ch-txt"><span class="contact-ch-title">Réserver un appel</span><span class="contact-ch-sub">Bientôt disponible</span></span>
           </span>
         </li>
-        <li class="contact-ch is-soon">
-          <span class="contact-ch-link" role="button" aria-disabled="true">
+        <li class="contact-ch">
+          <a class="contact-ch-link js-open-inquiry" href="#demander-des-renseignements">
             <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
-          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
-          </span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Réponse sous 24 h ouvrées</span></span>
+          </a>
         </li>
       </ul>
     </div>
@@ -136,6 +136,7 @@
       <a href="#prestations">Nos prestations</a>
       <a href="#methode">Comment ça marche</a>
       <a href="#tarifs">Tarifs</a>
+      <a class="js-open-inquiry" href="#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
     </div>
   </div>
@@ -631,7 +632,7 @@
 </section>
 
 <!-- ===== Section 11 — CTA final ===== -->
-<section class="cta-final">
+<section class="cta-final" id="demander-des-renseignements">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Parlons de votre projet</span></span>
@@ -648,7 +649,7 @@
       </div>
       <div id="cta-inquiry-form" class="cta-inquiry-panel" hidden>
         <div class="cta-inquiry-head">
-          <h3>Votre demande de renseignements</h3>
+          <h3 id="titre-renseignements" tabindex="-1">Votre demande de renseignements</h3>
           <p>Posez votre question&nbsp;: Urbizen vous répond sous 24&nbsp;heures ouvrées.</p>
         </div>
 <!-- /wp:html -->

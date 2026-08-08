@@ -19,6 +19,12 @@
 
 .urbizen-accueil, .urbizen-accueil * { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+/* Le défilement doux est une animation comme une autre : qui demande moins de
+   mouvement ne doit pas se le voir imposer, y compris sur un simple saut
+   d'ancre. Le JavaScript applique la même règle de son côté. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
 .urbizen-accueil { font-family: var(--u-font-body); color: var(--u-ink); line-height: 1.6; -webkit-font-smoothing: antialiased; }
 
 .urbizen-accueil h1, .urbizen-accueil h2, .urbizen-accueil h3, .urbizen-accueil h4 { font-family: var(--u-font-title); letter-spacing: -0.015em; line-height: 1.14; }
@@ -630,6 +636,19 @@ html { scroll-behavior: smooth; }
   .urbizen-accueil .nav-right .burger { order: 4; margin-left: auto; }
   .urbizen-accueil .nav-right .js-start { order: 5; flex: 1 0 100%; text-align: center; }
 }
+
+/* --- Ancre « Demander des renseignements » --------------------------------
+   L'en-tête est collant : une ancre visée sans précaution amène le haut de la
+   section sous la barre, et l'accroche « Parlons de votre projet » disparaît
+   derrière elle. `scroll-margin-top` réserve la hauteur de l'en-tête — et rien
+   de plus : la section porte déjà son propre rembourrage, qui fait le confort.
+   Trois valeurs, exactement les trois géométries de l'en-tête fermé : 95px sous
+   380 (barre repliée sur deux rangées), 63px jusqu'à 420, 71px au-delà. Exprimé
+   en CSS, jamais calculé en JavaScript — l'en-tête change de hauteur avec la
+   largeur, un offset mesuré au clic serait faux au redimensionnement suivant. */
+.urbizen-accueil #demander-des-renseignements { scroll-margin-top: 71px; }
+@media (max-width: 420px) { .urbizen-accueil #demander-des-renseignements { scroll-margin-top: 63px; } }
+@media (max-width: 380px) { .urbizen-accueil #demander-des-renseignements { scroll-margin-top: 95px; } }
 
 /* ===========================================================================
    LOT 2D (BIS/TER) — évolution de l'accueil : contenus, blocs, hiérarchie,
