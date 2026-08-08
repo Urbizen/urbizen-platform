@@ -244,80 +244,264 @@
     }
   }
 
-  /* ----- Sélection du type de projet + routage vers le formulaire ----- */
-  // Destinations finales du tunnel. Les pages WordPress dédiées DP et PC
-  // réutilisent les formulaires de référence ; Conception possède déjà sa
-  // propre section de formulaire.
+  /* ----- Sélection du type de projet et qualification -----
+
+     Auparavant, une seule ligne décidait de tout :
+
+         return FORM_BY_PROJECT[project] || "dp";
+
+     Deux types étaient mappés ; les huit autres tombaient en déclaration
+     préalable — une extension de soixante mètres carrés comme un ravalement.
+     La décision tombait au clic sur la carte, avant la moindre question de
+     surface, et l'écran annonçait « orientation proposée », donnant à un défaut
+     l'apparence d'une étude.
+
+     Désormais l'accueil ne décide de rien. Il pose les questions que le moteur
+     réclame, une à la fois, et n'oriente que lorsque le moteur a conclu. Aucun
+     seuil réglementaire ne vit ici : ils sont tous dans `qualification.js`,
+     testé hors navigateur et jumelé à son équivalent serveur. */
+
   var FORM_URLS = {
-    dp:          "/formulaire-declaration-prealable/",
-    pcmi:        "/formulaire-permis-de-construire/",
-    conception:  "/conception/#formulaire-conception"
-  };
-  var FORM_BY_PROJECT = {
-    maison:      "pcmi",
-    conception:  "conception"
-  };
-  var FORM_COPY = {
-    dp: {
-      button: "Continuer vers ma déclaration préalable",
-      hint: "Orientation proposée : déclaration préalable. Urbizen confirme la démarche après étude."
-    },
-    pcmi: {
-      button: "Continuer vers mon permis de construire",
-      hint: "Orientation proposée : permis de construire. Vos informations seront reprises dans le formulaire."
-    },
-    conception: {
-      button: "Continuer vers mes plans sur mesure",
-      hint: "Vous allez ouvrir le formulaire de conception de plans sur mesure."
-    }
+    dp:         "/formulaire-declaration-prealable/",
+    pcmi:       "/formulaire-permis-de-construire/",
+    conception: "/conception/#formulaire-conception"
   };
 
-  function formForProject(project) {
-    return FORM_BY_PROJECT[project] || "dp";
-  }
+  /* Les questions que le moteur peut réclamer. Chacune répond à un nom de
+     donnée manquante ; l'ordre de cette table est l'ordre d'apparition. Le
+     visiteur ne voit jamais les questions des autres branches. */
+  var QUESTIONS = [
+    { champ: "implantation", libelle: "Cette construction sera-t-elle accolée à un bâtiment existant, ou indépendante ?",
+      aide: "Accolée : elle touche la maison ou un autre bâtiment. Indépendante : elle est isolée sur le terrain.",
+      choix: [ { v: "accole", t: "Accolée" }, { v: "independant", t: "Indépendante" } ] },
 
+    { champ: "sp_creee", libelle: "Quelle surface au sol la construction va-t-elle occuper ?",
+      aide: "Une estimation suffit à ce stade. Urbizen vérifie les cotes exactes ensuite.",
+      unite: "m²" },
+
+    { champ: "emprise_creee", libelle: "Quelle emprise au sol le projet va-t-il occuper ?",
+      aide: "L'ombre portée de la construction au sol.", unite: "m²" },
+
+    { champ: "bassin_m2", libelle: "Quelle est la superficie du bassin ?",
+      aide: "La surface du bassin lui-même, hors plage et margelles.", unite: "m²" },
+
+    { champ: "couverte", libelle: "La piscine sera-t-elle couverte ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "hauteur_couverture_m", libelle: "Quelle hauteur fera la couverture au-dessus du sol ?",
+      unite: "m" },
+
+    { champ: "hauteur_m", libelle: "Quelle hauteur fera la construction ?",
+      aide: "Du sol au point le plus haut.", unite: "m" },
+
+    { champ: "sp_totale", libelle: "Quelle sera la surface habitable totale après travaux ?",
+      aide: "La surface actuelle de la maison, plus celle que vous créez.", unite: "m²" },
+
+    /* La zone urbaine décide du seuil de 20 ou 40 m². Personne ne connaît son
+       zonage de tête : « je ne sais pas » est une réponse légitime, et mène à
+       une vérification plutôt qu'à une supposition. */
+    { champ: "zone_u", libelle: "Votre terrain est-il situé dans la partie déjà urbanisée de la commune ?",
+      aide: "En clair : dans un secteur bâti desservi par les réseaux, et non en zone agricole ou naturelle. En cas de doute, choisissez « je ne sais pas » — nous vérifierons.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
+
+    { champ: "secteur_protege", libelle: "Votre terrain est-il dans un secteur protégé ?",
+      aide: "Abords d'un monument historique, site classé, secteur patrimonial remarquable. En cas de doute, « je ne sais pas ».",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
+
+    { champ: "changement_destination", libelle: "L'usage du local va-t-il changer ?",
+      aide: "Par exemple un local commercial transformé en logement.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "modifie_structure_ou_facade", libelle: "Les travaux toucheront-ils les murs porteurs ou la façade ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "aspect_exterieur", libelle: "Les travaux modifieront-ils l'aspect extérieur de la construction ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "description", libelle: "Décrivez votre projet en quelques mots.", texte: true }
+  ];
+
+  var MESSAGES = {
+    dp:         "Orientation : déclaration préalable.",
+    pcmi:       "Orientation : permis de construire.",
+    conception: "Vous allez ouvrir le formulaire de conception de plans sur mesure.",
+    none:       "D'après ces éléments, votre projet ne nécessite aucune autorisation d'urbanisme. Des règles locales peuvent toutefois s'appliquer : nous pouvons le vérifier avec vous.",
+    confirm:    "La formalité dépend des caractéristiques de votre projet et des règles d'urbanisme applicables à votre terrain. Urbizen la vérifie avant de constituer votre dossier."
+  };
+
+  var BOUTONS = {
+    dp:         "Continuer vers ma déclaration préalable",
+    pcmi:       "Continuer vers mon permis de construire",
+    conception: "Continuer vers mes plans sur mesure",
+    none:       "Faire vérifier mon projet",
+    confirm:    "Faire qualifier mon projet"
+  };
+
+  var reponses = {};
   var selectedProjet = null;
   var continueBtn = document.getElementById("js-continue");
   var continueHint = document.getElementById("js-continue-hint");
+  var zoneQuestions = document.getElementById("js-qualification");
   var cards = document.querySelectorAll(".pcard");
+  var moteur = window.UrbizenQualification;
 
-  // La sélection des cartes n'a de sens que dans le tunnel de l'accueil, dont le
-  // bouton de continuation est le marqueur naturel. Ailleurs (pages internes),
-  // les mêmes vignettes .pcard restent purement informatives : aucun écouteur,
-  // aucun aria-pressed, aucun état sélectionné qui promettrait une suite.
-  if (continueBtn) {
-    cards.forEach(function (card) {
-      card.setAttribute("aria-pressed", "false");
-      card.addEventListener("click", function () {
-        cards.forEach(function (c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
-        card.classList.add("is-selected");
-        card.setAttribute("aria-pressed", "true");
-        selectedProjet = card.getAttribute("data-projet");
-        try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
-        var form = formForProject(selectedProjet);
-        continueBtn.disabled = false;
-        continueBtn.textContent = FORM_COPY[form].button;
-        if (continueHint) continueHint.textContent = FORM_COPY[form].hint;
-      });
-    });
+  function question(champ) {
+    for (var i = 0; i < QUESTIONS.length; i++) {
+      if (QUESTIONS[i].champ === champ) { return QUESTIONS[i]; }
+    }
+    return null;
   }
+
+  /* Une seule question à la fois : la première que le moteur réclame et pour
+     laquelle nous savons formuler une phrase compréhensible. */
+  function prochaineQuestion(manquantes) {
+    for (var i = 0; i < QUESTIONS.length; i++) {
+      if (manquantes.indexOf(QUESTIONS[i].champ) !== -1) { return QUESTIONS[i]; }
+    }
+    return null;
+  }
+
+  function repondre(champ, valeur) {
+    reponses[champ] = valeur;
+    evaluer();
+  }
+
+  function afficherQuestion(q) {
+    if (!zoneQuestions) { return; }
+    zoneQuestions.innerHTML = "";
+    zoneQuestions.hidden = false;
+
+    var bloc = document.createElement("div");
+    bloc.className = "qualif-question";
+
+    var titre = document.createElement("p");
+    titre.className = "qualif-libelle";
+    titre.textContent = q.libelle;
+    bloc.appendChild(titre);
+
+    if (q.aide) {
+      var aide = document.createElement("p");
+      aide.className = "qualif-aide";
+      aide.textContent = q.aide;
+      bloc.appendChild(aide);
+    }
+
+    if (q.choix) {
+      var groupe = document.createElement("div");
+      groupe.className = "qualif-choix";
+      q.choix.forEach(function (c) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn-ghost btn-sm";
+        b.textContent = c.t;
+        b.addEventListener("click", function () { repondre(q.champ, c.v); });
+        groupe.appendChild(b);
+      });
+      bloc.appendChild(groupe);
+    } else {
+      var ligne = document.createElement("div");
+      ligne.className = "qualif-saisie";
+      var champ = document.createElement("input");
+      champ.type = q.texte ? "text" : "text";
+      champ.inputMode = q.texte ? "text" : "decimal";
+      champ.className = "qualif-champ";
+      champ.setAttribute("aria-label", q.libelle);
+      var valider = document.createElement("button");
+      valider.type = "button";
+      valider.className = "btn btn-primary btn-sm";
+      valider.textContent = "Valider";
+      var envoyer = function () {
+        var v = champ.value.trim();
+        if (!v) { return; }
+        repondre(q.champ, q.texte ? v : v.replace(",", "."));
+      };
+      valider.addEventListener("click", envoyer);
+      champ.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); envoyer(); } });
+      ligne.appendChild(champ);
+      if (q.unite) {
+        var u = document.createElement("span");
+        u.className = "qualif-unite";
+        u.textContent = q.unite;
+        ligne.appendChild(u);
+      }
+      ligne.appendChild(valider);
+      bloc.appendChild(ligne);
+      window.setTimeout(function () { champ.focus(); }, 0);
+    }
+
+    zoneQuestions.appendChild(bloc);
+  }
+
+  function masquerQuestions() {
+    if (zoneQuestions) { zoneQuestions.hidden = true; zoneQuestions.innerHTML = ""; }
+  }
+
+  /* Interroge le moteur, puis soit pose la question suivante, soit conclut.
+     Aucune redirection n'est proposée tant que le verdict n'est pas rendu. */
+  function evaluer() {
+    if (!selectedProjet || !moteur) { return; }
+
+    var donnees = { projet: selectedProjet };
+    for (var k in reponses) {
+      if (Object.prototype.hasOwnProperty.call(reponses, k)) { donnees[k] = reponses[k]; }
+    }
+
+    var verdict = moteur.qualifyProject(donnees);
+    continueBtn.setAttribute("data-statut", verdict.status);
+
+    if (verdict.status === "confirm" && verdict.missing.length) {
+      var q = prochaineQuestion(verdict.missing);
+      if (q) {
+        afficherQuestion(q);
+        continueBtn.disabled = true;
+        continueBtn.textContent = "Répondez pour continuer";
+        if (continueHint) { continueHint.textContent = ""; }
+        return;
+      }
+    }
+
+    masquerQuestions();
+    continueBtn.disabled = false;
+    continueBtn.textContent = BOUTONS[verdict.status];
+    if (continueHint) { continueHint.textContent = MESSAGES[verdict.status]; }
+
+    try {
+      sessionStorage.setItem("urbizen:qualification", JSON.stringify({ donnees: donnees, verdict: verdict }));
+    } catch (e) {}
+  }
+
+  cards.forEach(function (card) {
+    card.setAttribute("aria-pressed", "false");
+    card.addEventListener("click", function () {
+      cards.forEach(function (c) { c.classList.remove("is-selected"); c.setAttribute("aria-pressed", "false"); });
+      card.classList.add("is-selected");
+      card.setAttribute("aria-pressed", "true");
+      selectedProjet = card.getAttribute("data-projet");
+      reponses = {};
+      try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
+      evaluer();
+    });
+  });
 
   if (continueBtn) {
     continueBtn.addEventListener("click", function () {
-      if (!selectedProjet) return;
-      // adresse, parcelle et projet sont déjà conservés en sessionStorage :
-      // le formulaire (branche dédiée) les relira pour se pré-remplir.
-      var form = formForProject(selectedProjet);
-      window.location.href = FORM_URLS[form];
+      if (!selectedProjet) { return; }
+      var statut = continueBtn.getAttribute("data-statut");
+
+      /* `none` et `confirm` n'ont pas de formulaire de régime : envoyer
+         quelqu'un vers un dossier payant sans avoir conclu serait exactement
+         le défaut que cette tranche corrige. Ils mènent au formulaire de
+         renseignements, où Urbizen reprend la main. */
+      if (statut === "none" || statut === "confirm") {
+        window.location.href = "/#demander-des-renseignements";
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(FORM_URLS, statut)) {
+        window.location.href = FORM_URLS[statut];
+      }
     });
   }
-
-  /* ----- Composant cadastre -----
-     Aucun montage manuel ici : sous WordPress, le bloc `urbizen/cadastre`
-     rend son propre conteneur et urbizen-cadastre.js le monte via
-     autoMount(). Un mount() supplémentaire provoquerait un double montage.
-     Les libellés et la clé de stockage « accueil » sont portés par les
-     attributs du bloc, dans le gabarit. */
 
   /* ----- Réaction à la confirmation de parcelle -----
      Pour cette première version : on conserve les données (déjà persistées en

@@ -623,6 +623,21 @@ a.contact-ch-link:hover { border-color: var(--u-brand); background: var(--u-bran
   .nav-right .js-start { order: 5; flex: 1 0 100%; text-align: center; }
 }
 
+/* --- Qualification d'urbanisme : les questions du moteur -------------------
+   Une seule question est visible à la fois, et seulement quand le moteur en
+   réclame une. Rien ici ne décide de quoi que ce soit : la mise en forme suit
+   ce que `qualification.js` demande. */
+.qualif { margin-top: 18px; padding: 18px; border: 1px solid var(--u-line); border-radius: var(--u-radius); background: var(--u-surface); }
+.qualif-libelle { font-weight: 600; color: var(--u-ink); margin-bottom: 6px; }
+.qualif-aide { font-size: 14px; color: var(--u-ink-soft); margin-bottom: 12px; }
+.qualif-choix { display: flex; flex-wrap: wrap; gap: 10px; }
+.qualif-saisie { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.qualif-champ { min-height: 44px; padding: 10px 12px; border: 1px solid var(--u-line); border-radius: var(--u-radius); font: inherit; color: var(--u-ink); background: #fff; max-width: 160px; }
+.qualif-saisie .btn, .qualif-choix .btn { min-height: 44px; }
+.qualif-unite { font-family: var(--u-font-mono); color: var(--u-ink-soft); }
+/* Le sous-titre d'une carte de projet : « Garage, combles, sous-sol… ». */
+.pcard-sub { display: block; font-size: 12.5px; color: var(--u-ink-soft); margin-top: 3px; line-height: 1.3; }
+
 /* --- Ancre « Demander des renseignements » --------------------------------
    L'en-tête est collant : une ancre visée sans précaution amène le haut de la
    section sous la barre, et l'accroche « Parlons de votre projet » disparaît
