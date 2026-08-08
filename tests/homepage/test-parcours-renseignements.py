@@ -179,7 +179,10 @@ def main():
     menu = {m["largeur"]: m for m in donnees["menu"]}
     dial = {m["largeur"]: m for m in donnees["dialogue"]}
 
-    check("Les 7 viewports sont mesurés", len(menu) == 7 and len(dial) == 7)
+    check(
+        "Les 7 viewports sont mesurés sur les trois scénarios",
+        len(menu) == 7 and len(dial) == 7 and len(donnees["hash"]) == 7,
+    )
     if len(menu) != 7:
         print("\n1 CONTROLE(S) EN ECHEC")
         sys.exit(1)
@@ -337,6 +340,66 @@ def main():
         if s and s["scrollWidth"] > s["clientWidth"]
     ]
     check("Aucun débordement horizontal pendant le parcours", not ko, " | ".join(ko))
+
+    # ------------------------------------------------- l'arrivée par l'ancre ---
+    # Depuis une page interne, le clic ne peut pas être intercepté : la page
+    # change. C'est le manque trouvé en recette de production sur e114d69 — la
+    # section était atteinte, mais le formulaire restait fermé.
+
+    hach = {m["largeur"]: m for m in donnees["hash"]}
+    hach_r = {m["largeur"]: m for m in reduit["hash"]}
+
+    ko = []
+    for w in sorted(hach):
+        a = hach[w]["arrivee"]
+        if not a["blocOuvert"]:
+            ko.append("%dpx : bloc fermé à l'arrivée" % w)
+        if a["boutonAria"] != "true":
+            ko.append("%dpx : aria-expanded=%s" % (w, a["boutonAria"]))
+        if a["libelle"] != "Fermer le formulaire":
+            ko.append("%dpx : libellé « %s »" % (w, a["libelle"]))
+        if a["erreurs"]:
+            ko.append("%dpx : erreur JS %s" % (w, a["erreurs"]))
+    check("Arrivée sur l'ancre : le formulaire est déjà ouvert", not ko, " | ".join(ko))
+
+    ko = [
+        "%dpx" % w for w in sorted(hach) if hach[w]["arrivee"]["champFocalise"]
+    ]
+    check("Arrivée par l'ancre : aucun champ du formulaire n'est focalisé", not ko, " | ".join(ko))
+
+    # Un hash étranger ne doit rien déclencher.
+    ko = [
+        "%dpx : bloc ouvert par #tarifs" % w
+        for w in sorted(hach)
+        if hach[w]["autreHash"]["blocOuvert"]
+    ]
+    check("Un hash sans rapport n'ouvre pas le formulaire", not ko, " | ".join(ko))
+
+    # hashchange : ouvre sur l'ancre, et ne referme jamais en la quittant.
+    ko = []
+    for w in sorted(hach):
+        h = hach[w]
+        if h["avantHashchange"]["blocOuvert"]:
+            ko.append("%dpx : bloc déjà ouvert avant tout hash" % w)
+        if not h["apresHashchange"]["blocOuvert"]:
+            ko.append("%dpx : hashchange n'a pas ouvert" % w)
+        if not h["apresAutreHash"]["blocOuvert"]:
+            ko.append("%dpx : quitter l'ancre a REFERMÉ le bloc" % w)
+        if not h["apresRetourHash"]["blocOuvert"] or h["apresRetourHash"]["boutonAria"] != "true":
+            ko.append("%dpx : retour sur l'ancre — état %s" % (w, h["apresRetourHash"]["boutonAria"]))
+    check("hashchange : ouvre sur l'ancre, ne referme jamais en la quittant", not ko, " | ".join(ko))
+
+    # La position n'est vérifiable que là où le défilement s'exécute.
+    ko = []
+    for w in sorted(hach_r):
+        a = hach_r[w]["arrivee"]
+        if a["scrollY"] <= 0:
+            ko.append("%dpx : aucun défilement (scrollY=%s)" % (w, a["scrollY"]))
+            continue
+        ecart = a["section"]["y"] - a["entete"]["bas"]
+        if ecart < -0.5 or ecart > 40:
+            ko.append("%dpx : écart %.1fpx" % (w, ecart))
+    check("Arrivée par l'ancre : la section se pose sous l'en-tête", not ko, " | ".join(ko))
 
     # ------------------------------------------------------------- le rapport -
 

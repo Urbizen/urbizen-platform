@@ -17,6 +17,7 @@
 <pre id="resultat">EN COURS</pre>
 <script>
 const VIEWPORTS = [320, 360, 380, 381, 390, 430, 1280];
+const ANCRE = '#demander-des-renseignements';
 
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -45,10 +46,10 @@ const nom = (el) => {
 };
 
 /** Charge une copie neuve de la maquette : chaque scénario part d'un état vierge. */
-async function page( largeur ) {
+async function page( largeur, hash ) {
 	const f = document.createElement( 'iframe' );
 	f.style.cssText = 'position:fixed;left:-20000px;top:0;height:760px;border:0;width:' + largeur + 'px;';
-	f.src = '/frontend/homepage/index.html';
+	f.src = '/frontend/homepage/index.html' + ( hash || '' );
 	document.body.appendChild( f );
 	await new Promise( ( r ) => f.addEventListener( 'load', r, { once: true } ) );
 	const d = f.contentDocument;
@@ -178,11 +179,56 @@ async function scenarioDialogue( largeur ) {
 	return sortie;
 }
 
+/* Arrivée par l'ancre : le cas des pages internes, où le clic ne peut pas être
+   intercepté puisque la page change. */
+async function scenarioHash( largeur ) {
+	const sortie = { largeur };
+
+	// a) arrivée avec le bon hash
+	let f = await page( largeur, ANCRE );
+	armerErreurs( f );
+	await defilementStable( f.contentWindow );
+	sortie.arrivee = etat( f );
+	sortie.arrivee.hash = f.contentWindow.location.hash;
+	// aucun champ du formulaire ne doit avoir été focalisé
+	const d0 = f.contentDocument;
+	sortie.arrivee.champFocalise = !! ( d0.activeElement && d0.activeElement.closest( '#cta-inquiry-form' )
+		&& /^(INPUT|TEXTAREA|SELECT)$/.test( d0.activeElement.tagName ) );
+	f.remove();
+
+	// b) un hash sans rapport ne doit rien ouvrir
+	f = await page( largeur, '#tarifs' );
+	armerErreurs( f );
+	await defilementStable( f.contentWindow );
+	sortie.autreHash = etat( f );
+	f.remove();
+
+	// c) hashchange vers l'ancre, puis vers un autre hash : ouvre, puis ne referme pas
+	f = await page( largeur, '' );
+	armerErreurs( f );
+	const w = f.contentWindow;
+	sortie.avantHashchange = etat( f );
+	w.location.hash = ANCRE;
+	await defilementStable( w );
+	sortie.apresHashchange = etat( f );
+	// d) idempotence : re-déclencher l'ancre alors que le bloc est déjà ouvert
+	w.location.hash = '#tarifs';
+	await defilementStable( w );
+	sortie.apresAutreHash = etat( f );
+	w.location.hash = ANCRE;
+	await defilementStable( w );
+	sortie.apresRetourHash = etat( f );
+	f.remove();
+
+	return sortie;
+}
+
 ( async () => {
-	const sortie = { menu: [], dialogue: [] };
+	const sortie = { menu: [], dialogue: [], hash: [] };
 	for ( const largeur of VIEWPORTS ) {
 		sortie.menu.push( await scenarioMenu( largeur ) );
 		sortie.dialogue.push( await scenarioDialogue( largeur ) );
+		sortie.hash.push( await scenarioHash( largeur ) );
 	}
 	document.getElementById( 'resultat' ).textContent = 'JSON:' + JSON.stringify( sortie );
 } )().catch( ( e ) => {

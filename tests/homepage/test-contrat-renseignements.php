@@ -158,6 +158,36 @@ foreach ( array( 'source' => $js_src, 'porté' => $js ) as $nom => $doc ) {
 	check( "[$nom] les défilements du bloc respectent la préférence de mouvement",
 		2 === substr_count( $doc, 'behavior: glissement()' )
 		&& str_contains( $doc, 'return reduceMotion ? "auto" : "smooth";' ) );
+
+	/* ------------------------------------------------ arrivée par l'ancre --- */
+
+	check( "[$nom] openInquiryFromHash existe et ne réagit qu'à la bonne ancre",
+		str_contains( $doc, 'var ANCRE_RENSEIGNEMENTS = "#demander-des-renseignements";' )
+		&& str_contains( $doc, 'openInquiryFromHash = function (anime)' )
+		&& str_contains( $doc, 'if (window.location.hash !== ANCRE_RENSEIGNEMENTS) { return; }' ) );
+
+	// Elle passe par la fonction centrale : aucun second endroit ne déplie.
+	check( "[$nom] l'arrivée par l'ancre réutilise openInquiry, sans toucher l'état",
+		1 === preg_match( '#openInquiryFromHash = function \(anime\) \{.*?openInquiry\(\);#s', $doc )
+		&& 1 === substr_count( $doc, 'inquiryPanel.hidden = !open;' ) );
+
+	// L'ancre garantit l'ouverture ; la quitter ne referme jamais. Un formulaire
+	// à moitié rempli ne doit pas disparaître au premier clic vers une autre
+	// section.
+	check( "[$nom] hashchange est écouté, et rien n'y referme le bloc",
+		str_contains( $doc, 'window.addEventListener("hashchange", function () { openInquiryFromHash(true); });' )
+		&& ! preg_match( '#hashchange.*?setInquiry\(false\)#s', $doc ) );
+
+	// À l'arrivée, `instant` — jamais `auto`, qui hériterait du `scroll-behavior:
+	// smooth` de la feuille et animerait douze mille pixels malgré l'intention.
+	check( "[$nom] l'arrivée ne défile jamais en animé, le hashchange respecte la préférence",
+		str_contains( $doc, 'behavior: anime ? glissement() : "instant"' )
+		&& str_contains( $doc, 'openInquiryFromHash(false);' ) );
+
+	// Le recalage attend deux trames : mesuré nécessaire, la page se posant
+	// après le saut d'ancre du navigateur.
+	check( "[$nom] le recalage laisse la mise en page se stabiliser",
+		2 === substr_count( $doc, 'window.requestAnimationFrame(function () {' ) );
 }
 
 /* --------------------------------------------------------------- le CSS ---- */

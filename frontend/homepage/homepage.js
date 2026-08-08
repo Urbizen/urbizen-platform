@@ -177,6 +177,55 @@
     });
   }
 
+  /* ----- Arrivée par l'ancre -----
+     Depuis une page interne, le lien est une navigation véritable : le clic ne
+     peut pas être intercepté, la page change. Le navigateur saute bien à la
+     section — mais le formulaire, lui, reste fermé, et l'on arrive devant un
+     bouton à cliquer là où on venait de demander le formulaire. Manque trouvé en
+     recette de production sur e114d69.
+
+     La règle est volontairement asymétrique : le bon hash **garantit** l'état
+     ouvert, un autre hash ne referme rien. Refermer sur changement d'ancre
+     ferait disparaître un formulaire à moitié rempli au premier clic vers une
+     autre section.
+
+     Aucun état n'est touché ici : tout passe par `openInquiry()`. */
+  var ANCRE_RENSEIGNEMENTS = "#demander-des-renseignements";
+
+  /* `anime` distingue les deux entrées. À l'arrivée sur la page, non : le
+     navigateur a déjà sauté quelque part, et une glissade de douze mille pixels
+     depuis une position fausse n'est pas une transition, c'est du bruit — mesuré
+     à deux secondes et demie d'animation avant de se poser. Sur `hashchange`, la
+     page ne bouge pas sous les pieds et le mouvement fait sens ; il passe alors
+     par `glissement()`, donc par la préférence de l'utilisateur.
+
+     `"instant"` et non `"auto"` : `auto` hérite du `scroll-behavior: smooth` de
+     la feuille, et animait donc malgré l'intention. `instant` n'anime jamais —
+     il ne peut pas contredire une préférence de mouvement réduit. */
+  var openInquiryFromHash = function (anime) {
+    if (window.location.hash !== ANCRE_RENSEIGNEMENTS) { return; }
+    if (!inquiryPanel || !inquirySection) { return; }
+    openInquiry();
+
+    /* Le saut d'ancre du navigateur a lieu avant que la page ait fini de se
+       poser : images et polices arrivent après et repoussent le contenu. Mesuré
+       sur la maquette, la section finissait à trois mille pixels de sa cible.
+       Deux trames suffisent à laisser la mise en page se stabiliser — la
+       première applique l'ouverture, la seconde la mesure. */
+    window.requestAnimationFrame(function () {
+      window.requestAnimationFrame(function () {
+        inquirySection.scrollIntoView({ behavior: anime ? glissement() : "instant", block: "start" });
+      });
+    });
+  };
+
+  if (inquiryPanel && inquirySection) {
+    openInquiryFromHash(false);
+    // Retour arrière, lien vers l'ancre depuis la page elle-même, ancre saisie
+    // à la main : le navigateur ne recharge pas, seul `hashchange` le signale.
+    window.addEventListener("hashchange", function () { openInquiryFromHash(true); });
+  }
+
   /* ----- Planche du HERO : animation au moment où elle devient visible ----- */
   var heroBoard = document.querySelector(".hero-v7 .hero-board");
   if (heroBoard && !reduceMotion) {
