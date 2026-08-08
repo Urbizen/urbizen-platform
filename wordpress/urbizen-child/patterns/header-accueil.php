@@ -53,7 +53,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="3.6"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>
       </button>
       <a class="btn btn-primary btn-sm js-start" href="<?php echo $pfx; ?>#localisation" aria-label="Démarrer mon projet"><span class="nav-cta-long">Démarrer mon projet</span><span class="nav-cta-short" aria-hidden="true">Démarrer</span></a>
-      <button class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
+      <button type="button" class="burger" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="mmenu">
         <span></span><span></span><span></span>
       </button>
     </div>
