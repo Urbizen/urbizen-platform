@@ -297,6 +297,86 @@ def main():
 
     # ------------------------------------------------------------ erreurs ----
 
+    # ------------------- contexte transmis au formulaire de renseignements ---
+
+    # `none` et `confirm` mènent au formulaire de renseignements. Sans contexte,
+    # Urbizen reçoit une demande sans savoir ce que la personne venait de
+    # qualifier — et lui redemande tout.
+    ctx = donnees.get("contexteRenseignements") or {}
+    check("Le scénario de contexte conclut bien « aucune formalité »", ctx.get("statut") == "none", str(ctx.get("statut")))
+
+    message = ctx.get("message") or ""
+    check(
+        "Le message de renseignements reçoit un contexte lisible",
+        "Projet :" in message and "Qualification :" in message,
+        repr(message[:80]),
+    )
+    check(
+        "Le contexte nomme le projet et ses réponses, en clair",
+        "Garage" in message and "indépendant" in message and "Surface" in message,
+        repr(message[:120]),
+    )
+    check(
+        "Le contexte n'expose aucune chaîne technique au client",
+        "{" not in message and "status" not in message and "sp_creee" not in message,
+        repr(message[:120]),
+    )
+    check(
+        "Le verdict y figure comme contexte, pas comme décision",
+        "aucune formalité nationale identifiée" in message,
+        repr(message[-80:]),
+    )
+    check(
+        "Un message déjà écrit par le client n'est jamais réécrit",
+        (ctx.get("messageClient") or "") == "Bonjour, j'ai une question précise.",
+        repr(ctx.get("messageClient")),
+    )
+
+    # ------------------------------ contamination entre projets successifs ---
+
+    # Une extension de 60 m² conclut « permis ». Si le garage héritait de cette
+    # surface, il conclurait sans avoir posé sa première question — et sur une
+    # mesure qui n'est pas la sienne.
+    cont = donnees.get("contamination") or {}
+    check(
+        "L'extension à 60 m² conclut bien « permis » avant le changement",
+        (cont.get("apresExtension") or {}).get("statut") == "pcmi",
+        str((cont.get("apresExtension") or {}).get("statut")),
+    )
+    apres_garage = cont.get("apresGarage") or {}
+    check(
+        "Changer de projet repart de zéro : le garage redemande son implantation",
+        apres_garage.get("statut") == "confirm" and apres_garage.get("questionVisible"),
+        "statut=%s · question=%r" % (apres_garage.get("statut"), apres_garage.get("question")),
+    )
+    check(
+        "Aucune réponse du projet précédent ne contamine le suivant",
+        "accolée" in (apres_garage.get("question") or "").lower()
+        or "indépendante" in (apres_garage.get("question") or "").lower(),
+        apres_garage.get("question"),
+    )
+
+    # ------------------------------------------------------ retour arrière ---
+
+    ret = donnees.get("retour") or {}
+    check("Le retour arrière n'a produit aucune exception", not ret.get("erreur"), str(ret.get("erreur")))
+    apres_retour = ret.get("apres") or {}
+    check(
+        "Après un retour arrière, le tunnel revient sur l'accueil",
+        "index.html" in (ret.get("url") or "") or (ret.get("url") or "").endswith("/"),
+        ret.get("url"),
+    )
+    check(
+        "Après un retour arrière, aucun état incohérent n'est affiché",
+        apres_retour.get("statut") in (None, "dp", "pcmi", "none", "confirm", "conception"),
+        str(apres_retour.get("statut")),
+    )
+    check(
+        "Après un retour arrière, aucune erreur JavaScript",
+        not apres_retour.get("erreurs"),
+        str(apres_retour.get("erreurs")),
+    )
+
     err = [s["nom"] for s in scenarios.values() if s.get("erreurs")]
     check("Aucune erreur JavaScript pendant le tunnel", not err, " | ".join(err))
 

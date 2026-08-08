@@ -50,8 +50,11 @@ function etat(f) {
 		message: (d.getElementById("js-continue-hint") || {}).textContent || "",
 		question: q ? q.textContent.trim() : null,
 		questionVisible: !!(zone && !zone.hidden),
-		navigations: f.contentWindow.__nav.slice(),
-		erreurs: f.contentWindow.__err.slice()
+		/* Après un retour arrière la page est rechargée : les collecteurs posés
+		   à l'ouverture n'existent plus. Leur absence n'est pas une anomalie du
+		   produit, c'est la preuve que la page est neuve. */
+		navigations: (f.contentWindow.__nav || []).slice(),
+		erreurs: (f.contentWindow.__err || []).slice()
 	};
 }
 
@@ -118,6 +121,98 @@ async function jouer(f, projet, reponses) {
 	for (const s of scenarios) {
 		const r = await jouer(f, s.projet, s.reponses);
 		sortie.scenarios.push(Object.assign({ nom: s.nom, projet: s.projet }, r));
+	}
+
+	/* Contexte transmis au formulaire de renseignements. Le vrai formulaire est
+	   un bloc FluentForm, absent de la maquette : sans champ témoin, « le
+	   message est prérempli » passerait au vert sans rien prouver. */
+	{
+		const c = await page();
+		const d = c.contentDocument;
+		const panneau = d.getElementById("cta-inquiry-form");
+		const temoin = d.createElement("textarea");
+		temoin.name = "message-temoin";
+		panneau.appendChild(temoin);
+
+		d.querySelector('.pcard[data-projet="garage"]').click();
+		await attendre(60);
+		for (const rep of ["Indépendante", "4", "Non", "2.5"]) {
+			const zone = d.getElementById("js-qualification");
+			if (!zone || zone.hidden) break;
+			const boutons = [...zone.querySelectorAll(".qualif-choix .btn")];
+			if (boutons.length) { (boutons.find((b) => b.textContent.trim() === rep) || boutons[0]).click(); }
+			else { zone.querySelector(".qualif-champ").value = rep; zone.querySelector(".btn").click(); }
+			await attendre(60);
+		}
+		const statutNone = etat(c).statut;
+
+		c.contentWindow.location.hash = "#demander-des-renseignements";
+		await attendre(500);
+
+		sortie.contexteRenseignements = {
+			statut: statutNone,
+			message: temoin.value,
+			blocOuvert: !panneau.hidden
+		};
+
+		// Un message déjà écrit ne doit jamais être réécrit.
+		temoin.value = "Bonjour, j'ai une question précise.";
+		c.contentWindow.location.hash = "#tarifs";
+		await attendre(120);
+		c.contentWindow.location.hash = "#demander-des-renseignements";
+		await attendre(400);
+		sortie.contexteRenseignements.messageClient = temoin.value;
+
+		c.remove();
+	}
+
+	/* Contamination : les réponses d'un projet ne doivent pas influencer le
+	   suivant. Extension à 60 m² conclut « permis » ; si Garage héritait de
+	   cette surface, il conclurait sans avoir posé sa première question. */
+	{
+		const g = await page();
+		const d = g.contentDocument;
+		d.querySelector('.pcard[data-projet="extension"]').click();
+		await attendre(60);
+		let zone = d.getElementById("js-qualification");
+		zone.querySelector(".qualif-champ").value = "60";
+		zone.querySelector(".btn").click();
+		await attendre(80);
+		const apresExtension = etat(g);
+
+		// L'utilisateur revient aux cartes et choisit un autre projet.
+		d.querySelector('.pcard[data-projet="garage"]').click();
+		await attendre(80);
+		const apresGarage = etat(g);
+
+		sortie.contamination = { apresExtension: apresExtension, apresGarage: apresGarage };
+		g.remove();
+	}
+
+	/* Retour arrière : on quitte vers le formulaire, puis on revient. */
+	{
+		const b = await page();
+		const d = b.contentDocument;
+		d.querySelector('.pcard[data-projet="extension"]').click();
+		await attendre(60);
+		let zone = d.getElementById("js-qualification");
+		zone.querySelector(".qualif-champ").value = "15";
+		zone.querySelector(".btn").click();
+		await attendre(80);
+		const avant = etat(b);
+
+		b.src = "/frontend/formulaires/dp-formulaire.html";
+		await new Promise((r) => b.addEventListener("load", r, { once: true }));
+		await attendre(400);
+
+		b.contentWindow.history.back();
+		await attendre(1200);
+
+		let apres = null, erreurRetour = null;
+		try { apres = etat(b); } catch (e) { erreurRetour = e.message; }
+		sortie.retour = { avant: avant, apres: apres, erreur: erreurRetour,
+			url: b.contentWindow.location.pathname };
+		b.remove();
 	}
 
 	/* Le tunnel expose-t-il ce qu'il a recueilli, pour que le formulaire n'ait

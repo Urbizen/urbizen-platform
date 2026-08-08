@@ -167,6 +167,7 @@
         if (typeof closeContact === "function") { closeContact(false); }
         closeMobileMenu();
         openInquiry();
+        contextualiserRenseignements();
         inquirySection.scrollIntoView({ behavior: glissement(), block: "start" });
         // `preventScroll` : le focus ne doit pas court-circuiter le défilement.
         focusSafe(inquiryTitle || inquiryPanel);
@@ -187,6 +188,85 @@
      autre section.
 
      Aucun état n'est touché ici : tout passe par `openInquiry()`. */
+  /* ----- contexte de qualification vers le formulaire de renseignements -----
+
+     `none` et `confirm` mènent ici. Urbizen doit savoir ce que la personne
+     venait de qualifier, sinon la demande arrive sans son histoire.
+
+     Le formulaire est un bloc FluentForm : sa définition vit en base, et lui
+     ajouter un champ depuis le dépôt serait fragile — un champ inconnu de la
+     définition est écarté à la soumission. On prérempli donc le message, en
+     clair. Le résumé est écrit pour être lu par un humain : aucune chaîne
+     technique, aucun JSON.
+
+     Deux garde-fous. Le message n'est prérempli que s'il est vide : ce que le
+     client a écrit ne se réécrit jamais. Et le verdict est présenté comme un
+     élément de contexte, jamais comme une décision — c'est Urbizen qui tranche.
+  */
+  var LIBELLES_PROJET = {
+    extension: "Extension", garage: "Garage", abri: "Abri de jardin",
+    piscine: "Piscine", pergola: "Pergola", transformation: "Transformation d'un espace existant",
+    facade: "Modification de façade", toiture: "Toiture", solaire: "Panneaux solaires",
+    maison: "Maison individuelle", autre: "Autre projet"
+  };
+
+  var LIBELLES_VERDICT = {
+    none: "aucune formalité nationale identifiée, à confirmer",
+    confirm: "à confirmer"
+  };
+
+  var LIBELLES_REPONSE = {
+    implantation: { accole: "accolé à une construction existante", independant: "indépendant" },
+    local_actuel: { garage: "un garage", combles: "des combles", sous_sol: "un sous-sol ou une cave", dependance: "une dépendance" },
+    local_rattache: { maison: "rattaché à la maison", batiment_separe: "bâtiment séparé" },
+    zone_u: { "true": "oui", "false": "non", unknown: "inconnue" },
+    secteur_protege: { "true": "oui", "false": "non", unknown: "inconnu" },
+    modifie_aspect_exterieur: { "true": "oui", "false": "non" }
+  };
+
+  function resumeQualification(donnees, verdict) {
+    var lignes = [];
+    lignes.push("Projet : " + (LIBELLES_PROJET[donnees.projet] || donnees.projet || "non précisé"));
+
+    if (donnees.local_actuel && LIBELLES_REPONSE.local_actuel[donnees.local_actuel]) {
+      lignes.push("Espace transformé : " + LIBELLES_REPONSE.local_actuel[donnees.local_actuel]);
+    }
+    if (donnees.implantation && LIBELLES_REPONSE.implantation[donnees.implantation]) {
+      lignes.push("Implantation : " + LIBELLES_REPONSE.implantation[donnees.implantation]);
+    }
+    if (donnees.sp_creee !== undefined) { lignes.push("Surface créée : " + donnees.sp_creee + " m²"); }
+    if (donnees.emprise_creee !== undefined) { lignes.push("Emprise créée : " + donnees.emprise_creee + " m²"); }
+    if (donnees.sp_totale !== undefined) { lignes.push("Surface totale après travaux : " + donnees.sp_totale + " m²"); }
+    if (donnees.bassin_m2 !== undefined) { lignes.push("Bassin : " + donnees.bassin_m2 + " m²"); }
+    if (donnees.hauteur_m !== undefined) { lignes.push("Hauteur : " + donnees.hauteur_m + " m"); }
+    if (donnees.zone_u !== undefined) { lignes.push("Zone U du PLU : " + LIBELLES_REPONSE.zone_u[String(donnees.zone_u)]); }
+    if (donnees.secteur_protege !== undefined) { lignes.push("Secteur protégé : " + LIBELLES_REPONSE.secteur_protege[String(donnees.secteur_protege)]); }
+    if (donnees.modifie_aspect_exterieur !== undefined) { lignes.push("Modification extérieure : " + LIBELLES_REPONSE.modifie_aspect_exterieur[String(donnees.modifie_aspect_exterieur)]); }
+
+    lignes.push("Qualification : " + (LIBELLES_VERDICT[verdict.status] || verdict.status));
+
+    return lignes.join("\n");
+  }
+
+  function contextualiserRenseignements() {
+    if (!inquiryPanel) { return; }
+
+    var qualif = null;
+    try {
+      var brut = sessionStorage.getItem("urbizen:qualification");
+      qualif = brut ? JSON.parse(brut) : null;
+    } catch (e) { return; }
+
+    if (!qualif || !qualif.verdict) { return; }
+    if (qualif.verdict.status !== "none" && qualif.verdict.status !== "confirm") { return; }
+
+    var message = inquiryPanel.querySelector("textarea");
+    if (!message || message.value.trim() !== "") { return; }
+
+    message.value = resumeQualification(qualif.donnees || {}, qualif.verdict) + "\n\n";
+    message.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   var ANCRE_RENSEIGNEMENTS = "#demander-des-renseignements";
 
   /* `anime` distingue les deux entrées. À l'arrivée sur la page, non : le
@@ -203,6 +283,7 @@
     if (window.location.hash !== ANCRE_RENSEIGNEMENTS) { return; }
     if (!inquiryPanel || !inquirySection) { return; }
     openInquiry();
+    contextualiserRenseignements();
 
     /* Le saut d'ancre du navigateur a lieu avant que la page ait fini de se
        poser : images et polices arrivent après et repoussent le contenu. Mesuré
