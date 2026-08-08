@@ -266,12 +266,47 @@ final class QualificationUrbanisme {
 	}
 
 	/**
-	 * Transformer un espace existant : garage en pièce, combles, sous-sol.
+	 * Cet espace compte-t-il déjà dans la surface de plancher ?
 	 *
-	 * R.421-17 g) vise la transformation de plus de 5 m² de surface close et
-	 * couverte non comprise dans la surface de plancher. Au-delà des seuils de
-	 * R.421-14, le permis reprend la main : la déclaration ne joue que si le
-	 * permis n'est pas exigé.
+	 * Un garage n'y compte pas : c'est une aire de stationnement. Des combles ou
+	 * un sous-sol n'y comptent pas sous 1,80 m de hauteur. Rend `null` quand la
+	 * réponse dépend d'une donnée absente.
+	 *
+	 * @param array<string, mixed> $donnees
+	 */
+	private static function hors_surface_plancher( array $donnees ): ?bool {
+		$local = $donnees['local_actuel'] ?? null;
+
+		if ( 'garage' === $local ) {
+			return true;
+		}
+
+		if ( in_array( $local, array( 'combles', 'sous_sol', 'dependance' ), true ) ) {
+			$h = $donnees['hauteur_sup_180'] ?? null;
+			if ( false === $h ) { return true; }
+			if ( true === $h ) { return false; }
+			return null;
+		}
+
+		return null;
+	}
+
+	/**
+	 * Transformer un espace existant.
+	 *
+	 * Quatre situations que le mot « transformation » confond :
+	 *
+	 *   A. une surface close et couverte aujourd'hui hors surface de plancher
+	 *      devient un local qui en constitue — R.421-17 g) ;
+	 *   B. un vrai changement de destination au sens de R.151-27 ;
+	 *   C. l'un ou l'autre avec travaux sur la structure ou la façade — R.421-14 c) ;
+	 *   D. un simple réaménagement intérieur.
+	 *
+	 * Le piège est B. Un garage accessoire d'une maison a la destination du local
+	 * principal — l'habitation : R.421-14 le dit en toutes lettres. Le transformer
+	 * en chambre ne change AUCUNE destination. C'est A qui s'applique.
+	 *
+	 * La destination n'est donc jamais demandée : elle se déduit du rattachement.
 	 *
 	 * @param array<string, mixed> $donnees
 	 * @return array{status: string, rule: ?string, reason: string, missing: string[]}
@@ -283,18 +318,62 @@ final class QualificationUrbanisme {
 			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'La surface transformée n’est pas connue.', array( 'sp_creee' ) );
 		}
 
-		if ( true === ( $donnees['changement_destination'] ?? null ) ) {
+		$ferme = $donnees['ferme_couvert'] ?? null;
+
+		if ( false === $ferme ) {
+			return self::r( self::A_CONFIRMER, 'R.421-17', 'Un espace qui n’est pas clos et couvert ne relève pas de la transformation prévue par le code : le projet doit être décrit.', array( 'description' ) );
+		}
+		if ( true !== $ferme ) {
+			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'L’espace transformé doit être clos et couvert pour relever de cette règle.', array( 'ferme_couvert' ) );
+		}
+
+		if ( empty( $donnees['local_actuel'] ) ) {
+			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'La nature du local transformé décide du régime applicable.', array( 'local_actuel' ) );
+		}
+
+		$rattache   = $donnees['local_rattache'] ?? null;
+		$changement = false;
+
+		if ( 'batiment_separe' === $rattache ) {
+			$destination = $donnees['destination_actuelle'] ?? null;
+			if ( null === $destination ) {
+				return self::r( self::A_CONFIRMER, 'R.151-27', 'Un bâtiment séparé a sa propre destination : la connaître décide s’il y a changement de destination.', array( 'destination_actuelle' ) );
+			}
+			$changement = 'habitation' !== $destination;
+		} elseif ( 'maison' !== $rattache ) {
+			return self::r( self::A_CONFIRMER, 'R.421-14 c)', 'Un local rattaché au logement en suit la destination ; un bâtiment séparé a la sienne.', array( 'local_rattache' ) );
+		}
+
+		if ( $changement ) {
 			$travaux = $donnees['modifie_structure_ou_facade'] ?? null;
 			if ( true === $travaux ) {
-				return self::r( self::PCMI, 'R.421-14 c)', 'Changement de destination avec modification des structures porteuses ou de la façade : permis de construire.' );
+				return self::r( self::PCMI, 'R.421-14 c)', 'Changement de destination accompagné de travaux sur les structures porteuses ou la façade : permis de construire.' );
 			}
 			if ( false !== $travaux ) {
 				return self::r( self::A_CONFIRMER, 'R.421-14 c)', 'Un changement de destination bascule en permis s’il s’accompagne de travaux sur la structure porteuse ou la façade.', array( 'modifie_structure_ou_facade' ) );
 			}
+			return self::r( self::DP, 'R.421-17 b)', 'Changement de destination sans travaux sur la structure ni la façade : déclaration préalable.' );
+		}
+
+		$hors = self::hors_surface_plancher( $donnees );
+
+		if ( null === $hors ) {
+			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'Sous 1,80 m de hauteur, l’espace ne compte pas dans la surface de plancher : la réponse change le régime.', array( 'hauteur_sup_180' ) );
+		}
+
+		if ( ! $hors ) {
+			$aspect = $donnees['modifie_aspect_exterieur'] ?? null;
+			if ( true === $aspect ) {
+				return self::r( self::DP, 'R.421-17 a)', 'Réaménagement intérieur avec modification de l’aspect extérieur : déclaration préalable.' );
+			}
+			if ( false === $aspect ) {
+				return self::r( self::AUCUNE, 'R.421-17', 'Réaménagement intérieur sans création de surface de plancher ni modification extérieure : aucune formalité au titre du code de l’urbanisme.' );
+			}
+			return self::r( self::A_CONFIRMER, 'R.421-17 a)', 'Cet espace compte déjà dans la surface de plancher : seule une modification extérieure déclencherait une formalité.', array( 'modifie_aspect_exterieur' ) );
 		}
 
 		if ( $cree <= self::EXISTANT_DP ) {
-			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'Transformation de ' . self::m( $cree ) . ' m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.', array( 'aspect_exterieur' ) );
+			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'Transformation de ' . self::m( $cree ) . ' m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.', array( 'modifie_aspect_exterieur' ) );
 		}
 
 		$sur_seuils = self::sur_existant( $donnees, 'Transformation' );

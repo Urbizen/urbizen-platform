@@ -222,33 +222,122 @@
 	}
 
 	/* --------------------------------------------- transformer un existant --
-	   Garage en chambre, combles, sous-sol, dépendance. R.421-17 g) vise la
-	   transformation de plus de 5 m² de surface close et couverte non comprise
-	   dans la surface de plancher. Au-delà des seuils de R.421-14, le permis
-	   reprend la main : R.421-17 ne joue que si le permis n'est pas exigé. */
+
+	   Le cas prioritaire est le garage transformé en pièce habitable, et il
+	   demande de distinguer quatre situations que le mot « transformation »
+	   confond :
+
+	     A. une surface close et couverte AUJOURD'HUI hors surface de plancher
+	        devient un local qui en constitue — R.421-17 g) ;
+	     B. un vrai changement de destination au sens de R.151-27 ;
+	     C. l'un ou l'autre accompagné de travaux sur la structure porteuse ou
+	        la façade — R.421-14 c) ;
+	     D. un simple réaménagement intérieur, qui ne crée aucune surface de
+	        plancher et ne change aucune destination.
+
+	   Le piège est B. Un garage accessoire d'une maison a la destination du
+	   local principal — l'habitation : R.421-14 le dit en toutes lettres, « les
+	   locaux accessoires sont réputés avoir la même destination que le local
+	   principal ». Le transformer en chambre ne change donc AUCUNE destination,
+	   et l'appeler « changement d'usage » ferait basculer à tort en permis.
+	   C'est A qui s'applique, pas B.
+
+	   La destination n'est donc jamais demandée : elle se déduit. Un local
+	   rattaché à la maison reste en habitation ; seul un bâtiment séparé d'une
+	   autre destination en change. */
+
+	/* Cet espace compte-t-il déjà dans la surface de plancher ?
+	   Un garage n'y compte pas : c'est une aire de stationnement. Des combles ou
+	   un sous-sol n'y comptent pas sous 1,80 m de hauteur. Rendu `null` quand la
+	   réponse dépend d'une donnée absente. */
+	function horsSurfacePlancher(d) {
+		if (d.local_actuel === "garage") { return true; }
+
+		if (d.local_actuel === "combles" || d.local_actuel === "sous_sol") {
+			if (d.hauteur_sup_180 === false) { return true; }
+			if (d.hauteur_sup_180 === true) { return false; }
+			return null;
+		}
+
+		if (d.local_actuel === "dependance") {
+			// Une dépendance close et couverte suit la même logique de hauteur.
+			if (d.hauteur_sup_180 === false) { return true; }
+			if (d.hauteur_sup_180 === true) { return false; }
+			return null;
+		}
+
+		return null;
+	}
+
 	function transformation(d) {
 		var cree = creation(d);
 		if (cree === null) {
 			return resultat("confirm", "R.421-17 g)", "La surface transformée n'est pas connue.", ["sp_creee"]);
 		}
 
-		// Un changement de destination accompagné de travaux sur la structure
-		// porteuse ou la façade relève du permis (R.421-14 c).
-		if (d.changement_destination === true) {
+		if (d.ferme_couvert === false) {
+			// Sans espace clos et couvert, ce n'est pas la transformation de
+			// R.421-17 g) : on ne sait pas ce que c'est.
+			return resultat("confirm", "R.421-17", "Un espace qui n'est pas clos et couvert ne relève pas de la transformation prévue par le code : le projet doit être décrit.", ["description"]);
+		}
+		if (d.ferme_couvert !== true) {
+			return resultat("confirm", "R.421-17 g)", "L'espace transformé doit être clos et couvert pour relever de cette règle.", ["ferme_couvert"]);
+		}
+
+		if (!d.local_actuel) {
+			return resultat("confirm", "R.421-17 g)", "La nature du local transformé décide du régime applicable.", ["local_actuel"]);
+		}
+
+		/* B — le changement de destination se déduit du rattachement, jamais
+		   d'une question sur « l'usage ». */
+		var changement = false;
+
+		if (d.local_rattache === "batiment_separe") {
+			if (d.destination_actuelle === undefined || d.destination_actuelle === null) {
+				return resultat("confirm", "R.151-27", "Un bâtiment séparé a sa propre destination : la connaître décide s'il y a changement de destination.", ["destination_actuelle"]);
+			}
+			changement = d.destination_actuelle !== "habitation";
+		} else if (d.local_rattache !== "maison") {
+			return resultat("confirm", "R.421-14 c)", "Un local rattaché au logement en suit la destination ; un bâtiment séparé a la sienne.", ["local_rattache"]);
+		}
+
+		/* C — un changement de destination avec travaux sur la structure
+		   porteuse ou la façade relève du permis. */
+		if (changement) {
 			if (d.modifie_structure_ou_facade === true) {
-				return resultat("pcmi", "R.421-14 c)", "Changement de destination avec modification des structures porteuses ou de la façade : permis de construire.");
+				return resultat("pcmi", "R.421-14 c)", "Changement de destination accompagné de travaux sur les structures porteuses ou la façade : permis de construire.");
 			}
 			if (d.modifie_structure_ou_facade !== false) {
 				return resultat("confirm", "R.421-14 c)", "Un changement de destination bascule en permis s'il s'accompagne de travaux sur la structure porteuse ou la façade.", ["modifie_structure_ou_facade"]);
 			}
+			return resultat("dp", "R.421-17 b)", "Changement de destination sans travaux sur la structure ni la façade : déclaration préalable.");
 		}
 
+		var hors = horsSurfacePlancher(d);
+		if (hors === null) {
+			return resultat("confirm", "R.421-17 g)", "Sous 1,80 m de hauteur, l'espace ne compte pas dans la surface de plancher : la réponse change le régime.", ["hauteur_sup_180"]);
+		}
+
+		/* D — l'espace compte déjà dans la surface de plancher : la
+		   transformation n'en crée pas. Seule une modification de l'aspect
+		   extérieur déclencherait alors une déclaration. */
+		if (!hors) {
+			if (d.modifie_aspect_exterieur === true) {
+				return resultat("dp", "R.421-17 a)", "Réaménagement intérieur avec modification de l'aspect extérieur : déclaration préalable.");
+			}
+			if (d.modifie_aspect_exterieur === false) {
+				return resultat("none", "R.421-17", "Réaménagement intérieur sans création de surface de plancher ni modification extérieure : aucune formalité au titre du code de l'urbanisme.");
+			}
+			return resultat("confirm", "R.421-17 a)", "Cet espace compte déjà dans la surface de plancher : seule une modification extérieure déclencherait une formalité.", ["modifie_aspect_exterieur"]);
+		}
+
+		/* A — R.421-17 g) : plus de cinq mètres carrés de surface close et
+		   couverte deviennent de la surface de plancher. Au-delà des seuils de
+		   R.421-14, le permis reprend la main. */
 		if (cree <= S.EXISTANT_DP) {
-			return resultat("confirm", "R.421-17 g)", "Transformation de " + cree + " m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.", ["aspect_exterieur"]);
+			return resultat("confirm", "R.421-17 g)", "Transformation de " + cree + " m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.", ["modifie_aspect_exterieur"]);
 		}
 
-		// Au-delà de 5 m², les seuils de l'existant s'appliquent : la
-		// transformation crée de la surface de plancher.
 		var surSeuils = surExistant(d, "Transformation");
 		if (surSeuils.status === "dp") {
 			return resultat("dp", "R.421-17 g)", "Transformation de " + cree + " m² de surface close et couverte en surface de plancher : déclaration préalable.");
