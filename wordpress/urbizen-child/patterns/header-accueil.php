@@ -79,11 +79,11 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
           <span class="contact-ch-txt"><span class="contact-ch-title">Réserver un appel</span><span class="contact-ch-sub">Bientôt disponible</span></span>
           </span>
         </li>
-        <li class="contact-ch is-soon">
-          <span class="contact-ch-link" role="button" aria-disabled="true">
+        <li class="contact-ch">
+          <a class="contact-ch-link js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">
             <span class="contact-ch-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5.5" width="17" height="13" rx="2"/><path d="M4 6.5l8 6 8-6"/></svg></span>
-          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Bientôt disponible</span></span>
-          </span>
+          <span class="contact-ch-txt"><span class="contact-ch-title">Écrire à Urbizen</span><span class="contact-ch-sub">Réponse sous 24 h ouvrées</span></span>
+          </a>
         </li>
       </ul>
     </div>
@@ -95,6 +95,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
+      <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
   </div>

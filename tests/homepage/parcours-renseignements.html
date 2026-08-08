@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc du parcours « Écrire à Urbizen »</title>
+<!--
+  Page de mesure chargée par `test-parcours-renseignements.py` dans un Chrome
+  sans interface. Elle rejoue le parcours réel dans une iframe de même origine
+  et relève des états observables : attributs ARIA, visibilité, élément
+  focalisé, position de la section, défilement du document.
+
+  Elle ne décide de rien. Les verdicts sont dans le banc Python.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style>
+</head>
+<body>
+<pre id="resultat">EN COURS</pre>
+<script>
+const VIEWPORTS = [320, 360, 380, 381, 390, 430, 1280];
+const ANCRE = '#demander-des-renseignements';
+
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Le défilement est animé (`scroll-behavior: smooth`) : un délai fixe serait
+   soit trop court, soit du temps perdu. On attend qu'il se pose. */
+async function defilementStable( w ) {
+	let precedent = null, stables = 0;
+	for ( let i = 0; i < 40 && stables < 3; i++ ) {
+		await attendre( 80 );
+		const y = Math.round( w.scrollY );
+		stables = ( y === precedent ) ? stables + 1 : 0;
+		precedent = y;
+	}
+}
+
+const rect = (el) => {
+	const r = el.getBoundingClientRect();
+	return { y: +r.top.toFixed(1), bas: +(r.top + r.height).toFixed(1), h: +r.height.toFixed(1) };
+};
+
+const nom = (el) => {
+	if (!el) { return null; }
+	if (el.id) { return el.tagName.toLowerCase() + '#' + el.id; }
+	const cl = (el.className || '').toString().trim().split(/\s+/).filter(Boolean)[0];
+	return el.tagName.toLowerCase() + (cl ? '.' + cl : '');
+};
+
+/** Charge une copie neuve de la maquette : chaque scénario part d'un état vierge. */
+async function page( largeur, hash ) {
+	const f = document.createElement( 'iframe' );
+	f.style.cssText = 'position:fixed;left:-20000px;top:0;height:760px;border:0;width:' + largeur + 'px;';
+	f.src = '/frontend/homepage/index.html' + ( hash || '' );
+	document.body.appendChild( f );
+	await new Promise( ( r ) => f.addEventListener( 'load', r, { once: true } ) );
+	const d = f.contentDocument;
+	await Promise.race( [ d.fonts.ready, attendre( 3000 ) ] );
+
+	/* Le formulaire est un bloc FluentForm : il n'existe que sous WordPress, pas
+	   dans la maquette. Sans lui, « le focus ne doit pas atterrir dans un champ »
+	   ne veut rien dire — il n'y a aucun champ où atterrir, et le banc passerait
+	   au vert sans rien prouver. On installe donc un champ témoin, à la place et
+	   dans l'ordre où FluentForm rendra le sien. */
+	const panneau = d.getElementById( 'cta-inquiry-form' );
+	if ( panneau && ! panneau.querySelector( 'input, textarea, select' ) ) {
+		const champ = d.createElement( 'input' );
+		champ.type = 'text';
+		champ.className = 'banc-champ-temoin';
+		champ.setAttribute( 'aria-label', 'champ témoin du banc' );
+		panneau.appendChild( champ );
+	}
+
+	return f;
+}
+
+/** État observable du bloc de renseignements et de ses surfaces voisines. */
+function etat( f ) {
+	const d = f.contentDocument, w = f.contentWindow;
+	const burger = d.querySelector( '.burger' );
+	const mmenu = d.getElementById( 'mmenu' );
+	const dialogue = d.getElementById( 'contact-panel' );
+	const bouton = d.querySelector( '.js-toggle-inquiry' );
+	const panneau = d.getElementById( 'cta-inquiry-form' );
+	const section = d.getElementById( 'demander-des-renseignements' );
+	const entete = d.querySelector( 'header.site' );
+	const label = bouton ? bouton.querySelector( 'span' ) : null;
+
+	return {
+		menuOuvert: mmenu ? ! mmenu.hidden : null,
+		burgerAria: burger ? burger.getAttribute( 'aria-expanded' ) : null,
+		burgerVisible: burger ? getComputedStyle( burger ).display !== 'none' : null,
+		dialogueOuvert: dialogue ? ! dialogue.hidden : null,
+		dialogueAria: [ ...d.querySelectorAll( '.link-tel, .js-open-contact' ) ]
+			.map( ( t ) => t.getAttribute( 'aria-expanded' ) ),
+		defilementBloque: d.documentElement.style.overflow === 'hidden',
+		blocOuvert: panneau ? ! panneau.hidden : null,
+		boutonAria: bouton ? bouton.getAttribute( 'aria-expanded' ) : null,
+		libelle: label ? label.textContent.trim() : null,
+		focalise: nom( d.activeElement ),
+		entete: entete ? rect( entete ) : null,
+		section: section ? rect( section ) : null,
+		scrollY: Math.round( w.scrollY ),
+		clientWidth: d.documentElement.clientWidth,
+		scrollWidth: d.documentElement.scrollWidth,
+		erreurs: w.__err ? w.__err.slice() : [],
+	};
+}
+
+function armerErreurs( f ) {
+	const w = f.contentWindow;
+	w.__err = [];
+	w.addEventListener( 'error', ( e ) => w.__err.push( e.message ) );
+}
+
+async function scenarioMenu( largeur ) {
+	const f = await page( largeur );
+	const d = f.contentDocument;
+	armerErreurs( f );
+
+	const burger = d.querySelector( '.burger' );
+	const lienMenu = d.querySelector( '#mmenu .js-open-inquiry' );
+
+	const sortie = { largeur, lienPresent: !! lienMenu, burgerVisible: getComputedStyle( burger ).display !== 'none' };
+	sortie.href = lienMenu ? lienMenu.getAttribute( 'href' ) : null;
+
+	if ( ! lienMenu || ! sortie.burgerVisible ) { f.remove(); return sortie; }
+
+	burger.click();
+	await attendre( 120 );
+	sortie.apresOuvertureMenu = etat( f );
+
+	lienMenu.click();
+	await defilementStable( f.contentWindow );
+	sortie.apresClic = etat( f );
+
+	// Idempotence : le menu est refermé, on rouvre pour recliquer le même lien.
+	burger.click();
+	await attendre( 120 );
+	lienMenu.click();
+	await defilementStable( f.contentWindow );
+	sortie.apresSecondClic = etat( f );
+
+	f.remove();
+	return sortie;
+}
+
+async function scenarioDialogue( largeur ) {
+	const f = await page( largeur );
+	const d = f.contentDocument;
+	armerErreurs( f );
+
+	const declencheur = d.querySelector( '.link-tel' );
+	const sortie = { largeur };
+
+	declencheur.click();
+	await attendre( 200 );
+	sortie.apresOuvertureDialogue = etat( f );
+
+	// Le panneau est déplacé sous l'hôte à la 1re ouverture : on le rerequête.
+	const lien = d.querySelector( '#contact-panel .js-open-inquiry' );
+	sortie.lienPresent = !! lien;
+	sortie.href = lien ? lien.getAttribute( 'href' ) : null;
+
+	if ( ! lien ) { f.remove(); return sortie; }
+
+	lien.click();
+	await defilementStable( f.contentWindow );
+	sortie.apresClic = etat( f );
+
+	// Le bouton natif doit continuer de basculer dans les deux sens.
+	const bouton = d.querySelector( '.js-toggle-inquiry' );
+	bouton.click();
+	await attendre( 200 );
+	sortie.apresBoutonFerme = etat( f );
+	bouton.click();
+	await attendre( 200 );
+	sortie.apresBoutonOuvre = etat( f );
+
+	f.remove();
+	return sortie;
+}
+
+/* Arrivée par l'ancre : le cas des pages internes, où le clic ne peut pas être
+   intercepté puisque la page change. */
+async function scenarioHash( largeur ) {
+	const sortie = { largeur };
+
+	// a) arrivée avec le bon hash
+	let f = await page( largeur, ANCRE );
+	armerErreurs( f );
+	await defilementStable( f.contentWindow );
+	sortie.arrivee = etat( f );
+	sortie.arrivee.hash = f.contentWindow.location.hash;
+	// aucun champ du formulaire ne doit avoir été focalisé
+	const d0 = f.contentDocument;
+	sortie.arrivee.champFocalise = !! ( d0.activeElement && d0.activeElement.closest( '#cta-inquiry-form' )
+		&& /^(INPUT|TEXTAREA|SELECT)$/.test( d0.activeElement.tagName ) );
+	f.remove();
+
+	// b) un hash sans rapport ne doit rien ouvrir
+	f = await page( largeur, '#tarifs' );
+	armerErreurs( f );
+	await defilementStable( f.contentWindow );
+	sortie.autreHash = etat( f );
+	f.remove();
+
+	// c) hashchange vers l'ancre, puis vers un autre hash : ouvre, puis ne referme pas
+	f = await page( largeur, '' );
+	armerErreurs( f );
+	const w = f.contentWindow;
+	sortie.avantHashchange = etat( f );
+	w.location.hash = ANCRE;
+	await defilementStable( w );
+	sortie.apresHashchange = etat( f );
+	// d) idempotence : re-déclencher l'ancre alors que le bloc est déjà ouvert
+	w.location.hash = '#tarifs';
+	await defilementStable( w );
+	sortie.apresAutreHash = etat( f );
+	w.location.hash = ANCRE;
+	await defilementStable( w );
+	sortie.apresRetourHash = etat( f );
+	f.remove();
+
+	return sortie;
+}
+
+( async () => {
+	const sortie = { menu: [], dialogue: [], hash: [] };
+	for ( const largeur of VIEWPORTS ) {
+		sortie.menu.push( await scenarioMenu( largeur ) );
+		sortie.dialogue.push( await scenarioDialogue( largeur ) );
+		sortie.hash.push( await scenarioHash( largeur ) );
+	}
+	document.getElementById( 'resultat' ).textContent = 'JSON:' + JSON.stringify( sortie );
+} )().catch( ( e ) => {
+	document.getElementById( 'resultat' ).textContent = 'ERREUR:' + ( e && e.message ? e.message : e );
+} );
+</script>
+</body>
+</html>
