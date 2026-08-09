@@ -662,26 +662,26 @@
       "donnees": {
         "projet": "facade"
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-17"
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
     },
     {
-      "nom": "façade avec changement de destination",
+      "nom": "la carte façade reste une DP directe malgré des données parasites",
       "donnees": {
         "projet": "facade",
         "changement_destination": true,
         "modifie_structure_ou_facade": true
       },
-      "attendu": "pcmi",
-      "rule": "R.421-14 c)"
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
     },
     {
       "nom": "toiture",
       "donnees": {
         "projet": "toiture"
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-17"
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
     },
     {
       "nom": "panneaux solaires hors secteur protégé",
@@ -689,16 +689,16 @@
         "projet": "solaire",
         "secteur_protege": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-9 / R.421-17"
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
     },
     {
       "nom": "panneaux solaires, secteur inconnu",
       "donnees": {
         "projet": "solaire"
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-9 / R.421-17"
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
     },
     {
       "nom": "maison individuelle",

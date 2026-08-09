@@ -84,17 +84,13 @@ final class QualificationUrbanisme {
 				return self::transformation( $donnees );
 
 			case 'facade':
-				if ( true === ( $donnees['modifie_structure_ou_facade'] ?? null )
-					&& true === ( $donnees['changement_destination'] ?? null ) ) {
-					return self::r( self::PCMI, 'R.421-14 c)', 'Modification de la façade accompagnant un changement de destination : permis de construire.' );
-				}
-				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-17', 'Il faut distinguer l’entretien à l’identique d’une modification de l’aspect extérieur et d’un changement de destination.', array( 'description' ) );
+				return self::r( self::DP, 'R.421-17 a)', 'Modification de façade : déclaration préalable.' );
 
 			case 'toiture':
-				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-17', 'Il faut distinguer l’entretien à l’identique d’une modification de l’aspect extérieur, du volume ou de la structure.', array( 'description' ) );
+				return self::r( self::DP, 'R.421-17 a)', 'Modification de toiture ou fenêtre de toit : déclaration préalable.' );
 
 			case 'solaire':
-				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-9 / R.421-17', 'La formalité dépend notamment d’une pose en toiture ou au sol, de la hauteur, de la puissance et du secteur.', array( 'description' ) );
+				return self::r( self::DP, 'R.421-17 a)', 'Panneaux solaires : déclaration préalable.' );
 
 			case 'maison':
 				return self::r( self::PCMI, 'R.421-1', 'Construction d’une maison individuelle : permis de construire.' );

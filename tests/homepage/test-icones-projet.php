@@ -21,7 +21,7 @@ function check( $label, $cond ) {
 	printf( "%-76s %s\n", $label, $cond ? 'OK' : 'ECHEC' );
 }
 
-/** Les onze cartes, dans l'ordre, telles qu'elles existent sur main. */
+/** Les dix cartes, dans l'ordre, telles qu'elles existent sur l'accueil. */
 $attendu = array(
 	'piscine'   => 'Piscine',
 	'extension' => 'Extension',
@@ -33,7 +33,6 @@ $attendu = array(
 	'solaire'   => 'Panneaux solaires',
 	'maison'    => 'Maison individuelle',
 	'transformation' => 'Transformer un espace existant',
-	'autre'     => 'Autre projet',
 );
 
 $sources = array(
@@ -48,10 +47,10 @@ foreach ( $sources as $nom => $chemin ) {
 	preg_match_all( '#<button type="button" class="pcard".*?</button>#s', $h, $m );
 	$cartes = $m[0];
 
-	check( "[$nom] exactement 11 .pcard", 11 === count( $cartes ) );
-	check( "[$nom] exactement 11 .pcard-ico", 11 === substr_count( $h, 'class="pcard-ico"' ) );
+	check( "[$nom] exactement 10 .pcard", 10 === count( $cartes ) );
+	check( "[$nom] exactement 10 .pcard-ico", 10 === substr_count( $h, 'class="pcard-ico"' ) );
 
-	if ( 11 !== count( $cartes ) ) { continue; }
+	if ( 10 !== count( $cartes ) ) { continue; }
 
 	// --- un SVG par icône, et nulle part ailleurs dans les cartes ---
 	$svgs = array();
@@ -60,11 +59,11 @@ foreach ( $sources as $nom => $chemin ) {
 		$svgs = array_merge( $svgs, $s[0] );
 	}
 
-	check( "[$nom] exactement 11 SVG dans les cartes", 11 === count( $svgs ) );
+	check( "[$nom] exactement 10 SVG dans les cartes", 10 === count( $svgs ) );
 	check( "[$nom] chaque carte porte un SVG et un seul",
-		11 === count( array_filter( $cartes, static fn( $c ) => 1 === substr_count( $c, '<svg' ) ) ) );
+		10 === count( array_filter( $cartes, static fn( $c ) => 1 === substr_count( $c, '<svg' ) ) ) );
 	check( "[$nom] chaque SVG est dans son .pcard-ico",
-		11 === preg_match_all( '#<span class="pcard-ico" aria-hidden="true"><svg #', $h ) );
+		10 === preg_match_all( '#<span class="pcard-ico" aria-hidden="true"><svg #', $h ) );
 
 	// --- aucun ancien symbole ne subsiste ---
 	$anciens = array( '▢', '▤', '▣', '◱', '◲', '◫', '◪', '☼', '⌂', '✎' );
@@ -75,17 +74,17 @@ foreach ( $sources as $nom => $chemin ) {
 	if ( array() !== $restants ) { echo '    reste : ' . implode( ' ', $restants ) . "\n"; }
 
 	// --- décoratifs, homogènes, sans texte ---
-	check( "[$nom] les 11 SVG sont aria-hidden",
-		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'aria-hidden="true"' ) ) ) );
-	check( "[$nom] les 11 SVG sont focusable=\"false\"",
-		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'focusable="false"' ) ) ) );
+	check( "[$nom] les 10 SVG sont aria-hidden",
+		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'aria-hidden="true"' ) ) ) );
+	check( "[$nom] les 10 SVG sont focusable=\"false\"",
+		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'focusable="false"' ) ) ) );
 
 	$viewbox = array();
 	foreach ( $svgs as $s ) {
 		if ( preg_match( '#viewBox="([^"]*)"#', $s, $v ) ) { $viewbox[] = $v[1]; }
 	}
 
-	check( "[$nom] un seul viewBox pour les 11 icônes : " . implode( ', ', array_unique( $viewbox ) ),
+	check( "[$nom] un seul viewBox pour les 10 icônes : " . implode( ', ', array_unique( $viewbox ) ),
 		array( '0 0 24 24' ) === array_values( array_unique( $viewbox ) ) );
 	check( "[$nom] aucun texte dans les icônes",
 		0 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, '<text' ) ) ) );
@@ -93,12 +92,12 @@ foreach ( $sources as $nom => $chemin ) {
 		0 === count( array_filter( $svgs, static fn( $s ) => preg_match( '#<title|<desc#', $s ) ) ) );
 
 	// --- homogénéité graphique ---
-	check( "[$nom] les 11 icônes partagent la même épaisseur de trait",
-		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke-width="1.5"' ) ) ) );
-	check( "[$nom] les 11 icônes héritent de la couleur du texte",
-		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke="currentColor"' ) ) ) );
+	check( "[$nom] les 10 icônes partagent la même épaisseur de trait",
+		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke-width="1.5"' ) ) ) );
+	check( "[$nom] les 10 icônes héritent de la couleur du texte",
+		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke="currentColor"' ) ) ) );
 	check( "[$nom] extrémités et jointures cohérentes",
-		11 === count( array_filter( $svgs, static fn( $s ) =>
+		10 === count( array_filter( $svgs, static fn( $s ) =>
 			str_contains( $s, 'stroke-linecap="round"' ) && str_contains( $s, 'stroke-linejoin="round"' ) ) ) );
 	check( "[$nom] aucun dégradé, aucune ombre",
 		0 === count( array_filter( $svgs, static fn( $s ) => preg_match( '#Gradient|filter=|drop-shadow#', $s ) ) ) );
@@ -120,7 +119,9 @@ foreach ( $sources as $nom => $chemin ) {
 		$i++;
 	}
 
-	check( "[$nom] les 11 data-projet et leurs titres, dans l'ordre", array() === $ecarts );
+	check( "[$nom] les 10 data-projet et leurs titres, dans l'ordre", array() === $ecarts );
+	check( "[$nom] la carte Autre projet est absente",
+		! str_contains( $h, 'data-projet="autre"' ) && ! str_contains( $h, '>Autre projet<' ) );
 	check( "[$nom] aucun sous-texte sous la carte de transformation",
 		! str_contains( $h, 'pcard-sub' )
 		&& ! str_contains( $h, 'Garage, combles, sous-sol, dépendance' ) );
@@ -142,7 +143,7 @@ foreach ( $sources as $nom => $chemin ) {
 
 	// --- l'interaction reste intacte ---
 	check( "[$nom] les cartes restent des <button type=\"button\">",
-		11 === preg_match_all( '#<button type="button" class="pcard" data-projet=#', $h ) );
+		10 === preg_match_all( '#<button type="button" class="pcard" data-projet=#', $h ) );
 	check( "[$nom] aucun gestionnaire d'événement en ligne",
 		0 === count( array_filter( $cartes, static fn( $c ) => preg_match( '#\son[a-z]+\s*=#', $c ) ) ) );
 }
@@ -157,6 +158,9 @@ check( 'JavaScript : la sélection repose toujours sur .pcard et .is-selected',
 	&& str_contains( $js_wp, 'getAttribute("data-projet")' ) );
 check( 'JavaScript : aucune référence à .pcard-ico', ! str_contains( $js_wp, 'pcard-ico' ) );
 check( 'JavaScript : aria-pressed toujours géré', str_contains( $js_wp, 'aria-pressed' ) );
+check( 'JavaScript : aucune saisie libre « Décrivez votre projet » sur l’accueil',
+	! str_contains( $js_src, 'Décrivez votre projet en quelques mots' )
+	&& ! str_contains( $js_wp, 'Décrivez votre projet en quelques mots' ) );
 
 // --------------------------------------------------------------- le CSS ----
 $css_src = file_get_contents( $racine . '/frontend/homepage/homepage.css' );

@@ -401,22 +401,19 @@
 
 		transformation: transformation,
 
-		/* Les cartes « façade », « toiture » et « solaire » sont trop larges pour
-		   trancher sans description : entretien à l'identique, installation au sol,
-		   changement de destination et structure n'ont pas le même régime. */
-		facade: function (d) {
-			if (d.modifie_structure_ou_facade === true && d.changement_destination === true) {
-				return resultat("pcmi", "R.421-14 c)", "Modification de la façade accompagnant un changement de destination : permis de construire.");
-			}
-			return resultat("confirm", "R.421-2 / R.421-17", "Il faut distinguer l'entretien à l'identique d'une modification de l'aspect extérieur et d'un changement de destination.", ["description"]);
+		/* Ces cartes décrivent des travaux extérieurs destinés au formulaire DP.
+		   Les précisions sont recueillies dans ce formulaire, puis vérifiées par
+		   Urbizen après l'envoi : aucun texte libre intermédiaire n'est demandé. */
+		facade: function () {
+			return resultat("dp", "R.421-17 a)", "Modification de façade : déclaration préalable.");
 		},
 
 		toiture: function () {
-			return resultat("confirm", "R.421-2 / R.421-17", "Il faut distinguer l'entretien à l'identique d'une modification de l'aspect extérieur, du volume ou de la structure.", ["description"]);
+			return resultat("dp", "R.421-17 a)", "Modification de toiture ou fenêtre de toit : déclaration préalable.");
 		},
 
 		solaire: function () {
-			return resultat("confirm", "R.421-2 / R.421-9 / R.421-17", "La formalité dépend notamment d'une pose en toiture ou au sol, de la hauteur, de la puissance et du secteur.", ["description"]);
+			return resultat("dp", "R.421-17 a)", "Panneaux solaires : déclaration préalable.");
 		},
 
 		maison: function () {
