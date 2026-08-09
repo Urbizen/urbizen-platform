@@ -52,6 +52,7 @@ foreach (
 		'src/Forms/AdresseTerrain.php',
 		'src/Forms/ConceptionPricingStrategy.php',
 		'src/Forms/PricingStrategyRegistry.php',
+		'src/Forms/QualificationUrbanisme.php',
 		'src/Forms/Validator.php',
 		'src/Forms/Renderer.php',
 		'src/Forms/StepFormRenderConfig.php',

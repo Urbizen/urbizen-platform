@@ -29,6 +29,11 @@ final class ValidationMetierDeclarationPrealable extends ValidationMetierProjets
 	protected const BAREME = PricingDeclarationPrealable::class;
 
 	/**
+	 * @var string
+	 */
+	protected const REGIME = 'dp';
+
+	/**
 	 * Les deux adresses sont exigées.
 	 *
 	 * Une déclaration préalable sans adresse de déclarant ou sans adresse de

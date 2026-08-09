@@ -47,8 +47,8 @@ foreach ( $sources as $nom => $chemin ) {
 	preg_match_all( '#<button type="button" class="pcard".*?</button>#s', $h, $m );
 	$cartes = $m[0];
 
-	check( "[$nom] exactement 10 .pcard", 10 === count( $cartes ) );
-	check( "[$nom] exactement 10 .pcard-ico", 10 === substr_count( $h, 'class="pcard-ico"' ) );
+	check( "[$nom] exactement 11 .pcard", 11 === count( $cartes ) );
+	check( "[$nom] exactement 11 .pcard-ico", 11 === substr_count( $h, 'class="pcard-ico"' ) );
 
 	if ( 10 !== count( $cartes ) ) { continue; }
 
@@ -59,11 +59,11 @@ foreach ( $sources as $nom => $chemin ) {
 		$svgs = array_merge( $svgs, $s[0] );
 	}
 
-	check( "[$nom] exactement 10 SVG dans les cartes", 10 === count( $svgs ) );
+	check( "[$nom] exactement 11 SVG dans les cartes", 11 === count( $svgs ) );
 	check( "[$nom] chaque carte porte un SVG et un seul",
 		10 === count( array_filter( $cartes, static fn( $c ) => 1 === substr_count( $c, '<svg' ) ) ) );
 	check( "[$nom] chaque SVG est dans son .pcard-ico",
-		10 === preg_match_all( '#<span class="pcard-ico" aria-hidden="true"><svg #', $h ) );
+		11 === preg_match_all( '#<span class="pcard-ico" aria-hidden="true"><svg #', $h ) );
 
 	// --- aucun ancien symbole ne subsiste ---
 	$anciens = array( '▢', '▤', '▣', '◱', '◲', '◫', '◪', '☼', '⌂', '✎' );
@@ -74,9 +74,9 @@ foreach ( $sources as $nom => $chemin ) {
 	if ( array() !== $restants ) { echo '    reste : ' . implode( ' ', $restants ) . "\n"; }
 
 	// --- décoratifs, homogènes, sans texte ---
-	check( "[$nom] les 10 SVG sont aria-hidden",
+	check( "[$nom] les 11 SVG sont aria-hidden",
 		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'aria-hidden="true"' ) ) ) );
-	check( "[$nom] les 10 SVG sont focusable=\"false\"",
+	check( "[$nom] les 11 SVG sont focusable=\"false\"",
 		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'focusable="false"' ) ) ) );
 
 	$viewbox = array();
@@ -84,7 +84,7 @@ foreach ( $sources as $nom => $chemin ) {
 		if ( preg_match( '#viewBox="([^"]*)"#', $s, $v ) ) { $viewbox[] = $v[1]; }
 	}
 
-	check( "[$nom] un seul viewBox pour les 10 icônes : " . implode( ', ', array_unique( $viewbox ) ),
+	check( "[$nom] un seul viewBox pour les 11 icônes : " . implode( ', ', array_unique( $viewbox ) ),
 		array( '0 0 24 24' ) === array_values( array_unique( $viewbox ) ) );
 	check( "[$nom] aucun texte dans les icônes",
 		0 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, '<text' ) ) ) );
@@ -135,7 +135,7 @@ foreach ( $sources as $nom => $chemin ) {
 
 	// --- l'interaction reste intacte ---
 	check( "[$nom] les cartes restent des <button type=\"button\">",
-		10 === preg_match_all( '#<button type="button" class="pcard" data-projet=#', $h ) );
+		11 === preg_match_all( '#<button type="button" class="pcard" data-projet=#', $h ) );
 	check( "[$nom] aucun gestionnaire d'événement en ligne",
 		0 === count( array_filter( $cartes, static fn( $c ) => preg_match( '#\son[a-z]+\s*=#', $c ) ) ) );
 }

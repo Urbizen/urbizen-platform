@@ -170,6 +170,7 @@
         if (typeof closeContact === "function") { closeContact(false); }
         closeMobileMenu();
         openInquiry();
+        contextualiserRenseignements();
         inquirySection.scrollIntoView({ behavior: glissement(), block: "start" });
         // `preventScroll` : le focus ne doit pas court-circuiter le défilement.
         focusSafe(inquiryTitle || inquiryPanel);
@@ -190,6 +191,105 @@
      autre section.
 
      Aucun état n'est touché ici : tout passe par `openInquiry()`. */
+  /* ----- contexte de qualification vers le formulaire de renseignements -----
+
+     `none` et `confirm` mènent ici. Urbizen doit savoir ce que la personne
+     venait de qualifier, sinon la demande arrive sans son histoire.
+
+     Le formulaire est un bloc FluentForm : sa définition vit en base, et lui
+     ajouter un champ depuis le dépôt serait fragile — un champ inconnu de la
+     définition est écarté à la soumission. On prérempli donc le message, en
+     clair. Le résumé est écrit pour être lu par un humain : aucune chaîne
+     technique, aucun JSON.
+
+     Deux garde-fous. Le message n'est prérempli que s'il est vide : ce que le
+     client a écrit ne se réécrit jamais. Et le verdict est présenté comme un
+     élément de contexte, jamais comme une décision — c'est Urbizen qui tranche.
+  */
+  var LIBELLES_PROJET = {
+    extension: "Extension", garage: "Garage", abri: "Abri de jardin",
+    piscine: "Piscine", pergola: "Pergola", transformation: "Transformation d'un espace existant",
+    facade: "Modification de façade", toiture: "Toiture", solaire: "Panneaux solaires",
+    maison: "Maison individuelle", autre: "Autre projet"
+  };
+
+  var LIBELLES_VERDICT = {
+    none: "aucune formalité nationale identifiée, à confirmer",
+    confirm: "à confirmer"
+  };
+
+  var LIBELLES_REPONSE = {
+    implantation: { accole: "accolé à une construction existante", independant: "indépendant" },
+    local_actuel: { garage: "un garage", combles: "des combles", sous_sol: "un sous-sol ou une cave", dependance: "une dépendance" },
+    local_rattache: { maison: "rattaché à la maison", batiment_separe: "bâtiment séparé" },
+    zone_u: { "true": "oui", "false": "non", unknown: "inconnue" },
+    secteur_protege: { "true": "oui", "false": "non", unknown: "inconnu" },
+    modifie_aspect_exterieur: { "true": "oui", "false": "non" }
+  };
+
+  function resumeQualification(donnees, verdict) {
+    var lignes = [];
+    lignes.push("Projet : " + (LIBELLES_PROJET[donnees.projet] || donnees.projet || "non précisé"));
+
+    if (donnees.local_actuel && LIBELLES_REPONSE.local_actuel[donnees.local_actuel]) {
+      lignes.push("Espace transformé : " + LIBELLES_REPONSE.local_actuel[donnees.local_actuel]);
+    }
+    if (donnees.implantation && LIBELLES_REPONSE.implantation[donnees.implantation]) {
+      lignes.push("Implantation : " + LIBELLES_REPONSE.implantation[donnees.implantation]);
+    }
+    if (donnees.sp_creee !== undefined) { lignes.push("Surface de plancher créée : " + donnees.sp_creee + " m²"); }
+    if (donnees.emprise_creee !== undefined) { lignes.push("Emprise créée : " + donnees.emprise_creee + " m²"); }
+    if (donnees.sp_totale !== undefined) { lignes.push("Surface de plancher totale après travaux : " + donnees.sp_totale + " m²"); }
+    if (donnees.bassin_m2 !== undefined) { lignes.push("Bassin : " + donnees.bassin_m2 + " m²"); }
+    if (donnees.hauteur_m !== undefined) { lignes.push("Hauteur : " + donnees.hauteur_m + " m"); }
+    if (donnees.zone_u !== undefined) { lignes.push("Zone U du PLU : " + LIBELLES_REPONSE.zone_u[String(donnees.zone_u)]); }
+    if (donnees.secteur_protege !== undefined) { lignes.push("Secteur protégé : " + LIBELLES_REPONSE.secteur_protege[String(donnees.secteur_protege)]); }
+    if (donnees.modifie_aspect_exterieur !== undefined) { lignes.push("Modification extérieure : " + LIBELLES_REPONSE.modifie_aspect_exterieur[String(donnees.modifie_aspect_exterieur)]); }
+
+    lignes.push("Qualification : " + (LIBELLES_VERDICT[verdict.status] || verdict.status));
+
+    return lignes.join("\n");
+  }
+
+  var QUALIFICATION_VERSION = 2;
+  var QUALIFICATION_MAX_AGE = 30 * 60 * 1000;
+
+  function qualificationValide(qualif, projetAttendu, statutAttendu) {
+    var parcours = null;
+    try {
+      var brutParcours = sessionStorage.getItem("urbizen:parcours");
+      parcours = brutParcours ? JSON.parse(brutParcours) : null;
+    } catch (e) { return false; }
+
+    if (!qualif || qualif.version !== QUALIFICATION_VERSION) { return false; }
+    if (typeof qualif.parcours_id !== "string" || !qualif.parcours_id) { return false; }
+    if (typeof qualif.created_at !== "number" || Date.now() - qualif.created_at > QUALIFICATION_MAX_AGE || qualif.created_at > Date.now() + 60000) { return false; }
+    if (!qualif.donnees || !qualif.verdict || qualif.projet !== qualif.donnees.projet) { return false; }
+    if (!parcours || parcours.version !== QUALIFICATION_VERSION || parcours.parcours_id !== qualif.parcours_id || parcours.projet !== qualif.projet) { return false; }
+    if (projetAttendu && qualif.projet !== projetAttendu) { return false; }
+    if (statutAttendu && qualif.verdict.status !== statutAttendu) { return false; }
+    return true;
+  }
+
+  function contextualiserRenseignements() {
+    if (!inquiryPanel) { return; }
+
+    var qualif = null;
+    try {
+      var brut = sessionStorage.getItem("urbizen:qualification");
+      qualif = brut ? JSON.parse(brut) : null;
+    } catch (e) { return; }
+
+    if (!qualificationValide(qualif)) { return; }
+    if (qualif.verdict.status !== "none" && qualif.verdict.status !== "confirm") { return; }
+
+    var message = inquiryPanel.querySelector("textarea");
+    if (!message || message.value.trim() !== "") { return; }
+
+    message.value = resumeQualification(qualif.donnees || {}, qualif.verdict) + "\n\n";
+    message.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   var ANCRE_RENSEIGNEMENTS = "#demander-des-renseignements";
 
   /* `anime` distingue les deux entrées. À l'arrivée sur la page, non : le
@@ -206,6 +306,7 @@
     if (window.location.hash !== ANCRE_RENSEIGNEMENTS) { return; }
     if (!inquiryPanel || !inquirySection) { return; }
     openInquiry();
+    contextualiserRenseignements();
 
     /* Le saut d'ancre du navigateur a lieu avant que la page ait fini de se
        poser : images et polices arrivent après et repoussent le contenu. Mesuré
@@ -247,42 +348,297 @@
     }
   }
 
-  /* ----- Sélection du type de projet + routage vers le formulaire ----- */
-  // Destinations finales du tunnel. Les pages WordPress dédiées DP et PC
-  // réutilisent les formulaires de référence ; Conception possède déjà sa
-  // propre section de formulaire.
+  /* ----- Sélection du type de projet et qualification -----
+
+     Auparavant, un choix non mappé tombait implicitement en déclaration
+     préalable. Deux types étaient explicites ; les huit autres recevaient ce
+     même régime — une extension de soixante mètres carrés comme un ravalement.
+     La décision tombait au clic sur la carte, avant la moindre question de
+     surface, et l'écran annonçait « orientation proposée », donnant à un défaut
+     l'apparence d'une étude.
+
+     Désormais l'accueil ne décide de rien. Il pose les questions que le moteur
+     réclame, une à la fois, et n'oriente que lorsque le moteur a conclu. Aucun
+     seuil réglementaire ne vit ici : ils sont tous dans `qualification.js`,
+     testé hors navigateur et jumelé à son équivalent serveur. */
+
   var FORM_URLS = {
-    dp:          "/formulaire-declaration-prealable/",
-    pcmi:        "/formulaire-permis-de-construire/",
-    conception:  "/conception/#formulaire-conception"
-  };
-  var FORM_BY_PROJECT = {
-    maison:      "pcmi",
-    conception:  "conception"
-  };
-  var FORM_COPY = {
-    dp: {
-      button: "Continuer vers ma déclaration préalable",
-      hint: "Orientation proposée : déclaration préalable. Urbizen confirme la démarche après étude."
-    },
-    pcmi: {
-      button: "Continuer vers mon permis de construire",
-      hint: "Orientation proposée : permis de construire. Vos informations seront reprises dans le formulaire."
-    },
-    conception: {
-      button: "Continuer vers mes plans sur mesure",
-      hint: "Vous allez ouvrir le formulaire de conception de plans sur mesure."
-    }
+    dp:         "/formulaire-declaration-prealable/",
+    pcmi:       "/formulaire-permis-de-construire/",
+    conception: "/conception/#formulaire-conception"
   };
 
-  function formForProject(project) {
-    return FORM_BY_PROJECT[project] || "dp";
-  }
+  /* Les questions que le moteur peut réclamer. Chacune répond à un nom de
+     donnée manquante ; l'ordre de cette table est l'ordre d'apparition. Le
+     visiteur ne voit jamais les questions des autres branches. */
+  var QUESTIONS = [
+    { champ: "implantation", libelle: "Cette construction sera-t-elle accolée à un bâtiment existant, ou indépendante ?",
+      aide: "Accolée : elle touche la maison ou un autre bâtiment. Indépendante : elle est isolée sur le terrain.",
+      choix: [ { v: "accole", t: "Accolée" }, { v: "independant", t: "Indépendante" } ] },
 
+    { champ: "sp_creee", libelle: "Quelle surface de plancher le projet va-t-il créer ?",
+      aide: "Il s'agit des surfaces closes et couvertes, mesurées selon les règles de la surface de plancher. Une estimation suffit à ce stade.",
+      unite: "m²" },
+
+    { champ: "emprise_creee", libelle: "Quelle emprise au sol le projet va-t-il occuper ?",
+      aide: "L'ombre portée de la construction au sol.", unite: "m²" },
+
+    { champ: "bassin_m2", libelle: "Quelle est la superficie du bassin ?",
+      aide: "La surface du bassin lui-même, hors plage et margelles.", unite: "m²" },
+
+    { champ: "couverte", libelle: "La piscine sera-t-elle couverte ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "hauteur_couverture_m", libelle: "Quelle hauteur fera la couverture au-dessus du sol ?",
+      unite: "m" },
+
+    { champ: "hauteur_m", libelle: "Quelle hauteur fera la construction ?",
+      aide: "Du sol au point le plus haut.", unite: "m" },
+
+    { champ: "sp_totale", libelle: "Quelle sera la surface de plancher totale après travaux ?",
+      aide: "La surface de plancher actuelle, plus celle que vous créez.", unite: "m²" },
+
+    { champ: "personne_physique", libelle: "Le projet est-il réalisé par un particulier pour lui-même ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "usage_agricole", libelle: "La construction est-elle destinée à une activité agricole ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    /* La zone urbaine décide du seuil de 20 ou 40 m². Attention à ce que la
+       question demande : R.421-14 b) vise le CLASSEMENT en zone urbaine d'un
+       PLU ou d'un document en tenant lieu, pas l'impression d'être « dans un
+       secteur déjà bâti ». Un terrain construit peut être classé en zone
+       agricole ou naturelle ; l'apparence n'est pas le zonage. Demander l'un
+       pour l'autre produirait des permis manqués.
+       Personne ne connaît son zonage de tête : « je ne sais pas » est une
+       réponse légitime, et mène à une vérification, jamais à une supposition. */
+    { champ: "zone_u", libelle: "Votre terrain est-il classé en zone U (zone urbaine) du PLU ?",
+      aide: "Cette information figure sur le plan de zonage de votre commune, ou sur le document d'urbanisme qui en tient lieu. Si vous ne la connaissez pas, choisissez « Je ne sais pas » : nous la vérifierons.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
+
+    { champ: "secteur_protege", libelle: "Votre terrain est-il dans un secteur protégé ?",
+      aide: "Abords d'un monument historique, site classé, secteur patrimonial remarquable. En cas de doute, « je ne sais pas ».",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
+
+    /* Les questions de la transformation évitent le vocabulaire du code. On ne
+       demande pas « cette surface est-elle comprise dans la surface de
+       plancher ? » : on demande ce que le propriétaire sait — quel espace, est-il
+       fermé, quelle hauteur — et le moteur en tire la donnée réglementaire.
+       On ne demande pas non plus « l'usage va-t-il changer ? » : un garage de
+       maison a déjà la destination du logement, et la question induirait un
+       changement de destination qui n'existe pas. */
+    { champ: "local_actuel", libelle: "Quel espace allez-vous transformer ?",
+      choix: [ { v: "garage", t: "Un garage" }, { v: "combles", t: "Des combles" },
+               { v: "sous_sol", t: "Un sous-sol ou une cave" }, { v: "dependance", t: "Une dépendance" } ] },
+
+    { champ: "ferme_couvert", libelle: "Cet espace est-il aujourd'hui fermé et couvert ?",
+      aide: "Des murs et un toit, même sans chauffage ni isolation.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "local_rattache", libelle: "Cet espace fait-il partie de votre maison, ou est-ce un bâtiment séparé ?",
+      aide: "Un garage attenant fait partie de la maison. Un bâtiment isolé sur le terrain est séparé.",
+      choix: [ { v: "maison", t: "Il fait partie de la maison" }, { v: "batiment_separe", t: "C'est un bâtiment séparé" } ] },
+
+    { champ: "destination_actuelle", libelle: "À quoi sert aujourd'hui ce bâtiment séparé ?",
+      aide: "Sa destination actuelle décide s'il y a changement de destination au sens du code.",
+      choix: [ { v: "habitation", t: "À l'habitation" }, { v: "autres_activites", t: "À autre chose (atelier, remise, activité…)" } ] },
+
+    { champ: "hauteur_sup_180", libelle: "La hauteur sous plafond dépasse-t-elle 1,80 m ?",
+      aide: "En dessous de 1,80 m, l'espace ne compte pas dans la surface habitable ; le régime n'est pas le même.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "modifie_aspect_exterieur", libelle: "L'aspect extérieur va-t-il changer ?",
+      aide: "Par exemple une porte de garage remplacée par une fenêtre ou une baie, ou une fenêtre de toit ajoutée.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "changement_destination", libelle: "L'usage du bâtiment va-t-il changer ?",
+      aide: "Par exemple un local commercial transformé en logement.",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "modifie_structure_ou_facade", libelle: "Les travaux toucheront-ils les murs porteurs ou la façade ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "aspect_exterieur", libelle: "Les travaux modifieront-ils l'aspect extérieur de la construction ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "description", libelle: "Décrivez votre projet en quelques mots.", texte: true }
+  ];
+
+  var MESSAGES = {
+    dp:         "Orientation : déclaration préalable.",
+    pcmi:       "Orientation : permis de construire.",
+    conception: "Vous allez ouvrir le formulaire de conception de plans sur mesure.",
+    none:       "D'après ces éléments, votre projet ne nécessite aucune autorisation d'urbanisme. Des règles locales peuvent toutefois s'appliquer : nous pouvons le vérifier avec vous.",
+    confirm:    "La formalité dépend des caractéristiques de votre projet et des règles d'urbanisme applicables à votre terrain. Urbizen la vérifie avant de constituer votre dossier."
+  };
+
+  var BOUTONS = {
+    dp:         "Continuer vers ma déclaration préalable",
+    pcmi:       "Continuer vers mon permis de construire",
+    conception: "Continuer vers mes plans sur mesure",
+    none:       "Faire vérifier mon projet",
+    confirm:    "Faire qualifier mon projet"
+  };
+
+  var reponses = {};
   var selectedProjet = null;
+  var parcoursId = null;
   var continueBtn = document.getElementById("js-continue");
   var continueHint = document.getElementById("js-continue-hint");
+  var zoneQuestions = document.getElementById("js-qualification");
   var cards = document.querySelectorAll(".pcard");
+  var moteur = window.UrbizenQualification;
+
+  function question(champ) {
+    for (var i = 0; i < QUESTIONS.length; i++) {
+      if (QUESTIONS[i].champ === champ) { return QUESTIONS[i]; }
+    }
+    return null;
+  }
+
+  /* Une seule question à la fois : la première que le moteur réclame, pour
+     laquelle nous savons formuler une phrase compréhensible, et à laquelle le
+     visiteur n'a pas DÉJÀ répondu.
+
+     Cette dernière condition n'est pas un détail. « Je ne sais pas » est une
+     réponse légitime — c'est même celle qu'on attend de la plupart des gens sur
+     le zonage. Mais le moteur continue alors de réclamer la donnée, puisqu'elle
+     lui manque toujours. Sans cette garde, la question revenait indéfiniment et
+     le tunnel ne concluait jamais : une impasse, découverte par le banc du
+     tunnel. Une réponse donnée ne se redemande pas ; si tout ce qui manque a
+     déjà été demandé, on conclut « à confirmer ». */
+  function prochaineQuestion(manquantes) {
+    for (var i = 0; i < QUESTIONS.length; i++) {
+      var q = QUESTIONS[i];
+      if (manquantes.indexOf(q.champ) === -1) { continue; }
+      if (Object.prototype.hasOwnProperty.call(reponses, q.champ)) { continue; }
+      return q;
+    }
+    return null;
+  }
+
+  function repondre(champ, valeur) {
+    reponses[champ] = valeur;
+    evaluer();
+  }
+
+  function afficherQuestion(q) {
+    if (!zoneQuestions) { return; }
+    zoneQuestions.innerHTML = "";
+    zoneQuestions.hidden = false;
+
+    var bloc = document.createElement("div");
+    bloc.className = "qualif-question";
+
+    var titre = document.createElement("p");
+    titre.className = "qualif-libelle";
+    titre.textContent = q.libelle;
+    titre.tabIndex = -1;
+    bloc.appendChild(titre);
+
+    if (q.aide) {
+      var aide = document.createElement("p");
+      aide.className = "qualif-aide";
+      aide.textContent = q.aide;
+      bloc.appendChild(aide);
+    }
+
+    if (q.choix) {
+      var groupe = document.createElement("div");
+      groupe.className = "qualif-choix";
+      q.choix.forEach(function (c) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "btn btn-ghost btn-sm";
+        b.textContent = c.t;
+        b.addEventListener("click", function () { repondre(q.champ, c.v); });
+        groupe.appendChild(b);
+      });
+      bloc.appendChild(groupe);
+    } else {
+      var ligne = document.createElement("div");
+      ligne.className = "qualif-saisie";
+      var champ = document.createElement("input");
+      champ.type = q.texte ? "text" : "text";
+      champ.inputMode = q.texte ? "text" : "decimal";
+      champ.maxLength = q.texte ? 500 : 32;
+      champ.className = "qualif-champ";
+      champ.setAttribute("aria-label", q.libelle);
+      var valider = document.createElement("button");
+      valider.type = "button";
+      valider.className = "btn btn-primary btn-sm";
+      valider.textContent = "Valider";
+      var envoyer = function () {
+        var v = champ.value.trim();
+        if (!v) { return; }
+        repondre(q.champ, q.texte ? v : v.replace(",", "."));
+      };
+      valider.addEventListener("click", envoyer);
+      champ.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); envoyer(); } });
+      ligne.appendChild(champ);
+      if (q.unite) {
+        var u = document.createElement("span");
+        u.className = "qualif-unite";
+        u.textContent = q.unite;
+        ligne.appendChild(u);
+      }
+      ligne.appendChild(valider);
+      bloc.appendChild(ligne);
+    }
+
+    zoneQuestions.appendChild(bloc);
+    window.setTimeout(function () {
+      var tactile = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (!q.choix && !tactile) { champ.focus(); }
+      else { titre.focus(); }
+    }, 0);
+  }
+
+  function masquerQuestions() {
+    if (zoneQuestions) { zoneQuestions.hidden = true; zoneQuestions.innerHTML = ""; }
+  }
+
+  /* Interroge le moteur, puis soit pose la question suivante, soit conclut.
+     Aucune redirection n'est proposée tant que le verdict n'est pas rendu. */
+  function evaluer() {
+    if (!selectedProjet || !moteur) { return; }
+
+    var donnees = { projet: selectedProjet };
+    for (var k in reponses) {
+      if (Object.prototype.hasOwnProperty.call(reponses, k)) { donnees[k] = reponses[k]; }
+    }
+
+    var verdict = moteur.qualifyProject(donnees);
+    continueBtn.setAttribute("data-statut", verdict.status);
+
+    if (verdict.status === "confirm" && verdict.missing.length) {
+      var q = prochaineQuestion(verdict.missing);
+      if (q) {
+        afficherQuestion(q);
+        continueBtn.disabled = true;
+        continueBtn.textContent = "Répondez pour continuer";
+        if (continueHint) { continueHint.textContent = ""; }
+        return;
+      }
+    }
+
+    masquerQuestions();
+    continueBtn.disabled = false;
+    continueBtn.textContent = BOUTONS[verdict.status];
+    if (continueHint) { continueHint.textContent = MESSAGES[verdict.status]; }
+    window.setTimeout(function () { continueBtn.focus(); }, 0);
+
+    try {
+      sessionStorage.setItem("urbizen:qualification", JSON.stringify({
+        version: QUALIFICATION_VERSION,
+        parcours_id: parcoursId,
+        projet: selectedProjet,
+        created_at: Date.now(),
+        donnees: donnees,
+        verdict: verdict
+      }));
+    } catch (e) {}
+  }
 
   cards.forEach(function (card) {
     card.setAttribute("aria-pressed", "false");
@@ -291,22 +647,34 @@
       card.classList.add("is-selected");
       card.setAttribute("aria-pressed", "true");
       selectedProjet = card.getAttribute("data-projet");
-      try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
-      var form = formForProject(selectedProjet);
-      continueBtn.disabled = false;
-      continueBtn.textContent = FORM_COPY[form].button;
-      if (continueHint) continueHint.textContent = FORM_COPY[form].hint;
+      reponses = {};
+      parcoursId = String(Date.now()) + "-" + Math.random().toString(36).slice(2, 10);
+      try {
+        sessionStorage.removeItem("urbizen:qualification");
+        sessionStorage.setItem("urbizen:projet", selectedProjet);
+        sessionStorage.setItem("urbizen:parcours", JSON.stringify({ version: QUALIFICATION_VERSION, parcours_id: parcoursId, projet: selectedProjet, created_at: Date.now() }));
+      } catch (e) {}
+      evaluer();
     });
-    });
-
+  });
 
   if (continueBtn) {
     continueBtn.addEventListener("click", function () {
-      if (!selectedProjet) return;
-      // adresse, parcelle et projet sont déjà conservés en sessionStorage :
-      // le formulaire (branche dédiée) les relira pour se pré-remplir.
-      var form = formForProject(selectedProjet);
-      window.location.href = FORM_URLS[form];
+      if (!selectedProjet) { return; }
+      var statut = continueBtn.getAttribute("data-statut");
+
+      /* `none` et `confirm` n'ont pas de formulaire de régime : envoyer
+         quelqu'un vers un dossier payant sans avoir conclu serait exactement
+         le défaut que cette tranche corrige. Ils mènent au formulaire de
+         renseignements, où Urbizen reprend la main. */
+      if (statut === "none" || statut === "confirm") {
+        window.location.href = "/#demander-des-renseignements";
+        return;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(FORM_URLS, statut)) {
+        window.location.href = FORM_URLS[statut];
+      }
     });
   }
 

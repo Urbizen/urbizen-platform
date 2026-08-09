@@ -655,10 +655,10 @@
             <p class="dp-step-hint">Au-delà de 150 m² de surface de plancher, le recours à un architecte est obligatoire (rubrique « Réseaux &amp; intervenants »).</p>
             <div class="dp-grid">
               <div class="dp-field" data-champ="sp_existante"><label for="s_pe">Surface de plancher <b>existante</b></label><div class="dp-suffix"><input type="number" id="s_pe" name="sp_existante" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field" data-champ="sp_creee"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field" data-champ="sp_totale"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_creee"><label for="s_pc">Surface de plancher <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pc" name="sp_creee" class="measure" min="0" step="0.01"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="sp_totale"><label for="s_pt">Surface de plancher <b>totale</b> après travaux <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_pt" name="sp_totale" class="measure" min="0" step="0.01"><span class="unit">m²</span></div></div>
               <div class="dp-field" data-champ="emprise_avant"><label for="s_ea">Emprise au sol <b>avant</b></label><div class="dp-suffix"><input type="number" id="s_ea" name="emprise_avant" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
-              <div class="dp-field" data-champ="emprise_creee"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01" value="0"><span class="unit">m²</span></div></div>
+              <div class="dp-field" data-champ="emprise_creee"><label for="s_ep">Emprise au sol <b>créée</b> <span class="req">*</span></label><div class="dp-suffix"><input type="number" id="s_ep" name="emprise_creee" class="measure" min="0" step="0.01"><span class="unit">m²</span></div></div>
             </div>
             <div class="dp-attest" id="archi-flag" style="border-left-color:var(--cadastre);margin-top:18px;display:none">
               <span aria-hidden="true" style="font-family:'IBM Plex Mono',monospace;color:var(--cadastre)">!</span>
@@ -849,7 +849,7 @@
 
   /* ----- reprise du tunnel d'orientation de l'accueil ----- */
   function prefillFromHomepage() {
-    var contract = null, project = "";
+    var contract = null, project = "", maintenant = Date.now();
 
     try {
       var raw = sessionStorage.getItem("urbizen:accueil");
@@ -865,20 +865,146 @@
       field.value = String(value);
     }
 
-    if (contract && contract.address && contract.parcel) {
-      setIfEmpty("t_adr", contract.address.label);
-      setIfEmpty("t_cp", contract.address.postcode);
-      setIfEmpty("t_ville", contract.address.city);
+    var confirmeLe = contract && typeof contract.confirmedAt === "string"
+      ? Date.parse(contract.confirmedAt) : NaN;
+    var contractValide = contract && contract.schemaVersion === "1.0"
+      && contract.source === "urbizen-cadastre"
+      && contract.address && contract.parcel
+      && Number.isFinite(confirmeLe)
+      && maintenant - confirmeLe <= 30 * 60 * 1000
+      && confirmeLe <= maintenant + 60000;
+
+    if (contractValide) {
+      var blocAdresseTerrain = form.querySelector('[data-adresse="terrain"]');
+      var adresseTerrain = blocAdresseTerrain && blocAdresseTerrain.__adresse;
+      if (adresseTerrain && typeof adresseTerrain.appliquerContrat === "function") {
+        adresseTerrain.appliquerContrat(contract);
+      }
       setIfEmpty("t_sec", contract.parcel.section);
       setIfEmpty("t_num", contract.parcel.number);
       setIfEmpty("t_sup", contract.parcel.surfaceM2);
     }
 
+    /* ----- reprise des réponses de qualification -----
+       Le tunnel de l'accueil a déjà posé les questions nécessaires à la
+       QUALIFICATION ; ce formulaire collecte celles du DOSSIER. Redemander ce
+       qui vient d'être répondu serait un second formulaire complet, pas un
+       parcours.
+
+       Trois natures de données, traitées différemment :
+
+         A. ce que le client a fourni — surfaces : on préremplit le champ ;
+         B. ce qui n'a pas de champ ici — implantation, hauteur, zonage,
+            secteur protégé, nature du local transformé : on le conserve en
+            métadonnée, lisible par Urbizen, sans inventer dix champs visibles ;
+         C. le verdict du moteur : conservé pour information, JAMAIS autoritaire.
+            Le serveur le recalcule ; un paramètre venu du navigateur ne
+            contourne aucun contrôle.
+
+       `setIfEmpty` garantit qu'une saisie du client n'est jamais écrasée. */
+    var qualif = null;
+    var parcours = null;
+    try {
+      var brut = sessionStorage.getItem("urbizen:qualification");
+      var brutParcours = sessionStorage.getItem("urbizen:parcours");
+      qualif = brut ? JSON.parse(brut) : null;
+      parcours = brutParcours ? JSON.parse(brutParcours) : null;
+    } catch (e) { qualif = null; parcours = null; }
+
+    var qualifValide = qualif && qualif.version === 2
+      && typeof qualif.parcours_id === "string" && qualif.parcours_id
+      && typeof qualif.created_at === "number"
+      && maintenant - qualif.created_at <= 30 * 60 * 1000
+      && qualif.created_at <= maintenant + 60000
+      && parcours && parcours.version === 2
+      && parcours.parcours_id === qualif.parcours_id
+      && parcours.projet === qualif.projet
+      && qualif.projet === project
+      && qualif.donnees && qualif.donnees.projet === project
+      && qualif.verdict && qualif.verdict.status === "pcmi";
+    if (!qualifValide) { qualif = null; project = ""; }
+
+    var reponses = (qualif && qualif.donnees) ? qualif.donnees : {};
+
+    /* A — les surfaces ont leur champ.
+
+       Ces champs naissent désormais vides. Toute valeur présente — y compris
+       « 0 », « 0,0 », une saisie restaurée ou entourée d'espaces — est donc une
+       réponse réelle et n'est jamais écrasée par la qualification. */
+    function reprendreSurface(id, valeur) {
+      if (valeur === null || valeur === undefined || valeur === "") { return; }
+      var champ = document.getElementById(id);
+      if (!champ) { return; }
+      if (String(champ.value).trim() !== "") { return; }
+      champ.value = String(valeur);
+      champ.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    reprendreSurface("s_pc", reponses.sp_creee);
+    reprendreSurface("s_pt", reponses.sp_totale);
+    reprendreSurface("s_ep", reponses.emprise_creee);
+
+    // B et C — tout le reste part en métadonnée, sous une forme lisible.
+    if (qualif) {
+      var libelles = {
+        implantation: { accole: "accolé à une construction existante", independant: "indépendant" },
+        local_actuel: { garage: "un garage", combles: "des combles", sous_sol: "un sous-sol ou une cave", dependance: "une dépendance" },
+        local_rattache: { maison: "rattaché à la maison", batiment_separe: "bâtiment séparé" },
+        zone_u: { "true": "en zone U du PLU", "false": "hors zone U", unknown: "zonage inconnu" },
+        secteur_protege: { "true": "en secteur protégé", "false": "hors secteur protégé", unknown: "secteur protégé inconnu" },
+        modifie_aspect_exterieur: { "true": "avec modification extérieure", "false": "sans modification extérieure" },
+        ferme_couvert: { "true": "espace fermé et couvert", "false": "espace non fermé" },
+        hauteur_sup_180: { "true": "hauteur sous plafond supérieure à 1,80 m", "false": "hauteur sous plafond inférieure à 1,80 m" }
+      };
+
+      var lisible = [];
+      Object.keys(libelles).forEach(function (cle) {
+        if (reponses[cle] === undefined || reponses[cle] === null) { return; }
+        var table = libelles[cle];
+        var mot = table[String(reponses[cle])];
+        if (mot) { lisible.push(mot); }
+      });
+      if (reponses.hauteur_m !== undefined) { lisible.push("hauteur " + reponses.hauteur_m + " m"); }
+      if (reponses.bassin_m2 !== undefined) { lisible.push("bassin de " + reponses.bassin_m2 + " m²"); }
+
+      var champ = form.querySelector('input[name="qualification_contexte"]');
+      if (!champ) {
+        champ = document.createElement("input");
+        champ.type = "hidden";
+        champ.name = "qualification_contexte";
+        form.appendChild(champ);
+      }
+      champ.value = JSON.stringify({
+        version: qualif.version,
+        parcours_id: qualif.parcours_id,
+        created_at: qualif.created_at,
+        projet: reponses.projet || null,
+        resume: lisible.join(", "),
+        reponses: reponses,
+        verdict: qualif.verdict || null
+      });
+    }
+
+    /* Un permis n'est pas forcément une maison neuve : une extension de plus de
+       vingt mètres carrés en relève aussi, et confondre les deux ferait remplir
+       le mauvais dossier. La nature vient donc du projet qualifié, jamais du
+       régime.
+
+       `transformation` : voir le formulaire de déclaration préalable — la
+       nature n'est présélectionnée que si un changement de destination a été
+       réellement établi. */
     var projectNature = {
       maison: "maison_individuelle",
       extension: "extension",
-      garage: "annexe_garage"
+      garage: "annexe_garage",
+      abri: "annexe_garage"
     };
+
+    if (project === "transformation") {
+      var separe = reponses.local_rattache === "batiment_separe";
+      var autreDestination = reponses.destination_actuelle && reponses.destination_actuelle !== "habitation";
+      if (separe && autreDestination) { projectNature.transformation = "changement_destination"; }
+    }
     var expected = projectNature[project];
     if (!expected) return;
 

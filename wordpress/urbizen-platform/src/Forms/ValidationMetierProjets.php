@@ -58,6 +58,15 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 	protected const BAREME = PricingProjets::class;
 
 	/**
+	 * Régime d'autorisation servi par ce parcours, au sens de
+	 * {@see QualificationUrbanisme}. Chaîne vide : le parcours ne sert aucun
+	 * régime — la conception, par exemple — et ne peut donc rien contredire.
+	 *
+	 * @var string
+	 */
+	protected const REGIME = '';
+
+	/**
 	 * Les adresses que ce parcours exige, par rôle.
 	 *
 	 * Vide par défaut : un parcours qui ne dit rien n'exige rien, et une adresse
@@ -152,7 +161,154 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 			$vus[ $nature ] = true;
 		}
 
+		$erreurs += $this->regime_incompatible( $clean );
+
 		return $erreurs;
+	}
+
+	/**
+	 * Le régime déclaré est-il manifestement incompatible avec le projet décrit ?
+	 *
+	 * Le navigateur n'est pas une barrière. Avant ce contrôle, une extension de
+	 * soixante mètres carrés traversait tout le formulaire de déclaration
+	 * préalable sans qu'une seule vérification ne s'y oppose — `sp_creee` n'avait
+	 * qu'un `min: 0`, et aucune règle métier ne regardait les surfaces. Le
+	 * dossier partait en mairie sous un régime que le Code de l'urbanisme ne
+	 * permettait pas.
+	 *
+	 * Ce contrôle ne rejette une incertitude que lorsqu'elle provient d'une donnée
+	 * déterminante que le formulaire sait recueillir pour cette nature. Retirer
+	 * les surfaces d'une extension ou la couverture d'une piscine ne doit pas
+	 * devenir un contournement trivial. Les incertitudes extérieures au formulaire
+	 * (zone, protection, qualification locale) restent, elles, non bloquantes.
+	 * Une conclusion certaine opposée au régime du formulaire arrête toujours la
+	 * soumission.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, string>
+	 */
+	private function regime_incompatible( array $clean ): array {
+		$regime = static::REGIME;
+
+		if ( '' === $regime ) {
+			return array();
+		}
+
+		$donnees = $this->donnees_qualification( $clean );
+		$verdict = QualificationUrbanisme::qualifier( $donnees );
+
+		if ( QualificationUrbanisme::A_CONFIRMER === $verdict['status'] ) {
+			$obligatoires = array(
+				'extension' => array( 'sp_creee', 'emprise_creee' ),
+				'piscine'   => array( 'bassin_m2', 'couverte', 'hauteur_couverture_m' ),
+			);
+			$determinants_formulaire = $obligatoires[ $donnees['projet'] ?? '' ] ?? array();
+			$manquants               = array_intersect( $verdict['missing'], $determinants_formulaire );
+
+			if ( array() !== $manquants ) {
+				$instruction = 'piscine' === ( $donnees['projet'] ?? '' )
+					? __( 'Renseignez la surface du bassin, indiquez s’il sera couvert et, le cas échéant, la hauteur de la couverture.', 'urbizen-platform' )
+					: __( 'Renseignez la surface de plancher créée et l’emprise au sol créée.', 'urbizen-platform' );
+
+				return array(
+					'regime' => sprintf(
+						/* translators: %s: instruction propre à la nature du projet */
+						__( 'Les données nécessaires pour vérifier la formalité sont incomplètes ou invalides. %s', 'urbizen-platform' ),
+						$instruction
+					),
+				);
+			}
+
+			return array();
+		}
+
+		if ( QualificationUrbanisme::AUCUNE === $verdict['status'] ) {
+			return array(
+				'regime' => __( 'Les caractéristiques indiquées ne justifient pas ce formulaire d’autorisation. Urbizen reprend contact pour vérifier les règles locales avant tout dépôt.', 'urbizen-platform' ),
+			);
+		}
+
+		if ( QualificationUrbanisme::DP !== $verdict['status'] && QualificationUrbanisme::PCMI !== $verdict['status'] ) {
+			return array();
+		}
+
+		if ( $verdict['status'] === $regime ) {
+			return array();
+		}
+
+		$vers = QualificationUrbanisme::PCMI === $verdict['status']
+			? __( 'un permis de construire', 'urbizen-platform' )
+			: __( 'une déclaration préalable', 'urbizen-platform' );
+
+		return array(
+			'regime' => sprintf(
+				/* translators: 1: régime déterminé, 2: motif, 3: article du code de l'urbanisme */
+				__( 'D’après les surfaces indiquées, ce projet relève %1$s. %2$s (%3$s) Urbizen reprend contact pour vous orienter vers le bon dossier.', 'urbizen-platform' ),
+				$vers,
+				$verdict['reason'],
+				(string) $verdict['rule']
+			),
+		);
+	}
+
+	/**
+	 * Traduit une charge de formulaire en données de qualification.
+	 *
+	 * Les noms diffèrent de part et d'autre : le formulaire parle de `nature`,
+	 * le moteur de `projet`. Cette table est le seul endroit qui les rapproche.
+	 *
+	 * @param array<string, mixed> $clean Réponses nettoyées.
+	 * @return array<string, mixed>
+	 */
+	private function donnees_qualification( array $clean ): array {
+		$natures = array(
+			'extension'           => 'extension',
+			'surelevation'        => 'extension',
+			'garage'              => 'garage',
+			'annexe_garage'       => 'garage',
+			'abri_annexe'         => 'abri',
+			'carport'             => 'pergola',
+			'piscine'             => 'piscine',
+			'modification_facade' => 'facade',
+			'ravalement'          => 'facade',
+			'toiture'             => 'toiture',
+			'panneaux_solaires'   => 'solaire',
+			'changement_destination' => 'transformation',
+			'maison_individuelle' => 'maison',
+			'autre'               => 'autre',
+		);
+
+		$nature = $this->chaine( $clean['nature'] ?? '' );
+
+		if ( ! isset( $natures[ $nature ] ) ) {
+			return array();
+		}
+
+		$donnees = array( 'projet' => $natures[ $nature ] );
+
+		foreach ( array( 'sp_creee', 'sp_totale', 'emprise_creee' ) as $champ ) {
+			if ( array_key_exists( $champ, $clean ) && '' !== $clean[ $champ ] ) {
+				$donnees[ $champ ] = $clean[ $champ ];
+			}
+		}
+
+		if ( array_key_exists( 'surface_bassin_m2', $clean ) && '' !== $clean['surface_bassin_m2'] ) {
+			$donnees['bassin_m2'] = $clean['surface_bassin_m2'];
+		}
+
+		if ( array_key_exists( 'presence_abri_piscine', $clean ) ) {
+			if ( 'oui' === $clean['presence_abri_piscine'] ) {
+				$donnees['couverte'] = true;
+			} elseif ( 'non' === $clean['presence_abri_piscine'] ) {
+				$donnees['couverte'] = false;
+			}
+		}
+
+		if ( array_key_exists( 'hauteur_abri_m', $clean ) && '' !== $clean['hauteur_abri_m'] ) {
+			$donnees['hauteur_couverture_m'] = $clean['hauteur_abri_m'];
+		}
+
+		return $donnees;
 	}
 
 	/**

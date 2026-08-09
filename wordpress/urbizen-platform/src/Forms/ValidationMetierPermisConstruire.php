@@ -29,6 +29,11 @@ final class ValidationMetierPermisConstruire extends ValidationMetierProjets {
 	protected const BAREME = PricingPermisConstruire::class;
 
 	/**
+	 * @var string
+	 */
+	protected const REGIME = 'pcmi';
+
+	/**
 	 * Les deux adresses sont exigées.
 	 *
 	 * Un permis de construire sans adresse de déclarant ou sans adresse de

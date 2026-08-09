@@ -457,7 +457,14 @@ verifier( 'accepté : un dossier cohérent', array() === $metier->valider( $acce
 
 // La matrice des six : chaque nature, principale, doit passer.
 foreach ( $natures as $id ) {
-	verifier( sprintf( 'la nature « %s » est acceptée comme principale', $id ), array() === $metier->valider( avec_adresses( array( 'nature' => $id ) ) ) );
+	$projet = array( 'nature' => $id );
+
+	if ( in_array( $id, array( 'extension', 'surelevation' ), true ) ) {
+		$projet['sp_creee']      = 60;
+		$projet['emprise_creee'] = 60;
+	}
+
+	verifier( sprintf( 'la nature « %s » est acceptée comme principale', $id ), array() === $metier->valider( avec_adresses( $projet ) ) );
 }
 
 // Les descriptions n'ont aucune incidence : ni sur l'acceptation, ni sur le prix.

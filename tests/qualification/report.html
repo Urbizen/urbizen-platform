@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Banc du report tunnel → formulaire</title>
+<!--
+  Le tunnel dépose ; ce banc vérifie que le destinataire ramasse.
+
+  On fait le trajet complet dans une même iframe : qualification sur l'accueil,
+  puis navigation vers le formulaire. `sessionStorage` est partagé par l'origine,
+  exactement comme pour un visiteur.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style></head>
+<body><pre id="resultat">EN COURS</pre>
+<script>
+const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function charger(f, url) {
+  f.src = url;
+  await new Promise((r) => f.addEventListener("load", r, { once: true }));
+  await Promise.race([f.contentDocument.fonts.ready, attendre(2500)]);
+  await attendre(300);
+}
+
+async function qualifier(f, projet, reponses) {
+  await charger(f, "/frontend/homepage/index.html");
+  const d = f.contentDocument;
+  d.querySelector('.pcard[data-projet="' + projet + '"]').click();
+  await attendre(60);
+  for (let i = 0; i < 12; i++) {
+    const zone = d.getElementById("js-qualification");
+    if (!zone || zone.hidden) break;
+    const rep = reponses[i];
+    if (rep === undefined) break;
+    const boutons = [...zone.querySelectorAll(".qualif-choix .btn")];
+    if (boutons.length) { (boutons.find((b) => b.textContent.trim() === rep) || boutons[0]).click(); }
+    else { zone.querySelector(".qualif-champ").value = String(rep); zone.querySelector(".btn").click(); }
+    await attendre(60);
+  }
+  return f.contentDocument.getElementById("js-continue").getAttribute("data-statut");
+}
+
+function lire(f) {
+  const d = f.contentDocument;
+  const v = (id) => { const e = d.getElementById(id); return e ? e.value : null; };
+  const nature = d.querySelector('input[name="nature"]:checked');
+  const meta = d.querySelector('input[name="qualification_contexte"]');
+  let contexte = null;
+  try { contexte = meta ? JSON.parse(meta.value) : null; } catch (e) {}
+  return { sp_creee: v("s_pc"), sp_totale: v("s_pt"), emprise_creee: v("s_ep"),
+           nature: nature ? nature.value : null, contexte: contexte };
+}
+
+function lireAdresse(f) {
+  const d = f.contentDocument;
+  const valeur = (id) => { const e = d.getElementById(id); return e ? e.value : null; };
+  return { adresse: valeur("t_rech"), codePostal: valeur("t_cp"), ville: valeur("t_ville"),
+           section: valeur("t_sec"), numero: valeur("t_num") };
+}
+
+(async () => {
+  const sortie = { cas: [] };
+  const f = document.createElement("iframe");
+  f.style.cssText = "position:fixed;left:-20000px;top:0;width:390px;height:900px;border:0;";
+  document.body.appendChild(f);
+
+  const scenarios = [
+	{ nom: "extension DP", projet: "extension", reponses: ["15", "15"], form: "dp" },
+	{ nom: "extension PC", projet: "extension", reponses: ["60"], form: "pc" },
+	{ nom: "garage surfaces distinctes", projet: "garage", reponses: ["Indépendante", "4", "15", "Non", "2.5"], form: "dp" },
+	{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "15", "Non", "2.5"], form: "dp" },
+	{ nom: "abri DP", projet: "abri", reponses: ["Indépendante", "12", "12", "Non", "2"], form: "dp" },
+    { nom: "abri PC", projet: "abri", reponses: ["Indépendante", "25"], form: "pc" },
+    { nom: "transformation garage habitable", projet: "transformation",
+      reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison"], form: "dp" },
+    { nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"], form: "dp" },
+	{ nom: "pergola DP", projet: "pergola", reponses: ["Indépendante", "12", "12", "Non", "2.4"], form: "dp" }
+  ];
+
+  for (const s of scenarios) {
+    try { f.contentWindow.sessionStorage.clear(); } catch (e) {}
+    const statut = await qualifier(f, s.projet, s.reponses);
+    await charger(f, "/frontend/formulaires/" + s.form + "-formulaire.html");
+	sortie.cas.push(Object.assign({ nom: s.nom, projet: s.projet, statut: statut, form: s.form }, lire(f)));
+  }
+
+  /* Une qualification ne peut être reprise que par le même projet, le bon
+     formulaire et pendant sa courte durée de validité. */
+  try { f.contentWindow.sessionStorage.clear(); } catch (e) {}
+  await qualifier(f, "extension", ["60"]);
+  f.contentDocument.querySelector('.pcard[data-projet="garage"]').click();
+  await attendre(80);
+  await charger(f, "/frontend/formulaires/pc-formulaire.html");
+  const apresChangement = lire(f);
+
+  const maintenant = Date.now();
+  const qualification = (statut, createdAt) => ({
+    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: createdAt,
+    donnees: { projet: "extension", sp_creee: 60, emprise_creee: 60 },
+    verdict: { status: statut, rule: "R.421-14 a)", reason: "test", missing: [] }
+  });
+  f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
+  f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
+    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
+  }));
+  f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("pcmi", maintenant - 31 * 60 * 1000)));
+  await charger(f, "/frontend/formulaires/pc-formulaire.html");
+  const expiree = lire(f);
+
+  f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
+  f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
+    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
+  }));
+  f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("dp", maintenant)));
+  await charger(f, "/frontend/formulaires/pc-formulaire.html");
+  const mauvaisRegime = lire(f);
+
+  f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
+  f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("pcmi", maintenant)));
+  f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
+    version: 2, parcours_id: "autre-parcours", projet: "extension", created_at: maintenant
+  }));
+  await charger(f, "/frontend/formulaires/pc-formulaire.html");
+  const mauvaisParcours = lire(f);
+
+  sortie.securiteSession = { apresChangement, expiree, mauvaisRegime, mauvaisParcours };
+
+  /* L'adresse cadastrale est elle aussi éphémère : seule une confirmation
+     récente, issue du contrat canonique, peut préremplir un nouveau formulaire. */
+  const contratCadastre = (confirmedAt) => ({
+    schemaVersion: "1.0", source: "urbizen-cadastre", confirmedAt,
+    address: { label: "12 rue du Test", houseNumber: "12", street: "rue du Test",
+      postcode: "33000", city: "Bordeaux", cityCode: "33063" },
+    location: { latitude: 44.84, longitude: -0.58 },
+    parcel: { section: "AB", number: "42", surfaceM2: 350 }
+  });
+
+  f.contentWindow.sessionStorage.clear();
+  f.contentWindow.sessionStorage.setItem("urbizen:accueil", JSON.stringify(contratCadastre(new Date(maintenant).toISOString())));
+  await charger(f, "/frontend/formulaires/dp-formulaire.html");
+  const cadastreRecent = lireAdresse(f);
+
+  f.contentWindow.sessionStorage.clear();
+  f.contentWindow.sessionStorage.setItem("urbizen:accueil", JSON.stringify(contratCadastre(new Date(maintenant - 31 * 60 * 1000).toISOString())));
+  await charger(f, "/frontend/formulaires/dp-formulaire.html");
+  const cadastreExpire = lireAdresse(f);
+
+  f.contentWindow.sessionStorage.clear();
+  f.contentWindow.sessionStorage.setItem("urbizen:accueil", JSON.stringify(contratCadastre(new Date(maintenant + 2 * 60 * 1000).toISOString())));
+  await charger(f, "/frontend/formulaires/dp-formulaire.html");
+  const cadastreFutur = lireAdresse(f);
+
+  sortie.securiteCadastre = { recent: cadastreRecent, expire: cadastreExpire, futur: cadastreFutur };
+
+  f.remove();
+  document.getElementById("resultat").textContent = "JSON:" + JSON.stringify(sortie);
+})().catch((e) => {
+  document.getElementById("resultat").textContent = "ERREUR:" + (e && e.message ? e.message : e);
+});
+</script></body></html>

@@ -591,10 +591,19 @@ function urbizen_child_enqueue_accueil() {
 		}
 	}
 
+	// Le moteur de qualification d'urbanisme précède le script d'accueil, qui le
+	// consomme. Il est autonome et testable hors navigateur : les seuils
+	// réglementaires n'existent qu'à cet endroit, jamais dans l'orchestration.
+	$moteur = '/assets/js/urbizen-qualification.js';
+
+	if ( file_exists( $dir . $moteur ) ) {
+		wp_enqueue_script( 'urbizen-qualification', $uri . $moteur, array(), (string) filemtime( $dir . $moteur ), true );
+	}
+
 	$script = '/assets/js/urbizen-homepage.js';
 
 	if ( file_exists( $dir . $script ) ) {
-		wp_enqueue_script( 'urbizen-homepage', $uri . $script, array(), (string) filemtime( $dir . $script ), true );
+		wp_enqueue_script( 'urbizen-homepage', $uri . $script, array( 'urbizen-qualification' ), (string) filemtime( $dir . $script ), true );
 	}
 }
 add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_accueil', 30 );

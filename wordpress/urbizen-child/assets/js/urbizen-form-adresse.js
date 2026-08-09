@@ -681,6 +681,43 @@
     void voie; void numero;
   };
 
+  /**
+   * Reprend une adresse déjà confirmée par le composant cadastral de l'accueil.
+   *
+   * Ce n'est pas une saisie libre : le contrat porte le même vocabulaire que
+   * la recherche d'adresse et contient le code commune qui rend la sélection
+   * vérifiable par le serveur. Une valeur restaurée par le navigateur garde
+   * toutefois la priorité ; ce pont n'écrase jamais un formulaire commencé.
+   *
+   * @param {Object} contrat Contrat canonique `urbizen-cadastre` 1.0.
+   * @return {boolean} Vrai quand le contrat a effectivement été appliqué.
+   */
+  Adresse.prototype.appliquerContrat = function (contrat) {
+    var a = contrat && contrat.address ? contrat.address : {};
+    var l = contrat && contrat.location ? contrat.location : {};
+
+    if (this.manuel() || this.$recherche.value || this._lire("adresse")
+        || this._lire("voie") || this._lire("cp") || this._lire("ville")) return false;
+
+    if (!a.label || !a.postcode || !a.city || !a.cityCode) return false;
+
+    this.$recherche.value = texte(a.label, 200);
+    this._appliquer({
+      label: a.label,
+      houseNumber: a.houseNumber,
+      street: a.street,
+      postcode: a.postcode,
+      city: a.city,
+      cityCode: a.cityCode,
+      latitude: l.latitude,
+      longitude: l.longitude
+    });
+    this.selectionnee = true;
+    this._notifier();
+    this._message(MESSAGES.retenue(this.$recherche.value));
+    return true;
+  };
+
   /* ----- « L'adresse du terrain est la même que celle du déclarant » ----- */
 
   /**
@@ -788,7 +825,8 @@
     var trouves = [];
 
     Array.prototype.forEach.call(portee.querySelectorAll("[data-adresse]"), function (n) {
-      trouves.push(new Adresse(n));
+      n.__adresse = new Adresse(n);
+      trouves.push(n.__adresse);
     });
 
     // Les reports après les adresses : ils s'appuient dessus.

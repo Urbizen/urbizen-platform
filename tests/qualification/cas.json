@@ -1,0 +1,1140 @@
+{
+  "_lisez_moi": [
+    "Corpus partagé de qualification d'urbanisme.",
+    "",
+    "Deux moteurs appliquent les mêmes règles : qualification.js dans le",
+    "navigateur, QualificationUrbanisme.php sur le serveur. Ils ne partagent",
+    "aucun code — l'un tourne dans un navigateur, l'autre dans WordPress. Ils",
+    "partagent ce fichier, que les deux bancs rejouent en exigeant le MÊME",
+    "verdict. Une divergence est un échec de test, jamais une découverte de",
+    "production.",
+    "",
+    "Les seuils viennent des textes vérifiés sur Légifrance, pas des constantes",
+    "du code : R.421-2, R.421-9, R.421-14, R.421-17, R.431-2.",
+    "",
+    "Chaque cas porte `attendu` (l'état) et, quand il compte, `rule`."
+  ],
+  "cas": [
+    {
+      "nom": "extension 19 m² hors zone U",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 19,
+        "zone_u": false,
+        "emprise_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 20 m² hors zone U — au seuil, pas au-delà",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 20,
+        "zone_u": false,
+        "emprise_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 20,1 m² hors zone U — bascule",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 20.1,
+        "zone_u": false,
+        "emprise_creee": 0
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
+    },
+    {
+      "nom": "extension 39 m² en zone U, total 120",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 39,
+        "zone_u": true,
+        "sp_totale": 120,
+        "emprise_creee": 0,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 40 m² en zone U, total 120 — au seuil",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 40,
+        "zone_u": true,
+        "sp_totale": 120,
+        "emprise_creee": 0,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 40,1 m² en zone U — au-delà de 40, permis",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 40.1,
+        "zone_u": true,
+        "sp_totale": 120,
+        "emprise_creee": 0
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
+    },
+    {
+      "nom": "extension 40,1 m² hors zone U",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 40.1,
+        "zone_u": false,
+        "emprise_creee": 0
+      },
+      "attendu": "pcmi"
+    },
+    {
+      "nom": "extension 30 m² zone U, total 149 — sous le plafond R.431-2",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "zone_u": true,
+        "sp_totale": 149,
+        "emprise_creee": 0,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 30 m² zone U, total 150 — au plafond, pas au-delà",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "zone_u": true,
+        "sp_totale": 150,
+        "emprise_creee": 0,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 30 m² zone U, total 150,1 — exception R.421-14 b)",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "zone_u": true,
+        "sp_totale": 150.1,
+        "emprise_creee": 0,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 b) + R.431-2"
+    },
+    {
+      "nom": "extension 30 m² zone U, total inconnu",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "zone_u": true,
+        "emprise_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "extension 30 m² zone inconnue — décisive",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "emprise_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "extension 19 m² zone inconnue — la zone ne décide pas",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 19,
+        "emprise_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "extension 30 m² zone U, total 120, personne morale",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 30,
+        "zone_u": true,
+        "sp_totale": 120,
+        "personne_physique": false,
+        "emprise_creee": 0
+      },
+      "attendu": "confirm",
+      "rule": "R.431-2"
+    },
+    {
+      "nom": "extension sans surface",
+      "donnees": {
+        "projet": "extension"
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "extension 4 m² — sous 5, dépend de l'aspect extérieur",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 4,
+        "zone_u": true,
+        "emprise_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "extension : l'emprise l'emporte sur la surface de plancher",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 10,
+        "emprise_creee": 25,
+        "zone_u": false
+      },
+      "attendu": "pcmi"
+    },
+    {
+      "nom": "garage sans implantation — question bloquante",
+      "donnees": {
+        "projet": "garage",
+        "sp_creee": 18
+      },
+			"attendu": "confirm",
+			"rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "garage accolé 19 m² hors zone U",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "sp_creee": 19,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "garage accolé 20,1 m² hors zone U",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "sp_creee": 20.1,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "garage accolé 30 m² zone U total 120",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "sp_creee": 30,
+        "zone_u": true,
+        "sp_totale": 120
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "garage accolé 40,1 m² zone U",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "sp_creee": 40.1,
+        "zone_u": true,
+        "sp_totale": 120
+      },
+		"attendu": "pcmi",
+		"rule": "R.421-1 / R.421-14"
+    },
+    {
+      "nom": "garage indépendant 4,9 m², h 2,5, hors secteur protégé",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 4.9,
+        "hauteur_m": 2.5,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "none",
+      "rule": "R.421-2"
+    },
+    {
+      "nom": "garage indépendant 5 m² — au seuil, dispensé",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 5,
+        "hauteur_m": 2.5,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "none"
+    },
+    {
+      "nom": "garage indépendant 5,1 m² — bascule en déclaration",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 5.1,
+        "hauteur_m": 2.5,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "dp",
+      "rule": "R.421-9"
+    },
+    {
+      "nom": "garage indépendant 19 m²",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 19,
+        "hauteur_m": 3,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "garage indépendant 20 m² — au seuil",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 20,
+        "hauteur_m": 3,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "garage indépendant 20,1 m² — permis",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 20.1,
+        "hauteur_m": 3,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-1"
+    },
+    {
+      "nom": "garage indépendant 12 m², secteur protégé inconnu",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 12,
+        "hauteur_m": 3,
+        "sp_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "garage indépendant 12 m², en secteur protégé",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 12,
+        "hauteur_m": 3,
+        "secteur_protege": true,
+        "sp_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "garage indépendant 12 m², hauteur inconnue",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 12,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "garage indépendant 15 m², hauteur 12,5 m — permis",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 15,
+        "hauteur_m": 12.5,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-1 / R.421-9"
+    },
+    {
+      "nom": "abri indépendant 4,9 m² — aucune formalité",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "independant",
+        "emprise_creee": 4.9,
+        "hauteur_m": 2,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "none"
+    },
+    {
+      "nom": "abri indépendant 5,1 m² — déclaration",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "independant",
+        "emprise_creee": 5.1,
+        "hauteur_m": 2,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "abri indépendant 20,1 m² — permis",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "independant",
+        "emprise_creee": 20.1,
+        "hauteur_m": 2,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "pcmi"
+    },
+    {
+      "nom": "abri indépendant 4 m² en secteur protégé — la dispense tombe",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "independant",
+        "emprise_creee": 4,
+        "hauteur_m": 2,
+        "secteur_protege": true,
+        "sp_creee": 0
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-9"
+    },
+    {
+      "nom": "abri accolé 6 m²",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "accole",
+        "emprise_creee": 6,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "abri sans implantation",
+      "donnees": {
+        "projet": "abri",
+        "emprise_creee": 6
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "piscine bassin 9 m² non couverte",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 9,
+        "couverte": false,
+        "secteur_protege": false
+      },
+      "attendu": "none",
+      "rule": "R.421-2"
+    },
+    {
+      "nom": "piscine bassin 10 m² — au seuil",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 10,
+        "couverte": false,
+        "secteur_protege": false
+      },
+      "attendu": "none"
+    },
+    {
+      "nom": "piscine bassin 10,1 m² — déclaration",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 10.1,
+        "couverte": false,
+        "secteur_protege": false
+      },
+      "attendu": "dp",
+      "rule": "R.421-9"
+    },
+    {
+      "nom": "piscine bassin 100 m² — au seuil",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 100,
+        "couverte": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "piscine bassin 100,1 m² — permis",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 100.1,
+        "couverte": false
+      },
+      "attendu": "pcmi"
+    },
+    {
+      "nom": "piscine 40 m² couverte à 1,79 m",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 40,
+        "couverte": true,
+        "hauteur_couverture_m": 1.79
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "piscine 40 m² couverte à 1,80 m — permis",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 40,
+        "couverte": true,
+        "hauteur_couverture_m": 1.8
+      },
+      "attendu": "pcmi"
+    },
+    {
+      "nom": "piscine 8 m² en secteur protégé",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 8,
+        "couverte": false,
+        "secteur_protege": true
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "piscine sans bassin renseigné",
+      "donnees": {
+        "projet": "piscine"
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "pergola adossée 12 m²",
+      "donnees": {
+        "projet": "pergola",
+        "implantation": "accole",
+        "emprise_creee": 12,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "pergola adossée 25 m² hors zone U",
+      "donnees": {
+        "projet": "pergola",
+        "implantation": "accole",
+        "emprise_creee": 25,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9 / R.421-14"
+    },
+    {
+      "nom": "pergola autonome 4 m²",
+      "donnees": {
+        "projet": "pergola",
+        "implantation": "independant",
+        "emprise_creee": 4,
+        "hauteur_m": 2.4,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "none"
+    },
+    {
+      "nom": "pergola autonome 15 m²",
+      "donnees": {
+        "projet": "pergola",
+        "implantation": "independant",
+        "emprise_creee": 15,
+        "hauteur_m": 2.4,
+        "secteur_protege": false,
+        "sp_creee": 0
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "pergola sans implantation",
+      "donnees": {
+        "projet": "pergola",
+        "emprise_creee": 12
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "modification de façade",
+      "donnees": {
+        "projet": "facade"
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-17"
+    },
+    {
+      "nom": "façade avec changement de destination",
+      "donnees": {
+        "projet": "facade",
+        "changement_destination": true,
+        "modifie_structure_ou_facade": true
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 c)"
+    },
+    {
+      "nom": "toiture",
+      "donnees": {
+        "projet": "toiture"
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-17"
+    },
+    {
+      "nom": "panneaux solaires hors secteur protégé",
+      "donnees": {
+        "projet": "solaire",
+        "secteur_protege": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-9 / R.421-17"
+    },
+    {
+      "nom": "panneaux solaires, secteur inconnu",
+      "donnees": {
+        "projet": "solaire"
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-9 / R.421-17"
+    },
+    {
+      "nom": "maison individuelle",
+      "donnees": {
+        "projet": "maison"
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-1"
+    },
+    {
+      "nom": "conception",
+      "donnees": {
+        "projet": "conception"
+      },
+      "attendu": "conception"
+    },
+    {
+      "nom": "autre projet — jamais DP par défaut",
+      "donnees": {
+        "projet": "autre"
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "type de projet inconnu du moteur",
+      "donnees": {
+        "projet": "chose-inexistante"
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "aucun type de projet",
+      "donnees": {},
+      "attendu": "confirm"
+    },
+    {
+      "nom": "garage accessoire maison → chambre, 18 m², zone U, total 120",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 18,
+        "zone_u": true,
+        "sp_totale": 120
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "garage accessoire maison → bureau domestique, 15 m²",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 15,
+        "zone_u": false
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "garage accessoire maison → chambre avec baie à la place de la porte",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 18,
+        "zone_u": true,
+        "sp_totale": 120,
+        "modifie_aspect_exterieur": true
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "garage accessoire maison → chambre sans modification extérieure",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 18,
+        "zone_u": true,
+        "sp_totale": 120,
+        "modifie_aspect_exterieur": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "transformation garage 4,9 m² — sous le seuil",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 4.9
+      },
+      "attendu": "confirm",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "transformation garage 5 m² — au seuil, pas au-delà",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 5
+      },
+      "attendu": "confirm",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "transformation garage 5 m² sans modification extérieure — aucune formalité",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 5,
+        "modifie_aspect_exterieur": false
+      },
+      "attendu": "none",
+      "rule": "R.421-17"
+    },
+    {
+      "nom": "transformation garage 5 m² avec modification extérieure — déclaration",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 5,
+        "modifie_aspect_exterieur": true
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 a)"
+    },
+    {
+      "nom": "transformation garage 5,1 m² — déclaration",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 5.1,
+        "zone_u": false
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "transformation garage 25 m² hors zone U — permis",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 25,
+        "zone_u": false
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
+    },
+    {
+      "nom": "transformation garage 25 m² zone U total 200 — permis",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 25,
+        "zone_u": true,
+        "sp_totale": 200,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 b) + R.431-2"
+    },
+    {
+      "nom": "transformation garage 25 m² zone U total 120 — déclaration",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 25,
+        "zone_u": true,
+        "sp_totale": 120,
+        "personne_physique": true,
+        "usage_agricole": false
+      },
+      "attendu": "dp"
+    },
+    {
+      "nom": "transformation garage 25 m² zone inconnue — décisive",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "garage",
+        "local_rattache": "maison",
+        "sp_creee": 25
+      },
+      "attendu": "confirm",
+      "rule": "R.421-14 b)"
+    },
+    {
+      "nom": "dépendance séparée non habitable → logement, sans travaux de structure",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "dependance",
+        "local_rattache": "batiment_separe",
+        "destination_actuelle": "autres_activites",
+        "modifie_structure_ou_facade": false,
+        "sp_creee": 18,
+        "hauteur_sup_180": true
+      },
+      "attendu": "confirm",
+      "rule": "R.151-27 à R.151-29"
+    },
+    {
+      "nom": "dépendance séparée non habitable → logement, avec façade",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "dependance",
+        "local_rattache": "batiment_separe",
+        "destination_actuelle": "autres_activites",
+        "modifie_structure_ou_facade": true,
+        "sp_creee": 18
+      },
+      "attendu": "confirm",
+      "rule": "R.151-27 à R.151-29"
+    },
+    {
+      "nom": "dépendance séparée non habitable, travaux de structure inconnus",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "dependance",
+        "local_rattache": "batiment_separe",
+        "destination_actuelle": "autres_activites",
+        "sp_creee": 18
+      },
+      "attendu": "confirm",
+      "rule": "R.151-27 à R.151-29"
+    },
+    {
+      "nom": "dépendance séparée déjà en habitation → pas de changement de destination",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "dependance",
+        "local_rattache": "batiment_separe",
+        "destination_actuelle": "habitation",
+        "hauteur_sup_180": false,
+        "sp_creee": 18,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.151-27 à R.151-29"
+    },
+    {
+      "nom": "bâtiment séparé sans destination connue",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "dependance",
+        "local_rattache": "batiment_separe",
+        "sp_creee": 18
+      },
+      "attendu": "confirm",
+      "rule": "R.151-27 à R.151-29"
+    },
+    {
+      "nom": "combles > 1,80 m sans modification extérieure — aucune formalité",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "combles",
+        "local_rattache": "maison",
+        "hauteur_sup_180": true,
+        "modifie_aspect_exterieur": false,
+        "sp_creee": 20
+      },
+      "attendu": "confirm",
+      "rule": "R.111-22"
+    },
+    {
+      "nom": "combles > 1,80 m avec fenêtre de toit — déclaration",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "combles",
+        "local_rattache": "maison",
+        "hauteur_sup_180": true,
+        "modifie_aspect_exterieur": true,
+        "sp_creee": 20
+      },
+      "attendu": "confirm",
+      "rule": "R.111-22"
+    },
+    {
+      "nom": "combles ≤ 1,80 m — création de surface de plancher",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "combles",
+        "local_rattache": "maison",
+        "hauteur_sup_180": false,
+        "sp_creee": 18,
+        "zone_u": false
+      },
+      "attendu": "confirm",
+      "rule": "R.111-22"
+    },
+    {
+      "nom": "combles, hauteur inconnue — décisive",
+      "donnees": {
+        "projet": "transformation",
+        "ferme_couvert": true,
+        "local_actuel": "combles",
+        "local_rattache": "maison",
+        "sp_creee": 18
+      },
+      "attendu": "confirm",
+      "rule": "R.111-22"
+    },
+    {
+      "nom": "transformation sans surface",
+      "donnees": {
+        "projet": "transformation"
+      },
+      "attendu": "confirm"
+    },
+    {
+      "nom": "transformation, espace non clos et couvert",
+      "donnees": {
+        "projet": "transformation",
+        "sp_creee": 18,
+        "ferme_couvert": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-17"
+    },
+    {
+      "nom": "transformation, clos et couvert inconnu",
+      "donnees": {
+        "projet": "transformation",
+        "sp_creee": 18
+      },
+      "attendu": "confirm",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "transformation, nature du local inconnue",
+      "donnees": {
+        "projet": "transformation",
+        "sp_creee": 18,
+        "ferme_couvert": true
+      },
+      "attendu": "confirm",
+      "rule": "R.421-17 g)"
+    },
+    {
+      "nom": "transformation, rattachement inconnu",
+      "donnees": {
+        "projet": "transformation",
+        "sp_creee": 18,
+        "ferme_couvert": true,
+        "local_actuel": "garage"
+      },
+      "attendu": "confirm",
+      "rule": "R.421-14 c)"
+    },
+    {
+      "nom": "extension 15 m² avec seule surface de plancher — emprise décisive absente",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": 15,
+        "zone_u": true
+      },
+      "attendu": "confirm",
+      "rule": "R.421-14 / R.421-17"
+    },
+    {
+      "nom": "extension avec seule emprise de 60 m² — permis certain",
+      "donnees": {
+        "projet": "extension",
+        "emprise_creee": 60
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
+    },
+    {
+      "nom": "garage indépendant SP 4 m² et emprise 15 m² — emprise décisive",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "sp_creee": 4,
+        "emprise_creee": 15,
+        "hauteur_m": 3,
+        "secteur_protege": false
+      },
+      "attendu": "dp",
+      "rule": "R.421-9"
+    },
+    {
+      "nom": "garage indépendant avec seule SP 4 m² — emprise absente",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "sp_creee": 4,
+        "hauteur_m": 3,
+        "secteur_protege": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-9"
+    },
+    {
+      "nom": "piscine 8 m² sans réponse sur la couverture",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 8,
+        "secteur_protege": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9"
+    },
+    {
+      "nom": "piscine 8 m² avec booléen couverture falsifié en chaîne",
+      "donnees": {
+        "projet": "piscine",
+        "bassin_m2": 8,
+        "couverte": "false",
+        "secteur_protege": false
+      },
+      "attendu": "confirm",
+      "rule": "R.421-9"
+    },
+    {
+      "nom": "nombre avec suffixe refusé par les deux moteurs",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": "20abc",
+        "emprise_creee": 0
+      },
+      "attendu": "confirm",
+      "rule": "R.421-14 / R.421-17"
+    },
+    {
+      "nom": "tableau numérique refusé par les deux moteurs",
+      "donnees": {
+        "projet": "extension",
+        "sp_creee": [
+          60
+        ],
+        "emprise_creee": 0
+      },
+      "attendu": "confirm",
+      "rule": "R.421-14 / R.421-17"
+    },
+    {
+      "nom": "secteur protégé falsifié en chaîne ne vaut pas faux",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "sp_creee": 4,
+        "emprise_creee": 4,
+        "hauteur_m": 2,
+        "secteur_protege": "false"
+      },
+      "attendu": "confirm",
+      "rule": "R.421-2 / R.421-9"
+    },
+    {
+      "nom": "construction de 5 m² haute de 12,001 m — déclaration",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "sp_creee": 5,
+        "emprise_creee": 5,
+        "hauteur_m": 12.001,
+        "secteur_protege": false
+      },
+      "attendu": "dp",
+      "rule": "R.421-9 c)"
+    },
+    {
+      "nom": "construction de 5,001 m² haute de 12,001 m — permis",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "sp_creee": 5.001,
+        "emprise_creee": 5.001,
+        "hauteur_m": 12.001,
+        "secteur_protege": false
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-1 / R.421-9"
+    }
+  ]
+}
