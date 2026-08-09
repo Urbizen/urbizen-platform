@@ -120,23 +120,20 @@ final class QualificationUrbanisme {
 			'pergola' => array( 'Pergola adossée', 'Pergola autonome' ),
 		);
 
-		$cree = self::creation( $donnees );
-		if ( null !== $cree && $cree > self::EXISTANT_PC_ZONE_U ) {
-			return self::r( self::PCMI, 'R.421-1 / R.421-14', 'Au-delà de 40 m², le permis est exigé que le projet soit une construction nouvelle ou une extension.' );
+		/* Un garage de stationnement et une pergola ouverte ne créent pas de
+		 * surface de plancher : leur seuil est piloté par l’emprise au sol. */
+		$regles = $donnees;
+		if ( in_array( $projet, array( 'garage', 'pergola' ), true ) ) {
+			$regles['sp_creee'] = 0;
 		}
 
 		$implantation = $donnees['implantation'] ?? null;
 
 		if ( 'accole' === $implantation ) {
-			$raisons = array(
-				'garage'  => 'Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement le garage d’extension.',
-				'abri'    => 'Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement l’abri d’extension.',
-				'pergola' => 'Une pergola adossée peut être traitée comme construction nouvelle ou extension selon sa conception et le document d’urbanisme.',
-			);
-			return self::r( self::A_CONFIRMER, 'R.421-9 / R.421-14', $raisons[ $projet ], array( 'qualification_plu' ) );
+			return self::construction_accolee( $regles, $etiquettes[ $projet ][0] );
 		}
 		if ( 'independant' === $implantation ) {
-			return self::construction_nouvelle( $donnees, $etiquettes[ $projet ][1] );
+			return self::construction_nouvelle( $regles, $etiquettes[ $projet ][1] );
 		}
 
 		return self::r(
@@ -147,6 +144,41 @@ final class QualificationUrbanisme {
 				: 'Accolé à une construction existante ou indépendant : les règles applicables ne sont pas les mêmes.',
 			array( 'implantation' )
 		);
+	}
+
+	/**
+	 * Parcours de base Urbizen : accolé/adossé est traité comme une extension.
+	 * Une zone U inconnue entraîne le régime général prudent ; l’information
+	 * sera vérifiée humainement après l’envoi du formulaire.
+	 *
+	 * @param array<string, mixed> $donnees
+	 * @return array{status: string, rule: ?string, reason: string, missing: string[]}
+	 */
+	private static function construction_accolee( array $donnees, string $etiquette ): array {
+		$mesures = self::mesures_creation( $donnees );
+		$cree = self::creation( $donnees );
+
+		if ( null === $cree ) {
+			return self::r( self::A_CONFIRMER, 'R.421-14 / R.421-17', $etiquette . ' : la surface créée n’est pas connue.', array( 'sp_creee', 'emprise_creee' ) );
+		}
+		if ( $cree > self::EXISTANT_PC_ZONE_U ) {
+			return self::r( self::PCMI, 'R.421-14 a)', 'Création accolée de ' . self::m( $cree ) . ' m² : au-delà de 40 m², le permis de construire est requis.' );
+		}
+
+		$manque_mesure = self::mesures_manquantes( $mesures );
+		if ( array() !== $manque_mesure ) {
+			return self::r( self::A_CONFIRMER, 'R.421-14 / R.421-17', $etiquette . ' : surface de plancher et emprise au sol sont nécessaires pour appliquer les seuils.', $manque_mesure );
+		}
+		if ( $cree <= self::EXISTANT_PC ) {
+			return self::r( self::DP, 'R.421-17 a) / f)', 'Création accolée de ' . self::m( $cree ) . ' m² modifiant l’aspect extérieur : déclaration préalable.' );
+		}
+		if ( ! array_key_exists( 'zone_u', $donnees ) ) {
+			return self::r( self::A_CONFIRMER, 'R.421-14 / R.421-17', 'Entre 20 et 40 m², le classement du terrain en zone U décide entre déclaration préalable et permis de construire.', array( 'zone_u' ) );
+		}
+		if ( true === $donnees['zone_u'] ) {
+			return self::r( self::DP, 'R.421-17 f)', 'Création accolée de ' . self::m( $cree ) . ' m² en zone U : déclaration préalable.' );
+		}
+		return self::r( self::PCMI, 'R.421-14 a)', 'Création accolée de ' . self::m( $cree ) . ' m² sans classement en zone U établi : le régime général prudent est le permis de construire.' );
 	}
 
 	/**
@@ -230,8 +262,13 @@ final class QualificationUrbanisme {
 			return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-9', $etiquette . ' : surface de plancher et emprise au sol sont nécessaires pour vérifier les plafonds de 5 et 20 m².', $manque_mesure );
 		}
 
-		if ( self::secteur_bloquant( $donnees ) ) {
-			return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-9', 'En secteur patrimonial remarquable, aux abords d’un monument historique ou en site classé, les dispenses ne s’appliquent pas.', array( 'secteur_protege' ) );
+		if ( ! array_key_exists( 'secteur_protege', $donnees ) ) {
+			return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-11', 'Le secteur protégé décide si une construction jusqu’à 5 m² est dispensée ou soumise à déclaration préalable.', array( 'secteur_protege' ) );
+		}
+
+		/* « Je ne sais pas » suit le régime protégé, plus prudent. */
+		if ( false !== $donnees['secteur_protege'] ) {
+			return self::r( self::DP, 'R.421-11', 'Secteur protégé ou non déterminé : déclaration préalable retenue par prudence pour cette construction jusqu’à 20 m².' );
 		}
 
 		if ( null === $hauteur ) {

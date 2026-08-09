@@ -64,14 +64,14 @@ function lireAdresse(f) {
   const scenarios = [
 	{ nom: "extension DP", projet: "extension", reponses: ["15", "15"], form: "dp" },
 	{ nom: "extension PC", projet: "extension", reponses: ["60"], form: "pc" },
-	{ nom: "garage surfaces distinctes", projet: "garage", reponses: ["Indépendante", "4", "15", "Non", "2.5"], form: "dp" },
-	{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "15", "Non", "2.5"], form: "dp" },
+	{ nom: "garage emprise 15 m²", projet: "garage", reponses: ["Indépendante", "15", "Non", "2.5"], form: "dp" },
+	{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "Non", "2.5"], form: "dp" },
 	{ nom: "abri DP", projet: "abri", reponses: ["Indépendante", "12", "12", "Non", "2"], form: "dp" },
     { nom: "abri PC", projet: "abri", reponses: ["Indépendante", "25"], form: "pc" },
     { nom: "transformation garage habitable", projet: "transformation",
       reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison"], form: "dp" },
     { nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"], form: "dp" },
-	{ nom: "pergola DP", projet: "pergola", reponses: ["Indépendante", "12", "12", "Non", "2.4"], form: "dp" }
+	{ nom: "pergola DP", projet: "pergola", reponses: ["Indépendante", "12", "Non", "2.4"], form: "dp" }
   ];
 
   for (const s of scenarios) {
@@ -92,13 +92,13 @@ function lireAdresse(f) {
 
   const maintenant = Date.now();
   const qualification = (statut, createdAt) => ({
-    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: createdAt,
+    version: 3, parcours_id: "parcours-test", projet: "extension", created_at: createdAt,
     donnees: { projet: "extension", sp_creee: 60, emprise_creee: 60 },
     verdict: { status: statut, rule: "R.421-14 a)", reason: "test", missing: [] }
   });
   f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
   f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
-    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
+    version: 3, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
   }));
   f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("pcmi", maintenant - 31 * 60 * 1000)));
   await charger(f, "/frontend/formulaires/pc-formulaire.html");
@@ -106,7 +106,7 @@ function lireAdresse(f) {
 
   f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
   f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
-    version: 2, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
+    version: 3, parcours_id: "parcours-test", projet: "extension", created_at: maintenant
   }));
   f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("dp", maintenant)));
   await charger(f, "/frontend/formulaires/pc-formulaire.html");
@@ -115,7 +115,7 @@ function lireAdresse(f) {
   f.contentWindow.sessionStorage.setItem("urbizen:projet", "extension");
   f.contentWindow.sessionStorage.setItem("urbizen:qualification", JSON.stringify(qualification("pcmi", maintenant)));
   f.contentWindow.sessionStorage.setItem("urbizen:parcours", JSON.stringify({
-    version: 2, parcours_id: "autre-parcours", projet: "extension", created_at: maintenant
+    version: 3, parcours_id: "autre-parcours", projet: "extension", created_at: maintenant
   }));
   await charger(f, "/frontend/formulaires/pc-formulaire.html");
   const mauvaisParcours = lire(f);

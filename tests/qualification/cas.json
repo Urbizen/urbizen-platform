@@ -216,46 +216,67 @@
       "donnees": {
         "projet": "garage",
         "implantation": "accole",
-        "sp_creee": 19,
+        "emprise_creee": 19,
         "zone_u": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "dp",
+      "rule": "R.421-17 a) / f)"
+    },
+    {
+      "nom": "garage accolé 4 m² — modification extérieure",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "emprise_creee": 4
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 a) / f)"
     },
     {
       "nom": "garage accolé 20,1 m² hors zone U",
       "donnees": {
         "projet": "garage",
         "implantation": "accole",
-        "sp_creee": 20.1,
+        "emprise_creee": 20.1,
         "zone_u": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
     },
     {
       "nom": "garage accolé 30 m² zone U total 120",
       "donnees": {
         "projet": "garage",
         "implantation": "accole",
-        "sp_creee": 30,
+        "emprise_creee": 30,
         "zone_u": true,
         "sp_totale": 120
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "dp",
+      "rule": "R.421-17 f)"
+    },
+    {
+      "nom": "garage accolé 30 m² zone inconnue — permis prudent",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "accole",
+        "emprise_creee": 30,
+        "zone_u": "unknown"
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
     },
     {
       "nom": "garage accolé 40,1 m² zone U",
       "donnees": {
         "projet": "garage",
         "implantation": "accole",
-        "sp_creee": 40.1,
+        "emprise_creee": 40.1,
         "zone_u": true,
         "sp_totale": 120
       },
 		"attendu": "pcmi",
-		"rule": "R.421-1 / R.421-14"
+		"rule": "R.421-14 a)"
     },
     {
       "nom": "garage indépendant 4,9 m², h 2,5, hors secteur protégé",
@@ -353,7 +374,19 @@
         "secteur_protege": true,
         "sp_creee": 0
       },
-      "attendu": "confirm"
+      "attendu": "dp",
+      "rule": "R.421-11"
+    },
+    {
+      "nom": "garage indépendant 12 m², secteur inconnu — déclaration prudente",
+      "donnees": {
+        "projet": "garage",
+        "implantation": "independant",
+        "emprise_creee": 12,
+        "secteur_protege": "unknown"
+      },
+      "attendu": "dp",
+      "rule": "R.421-11"
     },
     {
       "nom": "garage indépendant 12 m², hauteur inconnue",
@@ -425,19 +458,44 @@
         "secteur_protege": true,
         "sp_creee": 0
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-9"
+      "attendu": "dp",
+		"rule": "R.421-11"
     },
     {
       "nom": "abri accolé 6 m²",
       "donnees": {
         "projet": "abri",
         "implantation": "accole",
+        "sp_creee": 6,
         "emprise_creee": 6,
         "zone_u": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "dp",
+      "rule": "R.421-17 a) / f)"
+    },
+    {
+      "nom": "abri accolé 25 m² en zone U",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "accole",
+        "sp_creee": 25,
+        "emprise_creee": 25,
+        "zone_u": true
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 f)"
+    },
+    {
+      "nom": "abri accolé 25 m² hors zone U",
+      "donnees": {
+        "projet": "abri",
+        "implantation": "accole",
+        "sp_creee": 25,
+        "emprise_creee": 25,
+        "zone_u": false
+      },
+      "attendu": "pcmi",
+      "rule": "R.421-14 a)"
     },
     {
       "nom": "abri sans implantation",
@@ -542,8 +600,8 @@
         "emprise_creee": 12,
         "zone_u": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "dp",
+      "rule": "R.421-17 a) / f)"
     },
     {
       "nom": "pergola adossée 25 m² hors zone U",
@@ -553,8 +611,19 @@
         "emprise_creee": 25,
         "zone_u": false
       },
-      "attendu": "confirm",
-      "rule": "R.421-9 / R.421-14"
+      "attendu": "pcmi",
+		"rule": "R.421-14 a)"
+    },
+    {
+      "nom": "pergola adossée 25 m² en zone U",
+      "donnees": {
+        "projet": "pergola",
+        "implantation": "accole",
+        "emprise_creee": 25,
+        "zone_u": true
+      },
+      "attendu": "dp",
+      "rule": "R.421-17 f)"
     },
     {
       "nom": "pergola autonome 4 m²",
@@ -1107,8 +1176,8 @@
         "hauteur_m": 2,
         "secteur_protege": "false"
       },
-      "attendu": "confirm",
-      "rule": "R.421-2 / R.421-9"
+      "attendu": "dp",
+		"rule": "R.421-11"
     },
     {
       "nom": "construction de 5 m² haute de 12,001 m — déclaration",

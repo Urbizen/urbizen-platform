@@ -5,25 +5,39 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
-## [0.14.0 — Correctif d’orientation des projets] — 2026-08-09
+## [0.14.0 — Orientation directe des projets] — 2026-08-09
 
-Le tunnel d’accueil ne choisit plus une formalité par défaut. Il applique un
-moteur explicite, partagé avec le serveur, puis réserve les situations qui
-dépendent d’une règle locale ou d’une information absente à la vérification
-humaine annoncée au client.
+Le tunnel d’accueil applique les règles nationales connues et dirige
+directement vers une déclaration préalable ou un permis de construire. La
+vérification humaine intervient après l’envoi du formulaire : Urbizen contrôle
+les informations transmises et rappelle sous 24 heures ouvrées.
 
 ### Corrigé
 
-- Les deux mesures déterminantes — surface de plancher et emprise au sol — sont
-  distinguées et conservées jusqu’aux formulaires DP et PC.
+- Un garage, un abri ou une pergola accolé/adossé suit le parcours de base
+  d’une extension : DP jusqu’à 20 m², puis DP jusqu’à 40 m² en zone U et PC
+  dans le régime général. « Je ne sais pas » retient le PC prudent ; Urbizen
+  rectifie si nécessaire après réception.
+- Un garage, un abri ou une pergola indépendant suit les seuils d’une
+  construction nouvelle : aucune formalité jusqu’à 5 m² hors secteur protégé,
+  DP jusqu’à 20 m² et PC au-delà. Un secteur protégé inconnu retient la DP
+  prudente.
+- Garage et pergola ne demandent plus une surface de plancher qu’ils ne créent
+  pas : un zéro explicite est transmis au formulaire avec leur emprise au sol.
+- Les boutons « Faire qualifier mon projet » et « Faire vérifier mon projet »
+  sont supprimés. Les conclusions DP et PC annoncent le contrôle post-envoi et
+  le rappel sous 24 heures ouvrées.
+- Le sous-texte « Garage, combles, sous-sol, dépendance… » est retiré de la
+  carte « Transformer un espace existant ».
+- La version de session du tunnel passe à **3** afin qu’aucune orientation
+  conservée avant ce correctif ne soit reprise par les formulaires.
+- Les deux mesures déterminantes — surface de plancher et emprise au sol —
+  restent distinguées et conservées jusqu’aux formulaires DP et PC.
 - Le serveur recalcule le régime depuis les champs réellement soumis et refuse
   une déclaration préalable qui relève certainement du permis, notamment une
   extension de 60 m² ou une piscine de plus de 100 m².
 - Les valeurs numériques ambiguës, les booléens falsifiés et les réponses de
   qualification incomplètes ne peuvent plus devenir une décision implicite.
-- Les garages, abris et pergolas suivent les règles générales lorsqu’elles
-  suffisent ; les cas accolés, locaux ou incomplets restent « à confirmer » et
-  sont vérifiés humainement avant tout dépôt administratif.
 - Chaque parcours possède un identifiant propre. Qualification et adresse
   cadastrale expirent après 30 minutes et ne sont reprises que par le même
   projet et le bon formulaire.
@@ -33,22 +47,27 @@ humaine annoncée au client.
   navigateurs ne conservent pas les anciens documents et scripts pendant sept
   jours.
 
-### Vérifié et déployé
+### Vérifié
 
-- PR [#58](https://github.com/Urbizen/urbizen-platform/pull/58) et correctif de
-  cache [#59](https://github.com/Urbizen/urbizen-platform/pull/59) fusionnés dans
-  `main`.
-- Corpus partagé de **100 cas**, équivalence navigateur/serveur, contrôleur réel,
-  tunnels Chrome, formulaires, cadastre, accueil mobile et soumissions au vert.
+- Corpus partagé porté à **106 cas**, équivalence navigateur/serveur,
+  contrôleur réel et protections contre la falsification au vert.
+- **21 parcours Chrome** vérifient notamment garage accolé, abri accolé et
+  pergola adossée en DP et en PC prudent, sans ancien libellé de qualification.
+- Le report complet vers les formulaires DP et PC, les gabarits de l’accueil,
+  le retrait du sous-texte et la promesse de rappel sous 24 heures sont testés.
+
+### Historique de mise en ligne
+
+- Les PR [#58](https://github.com/Urbizen/urbizen-platform/pull/58) et
+  [#59](https://github.com/Urbizen/urbizen-platform/pull/59) ont été fusionnées,
+  puis leur mise en ligne a été annulée immédiatement après contrôle produit :
+  le parcours demandait à tort de « faire qualifier » les projets accolés.
 - Sauvegarde préalable vérifiée dans
   `~/backups/urbizen-orientation-20260809-165920/` : base, thème enfant,
   extension, configuration et sommes de contrôle.
-- Déploiement limité à **17 fichiers applicatifs**, sans suppression ; les 17
-  empreintes de production correspondent au commit `66bc9a3`.
-- Cache LiteSpeed purgé. Accueil, formulaire DP et formulaire PC répondent en
-  HTTP 200 ; recette Chrome réussie à 390 et 1280 px, sans débordement ni erreur
-  de console. Une extension de 15 m² aboutit à la DP, une extension de 60 m² et
-  une piscine de 120 m² au permis, et un garage accolé à la vérification humaine.
+- La production a été restaurée depuis cette sauvegarde, fichier par fichier,
+  puis contrôlée en HTTP 200 sur l’accueil et les deux formulaires. Elle reste
+  sur cette version sûre jusqu’au déploiement de la présente correction.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 

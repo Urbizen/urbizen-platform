@@ -151,17 +151,22 @@ ATTENDUS = {
     "extension DP certaine": "dp",
     "extension PC certaine": "pcmi",
     "extension zone U inconnue": "confirm",
-    "garage accolé": "confirm",
+    "garage accolé DP": "dp",
+    "garage accolé PC prudent": "pcmi",
     "garage indépendant sans formalité": "none",
     "garage indépendant DP": "dp",
     "garage indépendant PC": "pcmi",
-    "abri secteur inconnu": "confirm",
+    "abri secteur inconnu": "dp",
+    "abri accolé DP": "dp",
+    "abri accolé PC prudent": "pcmi",
     "abri sans formalité": "none",
     "abri PC": "pcmi",
     "piscine sans formalité": "none",
     "piscine DP": "dp",
     "piscine PC": "pcmi",
     "pergola autonome": "dp",
+    "pergola adossée DP": "dp",
+    "pergola adossée PC prudent": "pcmi",
     "transformation garage en pièce": "dp",
     "autre projet": "confirm",
 }
@@ -189,7 +194,7 @@ def main():
 
     scenarios = {s["nom"]: s for s in donnees["scenarios"]}
 
-    check("Les 16 scénarios ont été rejoués", len(scenarios) == 16, str(sorted(scenarios)))
+    check("Les 21 scénarios ont été rejoués", len(scenarios) == 21, str(sorted(scenarios)))
     check(
         "La carte « Transformer un espace existant » existe dans le tunnel",
         "transformation" in donnees["cartes"],
@@ -242,7 +247,7 @@ def main():
 
     # Le garage commence par l'implantation : c'est la question qui change
     # d'article, et la poser en second n'aurait pas de sens.
-    premiere = (scenarios["garage accolé"].get("posees") or [""])[0]
+    premiere = (scenarios["garage accolé DP"].get("posees") or [""])[0]
     check(
         "Le garage commence par accolé ou indépendant",
         "accolée" in premiere.lower() or "indépendante" in premiere.lower(),
@@ -285,6 +290,29 @@ def main():
         " | ".join(fautes),
     )
 
+    anciens_libelles = [
+        "%s : %s" % (s["nom"], s["bouton"])
+        for s in scenarios.values()
+        if "qualifier mon projet" in s["bouton"].lower()
+        or "faire vérifier mon projet" in s["bouton"].lower()
+    ]
+    check(
+        "Aucun bouton ne propose de faire qualifier le projet",
+        not anciens_libelles,
+        " | ".join(anciens_libelles),
+    )
+
+    sans_suivi = [
+        s["nom"] for s in scenarios.values()
+        if s["statut"] in ("dp", "pcmi")
+        and ("après l'envoi" not in s["message"].lower() or "24 h ouvrées" not in s["message"].lower())
+    ]
+    check(
+        "Chaque démarche DP ou PC annonce le contrôle post-envoi sous 24 h",
+        not sans_suivi,
+        " | ".join(sans_suivi),
+    )
+
     # Le bouton reste inactif tant qu'une question attend.
     actifs = [s["nom"] for s in scenarios.values() if s["questionVisible"] and not s["desactive"]]
     check("Le bouton reste inactif tant qu'une question attend", not actifs, " | ".join(actifs))
@@ -320,12 +348,12 @@ def main():
     message = ctx.get("message") or ""
     check(
         "Le message de renseignements reçoit un contexte lisible",
-        "Projet :" in message and "Qualification :" in message,
+        "Projet :" in message and "Suite proposée :" in message,
         repr(message[:80]),
     )
     check(
         "Le contexte nomme le projet et ses réponses, en clair",
-        "Garage" in message and "indépendant" in message and "Surface" in message,
+        "Garage" in message and "indépendant" in message and "Emprise" in message,
         repr(message[:120]),
     )
     check(

@@ -649,9 +649,6 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .qualif-champ { min-height: 44px; padding: 10px 12px; border: 1px solid var(--u-line); border-radius: var(--u-radius); font: inherit; color: var(--u-ink); background: #fff; max-width: 160px; }
 .urbizen-accueil .qualif-saisie .btn, .urbizen-accueil .qualif-choix .btn { min-height: 44px; }
 .urbizen-accueil .qualif-unite { font-family: var(--u-font-mono); color: var(--u-ink-soft); }
-/* Le sous-titre d'une carte de projet : « Garage, combles, sous-sol… ». */
-.urbizen-accueil .pcard-sub { display: block; font-size: 12.5px; color: var(--u-ink-soft); margin-top: 3px; line-height: 1.3; }
-
 /* --- Ancre « Demander des renseignements » --------------------------------
    L'en-tête est collant : une ancre visée sans précaution amène le haut de la
    section sous la barre, et l'accroche « Parlons de votre projet » disparaît

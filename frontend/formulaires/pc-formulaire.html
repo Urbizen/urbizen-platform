@@ -910,12 +910,12 @@
       parcours = brutParcours ? JSON.parse(brutParcours) : null;
     } catch (e) { qualif = null; parcours = null; }
 
-    var qualifValide = qualif && qualif.version === 2
+    var qualifValide = qualif && qualif.version === 3
       && typeof qualif.parcours_id === "string" && qualif.parcours_id
       && typeof qualif.created_at === "number"
       && maintenant - qualif.created_at <= 30 * 60 * 1000
       && qualif.created_at <= maintenant + 60000
-      && parcours && parcours.version === 2
+      && parcours && parcours.version === 3
       && parcours.parcours_id === qualif.parcours_id
       && parcours.projet === qualif.projet
       && qualif.projet === project
