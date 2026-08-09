@@ -297,19 +297,23 @@ foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $p
 foreach ( array( 'DP thème' => $dp, 'DP maquette' => $dp_maq, 'PC thème' => $pc, 'PC maquette' => $pc_maq ) as $nom => $doc ) {
 	verifier( sprintf( '%s : le module d’adresse est chargé', $nom ),
 		str_contains( $doc, 'urbizen-form-adresse.js?v=' . $version ) );
+	// Les sélecteurs du script inline peuvent légitimement contenir les mêmes
+	// attributs que le HTML. Les compter comme du balisage inventerait alors un
+	// troisième composant qui n'existe pas dans le DOM.
+	$balisage = preg_replace( '/<script\b[^>]*>[\s\S]*?<\/script>/i', '', $doc ) ?? '';
 	// Deux blocs, chacun nommant son rôle : le module ne connaît que des rôles,
 	// et c'est le document qui dit lequel il monte. Sans ce marquage, la case
 	// « même adresse » ne saurait pas quel bloc retirer.
 	verifier( sprintf( '%s : deux composants d’adresse sont balisés', $nom ),
-		2 === substr_count( $doc, 'data-adresse=' ) );
+		2 === substr_count( $balisage, 'data-adresse=' ) );
 	verifier( sprintf( '%s : l’un porte le rôle déclarant', $nom ),
-		1 === substr_count( $doc, 'data-adresse="declarant"' ) );
+		1 === substr_count( $balisage, 'data-adresse="declarant"' ) );
 	verifier( sprintf( '%s : l’autre le rôle terrain', $nom ),
-		1 === substr_count( $doc, 'data-adresse="terrain"' ) );
+		1 === substr_count( $balisage, 'data-adresse="terrain"' ) );
 	verifier( sprintf( '%s : aucun composant sans rôle', $nom ),
-		! str_contains( $doc, 'data-adresse>' ) );
+		! str_contains( $balisage, 'data-adresse>' ) );
 	verifier( sprintf( '%s : deux recherches indépendantes', $nom ),
-		2 === substr_count( $doc, 'data-adresse-recherche' ) );
+		2 === substr_count( $balisage, 'data-adresse-recherche' ) );
 	verifier( sprintf( '%s : le mode du déclarant part avec une valeur par défaut', $nom ),
 		str_contains( $doc, 'name="mode_adresse_declarant" value="automatique"' ) );
 	verifier( sprintf( '%s : les noms historiques du déclarant sont conservés', $nom ),
