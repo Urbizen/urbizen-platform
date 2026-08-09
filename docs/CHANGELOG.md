@@ -94,6 +94,20 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   30 m² avec zone U inconnue → PC prudent, abri accolé de 12 m² → DP. Les deux
   formulaires s’ouvrent, le rappel sous 24 heures est présent, et les anciens
   libellés de qualification et le sous-texte de transformation sont absents.
+- La PR [#64](https://github.com/Urbizen/urbizen-platform/pull/64) retire ensuite
+  la carte « Autre projet » et toute saisie libre sur l’accueil, puis oriente
+  directement façade, toiture et panneaux solaires vers la DP.
+- Sauvegarde préalable vérifiée dans
+  `~/backups/urbizen-direct-dp-cards-20260809-203249/` : base, thème enfant,
+  extension, configuration et sommes de contrôle.
+- Les **5 fichiers applicatifs** concernés ont été publiés sans suppression.
+  Le chemin de l’extension, mal saisi au premier transfert, a été corrigé avant
+  la purge du cache ; les 5 empreintes correspondent ensuite au commit fusionné
+  `4e6fc70` et la syntaxe PHP est valide.
+- Après purge LiteSpeed, l’accueil et le formulaire DP répondent en HTTP 200.
+  La recette réelle confirme dix cartes, l’absence de « Autre projet » et du
+  champ de description, les trois accès DP directs et l’ouverture du formulaire
+  DP depuis la façade, sans erreur navigateur.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
