@@ -118,8 +118,8 @@
 		return manque;
 	}
 
-	/* Un secteur protégé retire le bénéfice des dispenses. Tant qu'on ne sait
-	   pas, on ne peut pas prononcer `none` ni s'appuyer sur R.421-9. */
+	/* Les petites piscines gardent leur parcours historique : sans réponse
+	   explicite sur le secteur, aucune dispense n'est affirmée. */
 	function secteurBloquant(d) {
 		return d.secteur_protege !== false;
 	}
@@ -180,6 +180,42 @@
 		return resultat("dp", "R.421-17 f)", "Création de " + cree + " m² : sous le seuil du permis, la déclaration préalable s'applique.");
 	}
 
+	/* ----------------------------------------- construction accolée/adossée --
+	   Pour le parcours de base demandé par Urbizen, un garage accolé, un abri
+	   accolé ou une pergola adossée suit les seuils d'une extension. La création
+	   modifie nécessairement l'aspect extérieur : jusqu'à 20 m², la DP suffit ;
+	   entre 20 et 40 m², elle reste possible en zone U. Si le visiteur ignore
+	   son zonage, on retient le régime général prudent (PC) et Urbizen vérifiera
+	   la donnée après l'envoi du formulaire. */
+	function constructionAccolee(d, etiquette) {
+		var mesures = mesuresCreation(d);
+		var cree = creation(d);
+		if (cree === null) {
+			return resultat("confirm", "R.421-14 / R.421-17", etiquette + " : la surface créée n'est pas connue.", ["sp_creee", "emprise_creee"]);
+		}
+
+		if (cree > S.EXISTANT_PC_ZONE_U) {
+			return resultat("pcmi", "R.421-14 a)", "Création accolée de " + cree + " m² : au-delà de 40 m², le permis de construire est requis.");
+		}
+
+		var manqueMesure = mesuresManquantes(mesures);
+		if (manqueMesure.length) {
+			return resultat("confirm", "R.421-14 / R.421-17", etiquette + " : surface de plancher et emprise au sol sont nécessaires pour appliquer les seuils.", manqueMesure);
+		}
+
+		if (cree <= S.EXISTANT_PC) {
+			return resultat("dp", "R.421-17 a) / f)", "Création accolée de " + cree + " m² modifiant l'aspect extérieur : déclaration préalable.");
+		}
+
+		if (!Object.prototype.hasOwnProperty.call(d, "zone_u")) {
+			return resultat("confirm", "R.421-14 / R.421-17", "Entre 20 et 40 m², le classement du terrain en zone U décide entre déclaration préalable et permis de construire.", ["zone_u"]);
+		}
+		if (d.zone_u === true) {
+			return resultat("dp", "R.421-17 f)", "Création accolée de " + cree + " m² en zone U : déclaration préalable.");
+		}
+		return resultat("pcmi", "R.421-14 a)", "Création accolée de " + cree + " m² sans classement en zone U établi : le régime général prudent est le permis de construire.");
+	}
+
 	/* ------------------------------------------- construction indépendante --
 	   Garage ou abri autonome : ce ne sont plus des travaux sur l'existant. */
 	function constructionNouvelle(d, etiquette) {
@@ -200,8 +236,15 @@
 			return resultat("confirm", "R.421-2 / R.421-9", etiquette + " : surface de plancher et emprise au sol sont nécessaires pour vérifier les plafonds de 5 et 20 m².", manqueMesure);
 		}
 
-		if (secteurBloquant(d)) {
-			return resultat("confirm", "R.421-2 / R.421-9", "En secteur patrimonial remarquable, aux abords d'un monument historique ou en site classé, les dispenses ne s'appliquent pas.", ["secteur_protege"]);
+		if (!Object.prototype.hasOwnProperty.call(d, "secteur_protege")) {
+			return resultat("confirm", "R.421-2 / R.421-11", "Le secteur protégé décide si une construction jusqu'à 5 m² est dispensée ou soumise à déclaration préalable.", ["secteur_protege"]);
+		}
+
+		/* En secteur protégé, une construction nouvelle jusqu'à 20 m² relève
+		   directement de la DP. « Je ne sais pas » suit ce régime prudent ; le
+		   contrôle humain post-envoi pourra ensuite confirmer ou alléger. */
+		if (d.secteur_protege !== false) {
+			return resultat("dp", "R.421-11", "Secteur protégé ou non déterminé : déclaration préalable retenue par prudence pour cette construction jusqu'à 20 m².");
 		}
 
 		if (hauteur === null) {
@@ -333,28 +376,26 @@
 		extension: function (d) { return surExistant(d, "Extension"); },
 
 		garage: function (d) {
-			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que le garage soit une construction nouvelle ou une extension."); }
-			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement le garage d'extension.", ["qualification_plu"]); }
-			if (d.implantation === "independant") { return constructionNouvelle(d, "Garage indépendant"); }
+			var garage = Object.assign({}, d, { sp_creee: 0 });
+			if (d.implantation === "accole") { return constructionAccolee(garage, "Garage accolé"); }
+			if (d.implantation === "independant") { return constructionNouvelle(garage, "Garage indépendant"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Accolé à une construction existante ou indépendant : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
 
 		abri: function (d) {
-			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que l'abri soit une construction nouvelle ou une extension."); }
-			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement l'abri d'extension.", ["qualification_plu"]); }
+			if (d.implantation === "accole") { return constructionAccolee(d, "Abri accolé"); }
 			if (d.implantation === "independant") { return constructionNouvelle(d, "Abri indépendant"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Accolé à une construction existante ou indépendant : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
 
 		piscine: piscine,
 
-		/* Une pergola ouverte ne crée pas de surface de plancher, seulement une
-		   emprise. Aucun article ne la nomme : elle suit le régime commun des
-		   constructions, sans que le seul adossement suffise à la qualifier. */
+		/* Une pergola ouverte ne crée pas de surface de plancher : le parcours ne
+		   demande donc que son emprise au sol. */
 		pergola: function (d) {
-			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que la pergola soit une construction nouvelle ou une extension."); }
-			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Une pergola adossée peut être traitée comme construction nouvelle ou extension selon sa conception et le document d'urbanisme.", ["qualification_plu"]); }
-			if (d.implantation === "independant") { return constructionNouvelle(d, "Pergola autonome"); }
+			var pergola = Object.assign({}, d, { sp_creee: 0 });
+			if (d.implantation === "accole") { return constructionAccolee(pergola, "Pergola adossée"); }
+			if (d.implantation === "independant") { return constructionNouvelle(pergola, "Pergola autonome"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Adossée à la construction ou autonome : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
 

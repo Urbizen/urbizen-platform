@@ -191,10 +191,10 @@
      autre section.
 
      Aucun état n'est touché ici : tout passe par `openInquiry()`. */
-  /* ----- contexte de qualification vers le formulaire de renseignements -----
+  /* ----- contexte du projet vers le formulaire de renseignements ------------
 
-     `none` et `confirm` mènent ici. Urbizen doit savoir ce que la personne
-     venait de qualifier, sinon la demande arrive sans son histoire.
+     `none` et `confirm` mènent ici. Urbizen doit recevoir les réponses déjà
+     données, sans présenter ce passage comme une prestation de qualification.
 
      Le formulaire est un bloc FluentForm : sa définition vit en base, et lui
      ajouter un champ depuis le dépôt serait fragile — un champ inconnu de la
@@ -214,8 +214,8 @@
   };
 
   var LIBELLES_VERDICT = {
-    none: "aucune formalité nationale identifiée, à confirmer",
-    confirm: "à confirmer"
+    none: "aucune formalité nationale identifiée",
+    confirm: "échange direct avec Urbizen"
   };
 
   var LIBELLES_REPONSE = {
@@ -246,12 +246,12 @@
     if (donnees.secteur_protege !== undefined) { lignes.push("Secteur protégé : " + LIBELLES_REPONSE.secteur_protege[String(donnees.secteur_protege)]); }
     if (donnees.modifie_aspect_exterieur !== undefined) { lignes.push("Modification extérieure : " + LIBELLES_REPONSE.modifie_aspect_exterieur[String(donnees.modifie_aspect_exterieur)]); }
 
-    lignes.push("Qualification : " + (LIBELLES_VERDICT[verdict.status] || verdict.status));
+    lignes.push("Suite proposée : " + (LIBELLES_VERDICT[verdict.status] || verdict.status));
 
     return lignes.join("\n");
   }
 
-  var QUALIFICATION_VERSION = 2;
+  var QUALIFICATION_VERSION = 3;
   var QUALIFICATION_MAX_AGE = 30 * 60 * 1000;
 
   function qualificationValide(qualif, projetAttendu, statutAttendu) {
@@ -411,13 +411,14 @@
        agricole ou naturelle ; l'apparence n'est pas le zonage. Demander l'un
        pour l'autre produirait des permis manqués.
        Personne ne connaît son zonage de tête : « je ne sais pas » est une
-       réponse légitime, et mène à une vérification, jamais à une supposition. */
+       réponse légitime. Le moteur retient alors le régime prudent, et Urbizen
+       vérifie le classement après l'envoi du formulaire. */
     { champ: "zone_u", libelle: "Votre terrain est-il classé en zone U (zone urbaine) du PLU ?",
-      aide: "Cette information figure sur le plan de zonage de votre commune, ou sur le document d'urbanisme qui en tient lieu. Si vous ne la connaissez pas, choisissez « Je ne sais pas » : nous la vérifierons.",
+      aide: "Cette information figure sur le plan de zonage de votre commune. Si vous ne la connaissez pas, le parcours retiendra la démarche la plus prudente ; Urbizen vérifiera après l'envoi.",
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
 
     { champ: "secteur_protege", libelle: "Votre terrain est-il dans un secteur protégé ?",
-      aide: "Abords d'un monument historique, site classé, secteur patrimonial remarquable. En cas de doute, « je ne sais pas ».",
+      aide: "Abords d'un monument historique, site classé, secteur patrimonial remarquable. En cas de doute, le parcours retient la démarche la plus prudente ; Urbizen vérifiera après l'envoi.",
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" }, { v: "unknown", t: "Je ne sais pas" } ] },
 
     /* Les questions de la transformation évitent le vocabulaire du code. On ne
@@ -465,19 +466,19 @@
   ];
 
   var MESSAGES = {
-    dp:         "Orientation : déclaration préalable.",
-    pcmi:       "Orientation : permis de construire.",
+    dp:         "Démarche : déclaration préalable. Après l'envoi, Urbizen vérifie vos informations et vous rappelle sous 24 h ouvrées.",
+    pcmi:       "Démarche : permis de construire. Après l'envoi, Urbizen vérifie vos informations et vous rappelle sous 24 h ouvrées.",
     conception: "Vous allez ouvrir le formulaire de conception de plans sur mesure.",
-    none:       "D'après ces éléments, votre projet ne nécessite aucune autorisation d'urbanisme. Des règles locales peuvent toutefois s'appliquer : nous pouvons le vérifier avec vous.",
-    confirm:    "La formalité dépend des caractéristiques de votre projet et des règles d'urbanisme applicables à votre terrain. Urbizen la vérifie avant de constituer votre dossier."
+    none:       "D'après ces éléments, aucune autorisation d'urbanisme nationale n'est nécessaire. Vous pouvez transmettre votre demande à Urbizen pour un contrôle des règles locales sous 24 h ouvrées.",
+    confirm:    "Continuez vers le formulaire de renseignements. Urbizen vérifie les informations transmises et vous répond sous 24 h ouvrées."
   };
 
   var BOUTONS = {
     dp:         "Continuer vers ma déclaration préalable",
     pcmi:       "Continuer vers mon permis de construire",
     conception: "Continuer vers mes plans sur mesure",
-    none:       "Faire vérifier mon projet",
-    confirm:    "Faire qualifier mon projet"
+    none:       "Continuer vers ma demande",
+    confirm:    "Continuer vers ma demande"
   };
 
   var reponses = {};
@@ -648,6 +649,12 @@
       card.setAttribute("aria-pressed", "true");
       selectedProjet = card.getAttribute("data-projet");
       reponses = {};
+      /* Un garage de stationnement et une pergola ouverte ne créent pas de
+         surface de plancher. Conserver ce zéro explicite évite de redemander
+         cette donnée dans le formulaire final. */
+      if (selectedProjet === "garage" || selectedProjet === "pergola") {
+        reponses.sp_creee = 0;
+      }
       parcoursId = String(Date.now()) + "-" + Math.random().toString(36).slice(2, 10);
       try {
         sessionStorage.removeItem("urbizen:qualification");

@@ -167,10 +167,10 @@ def main():
     # réponse et ne doit plus être confondu avec une valeur par défaut.
     SURFACES = {
         "extension DP": ("15", "15"), "extension PC": ("60", ""),
-        "garage surfaces distinctes": ("4", "15"),
-        "garage indépendant DP": ("15", "15"), "abri DP": ("12", "12"),
+        "garage emprise 15 m²": ("0", "15"),
+        "garage indépendant DP": ("0", "15"), "abri DP": ("12", "12"),
         "abri PC": ("25", ""), "transformation garage habitable": ("18", ""),
-        "pergola DP": ("12", "12"),
+        "pergola DP": ("0", "12"),
     }
     ko = []
     for n, attendues in SURFACES.items():
@@ -187,7 +187,7 @@ def main():
     attendus = {
         "extension DP": "extension",
         "extension PC": "extension",
-        "garage surfaces distinctes": "garage",
+        "garage emprise 15 m²": "garage",
         "garage indépendant DP": "garage",
         "abri DP": "abri_annexe",
         "abri PC": "annexe_garage",

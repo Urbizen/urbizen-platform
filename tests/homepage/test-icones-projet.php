@@ -2,8 +2,8 @@
 /**
  * Banc d'essai des icônes de la section « Quel est votre projet ? ».
  *
- * Les dix caractères typographiques provisoires — ▢ ▤ ▣ ◱ ◲ ◫ ◪ ☼ ⌂ ✎ — sont
- * remplacés par dix illustrations SVG au trait. Ce banc vérifie que le
+ * Les caractères typographiques provisoires — ▢ ▤ ▣ ◱ ◲ ◫ ◪ ☼ ⌂ ✎ — sont
+ * remplacés par des illustrations SVG au trait. Ce banc vérifie que le
  * remplacement est complet et homogène, que les icônes restent purement
  * décoratives, et surtout qu'il n'a rien emporté d'autre : ni un libellé, ni
  * un `data-projet`, ni la logique de sélection.
@@ -21,7 +21,7 @@ function check( $label, $cond ) {
 	printf( "%-76s %s\n", $label, $cond ? 'OK' : 'ECHEC' );
 }
 
-/** Les dix cartes, dans l'ordre, telles qu'elles existent sur main. */
+/** Les onze cartes, dans l'ordre, telles qu'elles existent sur main. */
 $attendu = array(
 	'piscine'   => 'Piscine',
 	'extension' => 'Extension',
@@ -32,6 +32,7 @@ $attendu = array(
 	'toiture'   => 'Toiture / fenêtres de toit',
 	'solaire'   => 'Panneaux solaires',
 	'maison'    => 'Maison individuelle',
+	'transformation' => 'Transformer un espace existant',
 	'autre'     => 'Autre projet',
 );
 
@@ -50,7 +51,7 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] exactement 11 .pcard", 11 === count( $cartes ) );
 	check( "[$nom] exactement 11 .pcard-ico", 11 === substr_count( $h, 'class="pcard-ico"' ) );
 
-	if ( 10 !== count( $cartes ) ) { continue; }
+	if ( 11 !== count( $cartes ) ) { continue; }
 
 	// --- un SVG par icône, et nulle part ailleurs dans les cartes ---
 	$svgs = array();
@@ -61,7 +62,7 @@ foreach ( $sources as $nom => $chemin ) {
 
 	check( "[$nom] exactement 11 SVG dans les cartes", 11 === count( $svgs ) );
 	check( "[$nom] chaque carte porte un SVG et un seul",
-		10 === count( array_filter( $cartes, static fn( $c ) => 1 === substr_count( $c, '<svg' ) ) ) );
+		11 === count( array_filter( $cartes, static fn( $c ) => 1 === substr_count( $c, '<svg' ) ) ) );
 	check( "[$nom] chaque SVG est dans son .pcard-ico",
 		11 === preg_match_all( '#<span class="pcard-ico" aria-hidden="true"><svg #', $h ) );
 
@@ -75,9 +76,9 @@ foreach ( $sources as $nom => $chemin ) {
 
 	// --- décoratifs, homogènes, sans texte ---
 	check( "[$nom] les 11 SVG sont aria-hidden",
-		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'aria-hidden="true"' ) ) ) );
+		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'aria-hidden="true"' ) ) ) );
 	check( "[$nom] les 11 SVG sont focusable=\"false\"",
-		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'focusable="false"' ) ) ) );
+		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'focusable="false"' ) ) ) );
 
 	$viewbox = array();
 	foreach ( $svgs as $s ) {
@@ -92,18 +93,18 @@ foreach ( $sources as $nom => $chemin ) {
 		0 === count( array_filter( $svgs, static fn( $s ) => preg_match( '#<title|<desc#', $s ) ) ) );
 
 	// --- homogénéité graphique ---
-	check( "[$nom] les 10 icônes partagent la même épaisseur de trait",
-		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke-width="1.5"' ) ) ) );
-	check( "[$nom] les 10 icônes héritent de la couleur du texte",
-		10 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke="currentColor"' ) ) ) );
+	check( "[$nom] les 11 icônes partagent la même épaisseur de trait",
+		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke-width="1.5"' ) ) ) );
+	check( "[$nom] les 11 icônes héritent de la couleur du texte",
+		11 === count( array_filter( $svgs, static fn( $s ) => str_contains( $s, 'stroke="currentColor"' ) ) ) );
 	check( "[$nom] extrémités et jointures cohérentes",
-		10 === count( array_filter( $svgs, static fn( $s ) =>
+		11 === count( array_filter( $svgs, static fn( $s ) =>
 			str_contains( $s, 'stroke-linecap="round"' ) && str_contains( $s, 'stroke-linejoin="round"' ) ) ) );
 	check( "[$nom] aucun dégradé, aucune ombre",
 		0 === count( array_filter( $svgs, static fn( $s ) => preg_match( '#Gradient|filter=|drop-shadow#', $s ) ) ) );
 	check( "[$nom] seules l'encre courante et le vert menthe sont employés",
 		0 === count( array_filter( $svgs, static fn( $s ) =>
-			preg_match_all( '#(?:fill|stroke)="(#[0-9A-Fa-f]{3,6})"#', $s, $c )
+			preg_match_all( '~(?:fill|stroke)="(#[0-9A-Fa-f]{3,6})"~', $s, $c )
 			&& array_diff( array_unique( $c[1] ), array( '#54CF99' ) ) ) ) );
 
 	// --- rien d'autre n'a changé dans les cartes ---
@@ -119,7 +120,10 @@ foreach ( $sources as $nom => $chemin ) {
 		$i++;
 	}
 
-	check( "[$nom] les 10 data-projet et leurs titres, dans l'ordre", array() === $ecarts );
+	check( "[$nom] les 11 data-projet et leurs titres, dans l'ordre", array() === $ecarts );
+	check( "[$nom] aucun sous-texte sous la carte de transformation",
+		! str_contains( $h, 'pcard-sub' )
+		&& ! str_contains( $h, 'Garage, combles, sous-sol, dépendance' ) );
 
 	/*
 	 * La carte se réduit à une icône et un titre. Une refonte antérieure
