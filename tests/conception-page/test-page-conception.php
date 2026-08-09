@@ -25,9 +25,11 @@ function check( $label, $cond ) {
 $tpl  = (string) file_get_contents( "$theme/templates/page-conception.html" );
 $css  = (string) file_get_contents( "$theme/assets/css/urbizen-conception.css" );
 $js   = (string) file_get_contents( "$theme/assets/js/urbizen-conception-gallery.js" );
-$home = (string) file_get_contents( "$theme/templates/front-page.html" );
-$fns  = (string) file_get_contents( "$theme/functions.php" );
-$json = (string) file_get_contents( "$theme/theme.json" );
+$home    = (string) file_get_contents( "$theme/templates/front-page.html" );
+$home_js = (string) file_get_contents( "$theme/assets/js/urbizen-homepage.js" );
+$header  = (string) file_get_contents( "$theme/patterns/header-accueil.php" );
+$fns     = (string) file_get_contents( "$theme/functions.php" );
+$json    = (string) file_get_contents( "$theme/theme.json" );
 
 // --- Structure du gabarit ---
 check( 'Un seul <h1> dans le gabarit', 1 === preg_match_all( '/<h1[\s>]/', $tpl ) );
@@ -81,9 +83,18 @@ check( 'JS ne désactive pas le clic droit globalement',
 check( 'CSS de protection scopé .urbizen-page-conception',
 	str_contains( $css, '.urbizen-page-conception [data-urbizen-protected-media]' ) );
 
-// --- Carte d'accueil vers /conception/ ---
-check( 'Carte Conception présente sur l\'accueil', str_contains( $home, 'accueil-conception' ) );
-check( 'La carte d\'accueil pointe vers /conception/', str_contains( $home, 'href="/conception/"' ) );
+// --- Deux accès distincts : carte vers le formulaire, menu vers la page ---
+check( 'Carte Conception présente sur l\'accueil',
+	str_contains( $home, 'data-projet="conception"' )
+	&& str_contains( $home, '>Conception de plans sur mesure</span>' ) );
+check( 'La carte d\'accueil ouvre directement #formulaire-conception',
+	str_contains( $home_js, 'conception: "/conception/#formulaire-conception"' )
+	&& str_contains( $home_js, 'if (selectedProjet === "conception")' )
+	&& str_contains( $home_js, 'window.location.href = FORM_URLS.conception' ) );
+check( 'Le menu Conception ouvre le haut de la page, sans ancre',
+	str_contains( $header, 'href="https://urbizen.fr/conception/"' )
+	&& str_contains( $header, '>Conception de plans</a>' )
+	&& ! str_contains( $header, 'conception/#formulaire-conception' ) );
 
 // --- Aucun lien mort vers des parcours non livrés (DP/PC) depuis la page ---
 check( 'Pas de lien vers /declaration-prealable depuis la page conception',

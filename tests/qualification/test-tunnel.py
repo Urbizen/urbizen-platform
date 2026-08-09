@@ -171,6 +171,7 @@ ATTENDUS = {
     "façade DP directe": "dp",
     "toiture DP directe": "dp",
     "solaire DP directe": "dp",
+    "autre projet": "confirm",
 }
 
 
@@ -196,16 +197,16 @@ def main():
 
     scenarios = {s["nom"]: s for s in donnees["scenarios"]}
 
-    check("Les 23 scénarios ont été rejoués", len(scenarios) == 23, str(sorted(scenarios)))
+    check("Les 24 scénarios ont été rejoués", len(scenarios) == 24, str(sorted(scenarios)))
     check(
         "La carte « Transformer un espace existant » existe dans le tunnel",
         "transformation" in donnees["cartes"],
         "cartes : %s" % ", ".join(donnees["cartes"]),
     )
-    check("Les dix cartes de projet attendues sont présentes", len(donnees["cartes"]) == 10)
+    check("Les douze cartes de projet attendues sont présentes", len(donnees["cartes"]) == 12)
     check(
-        "La carte « Autre projet » est retirée",
-        "autre" not in donnees["cartes"],
+        "Les cartes « Conception de plans » et « Autre projet » sont présentes",
+        "conception" in donnees["cartes"] and "autre" in donnees["cartes"],
         "cartes : %s" % ", ".join(donnees["cartes"]),
     )
 
@@ -240,6 +241,15 @@ def main():
         "Façade, toiture et solaire vont directement en DP sans description libre",
         all(s["statut"] == "dp" and not s.get("posees") for s in directs),
         " | ".join("%s · %s" % (s["statut"], s.get("posees")) for s in directs),
+    )
+
+    autre = scenarios["autre projet"]
+    check(
+        "« Autre projet » demande une description puis poursuit vers la demande",
+        autre["statut"] == "confirm"
+        and any("décrivez votre projet" in q.lower() for q in (autre.get("posees") or []))
+        and not autre["questionVisible"],
+        "%s · %s" % (autre["statut"], autre.get("posees")),
     )
 
     # Une réponse donnée ne doit jamais être redemandée : « je ne sais pas » est

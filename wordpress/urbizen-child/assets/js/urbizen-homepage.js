@@ -207,7 +207,8 @@
     extension: "Extension", garage: "Garage", abri: "Abri de jardin",
     piscine: "Piscine", pergola: "Pergola", transformation: "Transformation d'un espace existant",
     facade: "Modification de façade", toiture: "Toiture", solaire: "Panneaux solaires",
-    maison: "Maison individuelle"
+    maison: "Maison individuelle", conception: "Conception de plans sur mesure",
+    autre: "Autre projet"
   };
 
   var LIBELLES_VERDICT = {
@@ -457,7 +458,9 @@
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
 
     { champ: "aspect_exterieur", libelle: "Les travaux modifieront-ils l'aspect extérieur de la construction ?",
-      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] }
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "description", libelle: "Décrivez votre projet en quelques mots.", texte: true }
   ];
 
   var MESSAGES = {
@@ -556,8 +559,8 @@
       ligne.className = "qualif-saisie";
       var champ = document.createElement("input");
       champ.type = "text";
-      champ.inputMode = "decimal";
-      champ.maxLength = 32;
+      champ.inputMode = q.texte ? "text" : "decimal";
+      champ.maxLength = q.texte ? 500 : 32;
       champ.className = "qualif-champ";
       champ.setAttribute("aria-label", q.libelle);
       var valider = document.createElement("button");
@@ -567,7 +570,7 @@
       var envoyer = function () {
         var v = champ.value.trim();
         if (!v) { return; }
-        repondre(q.champ, v.replace(",", "."));
+        repondre(q.champ, q.texte ? v : v.replace(",", "."));
       };
       valider.addEventListener("click", envoyer);
       champ.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); envoyer(); } });
@@ -644,6 +647,17 @@
       card.setAttribute("aria-pressed", "true");
       selectedProjet = card.getAttribute("data-projet");
       reponses = {};
+      /* La carte Conception est un raccourci vers le formulaire lui-même.
+         La page commerciale reste accessible depuis le menu principal. */
+      if (selectedProjet === "conception") {
+        try {
+          sessionStorage.removeItem("urbizen:qualification");
+          sessionStorage.removeItem("urbizen:projet");
+          sessionStorage.removeItem("urbizen:parcours");
+        } catch (e) {}
+        window.location.href = FORM_URLS.conception;
+        return;
+      }
       /* Un garage de stationnement et une pergola ouverte ne créent pas de
          surface de plancher. Conserver ce zéro explicite évite de redemander
          cette donnée dans le formulaire final. */

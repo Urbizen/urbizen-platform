@@ -29,8 +29,11 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   le rappel sous 24 heures ouvrées.
 - Les cartes « Modification de façade », « Toiture / fenêtres de toit » et
   « Panneaux solaires » ouvrent directement le parcours DP, sans demander une
-  description libre sur l’accueil. La carte générique « Autre projet » est
-  retirée.
+  description libre sur l’accueil.
+- La carte « Autre projet » est rétablie avec une description libre réservée à
+  ce seul cas. La nouvelle carte « Conception de plans sur mesure » ouvre
+  directement le formulaire Conception, tandis que l’entrée du menu ouvre le
+  haut de la page de présentation.
 - Le sous-texte « Garage, combles, sous-sol, dépendance… » est retiré de la
   carte « Transformer un espace existant ».
 - L’introduction des cartes ne promet plus une confirmation « après étude » :
@@ -57,9 +60,10 @@ les informations transmises et rappelle sous 24 heures ouvrées.
 
 - Corpus partagé porté à **106 cas**, équivalence navigateur/serveur,
   contrôleur réel et protections contre la falsification au vert.
-- **23 parcours Chrome** vérifient notamment garage accolé, abri accolé et
+- **24 parcours Chrome** vérifient notamment garage accolé, abri accolé et
   pergola adossée en DP et en PC prudent, ainsi que les accès DP directs de la
-  façade, de la toiture et des panneaux solaires, sans saisie libre préalable.
+  façade, de la toiture et des panneaux solaires, sans saisie libre préalable,
+  et le retour de la description pour « Autre projet ».
 - Le report complet vers les formulaires DP et PC, les gabarits de l’accueil,
   le retrait du sous-texte et la promesse de rappel sous 24 heures sont testés.
 
