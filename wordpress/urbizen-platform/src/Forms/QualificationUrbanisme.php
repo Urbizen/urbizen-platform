@@ -88,16 +88,13 @@ final class QualificationUrbanisme {
 					&& true === ( $donnees['changement_destination'] ?? null ) ) {
 					return self::r( self::PCMI, 'R.421-14 c)', 'Modification de la façade accompagnant un changement de destination : permis de construire.' );
 				}
-				return self::r( self::DP, 'R.421-17 a)', 'Modification de l’aspect extérieur d’une construction existante : déclaration préalable.' );
+				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-17', 'Il faut distinguer l’entretien à l’identique d’une modification de l’aspect extérieur et d’un changement de destination.', array( 'description' ) );
 
 			case 'toiture':
-				return self::r( self::DP, 'R.421-17 a)', 'Réfection de toiture ou création d’ouvertures modifiant l’aspect extérieur : déclaration préalable.' );
+				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-17', 'Il faut distinguer l’entretien à l’identique d’une modification de l’aspect extérieur, du volume ou de la structure.', array( 'description' ) );
 
 			case 'solaire':
-				if ( self::secteur_bloquant( $donnees ) ) {
-					return self::r( self::A_CONFIRMER, 'R.421-17 a)', 'En secteur protégé, l’installation peut relever d’une autorisation particulière.', array( 'secteur_protege' ) );
-				}
-				return self::r( self::DP, 'R.421-17 a)', 'Panneaux modifiant l’aspect extérieur d’une construction existante : déclaration préalable.' );
+				return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-9 / R.421-17', 'La formalité dépend notamment d’une pose en toiture ou au sol, de la hauteur, de la puissance et du secteur.', array( 'description' ) );
 
 			case 'maison':
 				return self::r( self::PCMI, 'R.421-1', 'Construction d’une maison individuelle : permis de construire.' );
@@ -123,10 +120,20 @@ final class QualificationUrbanisme {
 			'pergola' => array( 'Pergola adossée', 'Pergola autonome' ),
 		);
 
+		$cree = self::creation( $donnees );
+		if ( null !== $cree && $cree > self::EXISTANT_PC_ZONE_U ) {
+			return self::r( self::PCMI, 'R.421-1 / R.421-14', 'Au-delà de 40 m², le permis est exigé que le projet soit une construction nouvelle ou une extension.' );
+		}
+
 		$implantation = $donnees['implantation'] ?? null;
 
 		if ( 'accole' === $implantation ) {
-			return self::sur_existant( $donnees, $etiquettes[ $projet ][0] );
+			$raisons = array(
+				'garage'  => 'Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement le garage d’extension.',
+				'abri'    => 'Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement l’abri d’extension.',
+				'pergola' => 'Une pergola adossée peut être traitée comme construction nouvelle ou extension selon sa conception et le document d’urbanisme.',
+			);
+			return self::r( self::A_CONFIRMER, 'R.421-9 / R.421-14', $raisons[ $projet ], array( 'qualification_plu' ) );
 		}
 		if ( 'independant' === $implantation ) {
 			return self::construction_nouvelle( $donnees, $etiquettes[ $projet ][1] );
@@ -143,12 +150,14 @@ final class QualificationUrbanisme {
 	}
 
 	/**
-	 * Travaux sur construction existante : extension, garage ou abri accolé.
+	 * Travaux sur construction existante : extension explicitement qualifiée ou
+	 * transformation d'un garage.
 	 *
 	 * @param array<string, mixed> $donnees
 	 * @return array{status: string, rule: ?string, reason: string, missing: string[]}
 	 */
 	private static function sur_existant( array $donnees, string $etiquette ): array {
+		$mesures = self::mesures_creation( $donnees );
 		$cree = self::creation( $donnees );
 
 		if ( null === $cree ) {
@@ -157,6 +166,11 @@ final class QualificationUrbanisme {
 
 		if ( $cree > self::EXISTANT_PC_ZONE_U ) {
 			return self::r( self::PCMI, 'R.421-14 a)', 'Création de ' . self::m( $cree ) . ' m² : au-delà de 40 m², le permis est exigé quelle que soit la zone.' );
+		}
+
+		$manque_mesure = self::mesures_manquantes( $mesures );
+		if ( array() !== $manque_mesure ) {
+			return self::r( self::A_CONFIRMER, 'R.421-14 / R.421-17', $etiquette . ' : surface de plancher et emprise au sol sont nécessaires tant que le seuil du permis n’est pas déjà dépassé.', $manque_mesure );
 		}
 
 		if ( $cree <= self::EXISTANT_DP ) {
@@ -179,7 +193,7 @@ final class QualificationUrbanisme {
 			if ( null === $total ) {
 				return self::r( self::A_CONFIRMER, 'R.421-14 b)', 'Création de ' . self::m( $cree ) . ' m² en zone urbaine : la surface totale après travaux décide entre déclaration et permis.', array( 'sp_totale' ) );
 			}
-			if ( false === ( $donnees['personne_physique'] ?? null ) || true === ( $donnees['usage_agricole'] ?? null ) ) {
+			if ( true !== ( $donnees['personne_physique'] ?? null ) || false !== ( $donnees['usage_agricole'] ?? null ) ) {
 				return self::r( self::A_CONFIRMER, 'R.431-2', 'Le plafond de 150 m² ne vaut que pour une personne physique construisant pour elle-même une construction non agricole.', array( 'personne_physique', 'usage_agricole' ) );
 			}
 			if ( $total > self::TOTAL_R431_2 ) {
@@ -198,6 +212,7 @@ final class QualificationUrbanisme {
 	 * @return array{status: string, rule: ?string, reason: string, missing: string[]}
 	 */
 	private static function construction_nouvelle( array $donnees, string $etiquette ): array {
+		$mesures = self::mesures_creation( $donnees );
 		$cree = self::creation( $donnees );
 
 		if ( null === $cree ) {
@@ -210,8 +225,9 @@ final class QualificationUrbanisme {
 			return self::r( self::PCMI, 'R.421-1', 'Construction indépendante de ' . self::m( $cree ) . ' m² : au-delà de 20 m², le permis est exigé.' );
 		}
 
-		if ( null !== $hauteur && $hauteur > self::HAUTEUR_NOUVELLE ) {
-			return self::r( self::PCMI, 'R.421-9', 'Hauteur de ' . self::m( $hauteur ) . ' m : au-delà de 12 m, la construction sort du champ de la déclaration.' );
+		$manque_mesure = self::mesures_manquantes( $mesures );
+		if ( array() !== $manque_mesure ) {
+			return self::r( self::A_CONFIRMER, 'R.421-2 / R.421-9', $etiquette . ' : surface de plancher et emprise au sol sont nécessaires pour vérifier les plafonds de 5 et 20 m².', $manque_mesure );
 		}
 
 		if ( self::secteur_bloquant( $donnees ) ) {
@@ -220,6 +236,13 @@ final class QualificationUrbanisme {
 
 		if ( null === $hauteur ) {
 			return self::r( self::A_CONFIRMER, 'R.421-9', 'La hauteur de la construction conditionne le régime.', array( 'hauteur_m' ) );
+		}
+
+		if ( $hauteur > self::HAUTEUR_NOUVELLE ) {
+			if ( $cree <= self::DISPENSE ) {
+				return self::r( self::DP, 'R.421-9 c)', 'Construction de ' . self::m( $cree ) . ' m² et de ' . self::m( $hauteur ) . ' m de haut : au-delà de 12 m et jusqu’à 5 m², une déclaration préalable est requise.' );
+			}
+			return self::r( self::PCMI, 'R.421-1 / R.421-9', 'Construction de ' . self::m( $cree ) . ' m² et de ' . self::m( $hauteur ) . ' m de haut : au-delà de 12 m et de 5 m², elle ne relève plus des cas soumis à déclaration préalable.' );
 		}
 
 		if ( $cree <= self::DISPENSE ) {
@@ -240,12 +263,16 @@ final class QualificationUrbanisme {
 			return self::r( self::A_CONFIRMER, 'R.421-9', 'La superficie du bassin décide de la formalité.', array( 'bassin_m2' ) );
 		}
 
-		$couverture = self::nombre( $donnees['hauteur_couverture_m'] ?? null );
-		$couverte   = true === ( $donnees['couverte'] ?? null );
-
 		if ( $bassin > self::BASSIN_DP ) {
 			return self::r( self::PCMI, 'R.421-9', 'Bassin de ' . self::m( $bassin ) . ' m² : au-delà de 100 m², le permis est exigé.' );
 		}
+
+		$couverte = $donnees['couverte'] ?? null;
+		if ( true !== $couverte && false !== $couverte ) {
+			return self::r( self::A_CONFIRMER, 'R.421-9', 'La présence d’une couverture peut modifier la formalité applicable.', array( 'couverte' ) );
+		}
+
+		$couverture = self::nombre( $donnees['hauteur_couverture_m'] ?? null );
 
 		if ( $couverte && null === $couverture ) {
 			return self::r( self::A_CONFIRMER, 'R.421-9', 'La hauteur de la couverture décide entre déclaration et permis.', array( 'hauteur_couverture_m' ) );
@@ -266,53 +293,20 @@ final class QualificationUrbanisme {
 	}
 
 	/**
-	 * Cet espace compte-t-il déjà dans la surface de plancher ?
-	 *
-	 * Un garage n'y compte pas : c'est une aire de stationnement. Des combles ou
-	 * un sous-sol n'y comptent pas sous 1,80 m de hauteur. Rend `null` quand la
-	 * réponse dépend d'une donnée absente.
-	 *
-	 * @param array<string, mixed> $donnees
-	 */
-	private static function hors_surface_plancher( array $donnees ): ?bool {
-		$local = $donnees['local_actuel'] ?? null;
-
-		if ( 'garage' === $local ) {
-			return true;
-		}
-
-		if ( in_array( $local, array( 'combles', 'sous_sol', 'dependance' ), true ) ) {
-			$h = $donnees['hauteur_sup_180'] ?? null;
-			if ( false === $h ) { return true; }
-			if ( true === $h ) { return false; }
-			return null;
-		}
-
-		return null;
-	}
-
-	/**
 	 * Transformer un espace existant.
 	 *
-	 * Quatre situations que le mot « transformation » confond :
-	 *
-	 *   A. une surface close et couverte aujourd'hui hors surface de plancher
-	 *      devient un local qui en constitue — R.421-17 g) ;
-	 *   B. un vrai changement de destination au sens de R.151-27 ;
-	 *   C. l'un ou l'autre avec travaux sur la structure ou la façade — R.421-14 c) ;
-	 *   D. un simple réaménagement intérieur.
-	 *
-	 * Le piège est B. Un garage accessoire d'une maison a la destination du local
-	 * principal — l'habitation : R.421-14 le dit en toutes lettres. Le transformer
-	 * en chambre ne change AUCUNE destination. C'est A qui s'applique.
-	 *
-	 * La destination n'est donc jamais demandée : elle se déduit du rattachement.
+	 * Le seul cas assez documenté pour conclure est le garage de stationnement
+	 * accessoire à une maison : il est exclu de la surface de plancher, mais suit
+	 * déjà la destination habitation. Pour les autres locaux et les bâtiments
+	 * séparés, le moteur conserve un verdict « à confirmer » tant qu'il ignore les
+	 * exclusions de R.111-22, les destinations et le statut accessoire.
 	 *
 	 * @param array<string, mixed> $donnees
 	 * @return array{status: string, rule: ?string, reason: string, missing: string[]}
 	 */
 	private static function transformation( array $donnees ): array {
-		$cree = self::creation( $donnees );
+		// Dans l’enveloppe existante, seule la surface de plancher est créée.
+		$cree = self::nombre( $donnees['sp_creee'] ?? null );
 
 		if ( null === $cree ) {
 			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'La surface transformée n’est pas connue.', array( 'sp_creee' ) );
@@ -331,52 +325,32 @@ final class QualificationUrbanisme {
 			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'La nature du local transformé décide du régime applicable.', array( 'local_actuel' ) );
 		}
 
-		$rattache   = $donnees['local_rattache'] ?? null;
-		$changement = false;
+		$rattache = $donnees['local_rattache'] ?? null;
 
 		if ( 'batiment_separe' === $rattache ) {
-			$destination = $donnees['destination_actuelle'] ?? null;
-			if ( null === $destination ) {
-				return self::r( self::A_CONFIRMER, 'R.151-27', 'Un bâtiment séparé a sa propre destination : la connaître décide s’il y a changement de destination.', array( 'destination_actuelle' ) );
-			}
-			$changement = 'habitation' !== $destination;
+			return self::r( self::A_CONFIRMER, 'R.151-27 à R.151-29', 'Un bâtiment séparé peut rester accessoire de la construction principale et un changement de destination exige de connaître les destinations actuelle et future.', array( 'destination_actuelle', 'destination_future', 'statut_accessoire' ) );
 		} elseif ( 'maison' !== $rattache ) {
 			return self::r( self::A_CONFIRMER, 'R.421-14 c)', 'Un local rattaché au logement en suit la destination ; un bâtiment séparé a la sienne.', array( 'local_rattache' ) );
 		}
 
-		if ( $changement ) {
-			$travaux = $donnees['modifie_structure_ou_facade'] ?? null;
-			if ( true === $travaux ) {
-				return self::r( self::PCMI, 'R.421-14 c)', 'Changement de destination accompagné de travaux sur les structures porteuses ou la façade : permis de construire.' );
-			}
-			if ( false !== $travaux ) {
-				return self::r( self::A_CONFIRMER, 'R.421-14 c)', 'Un changement de destination bascule en permis s’il s’accompagne de travaux sur la structure porteuse ou la façade.', array( 'modifie_structure_ou_facade' ) );
-			}
-			return self::r( self::DP, 'R.421-17 b)', 'Changement de destination sans travaux sur la structure ni la façade : déclaration préalable.' );
-		}
-
-		$hors = self::hors_surface_plancher( $donnees );
-
-		if ( null === $hors ) {
-			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'Sous 1,80 m de hauteur, l’espace ne compte pas dans la surface de plancher : la réponse change le régime.', array( 'hauteur_sup_180' ) );
-		}
-
-		if ( ! $hors ) {
-			$aspect = $donnees['modifie_aspect_exterieur'] ?? null;
-			if ( true === $aspect ) {
-				return self::r( self::DP, 'R.421-17 a)', 'Réaménagement intérieur avec modification de l’aspect extérieur : déclaration préalable.' );
-			}
-			if ( false === $aspect ) {
-				return self::r( self::AUCUNE, 'R.421-17', 'Réaménagement intérieur sans création de surface de plancher ni modification extérieure : aucune formalité au titre du code de l’urbanisme.' );
-			}
-			return self::r( self::A_CONFIRMER, 'R.421-17 a)', 'Cet espace compte déjà dans la surface de plancher : seule une modification extérieure déclencherait une formalité.', array( 'modifie_aspect_exterieur' ) );
+		if ( 'garage' !== ( $donnees['local_actuel'] ?? null ) ) {
+			return self::r( self::A_CONFIRMER, 'R.111-22', 'La hauteur ne suffit pas à savoir si des combles, un sous-sol ou une dépendance comptent déjà dans la surface de plancher.', array( 'surface_deja_plancher' ) );
 		}
 
 		if ( $cree <= self::EXISTANT_DP ) {
+			$aspect = $donnees['modifie_aspect_exterieur'] ?? null;
+			if ( true === $aspect ) {
+				return self::r( self::DP, 'R.421-17 a)', 'Transformation de ' . self::m( $cree ) . ' m² avec modification de l’aspect extérieur : déclaration préalable.' );
+			}
+			if ( false === $aspect ) {
+				return self::r( self::AUCUNE, 'R.421-17', 'Transformation de ' . self::m( $cree ) . ' m² sans modification extérieure : aucune formalité au titre du code de l’urbanisme.' );
+			}
 			return self::r( self::A_CONFIRMER, 'R.421-17 g)', 'Transformation de ' . self::m( $cree ) . ' m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.', array( 'modifie_aspect_exterieur' ) );
 		}
 
-		$sur_seuils = self::sur_existant( $donnees, 'Transformation' );
+		$donnees_seuils                    = $donnees;
+		$donnees_seuils['emprise_creee'] = 0;
+		$sur_seuils                       = self::sur_existant( $donnees_seuils, 'Transformation' );
 
 		if ( self::DP === $sur_seuils['status'] ) {
 			return self::r( self::DP, 'R.421-17 g)', 'Transformation de ' . self::m( $cree ) . ' m² de surface close et couverte en surface de plancher : déclaration préalable.' );
@@ -392,7 +366,29 @@ final class QualificationUrbanisme {
 	 */
 	private static function secteur_bloquant( array $donnees ): bool {
 		$v = $donnees['secteur_protege'] ?? null;
-		return true === $v || null === $v || 'unknown' === $v;
+		return false !== $v;
+	}
+
+	/**
+	 * @param array<string, mixed> $donnees
+	 * @return array{sp: ?float, em: ?float}
+	 */
+	private static function mesures_creation( array $donnees ): array {
+		return array(
+			'sp' => self::nombre( $donnees['sp_creee'] ?? null ),
+			'em' => self::nombre( $donnees['emprise_creee'] ?? null ),
+		);
+	}
+
+	/**
+	 * @param array{sp: ?float, em: ?float} $mesures
+	 * @return string[]
+	 */
+	private static function mesures_manquantes( array $mesures ): array {
+		$manque = array();
+		if ( null === $mesures['sp'] ) { $manque[] = 'sp_creee'; }
+		if ( null === $mesures['em'] ) { $manque[] = 'emprise_creee'; }
+		return $manque;
 	}
 
 	/**
@@ -401,8 +397,9 @@ final class QualificationUrbanisme {
 	 * @param array<string, mixed> $donnees
 	 */
 	private static function creation( array $donnees ): ?float {
-		$sp = self::nombre( $donnees['sp_creee'] ?? null );
-		$em = self::nombre( $donnees['emprise_creee'] ?? null );
+		$mesures = self::mesures_creation( $donnees );
+		$sp      = $mesures['sp'];
+		$em      = $mesures['em'];
 
 		if ( null === $sp && null === $em ) {
 			return null;
@@ -413,17 +410,21 @@ final class QualificationUrbanisme {
 
 	/** Une valeur numérique utilisable, ou `null` si elle n'a pas été fournie. */
 	private static function nombre( $v ): ?float {
-		if ( null === $v || '' === $v || is_bool( $v ) || is_array( $v ) ) {
+		if ( null === $v || '' === $v || is_bool( $v ) ) {
 			return null;
 		}
-		if ( is_string( $v ) ) {
-			$v = str_replace( ',', '.', trim( $v ) );
-		}
-		if ( ! is_numeric( $v ) ) {
+		if ( is_int( $v ) || is_float( $v ) ) {
+			$n = (float) $v;
+		} elseif ( is_string( $v ) ) {
+			$v = trim( $v );
+			if ( 1 !== preg_match( '/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/D', $v ) ) {
+				return null;
+			}
+			$n = (float) str_replace( ',', '.', $v );
+		} else {
 			return null;
 		}
-		$n = (float) $v;
-		return $n >= 0 ? $n : null;
+		return is_finite( $n ) && $n >= 0 ? $n : null;
 	}
 
 	/** Rend un nombre sans zéro décimal inutile, pour les messages. */

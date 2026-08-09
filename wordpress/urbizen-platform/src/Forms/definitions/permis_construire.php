@@ -441,6 +441,18 @@ $definition = array(
 			'required' => true,
 			'options'  => CataloguePermisConstruire::options_natures( true ),
 		),
+		// Contexte purement indicatif transmis par le tunnel. Il est conservé
+		// pour que l'équipe comprenne le parcours suivi, mais n'intervient jamais
+		// dans la validation du régime : le serveur recalcule depuis les champs
+		// métier ci-dessous. La mention « non vérifié » est volontaire, car toute
+		// donnée de session peut être falsifiée par le navigateur.
+		array(
+			'name'      => 'qualification_contexte',
+			'type'      => 'hidden',
+			'step'      => 'projet',
+			'label'     => __( 'Contexte indicatif du tunnel (non vérifié)', 'urbizen-platform' ),
+			'maxlength' => 4000,
+		),
 		array(
 			'name'     => 'intervention',
 			'type'     => 'radio',

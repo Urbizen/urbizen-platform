@@ -1,12 +1,9 @@
 /* Qualification d'urbanisme — quelle formalité pour ce projet ?
    ==========================================================================
 
-   Ce module remplace un défaut qui envoyait en déclaration préalable tout
-   projet non explicitement mappé :
-
-       return FORM_BY_PROJECT[project] || "dp";
-
-   Une extension de soixante mètres carrés y tombait comme un ravalement. Le
+   Ce module remplace un défaut qui envoyait implicitement en déclaration
+   préalable tout projet non explicitement mappé. Une extension de soixante
+   mètres carrés y tombait comme un ravalement. Le
    libellé affiché parlait pourtant d'« orientation proposée », donnant à un
    défaut technique l'apparence d'une étude.
 
@@ -88,27 +85,49 @@
 
 	/** Une valeur numérique utilisable, ou `null` si elle n'a pas été fournie. */
 	function nombre(v) {
-		if (v === null || v === undefined || v === "") { return null; }
-		var n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+		if (v === null || v === undefined || v === "" || typeof v === "boolean") { return null; }
+		var n;
+		if (typeof v === "number") {
+			n = v;
+		} else if (typeof v === "string") {
+			var texte = v.trim();
+			if (!/^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(texte)) { return null; }
+			n = Number(texte.replace(",", "."));
+		} else {
+			return null;
+		}
 		return (typeof n === "number" && isFinite(n) && n >= 0) ? n : null;
 	}
 
-	/** La plus grande des deux mesures : c'est elle que les seuils regardent. */
+	/** Les seuils regardent la plus grande mesure, mais une petite valeur connue
+	    ne permet jamais de supposer que l'autre vaut zéro. */
+	function mesuresCreation(d) {
+		return { sp: nombre(d.sp_creee), em: nombre(d.emprise_creee) };
+	}
+
 	function creation(d) {
-		var sp = nombre(d.sp_creee), em = nombre(d.emprise_creee);
-		if (sp === null && em === null) { return null; }
-		return Math.max(sp === null ? 0 : sp, em === null ? 0 : em);
+		var mesures = mesuresCreation(d);
+		if (mesures.sp === null && mesures.em === null) { return null; }
+		return Math.max(mesures.sp === null ? 0 : mesures.sp, mesures.em === null ? 0 : mesures.em);
+	}
+
+	function mesuresManquantes(mesures) {
+		var manque = [];
+		if (mesures.sp === null) { manque.push("sp_creee"); }
+		if (mesures.em === null) { manque.push("emprise_creee"); }
+		return manque;
 	}
 
 	/* Un secteur protégé retire le bénéfice des dispenses. Tant qu'on ne sait
 	   pas, on ne peut pas prononcer `none` ni s'appuyer sur R.421-9. */
 	function secteurBloquant(d) {
-		return d.secteur_protege === true || d.secteur_protege === undefined || d.secteur_protege === null || d.secteur_protege === "unknown";
+		return d.secteur_protege !== false;
 	}
 
 	/* ---------------------------------------------- travaux sur l'existant --
-	   Extension, garage ou abri accolé, transformation. */
+	   Extension explicitement qualifiée, et transformation d'un garage. */
 	function surExistant(d, etiquette) {
+		var mesures = mesuresCreation(d);
 		var cree = creation(d);
 		if (cree === null) {
 			return resultat("confirm", "R.421-14", etiquette + " : la surface créée n'est pas connue.", ["sp_creee", "emprise_creee"]);
@@ -116,6 +135,11 @@
 
 		if (cree > S.EXISTANT_PC_ZONE_U) {
 			return resultat("pcmi", "R.421-14 a)", "Création de " + cree + " m² : au-delà de 40 m², le permis est exigé quelle que soit la zone.");
+		}
+
+		var manqueMesure = mesuresManquantes(mesures);
+		if (manqueMesure.length) {
+			return resultat("confirm", "R.421-14 / R.421-17", etiquette + " : surface de plancher et emprise au sol sont nécessaires tant que le seuil du permis n'est pas déjà dépassé.", manqueMesure);
 		}
 
 		if (cree <= S.EXISTANT_DP) {
@@ -143,7 +167,7 @@
 			if (total === null) {
 				return resultat("confirm", "R.421-14 b)", "Création de " + cree + " m² en zone urbaine : la surface totale après travaux décide entre déclaration et permis.", ["sp_totale"]);
 			}
-			if (d.personne_physique === false || d.usage_agricole === true) {
+			if (d.personne_physique !== true || d.usage_agricole !== false) {
 				return resultat("confirm", "R.431-2", "Le plafond de 150 m² ne vaut que pour une personne physique construisant pour elle-même une construction non agricole.", ["personne_physique", "usage_agricole"]);
 			}
 			if (total > S.TOTAL_R431_2) {
@@ -159,6 +183,7 @@
 	/* ------------------------------------------- construction indépendante --
 	   Garage ou abri autonome : ce ne sont plus des travaux sur l'existant. */
 	function constructionNouvelle(d, etiquette) {
+		var mesures = mesuresCreation(d);
 		var cree = creation(d);
 		if (cree === null) {
 			return resultat("confirm", "R.421-9", etiquette + " : la surface créée n'est pas connue.", ["sp_creee", "emprise_creee"]);
@@ -170,8 +195,9 @@
 			return resultat("pcmi", "R.421-1", "Construction indépendante de " + cree + " m² : au-delà de 20 m², le permis est exigé.");
 		}
 
-		if (hauteur !== null && hauteur > S.HAUTEUR_NOUVELLE) {
-			return resultat("pcmi", "R.421-9", "Hauteur de " + hauteur + " m : au-delà de 12 m, la construction sort du champ de la déclaration.");
+		var manqueMesure = mesuresManquantes(mesures);
+		if (manqueMesure.length) {
+			return resultat("confirm", "R.421-2 / R.421-9", etiquette + " : surface de plancher et emprise au sol sont nécessaires pour vérifier les plafonds de 5 et 20 m².", manqueMesure);
 		}
 
 		if (secteurBloquant(d)) {
@@ -180,6 +206,13 @@
 
 		if (hauteur === null) {
 			return resultat("confirm", "R.421-9", "La hauteur de la construction conditionne le régime.", ["hauteur_m"]);
+		}
+
+		if (hauteur > S.HAUTEUR_NOUVELLE) {
+			if (cree <= S.DISPENSE) {
+				return resultat("dp", "R.421-9 c)", "Construction de " + cree + " m² et de " + hauteur + " m de haut : au-delà de 12 m et jusqu'à 5 m², une déclaration préalable est requise.");
+			}
+			return resultat("pcmi", "R.421-1 / R.421-9", "Construction de " + cree + " m² et de " + hauteur + " m de haut : au-delà de 12 m et de 5 m², elle ne relève plus des cas soumis à déclaration préalable.");
 		}
 
 		if (cree <= S.DISPENSE) {
@@ -196,12 +229,16 @@
 			return resultat("confirm", "R.421-9", "La superficie du bassin décide de la formalité.", ["bassin_m2"]);
 		}
 
-		var couverture = nombre(d.hauteur_couverture_m);
-		var couverte = d.couverte === true;
-
 		if (bassin > S.BASSIN_DP) {
 			return resultat("pcmi", "R.421-9", "Bassin de " + bassin + " m² : au-delà de 100 m², le permis est exigé.");
 		}
+
+		if (d.couverte !== true && d.couverte !== false) {
+			return resultat("confirm", "R.421-9", "La présence d'une couverture peut modifier la formalité applicable.", ["couverte"]);
+		}
+
+		var couverture = nombre(d.hauteur_couverture_m);
+		var couverte = d.couverte === true;
 
 		if (couverte && couverture === null) {
 			return resultat("confirm", "R.421-9", "La hauteur de la couverture décide entre déclaration et permis.", ["hauteur_couverture_m"]);
@@ -223,54 +260,17 @@
 
 	/* --------------------------------------------- transformer un existant --
 
-	   Le cas prioritaire est le garage transformé en pièce habitable, et il
-	   demande de distinguer quatre situations que le mot « transformation »
-	   confond :
-
-	     A. une surface close et couverte AUJOURD'HUI hors surface de plancher
-	        devient un local qui en constitue — R.421-17 g) ;
-	     B. un vrai changement de destination au sens de R.151-27 ;
-	     C. l'un ou l'autre accompagné de travaux sur la structure porteuse ou
-	        la façade — R.421-14 c) ;
-	     D. un simple réaménagement intérieur, qui ne crée aucune surface de
-	        plancher et ne change aucune destination.
-
-	   Le piège est B. Un garage accessoire d'une maison a la destination du
-	   local principal — l'habitation : R.421-14 le dit en toutes lettres, « les
-	   locaux accessoires sont réputés avoir la même destination que le local
-	   principal ». Le transformer en chambre ne change donc AUCUNE destination,
-	   et l'appeler « changement d'usage » ferait basculer à tort en permis.
-	   C'est A qui s'applique, pas B.
-
-	   La destination n'est donc jamais demandée : elle se déduit. Un local
-	   rattaché à la maison reste en habitation ; seul un bâtiment séparé d'une
-	   autre destination en change. */
-
-	/* Cet espace compte-t-il déjà dans la surface de plancher ?
-	   Un garage n'y compte pas : c'est une aire de stationnement. Des combles ou
-	   un sous-sol n'y comptent pas sous 1,80 m de hauteur. Rendu `null` quand la
-	   réponse dépend d'une donnée absente. */
-	function horsSurfacePlancher(d) {
-		if (d.local_actuel === "garage") { return true; }
-
-		if (d.local_actuel === "combles" || d.local_actuel === "sous_sol") {
-			if (d.hauteur_sup_180 === false) { return true; }
-			if (d.hauteur_sup_180 === true) { return false; }
-			return null;
-		}
-
-		if (d.local_actuel === "dependance") {
-			// Une dépendance close et couverte suit la même logique de hauteur.
-			if (d.hauteur_sup_180 === false) { return true; }
-			if (d.hauteur_sup_180 === true) { return false; }
-			return null;
-		}
-
-		return null;
-	}
+	   Le seul cas assez documenté pour conclure est le garage de stationnement
+	   accessoire à une maison : il est exclu de la surface de plancher, mais suit
+	   déjà la destination habitation. Pour des combles, un sous-sol ou une
+	   dépendance, la hauteur seule ne permet pas d'écarter les autres exclusions
+	   de R.111-22. Pour un bâtiment séparé, il faut en plus connaître sa
+	   destination actuelle, sa destination future et son statut accessoire. */
 
 	function transformation(d) {
-		var cree = creation(d);
+		/* Une transformation dans l'enveloppe existante crée éventuellement de la
+		   surface de plancher, mais pas une emprise nouvelle. */
+		var cree = nombre(d.sp_creee);
 		if (cree === null) {
 			return resultat("confirm", "R.421-17 g)", "La surface transformée n'est pas connue.", ["sp_creee"]);
 		}
@@ -288,57 +288,37 @@
 			return resultat("confirm", "R.421-17 g)", "La nature du local transformé décide du régime applicable.", ["local_actuel"]);
 		}
 
-		/* B — le changement de destination se déduit du rattachement, jamais
-		   d'une question sur « l'usage ». */
-		var changement = false;
-
 		if (d.local_rattache === "batiment_separe") {
-			if (d.destination_actuelle === undefined || d.destination_actuelle === null) {
-				return resultat("confirm", "R.151-27", "Un bâtiment séparé a sa propre destination : la connaître décide s'il y a changement de destination.", ["destination_actuelle"]);
-			}
-			changement = d.destination_actuelle !== "habitation";
+			return resultat("confirm", "R.151-27 à R.151-29", "Un bâtiment séparé peut rester accessoire de la construction principale et un changement de destination exige de connaître les destinations actuelle et future.", ["destination_actuelle", "destination_future", "statut_accessoire"]);
 		} else if (d.local_rattache !== "maison") {
 			return resultat("confirm", "R.421-14 c)", "Un local rattaché au logement en suit la destination ; un bâtiment séparé a la sienne.", ["local_rattache"]);
 		}
 
-		/* C — un changement de destination avec travaux sur la structure
-		   porteuse ou la façade relève du permis. */
-		if (changement) {
-			if (d.modifie_structure_ou_facade === true) {
-				return resultat("pcmi", "R.421-14 c)", "Changement de destination accompagné de travaux sur les structures porteuses ou la façade : permis de construire.");
-			}
-			if (d.modifie_structure_ou_facade !== false) {
-				return resultat("confirm", "R.421-14 c)", "Un changement de destination bascule en permis s'il s'accompagne de travaux sur la structure porteuse ou la façade.", ["modifie_structure_ou_facade"]);
-			}
-			return resultat("dp", "R.421-17 b)", "Changement de destination sans travaux sur la structure ni la façade : déclaration préalable.");
+		/* Le garage affecté au stationnement est le seul sous-parcours pour lequel
+		   le tunnel dispose de faits suffisants sur la surface de plancher. */
+		if (d.local_actuel !== "garage") {
+			return resultat("confirm", "R.111-22", "La hauteur ne suffit pas à savoir si des combles, un sous-sol ou une dépendance comptent déjà dans la surface de plancher.", ["surface_deja_plancher"]);
 		}
 
-		var hors = horsSurfacePlancher(d);
-		if (hors === null) {
-			return resultat("confirm", "R.421-17 g)", "Sous 1,80 m de hauteur, l'espace ne compte pas dans la surface de plancher : la réponse change le régime.", ["hauteur_sup_180"]);
-		}
-
-		/* D — l'espace compte déjà dans la surface de plancher : la
-		   transformation n'en crée pas. Seule une modification de l'aspect
-		   extérieur déclencherait alors une déclaration. */
-		if (!hors) {
-			if (d.modifie_aspect_exterieur === true) {
-				return resultat("dp", "R.421-17 a)", "Réaménagement intérieur avec modification de l'aspect extérieur : déclaration préalable.");
-			}
-			if (d.modifie_aspect_exterieur === false) {
-				return resultat("none", "R.421-17", "Réaménagement intérieur sans création de surface de plancher ni modification extérieure : aucune formalité au titre du code de l'urbanisme.");
-			}
-			return resultat("confirm", "R.421-17 a)", "Cet espace compte déjà dans la surface de plancher : seule une modification extérieure déclencherait une formalité.", ["modifie_aspect_exterieur"]);
-		}
-
-		/* A — R.421-17 g) : plus de cinq mètres carrés de surface close et
+		/* R.421-17 g) : plus de cinq mètres carrés de surface close et
 		   couverte deviennent de la surface de plancher. Au-delà des seuils de
 		   R.421-14, le permis reprend la main. */
 		if (cree <= S.EXISTANT_DP) {
+			if (d.modifie_aspect_exterieur === true) {
+				return resultat("dp", "R.421-17 a)", "Transformation de " + cree + " m² avec modification de l'aspect extérieur : déclaration préalable.");
+			}
+			if (d.modifie_aspect_exterieur === false) {
+				return resultat("none", "R.421-17", "Transformation de " + cree + " m² sans modification extérieure : aucune formalité au titre du code de l'urbanisme.");
+			}
 			return resultat("confirm", "R.421-17 g)", "Transformation de " + cree + " m² : sous le seuil de 5 m², la formalité dépend des travaux extérieurs.", ["modifie_aspect_exterieur"]);
 		}
 
-		var surSeuils = surExistant(d, "Transformation");
+		var donneesSeuils = {};
+		for (var cle in d) {
+			if (Object.prototype.hasOwnProperty.call(d, cle)) { donneesSeuils[cle] = d[cle]; }
+		}
+		donneesSeuils.emprise_creee = 0;
+		var surSeuils = surExistant(donneesSeuils, "Transformation");
 		if (surSeuils.status === "dp") {
 			return resultat("dp", "R.421-17 g)", "Transformation de " + cree + " m² de surface close et couverte en surface de plancher : déclaration préalable.");
 		}
@@ -353,13 +333,15 @@
 		extension: function (d) { return surExistant(d, "Extension"); },
 
 		garage: function (d) {
-			if (d.implantation === "accole") { return surExistant(d, "Garage accolé"); }
+			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que le garage soit une construction nouvelle ou une extension."); }
+			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement le garage d'extension.", ["qualification_plu"]); }
 			if (d.implantation === "independant") { return constructionNouvelle(d, "Garage indépendant"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Accolé à une construction existante ou indépendant : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
 
 		abri: function (d) {
-			if (d.implantation === "accole") { return surExistant(d, "Abri accolé"); }
+			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que l'abri soit une construction nouvelle ou une extension."); }
+			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Le fait de toucher le bâtiment ne suffit pas à qualifier juridiquement l'abri d'extension.", ["qualification_plu"]); }
 			if (d.implantation === "independant") { return constructionNouvelle(d, "Abri indépendant"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Accolé à une construction existante ou indépendant : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
@@ -367,34 +349,33 @@
 		piscine: piscine,
 
 		/* Une pergola ouverte ne crée pas de surface de plancher, seulement une
-		   emprise ; adossée, elle relève de l'existant. Aucun article ne la
-		   nomme : elle suit le régime commun des constructions. */
+		   emprise. Aucun article ne la nomme : elle suit le régime commun des
+		   constructions, sans que le seul adossement suffise à la qualifier. */
 		pergola: function (d) {
-			if (d.implantation === "accole") { return surExistant(d, "Pergola adossée"); }
+			if (creation(d) > S.EXISTANT_PC_ZONE_U) { return resultat("pcmi", "R.421-1 / R.421-14", "Au-delà de 40 m², le permis est exigé que la pergola soit une construction nouvelle ou une extension."); }
+			if (d.implantation === "accole") { return resultat("confirm", "R.421-9 / R.421-14", "Une pergola adossée peut être traitée comme construction nouvelle ou extension selon sa conception et le document d'urbanisme.", ["qualification_plu"]); }
 			if (d.implantation === "independant") { return constructionNouvelle(d, "Pergola autonome"); }
 			return resultat("confirm", "R.421-9 / R.421-14", "Adossée à la construction ou autonome : les règles applicables ne sont pas les mêmes.", ["implantation"]);
 		},
 
 		transformation: transformation,
 
-		/* Modifier l'aspect extérieur d'une construction relève de la
-		   déclaration préalable, sauf à toucher les structures porteuses. */
+		/* Les cartes « façade », « toiture » et « solaire » sont trop larges pour
+		   trancher sans description : entretien à l'identique, installation au sol,
+		   changement de destination et structure n'ont pas le même régime. */
 		facade: function (d) {
 			if (d.modifie_structure_ou_facade === true && d.changement_destination === true) {
 				return resultat("pcmi", "R.421-14 c)", "Modification de la façade accompagnant un changement de destination : permis de construire.");
 			}
-			return resultat("dp", "R.421-17 a)", "Modification de l'aspect extérieur d'une construction existante : déclaration préalable.");
+			return resultat("confirm", "R.421-2 / R.421-17", "Il faut distinguer l'entretien à l'identique d'une modification de l'aspect extérieur et d'un changement de destination.", ["description"]);
 		},
 
 		toiture: function () {
-			return resultat("dp", "R.421-17 a)", "Réfection de toiture ou création d'ouvertures modifiant l'aspect extérieur : déclaration préalable.");
+			return resultat("confirm", "R.421-2 / R.421-17", "Il faut distinguer l'entretien à l'identique d'une modification de l'aspect extérieur, du volume ou de la structure.", ["description"]);
 		},
 
-		solaire: function (d) {
-			if (secteurBloquant(d)) {
-				return resultat("confirm", "R.421-17 a)", "En secteur protégé, l'installation peut relever d'une autorisation particulière.", ["secteur_protege"]);
-			}
-			return resultat("dp", "R.421-17 a)", "Panneaux modifiant l'aspect extérieur d'une construction existante : déclaration préalable.");
+		solaire: function () {
+			return resultat("confirm", "R.421-2 / R.421-9 / R.421-17", "La formalité dépend notamment d'une pose en toiture ou au sol, de la hauteur, de la puissance et du secteur.", ["description"]);
 		},
 
 		maison: function () {

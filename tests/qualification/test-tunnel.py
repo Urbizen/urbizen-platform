@@ -2,7 +2,7 @@
 """Banc du tunnel de qualification — rejoué dans un moteur de rendu.
 
 Le moteur de qualification est couvert hors navigateur, et son équivalence avec
-le serveur prouvée sur 87 cas. Ce qui ne l'était pas, c'est l'orchestration :
+le serveur prouvée sur 100 cas. Ce qui ne l'était pas, c'est l'orchestration :
 l'enchaînement réel des questions, et surtout l'absence de redirection avant
 conclusion.
 
@@ -151,7 +151,7 @@ ATTENDUS = {
     "extension DP certaine": "dp",
     "extension PC certaine": "pcmi",
     "extension zone U inconnue": "confirm",
-    "garage accolé": "dp",
+    "garage accolé": "confirm",
     "garage indépendant sans formalité": "none",
     "garage indépendant DP": "dp",
     "garage indépendant PC": "pcmi",
@@ -247,6 +247,18 @@ def main():
         "Le garage commence par accolé ou indépendant",
         "accolée" in premiere.lower() or "indépendante" in premiere.lower(),
         premiere,
+    )
+
+    piscine = scenarios["piscine sans formalité"]
+    check(
+        "La piscine demande explicitement si elle sera couverte",
+        any("couverte" in q.lower() for q in (piscine.get("posees") or [])),
+        str(piscine.get("posees")),
+    )
+    check(
+        "Toutes les réponses du scénario piscine sont consommées",
+        len(piscine.get("posees") or []) == 3,
+        str(piscine.get("posees")),
     )
 
     premiere_t = (scenarios["transformation garage en pièce"].get("posees") or [""])[0]

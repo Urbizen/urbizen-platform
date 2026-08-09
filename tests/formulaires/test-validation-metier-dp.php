@@ -6,9 +6,10 @@
  *
  * 1. **Une demande recevable passe.** Une clôture, un ravalement ou des
  *    panneaux solaires ne créent aucune surface ; exiger des mètres carrés
- *    rejetterait des dossiers parfaitement valides. Et pour une extension, un
- *    client qui n'a pas encore mesuré doit pouvoir envoyer sa demande. D'où la
- *    matrice : les douze natures, sans aucun champ de surface.
+ *    rejetterait des dossiers parfaitement valides. En revanche, les deux
+ *    mesures d'une extension et les caractéristiques d'une piscine sont
+ *    déterminantes pour choisir le bon formulaire : les retirer ne doit pas
+ *    permettre de contourner ce choix.
  * 2. **Une demande incohérente est refusée, pas nettoyée.** Un doublon, un
  *    projet répétant le principal ou une liste forgée passent la validation de
  *    forme. Le catalogue tarifaire ne les facture pas — mais un calcul prudent
@@ -80,7 +81,7 @@ function verifier( $label, $condition ) {
 }
 
 /**
- * Réponses minimales d'une demande recevable, sans aucune surface.
+ * Réponses minimales d'une demande recevable avant contrôle du régime.
  *
  * @param string               $nature Nature du projet principal.
  * @param array<string, mixed> $ajouts Champs supplémentaires.
@@ -141,10 +142,10 @@ foreach ( $surfaces as $champ ) {
 }
 
 /* ================================================================== *
- *  2. Matrice des douze natures, sans aucune surface
+ *  2. Matrice des douze natures et données déterminantes
  * ================================================================== */
 
-echo "\n── 2. Matrice : les douze natures passent sans surface\n";
+echo "\n── 2. Matrice : les données déterminantes ne sont pas contournables\n";
 
 foreach ( CatalogueDeclarationPrealable::natures() as $nature ) {
 	$resultat = Validator::validate( $def, demande_minimale( $nature ) );
@@ -152,11 +153,40 @@ foreach ( CatalogueDeclarationPrealable::natures() as $nature ) {
 
 	$libelle = (string) CatalogueDeclarationPrealable::libelle_nature( $nature );
 
+	$determinants_requis = in_array( $nature, array( 'extension', 'piscine' ), true );
+
 	verifier(
-		sprintf( '%-24s (%s) — demande recevable sans surface', $nature, $libelle ),
-		$resultat['valid'] && array() === $metiers
+		sprintf( '%-24s (%s) — comportement attendu sans déterminants', $nature, $libelle ),
+		$resultat['valid']
+			&& ( $determinants_requis
+				? isset( $metiers['regime'] )
+				: array() === $metiers )
 	);
 }
+
+$extension_complete = $metier->valider(
+	demande_minimale(
+		'extension',
+		array(
+			'sp_creee'      => 15,
+			'emprise_creee' => 15,
+		)
+	)
+);
+
+verifier( 'extension · les deux mesures permettent la vérification', ! isset( $extension_complete['regime'] ) );
+
+$piscine_complete = $metier->valider(
+	demande_minimale(
+		'piscine',
+		array(
+			'surface_bassin_m2'     => 40,
+			'presence_abri_piscine' => 'non',
+		)
+	)
+);
+
+verifier( 'piscine · bassin et couverture permettent la vérification', ! isset( $piscine_complete['regime'] ) );
 
 // Le point de départ du sujet : ces cinq natures ne créent jamais de surface.
 foreach ( array( 'cloture_mur', 'panneaux_solaires', 'modification_facade', 'ravalement', 'toiture' ) as $nature ) {
@@ -267,7 +297,14 @@ verifier(
 	// celle des projets supplémentaires, pas celle des adresses. Les lui
 	// retirer ferait échouer le banc pour une raison qui n'est pas la sienne.
 	array() === $metier->valider(
-		demande_minimale( 'extension', array( 'projets_supplementaires' => $maximum ) )
+		demande_minimale(
+			'extension',
+			array(
+				'projets_supplementaires' => $maximum,
+				'sp_creee'                 => 15,
+				'emprise_creee'            => 15,
+			)
+		)
 	)
 );
 

@@ -99,22 +99,22 @@ async function jouer(f, projet, reponses) {
 	const f = await page();
 
 	const scenarios = [
-		{ nom: "extension DP certaine", projet: "extension", reponses: ["15"] },
+		{ nom: "extension DP certaine", projet: "extension", reponses: ["15", "15"] },
 		{ nom: "extension PC certaine", projet: "extension", reponses: ["60"] },
-		{ nom: "extension zone U inconnue", projet: "extension", reponses: ["30", "Je ne sais pas"] },
-		{ nom: "garage accolé", projet: "garage", reponses: ["Accolée", "15", "Non"] },
-		{ nom: "garage indépendant sans formalité", projet: "garage", reponses: ["Indépendante", "4", "Non", "2.5"] },
-		{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "Non", "2.5"] },
+		{ nom: "extension zone U inconnue", projet: "extension", reponses: ["30", "30", "Je ne sais pas"] },
+		{ nom: "garage accolé", projet: "garage", reponses: ["Accolée"] },
+		{ nom: "garage indépendant sans formalité", projet: "garage", reponses: ["Indépendante", "4", "4", "Non", "2.5"] },
+		{ nom: "garage indépendant DP", projet: "garage", reponses: ["Indépendante", "15", "15", "Non", "2.5"] },
 		{ nom: "garage indépendant PC", projet: "garage", reponses: ["Indépendante", "30"] },
-		{ nom: "abri secteur inconnu", projet: "abri", reponses: ["Indépendante", "12", "Je ne sais pas"] },
-		{ nom: "abri sans formalité", projet: "abri", reponses: ["Indépendante", "4", "Non", "2"] },
+		{ nom: "abri secteur inconnu", projet: "abri", reponses: ["Indépendante", "12", "12", "Je ne sais pas"] },
+		{ nom: "abri sans formalité", projet: "abri", reponses: ["Indépendante", "4", "4", "Non", "2"] },
 		{ nom: "abri PC", projet: "abri", reponses: ["Indépendante", "25"] },
 		{ nom: "piscine sans formalité", projet: "piscine", reponses: ["8", "Non", "Non"] },
 		{ nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"] },
 		{ nom: "piscine PC", projet: "piscine", reponses: ["120"] },
-		{ nom: "pergola autonome", projet: "pergola", reponses: ["Indépendante", "12", "Non", "2.4"] },
+		{ nom: "pergola autonome", projet: "pergola", reponses: ["Indépendante", "12", "12", "Non", "2.4"] },
 		{ nom: "transformation garage en pièce", projet: "transformation",
-		  reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison", "Non"] },
+		  reponses: ["18", "Un garage", "Oui", "Il fait partie de la maison"] },
 		{ nom: "autre projet", projet: "autre", reponses: ["Véranda sur terrasse existante"] }
 	];
 
@@ -136,7 +136,7 @@ async function jouer(f, projet, reponses) {
 
 		d.querySelector('.pcard[data-projet="garage"]').click();
 		await attendre(60);
-		for (const rep of ["Indépendante", "4", "Non", "2.5"]) {
+		for (const rep of ["Indépendante", "4", "4", "Non", "2.5"]) {
 			const zone = d.getElementById("js-qualification");
 			if (!zone || zone.hidden) break;
 			const boutons = [...zone.querySelectorAll(".qualif-choix .btn")];
@@ -196,8 +196,12 @@ async function jouer(f, projet, reponses) {
 		d.querySelector('.pcard[data-projet="extension"]').click();
 		await attendre(60);
 		let zone = d.getElementById("js-qualification");
-		zone.querySelector(".qualif-champ").value = "15";
-		zone.querySelector(".btn").click();
+			zone.querySelector(".qualif-champ").value = "15";
+			zone.querySelector(".btn").click();
+			await attendre(60);
+			zone = d.getElementById("js-qualification");
+			zone.querySelector(".qualif-champ").value = "15";
+			zone.querySelector(".btn").click();
 		await attendre(80);
 		const avant = etat(b);
 

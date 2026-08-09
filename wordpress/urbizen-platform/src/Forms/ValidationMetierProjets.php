@@ -176,10 +176,13 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 	 * dossier partait en mairie sous un régime que le Code de l'urbanisme ne
 	 * permettait pas.
 	 *
-	 * Ce contrôle ne rejette QUE ce qui est certain. `QualificationUrbanisme`
-	 * distingue une conclusion d'une hypothèse : tant qu'une donnée manque, elle
-	 * rend « à confirmer », et rien n'est bloqué. Seule une conclusion opposée au
-	 * régime du formulaire arrête la soumission. Douter n'est pas refuser.
+	 * Ce contrôle ne rejette une incertitude que lorsqu'elle provient d'une donnée
+	 * déterminante que le formulaire sait recueillir pour cette nature. Retirer
+	 * les surfaces d'une extension ou la couverture d'une piscine ne doit pas
+	 * devenir un contournement trivial. Les incertitudes extérieures au formulaire
+	 * (zone, protection, qualification locale) restent, elles, non bloquantes.
+	 * Une conclusion certaine opposée au régime du formulaire arrête toujours la
+	 * soumission.
 	 *
 	 * @param array<string, mixed> $clean Réponses nettoyées.
 	 * @return array<string, string>
@@ -191,11 +194,41 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 			return array();
 		}
 
-		$verdict = QualificationUrbanisme::qualifier( $this->donnees_qualification( $clean ) );
+		$donnees = $this->donnees_qualification( $clean );
+		$verdict = QualificationUrbanisme::qualifier( $donnees );
+
+		if ( QualificationUrbanisme::A_CONFIRMER === $verdict['status'] ) {
+			$obligatoires = array(
+				'extension' => array( 'sp_creee', 'emprise_creee' ),
+				'piscine'   => array( 'bassin_m2', 'couverte', 'hauteur_couverture_m' ),
+			);
+			$determinants_formulaire = $obligatoires[ $donnees['projet'] ?? '' ] ?? array();
+			$manquants               = array_intersect( $verdict['missing'], $determinants_formulaire );
+
+			if ( array() !== $manquants ) {
+				$instruction = 'piscine' === ( $donnees['projet'] ?? '' )
+					? __( 'Renseignez la surface du bassin, indiquez s’il sera couvert et, le cas échéant, la hauteur de la couverture.', 'urbizen-platform' )
+					: __( 'Renseignez la surface de plancher créée et l’emprise au sol créée.', 'urbizen-platform' );
+
+				return array(
+					'regime' => sprintf(
+						/* translators: %s: instruction propre à la nature du projet */
+						__( 'Les données nécessaires pour vérifier la formalité sont incomplètes ou invalides. %s', 'urbizen-platform' ),
+						$instruction
+					),
+				);
+			}
+
+			return array();
+		}
+
+		if ( QualificationUrbanisme::AUCUNE === $verdict['status'] ) {
+			return array(
+				'regime' => __( 'Les caractéristiques indiquées ne justifient pas ce formulaire d’autorisation. Urbizen reprend contact pour vérifier les règles locales avant tout dépôt.', 'urbizen-platform' ),
+			);
+		}
 
 		if ( QualificationUrbanisme::DP !== $verdict['status'] && QualificationUrbanisme::PCMI !== $verdict['status'] ) {
-			// « à confirmer », « aucune formalité » ou « conception » : le moteur
-			// n'a pas conclu contre ce formulaire, il n'a pas conclu du tout.
 			return array();
 		}
 
@@ -230,14 +263,22 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 	private function donnees_qualification( array $clean ): array {
 		$natures = array(
 			'extension'           => 'extension',
+			'surelevation'        => 'extension',
 			'garage'              => 'garage',
 			'annexe_garage'       => 'garage',
 			'abri_annexe'         => 'abri',
+			'carport'             => 'pergola',
 			'piscine'             => 'piscine',
+			'modification_facade' => 'facade',
+			'ravalement'          => 'facade',
+			'toiture'             => 'toiture',
+			'panneaux_solaires'   => 'solaire',
+			'changement_destination' => 'transformation',
 			'maison_individuelle' => 'maison',
+			'autre'               => 'autre',
 		);
 
-		$nature = $this->chaine( $clean['nature_projet'] ?? '' );
+		$nature = $this->chaine( $clean['nature'] ?? '' );
 
 		if ( ! isset( $natures[ $nature ] ) ) {
 			return array();
@@ -246,13 +287,25 @@ abstract class ValidationMetierProjets implements ValidationMetier {
 		$donnees = array( 'projet' => $natures[ $nature ] );
 
 		foreach ( array( 'sp_creee', 'sp_totale', 'emprise_creee' ) as $champ ) {
-			if ( isset( $clean[ $champ ] ) && '' !== $clean[ $champ ] ) {
+			if ( array_key_exists( $champ, $clean ) && '' !== $clean[ $champ ] ) {
 				$donnees[ $champ ] = $clean[ $champ ];
 			}
 		}
 
-		if ( isset( $clean['bassin_surface'] ) && '' !== $clean['bassin_surface'] ) {
-			$donnees['bassin_m2'] = $clean['bassin_surface'];
+		if ( array_key_exists( 'surface_bassin_m2', $clean ) && '' !== $clean['surface_bassin_m2'] ) {
+			$donnees['bassin_m2'] = $clean['surface_bassin_m2'];
+		}
+
+		if ( array_key_exists( 'presence_abri_piscine', $clean ) ) {
+			if ( 'oui' === $clean['presence_abri_piscine'] ) {
+				$donnees['couverte'] = true;
+			} elseif ( 'non' === $clean['presence_abri_piscine'] ) {
+				$donnees['couverte'] = false;
+			}
+		}
+
+		if ( array_key_exists( 'hauteur_abri_m', $clean ) && '' !== $clean['hauteur_abri_m'] ) {
+			$donnees['hauteur_couverture_m'] = $clean['hauteur_abri_m'];
 		}
 
 		return $donnees;

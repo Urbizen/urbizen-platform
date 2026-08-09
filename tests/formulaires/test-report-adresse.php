@@ -178,6 +178,10 @@ $PARCOURS = array(
 			'telephone'      => '0600000000',
 			'nature'         => 'extension',
 			'intervention'   => 'existant',
+			// Le banc porte sur les adresses. Deux mesures cohérentes avec un PC
+			// empêchent le contrôle du régime d'en masquer le résultat.
+			'sp_creee'       => 60,
+			'emprise_creee'  => 60,
 			'description'    => 'Projet décrit par le demandeur.',
 			'abf'            => 'non',
 			'demolition'     => 'non',

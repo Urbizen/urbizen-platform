@@ -237,9 +237,9 @@
     if (donnees.implantation && LIBELLES_REPONSE.implantation[donnees.implantation]) {
       lignes.push("Implantation : " + LIBELLES_REPONSE.implantation[donnees.implantation]);
     }
-    if (donnees.sp_creee !== undefined) { lignes.push("Surface créée : " + donnees.sp_creee + " m²"); }
+    if (donnees.sp_creee !== undefined) { lignes.push("Surface de plancher créée : " + donnees.sp_creee + " m²"); }
     if (donnees.emprise_creee !== undefined) { lignes.push("Emprise créée : " + donnees.emprise_creee + " m²"); }
-    if (donnees.sp_totale !== undefined) { lignes.push("Surface totale après travaux : " + donnees.sp_totale + " m²"); }
+    if (donnees.sp_totale !== undefined) { lignes.push("Surface de plancher totale après travaux : " + donnees.sp_totale + " m²"); }
     if (donnees.bassin_m2 !== undefined) { lignes.push("Bassin : " + donnees.bassin_m2 + " m²"); }
     if (donnees.hauteur_m !== undefined) { lignes.push("Hauteur : " + donnees.hauteur_m + " m"); }
     if (donnees.zone_u !== undefined) { lignes.push("Zone U du PLU : " + LIBELLES_REPONSE.zone_u[String(donnees.zone_u)]); }
@@ -251,6 +251,26 @@
     return lignes.join("\n");
   }
 
+  var QUALIFICATION_VERSION = 2;
+  var QUALIFICATION_MAX_AGE = 30 * 60 * 1000;
+
+  function qualificationValide(qualif, projetAttendu, statutAttendu) {
+    var parcours = null;
+    try {
+      var brutParcours = sessionStorage.getItem("urbizen:parcours");
+      parcours = brutParcours ? JSON.parse(brutParcours) : null;
+    } catch (e) { return false; }
+
+    if (!qualif || qualif.version !== QUALIFICATION_VERSION) { return false; }
+    if (typeof qualif.parcours_id !== "string" || !qualif.parcours_id) { return false; }
+    if (typeof qualif.created_at !== "number" || Date.now() - qualif.created_at > QUALIFICATION_MAX_AGE || qualif.created_at > Date.now() + 60000) { return false; }
+    if (!qualif.donnees || !qualif.verdict || qualif.projet !== qualif.donnees.projet) { return false; }
+    if (!parcours || parcours.version !== QUALIFICATION_VERSION || parcours.parcours_id !== qualif.parcours_id || parcours.projet !== qualif.projet) { return false; }
+    if (projetAttendu && qualif.projet !== projetAttendu) { return false; }
+    if (statutAttendu && qualif.verdict.status !== statutAttendu) { return false; }
+    return true;
+  }
+
   function contextualiserRenseignements() {
     if (!inquiryPanel) { return; }
 
@@ -260,7 +280,7 @@
       qualif = brut ? JSON.parse(brut) : null;
     } catch (e) { return; }
 
-    if (!qualif || !qualif.verdict) { return; }
+    if (!qualificationValide(qualif)) { return; }
     if (qualif.verdict.status !== "none" && qualif.verdict.status !== "confirm") { return; }
 
     var message = inquiryPanel.querySelector("textarea");
@@ -330,12 +350,9 @@
 
   /* ----- Sélection du type de projet et qualification -----
 
-     Auparavant, une seule ligne décidait de tout :
-
-         return FORM_BY_PROJECT[project] || "dp";
-
-     Deux types étaient mappés ; les huit autres tombaient en déclaration
-     préalable — une extension de soixante mètres carrés comme un ravalement.
+     Auparavant, un choix non mappé tombait implicitement en déclaration
+     préalable. Deux types étaient explicites ; les huit autres recevaient ce
+     même régime — une extension de soixante mètres carrés comme un ravalement.
      La décision tombait au clic sur la carte, avant la moindre question de
      surface, et l'écran annonçait « orientation proposée », donnant à un défaut
      l'apparence d'une étude.
@@ -359,8 +376,8 @@
       aide: "Accolée : elle touche la maison ou un autre bâtiment. Indépendante : elle est isolée sur le terrain.",
       choix: [ { v: "accole", t: "Accolée" }, { v: "independant", t: "Indépendante" } ] },
 
-    { champ: "sp_creee", libelle: "Quelle surface au sol la construction va-t-elle occuper ?",
-      aide: "Une estimation suffit à ce stade. Urbizen vérifie les cotes exactes ensuite.",
+    { champ: "sp_creee", libelle: "Quelle surface de plancher le projet va-t-il créer ?",
+      aide: "Il s'agit des surfaces closes et couvertes, mesurées selon les règles de la surface de plancher. Une estimation suffit à ce stade.",
       unite: "m²" },
 
     { champ: "emprise_creee", libelle: "Quelle emprise au sol le projet va-t-il occuper ?",
@@ -378,8 +395,14 @@
     { champ: "hauteur_m", libelle: "Quelle hauteur fera la construction ?",
       aide: "Du sol au point le plus haut.", unite: "m" },
 
-    { champ: "sp_totale", libelle: "Quelle sera la surface habitable totale après travaux ?",
-      aide: "La surface actuelle de la maison, plus celle que vous créez.", unite: "m²" },
+    { champ: "sp_totale", libelle: "Quelle sera la surface de plancher totale après travaux ?",
+      aide: "La surface de plancher actuelle, plus celle que vous créez.", unite: "m²" },
+
+    { champ: "personne_physique", libelle: "Le projet est-il réalisé par un particulier pour lui-même ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
+
+    { champ: "usage_agricole", libelle: "La construction est-elle destinée à une activité agricole ?",
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
 
     /* La zone urbaine décide du seuil de 20 ou 40 m². Attention à ce que la
        question demande : R.421-14 b) vise le CLASSEMENT en zone urbaine d'un
@@ -459,6 +482,7 @@
 
   var reponses = {};
   var selectedProjet = null;
+  var parcoursId = null;
   var continueBtn = document.getElementById("js-continue");
   var continueHint = document.getElementById("js-continue-hint");
   var zoneQuestions = document.getElementById("js-qualification");
@@ -509,6 +533,7 @@
     var titre = document.createElement("p");
     titre.className = "qualif-libelle";
     titre.textContent = q.libelle;
+    titre.tabIndex = -1;
     bloc.appendChild(titre);
 
     if (q.aide) {
@@ -536,6 +561,7 @@
       var champ = document.createElement("input");
       champ.type = q.texte ? "text" : "text";
       champ.inputMode = q.texte ? "text" : "decimal";
+      champ.maxLength = q.texte ? 500 : 32;
       champ.className = "qualif-champ";
       champ.setAttribute("aria-label", q.libelle);
       var valider = document.createElement("button");
@@ -558,10 +584,14 @@
       }
       ligne.appendChild(valider);
       bloc.appendChild(ligne);
-      window.setTimeout(function () { champ.focus(); }, 0);
     }
 
     zoneQuestions.appendChild(bloc);
+    window.setTimeout(function () {
+      var tactile = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      if (!q.choix && !tactile) { champ.focus(); }
+      else { titre.focus(); }
+    }, 0);
   }
 
   function masquerQuestions() {
@@ -596,9 +626,17 @@
     continueBtn.disabled = false;
     continueBtn.textContent = BOUTONS[verdict.status];
     if (continueHint) { continueHint.textContent = MESSAGES[verdict.status]; }
+    window.setTimeout(function () { continueBtn.focus(); }, 0);
 
     try {
-      sessionStorage.setItem("urbizen:qualification", JSON.stringify({ donnees: donnees, verdict: verdict }));
+      sessionStorage.setItem("urbizen:qualification", JSON.stringify({
+        version: QUALIFICATION_VERSION,
+        parcours_id: parcoursId,
+        projet: selectedProjet,
+        created_at: Date.now(),
+        donnees: donnees,
+        verdict: verdict
+      }));
     } catch (e) {}
   }
 
@@ -610,7 +648,12 @@
       card.setAttribute("aria-pressed", "true");
       selectedProjet = card.getAttribute("data-projet");
       reponses = {};
-      try { sessionStorage.setItem("urbizen:projet", selectedProjet); } catch (e) {}
+      parcoursId = String(Date.now()) + "-" + Math.random().toString(36).slice(2, 10);
+      try {
+        sessionStorage.removeItem("urbizen:qualification");
+        sessionStorage.setItem("urbizen:projet", selectedProjet);
+        sessionStorage.setItem("urbizen:parcours", JSON.stringify({ version: QUALIFICATION_VERSION, parcours_id: parcoursId, projet: selectedProjet, created_at: Date.now() }));
+      } catch (e) {}
       evaluer();
     });
   });

@@ -15,10 +15,10 @@
  *   D. un verdict `pcmi` injecté là où les données donnent `dp` ;
  *   E. des données retirées jusqu'à rendre la qualification impossible.
  *
- * Deux attendus opposés, et c'est le cœur du sujet. Une contradiction CERTAINE
- * doit être refusée. Une donnée manquante ne doit RIEN refuser : le moteur rend
- * alors « à confirmer », et une barrière qui bloquerait là renverrait des
- * dossiers parfaitement valides au motif qu'on ignore un zonage.
+ * Deux attendus opposés, et c'est le cœur du sujet. Une contradiction certaine
+ * doit être refusée. Un déterminant que le formulaire sait collecter — surfaces
+ * ou couverture — doit aussi être exigé ; une donnée externe comme le zonage
+ * peut en revanche rester à confirmer sans bloquer une demande recevable.
  *
  * Usage : php tests/qualification/test-falsification.php
  */
@@ -65,17 +65,23 @@ function regime( $validateur, array $charge ): ?string {
 	return $erreurs['regime'] ?? null;
 }
 
+/** Rend toutes les erreurs pour vérifier aussi le contrat des noms de champs. */
+function erreurs( $validateur, array $charge ): array {
+	return $validateur->valider( $charge );
+}
+
 /* ================================================== A · verdict falsifié == */
 
 // Le navigateur affirme « déclaration préalable » pour une extension de 60 m².
 // Le code exige un permis au-delà de 40 m², quelle que soit la zone.
 $a = array(
-	'nature_projet'          => 'extension',
+	'nature'                 => 'extension',
 	'sp_creee'               => 60,
 	'qualification_verdict'  => 'dp',      // ce que le client prétend
 	'qualification_contexte' => '{"verdict":{"status":"dp"}}',
 );
-$erreur_a = regime( $dp, $a );
+$erreurs_a = erreurs( $dp, $a );
+$erreur_a  = $erreurs_a['regime'] ?? null;
 
 check(
 	'A · un verdict « dp » transmis avec 60 m² créés est refusé',
@@ -92,22 +98,28 @@ check(
 	null !== $erreur_a && str_contains( (string) $erreur_a, 'R.421-14' ),
 	(string) $erreur_a
 );
+check( 'A · le vrai champ « nature » est reconnu', ! isset( $erreurs_a['nature'] ) );
 
 /* =============================================== B · nature réécrite ====== */
 
 // La qualification portait sur une extension ; la charge annonce une piscine
 // pour se glisser dans le tarif d'une déclaration. Le serveur ne juge que ce
 // qu'il reçoit — et une piscine sans bassin ne conclut rien.
-$b = regime( $dp, array( 'nature_projet' => 'piscine', 'sp_creee' => 60 ) );
+$b = regime( $dp, array( 'nature' => 'piscine', 'sp_creee' => 60 ) );
 check(
-	'B · une nature réécrite ne fait pas juger l’ancienne',
-	null === $b,
-	'la barrière a jugé sur une nature qui n’est plus déclarée'
+	'B · une piscine sans bassin est refusée comme incomplète',
+	null !== $b,
+	'la barrière a accepté une nature sans son déterminant principal'
+);
+check(
+	'B · le refus indique la donnée de bassin à compléter',
+	null !== $b && str_contains( $b, 'surface du bassin' ),
+	(string) $b
 );
 
 // Mais réécrire la nature ne met pas non plus à l'abri : une piscine dont le
 // bassin dépasse 100 m² relève du permis, déclarée en déclaration préalable.
-$b2 = regime( $dp, array( 'nature_projet' => 'piscine', 'bassin_surface' => 120 ) );
+$b2 = regime( $dp, array( 'nature' => 'piscine', 'surface_bassin_m2' => 120 ) );
 check(
 	'B · une piscine de 120 m² déclarée en déclaration préalable est refusée',
 	null !== $b2,
@@ -118,10 +130,10 @@ check(
 
 // Qualifié à 15 m² — donc déclaration préalable — puis 60 m² envoyés au
 // serveur. C'est la charge qui décide, pas la qualification passée.
-$c = regime( $dp, array( 'nature_projet' => 'extension', 'sp_creee' => 15 ) );
+$c = regime( $dp, array( 'nature' => 'extension', 'sp_creee' => 15, 'emprise_creee' => 15 ) );
 check( 'C · 15 m² en déclaration préalable : rien à redire', null === $c, (string) $c );
 
-$c2 = regime( $dp, array( 'nature_projet' => 'extension', 'sp_creee' => 60 ) );
+$c2 = regime( $dp, array( 'nature' => 'extension', 'sp_creee' => 60 ) );
 check( 'C · la même charge à 60 m² est refusée', null !== $c2 );
 
 /* ============================================ D · verdict pcmi injecté ==== */
@@ -130,8 +142,9 @@ check( 'C · la même charge à 60 m² est refusée', null !== $c2 );
 // conclut « déclaration préalable » — et le formulaire de permis, lui, est bien
 // contredit.
 $d = array(
-	'nature_projet'         => 'extension',
+	'nature'                => 'extension',
 	'sp_creee'              => 15,
+	'emprise_creee'         => 15,
 	'qualification_verdict' => 'pcmi',
 );
 $erreur_d = regime( $pc, $d );
@@ -148,14 +161,15 @@ check(
 
 /* ========================================= E · données retirées =========== */
 
-// Une charge amputée ne doit RIEN déclencher : le moteur rend « à confirmer »,
-// et refuser là renverrait des dossiers valides.
+// Une surface ou une couverture retirée doit être refusée. Le zonage, qui ne
+// figure pas dans le formulaire, peut rester à confirmer sans refus automatique.
 $sans = array(
-	array( 'nature_projet' => 'extension' ),                                  // aucune surface
-	array( 'nature_projet' => 'extension', 'sp_creee' => 30 ),                 // zone décisive, inconnue
-	array( 'nature_projet' => 'extension', 'sp_creee' => 30, 'sp_totale' => 200 ), // zone toujours inconnue
-	array( 'nature_projet' => 'garage' ),                                      // implantation inconnue
-	array( 'nature_projet' => '' ),                                            // aucune nature
+	array( 'nature' => 'extension' ),                                           // aucune surface : refus
+	array( 'nature' => 'extension', 'sp_creee' => 30 ),                         // emprise retirée : refus
+	array( 'nature' => 'extension', 'sp_creee' => 30, 'emprise_creee' => 30 ), // zone inconnue : confirmation
+	array( 'nature' => 'piscine', 'surface_bassin_m2' => 40 ),                  // couverture retirée : refus
+	array( 'nature' => 'garage' ),                                              // implantation non collectée ici
+	array( 'nature' => '' ),                                                    // erreur de nature, distincte du régime
 	array(),                                                                   // charge vide
 );
 $bloques = array();
@@ -163,16 +177,16 @@ foreach ( $sans as $i => $charge ) {
 	if ( null !== regime( $dp, $charge ) ) { $bloques[] = '#' . $i; }
 }
 check(
-	'E · une charge incomplète n’est jamais refusée : douter n’est pas refuser',
-	array() === $bloques,
-	'refusées à tort : ' . implode( ', ', $bloques )
+	'E · surfaces et couverture manquantes sont refusées, pas le zonage inconnu',
+	array( '#0', '#1', '#3' ) === $bloques,
+	'refus observés : ' . implode( ', ', $bloques )
 );
 
 /* ================================= le verdict client n’est jamais consulté = */
 
 // La preuve directe : la même charge, avec tous les verdicts possibles greffés
 // dessus, doit produire exactement le même résultat.
-$base      = array( 'nature_projet' => 'extension', 'sp_creee' => 60 );
+$base      = array( 'nature' => 'extension', 'sp_creee' => 60 );
 $reference = regime( $dp, $base );
 $divergents = array();
 

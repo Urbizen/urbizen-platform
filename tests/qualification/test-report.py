@@ -163,33 +163,31 @@ def main():
     check("Les 9 trajets ont été rejoués", len(cas) == 9, str(sorted(cas)))
 
     # --- A · les surfaces saisies dans le tunnel ne sont pas redemandées ---
-    # « 0 » n'est pas une valeur reprise : c'est le zéro de départ du champ.
-    # L'accepter ferait passer au vert un formulaire qui affiche 0 m² là où le
-    # client vient de saisir 18.
+    # Les champs naissent vides : un zéro explicite reste désormais une vraie
+    # réponse et ne doit plus être confondu avec une valeur par défaut.
     SURFACES = {
-        "extension DP": "15", "extension PC": "60", "garage accolé": "15",
-        "garage indépendant DP": "15", "abri DP": "12", "abri PC": "25",
-        "transformation garage habitable": "18", "pergola DP": "12",
+        "extension DP": ("15", "15"), "extension PC": ("60", ""),
+        "garage surfaces distinctes": ("4", "15"),
+        "garage indépendant DP": ("15", "15"), "abri DP": ("12", "12"),
+        "abri PC": ("25", ""), "transformation garage habitable": ("18", ""),
+        "pergola DP": ("12", "12"),
     }
     ko = []
-    for n, attendue in SURFACES.items():
+    for n, attendues in SURFACES.items():
         c = cas.get(n)
         if not c:
             continue
-        obtenue = (c["sp_creee"] or "").strip() or (c["emprise_creee"] or "").strip()
-        try:
-            juste = abs(float(obtenue.replace(",", ".")) - float(attendue)) < 0.001
-        except ValueError:
-            juste = False
+        obtenues = ((c["sp_creee"] or "").strip(), (c["emprise_creee"] or "").strip())
+        juste = obtenues == attendues
         if not juste:
-            ko.append("%s : %r (attendu %s)" % (n, obtenue, attendue))
-    check("La surface saisie dans le tunnel n'est pas redemandée", not ko, " | ".join(ko))
+            ko.append("%s : %r (attendu %r)" % (n, obtenues, attendues))
+    check("Les deux surfaces saisies dans le tunnel ne sont pas redemandées", not ko, " | ".join(ko))
 
     # --- B · le type de projet survit au trajet ---
     attendus = {
         "extension DP": "extension",
         "extension PC": "extension",
-        "garage accolé": "garage",
+        "garage surfaces distinctes": "garage",
         "garage indépendant DP": "garage",
         "abri DP": "abri_annexe",
         "abri PC": "annexe_garage",
@@ -240,6 +238,40 @@ def main():
         "Le verdict est transmis pour information",
         (cas["extension DP"]["contexte"].get("verdict") or {}).get("status") == "dp",
     )
+
+    # --- F · une session ancienne ou contradictoire ne préremplit rien ---
+    securite = donnees.get("securiteSession") or {}
+    for cle, libelle in (
+        ("apresChangement", "un autre projet commencé"),
+        ("expiree", "une qualification expirée"),
+        ("mauvaisRegime", "un verdict destiné à l’autre formulaire"),
+        ("mauvaisParcours", "un identifiant de parcours différent"),
+    ):
+        valeurs = securite.get(cle) or {}
+        check(
+            "La session est ignorée après " + libelle,
+            not valeurs.get("nature") and not valeurs.get("sp_creee") and not valeurs.get("contexte"),
+            repr(valeurs),
+        )
+
+    # --- G · une adresse cadastrale n'est reprise que juste après confirmation ---
+    cadastre = donnees.get("securiteCadastre") or {}
+    recent = cadastre.get("recent") or {}
+    check(
+        "Une confirmation cadastrale récente préremplit encore l’adresse",
+        recent == {
+            "adresse": "12 rue du Test", "codePostal": "33000", "ville": "Bordeaux",
+            "section": "AB", "numero": "42",
+        },
+        repr(recent),
+    )
+    for cle, libelle in (("expire", "expirée"), ("futur", "datée dans le futur")):
+        valeurs = cadastre.get(cle) or {}
+        check(
+            "Une confirmation cadastrale " + libelle + " est ignorée",
+            not any(valeurs.values()),
+            repr(valeurs),
+        )
 
     print("")
     for n, c in cas.items():

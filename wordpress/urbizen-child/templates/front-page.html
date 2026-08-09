@@ -210,10 +210,10 @@
     <!-- Les questions de qualification s'affichent ici, une à la fois, et
          uniquement lorsque le moteur en réclame une. Le visiteur ne voit
          jamais les questions des autres branches. -->
-    <div class="qualif" id="js-qualification" hidden></div>
+    <div class="qualif" id="js-qualification" aria-live="polite" aria-atomic="true" hidden></div>
     <div class="projet-continue">
       <button type="button" class="btn btn-primary" id="js-continue" disabled>Continuer vers ma demande</button>
-      <span class="projet-continue-hint" id="js-continue-hint">Sélectionnez un type de projet pour continuer.</span>
+      <span class="projet-continue-hint" id="js-continue-hint" role="status" aria-live="polite">Sélectionnez un type de projet pour continuer.</span>
     </div>
   </div>
 </section>
