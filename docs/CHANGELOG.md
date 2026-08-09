@@ -112,6 +112,21 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   La recette réelle confirme dix cartes, l’absence de « Autre projet » et du
   champ de description, les trois accès DP directs et l’ouverture du formulaire
   DP depuis la façade, sans erreur navigateur.
+- La PR [#66](https://github.com/Urbizen/urbizen-platform/pull/66) rétablit
+  ensuite « Autre projet » avec sa description libre et rend la Conception
+  visible depuis l’accueil : la carte ouvre directement le formulaire, tandis
+  que le menu ouvre le haut de la page de présentation.
+- Sauvegarde préalable vérifiée dans
+  `~/backups/urbizen-conception-entry-points-20260809-214528/` : base, thème
+  enfant, extension, configuration, inventaire et sommes de contrôle.
+- Les **4 fichiers applicatifs** concernés ont été publiés sans suppression ;
+  leurs 4 empreintes locales et distantes correspondent au commit fusionné
+  `4f22027`. La syntaxe PHP est valide, le thème enfant est actif et le cache
+  LiteSpeed a été purgé.
+- L’accueil, la page Conception et le formulaire DP répondent en HTTP 200. La
+  recette réelle confirme les 12 cartes, le champ libre de « Autre projet »,
+  l’arrivée de la carte Conception sur `#formulaire-conception`, l’entrée du
+  menu sans ancre et l’accès DP direct de la façade sans description libre.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
