@@ -124,6 +124,9 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] aucun sous-texte sous la carte de transformation",
 		! str_contains( $h, 'pcard-sub' )
 		&& ! str_contains( $h, 'Garage, combles, sous-sol, dépendance' ) );
+	check( "[$nom] l'introduction mène directement au bon formulaire",
+		str_contains( $h, 'accéder directement au bon formulaire' )
+		&& ! str_contains( $h, 'démarche adaptée après étude' ) );
 
 	/*
 	 * La carte se réduit à une icône et un titre. Une refonte antérieure
