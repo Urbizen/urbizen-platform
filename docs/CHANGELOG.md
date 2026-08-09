@@ -5,6 +5,51 @@ Ce fichier est mis à jour **dans le même commit** que le code qu'il décrit.
 
 ---
 
+## [0.14.0 — Correctif d’orientation des projets] — 2026-08-09
+
+Le tunnel d’accueil ne choisit plus une formalité par défaut. Il applique un
+moteur explicite, partagé avec le serveur, puis réserve les situations qui
+dépendent d’une règle locale ou d’une information absente à la vérification
+humaine annoncée au client.
+
+### Corrigé
+
+- Les deux mesures déterminantes — surface de plancher et emprise au sol — sont
+  distinguées et conservées jusqu’aux formulaires DP et PC.
+- Le serveur recalcule le régime depuis les champs réellement soumis et refuse
+  une déclaration préalable qui relève certainement du permis, notamment une
+  extension de 60 m² ou une piscine de plus de 100 m².
+- Les valeurs numériques ambiguës, les booléens falsifiés et les réponses de
+  qualification incomplètes ne peuvent plus devenir une décision implicite.
+- Les garages, abris et pergolas suivent les règles générales lorsqu’elles
+  suffisent ; les cas accolés, locaux ou incomplets restent « à confirmer » et
+  sont vérifiés humainement avant tout dépôt administratif.
+- Chaque parcours possède un identifiant propre. Qualification et adresse
+  cadastrale expirent après 30 minutes et ne sont reprises que par le même
+  projet et le bon formulaire.
+- Le report cadastral vise de nouveau le vrai composant d’adresse du terrain,
+  sans écraser une saisie restaurée par le navigateur.
+- Le lot de ressources des formulaires passe de **0.2.7 à 0.2.8** afin que les
+  navigateurs ne conservent pas les anciens documents et scripts pendant sept
+  jours.
+
+### Vérifié et déployé
+
+- PR [#58](https://github.com/Urbizen/urbizen-platform/pull/58) et correctif de
+  cache [#59](https://github.com/Urbizen/urbizen-platform/pull/59) fusionnés dans
+  `main`.
+- Corpus partagé de **100 cas**, équivalence navigateur/serveur, contrôleur réel,
+  tunnels Chrome, formulaires, cadastre, accueil mobile et soumissions au vert.
+- Sauvegarde préalable vérifiée dans
+  `~/backups/urbizen-orientation-20260809-165920/` : base, thème enfant,
+  extension, configuration et sommes de contrôle.
+- Déploiement limité à **17 fichiers applicatifs**, sans suppression ; les 17
+  empreintes de production correspondent au commit `66bc9a3`.
+- Cache LiteSpeed purgé. Accueil, formulaire DP et formulaire PC répondent en
+  HTTP 200 ; recette Chrome réussie à 390 et 1280 px, sans débordement ni erreur
+  de console. Une extension de 15 m² aboutit à la DP, une extension de 60 m² et
+  une piscine de 120 m² au permis, et un garage accolé à la vérification humaine.
+
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
 Les deux parcours postent réellement. Le serveur recalcule tout ce qui engage
