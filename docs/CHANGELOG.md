@@ -29,6 +29,8 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   le rappel sous 24 heures ouvrées.
 - Le sous-texte « Garage, combles, sous-sol, dépendance… » est retiré de la
   carte « Transformer un espace existant ».
+- L’introduction des cartes ne promet plus une confirmation « après étude » :
+  elle annonce l’accès direct au formulaire correspondant.
 - La version de session du tunnel passe à **3** afin qu’aucune orientation
   conservée avant ce correctif ne soit reprise par les formulaires.
 - Les deux mesures déterminantes — surface de plancher et emprise au sol —
