@@ -68,8 +68,27 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   `~/backups/urbizen-orientation-20260809-165920/` : base, thème enfant,
   extension, configuration et sommes de contrôle.
 - La production a été restaurée depuis cette sauvegarde, fichier par fichier,
-  puis contrôlée en HTTP 200 sur l’accueil et les deux formulaires. Elle reste
-  sur cette version sûre jusqu’au déploiement de la présente correction.
+  puis contrôlée en HTTP 200 sur l’accueil et les deux formulaires avant le
+  nouveau déploiement.
+- Les PR [#61](https://github.com/Urbizen/urbizen-platform/pull/61) et
+  [#62](https://github.com/Urbizen/urbizen-platform/pull/62) ont ensuite été
+  fusionnées et déployées. La seconde retire le dernier texte d’introduction
+  qui évoquait encore une confirmation après étude, détecté pendant la recette
+  visuelle de production.
+- Sauvegarde préalable au déploiement corrigé vérifiée dans
+  `~/backups/urbizen-direct-orientation-20260809-174715/` : base, thème enfant,
+  extension, configuration et sommes de contrôle.
+- Les **17 fichiers applicatifs** du thème et de l’extension ont été publiés
+  sans suppression. Un chemin de gabarit PC mal saisi lors du premier transfert
+  a été corrigé avant la purge du cache ; les empreintes des 11 fichiers du
+  thème et des 6 fichiers de l’extension correspondent ensuite toutes au commit
+  `44208ed`.
+- Le contrôle final confirme la syntaxe PHP, la purge LiteSpeed, les réponses
+  HTTP 200 de l’accueil et des formulaires DP/PC, et l’absence d’erreur dans le
+  navigateur. En production : garage accolé de 15 m² → DP, pergola accolée de
+  30 m² avec zone U inconnue → PC prudent, abri accolé de 12 m² → DP. Les deux
+  formulaires s’ouvrent, le rappel sous 24 heures est présent, et les anciens
+  libellés de qualification et le sous-texte de transformation sont absents.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
