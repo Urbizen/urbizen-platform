@@ -66,7 +66,7 @@ $planches = array(
 $prestations = array(
 	'Déclaration préalable' => 'https://urbizen.fr/declarations-prealables/',
 	'Permis de construire'  => 'https://urbizen.fr/permis-de-construire/',
-	'Plans sur mesure'      => 'https://urbizen.fr/conception/',
+	'Conception de plans sur mesure' => 'https://urbizen.fr/conception/',
 );
 
 foreach ( $sources as $nom => $chemin ) {

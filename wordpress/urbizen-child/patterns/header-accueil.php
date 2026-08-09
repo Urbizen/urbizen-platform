@@ -41,7 +41,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
     <nav class="nav-links" aria-label="Navigation principale">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
+      <a href="https://urbizen.fr/conception/">Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
     </nav>
@@ -92,7 +92,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
     <div class="wrap">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="<?php echo $pfx; ?>#prestations">Nos prestations</a>
+      <a href="https://urbizen.fr/conception/">Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
       <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>
