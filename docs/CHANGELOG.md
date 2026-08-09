@@ -127,6 +127,18 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   recette réelle confirme les 12 cartes, le champ libre de « Autre projet »,
   l’arrivée de la carte Conception sur `#formulaire-conception`, l’entrée du
   menu sans ancre et l’accès DP direct de la façade sans description libre.
+- La PR [#68](https://github.com/Urbizen/urbizen-platform/pull/68) refond la page
+  « Déclaration préalable » dans la charte de l’accueil, avec un contenu à la
+  fois commercial et informatif, des appels directs au formulaire et sans
+  promesse de qualification préalable.
+- Sauvegarde préalable vérifiée dans
+  `~/backups/urbizen-page-dp-20260809-223208/` : base, thème enfant, extension,
+  configuration, inventaire et sommes de contrôle.
+- Les **2 fichiers du thème enfant** concernés ont été publiés sans suppression ;
+  leurs empreintes locales et distantes correspondent au commit fusionné
+  `156067d`. Après purge LiteSpeed, l’accueil, la page DP et son formulaire
+  répondent en HTTP 200. La recette réelle confirme le nouveau contenu, les six
+  accès directs au formulaire et l’absence des anciens termes de qualification.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
