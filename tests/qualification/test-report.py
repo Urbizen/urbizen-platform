@@ -160,7 +160,7 @@ def main():
         sys.exit(1)
 
     cas = {c["nom"]: c for c in donnees["cas"]}
-    check("Les 9 trajets ont été rejoués", len(cas) == 9, str(sorted(cas)))
+    check("Les 12 trajets ont été rejoués", len(cas) == 12, str(sorted(cas)))
 
     # --- A · les surfaces saisies dans le tunnel ne sont pas redemandées ---
     # Les champs naissent vides : un zéro explicite reste désormais une vraie
@@ -193,6 +193,9 @@ def main():
         "abri PC": "annexe_garage",
         "piscine DP": "piscine",
         "pergola DP": "autre",
+        "façade DP directe": "modification_facade",
+        "toiture DP directe": "toiture",
+        "solaire DP directe": "panneaux_solaires",
     }
     ko = [
         "%s → %r (attendu %r)" % (n, cas[n]["nature"], a)
@@ -200,6 +203,13 @@ def main():
         if n in cas and cas[n]["nature"] != a
     ]
     check("Le type de projet est préservé jusqu'au formulaire", not ko, " | ".join(ko))
+
+    directs = [cas[n] for n in ("façade DP directe", "toiture DP directe", "solaire DP directe")]
+    check(
+        "Les trois cartes directes atteignent bien le formulaire DP",
+        all(c["statut"] == "dp" and c["form"] == "dp" for c in directs),
+        " | ".join("%s/%s" % (c["statut"], c["form"]) for c in directs),
+    )
 
     # Le piège nommé : un permis n'est pas une maison neuve.
     check(

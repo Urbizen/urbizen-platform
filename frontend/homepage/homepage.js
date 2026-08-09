@@ -210,7 +210,7 @@
     extension: "Extension", garage: "Garage", abri: "Abri de jardin",
     piscine: "Piscine", pergola: "Pergola", transformation: "Transformation d'un espace existant",
     facade: "Modification de façade", toiture: "Toiture", solaire: "Panneaux solaires",
-    maison: "Maison individuelle", autre: "Autre projet"
+    maison: "Maison individuelle"
   };
 
   var LIBELLES_VERDICT = {
@@ -460,9 +460,7 @@
       choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
 
     { champ: "aspect_exterieur", libelle: "Les travaux modifieront-ils l'aspect extérieur de la construction ?",
-      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] },
-
-    { champ: "description", libelle: "Décrivez votre projet en quelques mots.", texte: true }
+      choix: [ { v: true, t: "Oui" }, { v: false, t: "Non" } ] }
   ];
 
   var MESSAGES = {
@@ -560,9 +558,9 @@
       var ligne = document.createElement("div");
       ligne.className = "qualif-saisie";
       var champ = document.createElement("input");
-      champ.type = q.texte ? "text" : "text";
-      champ.inputMode = q.texte ? "text" : "decimal";
-      champ.maxLength = q.texte ? 500 : 32;
+      champ.type = "text";
+      champ.inputMode = "decimal";
+      champ.maxLength = 32;
       champ.className = "qualif-champ";
       champ.setAttribute("aria-label", q.libelle);
       var valider = document.createElement("button");
@@ -572,7 +570,7 @@
       var envoyer = function () {
         var v = champ.value.trim();
         if (!v) { return; }
-        repondre(q.champ, q.texte ? v : v.replace(",", "."));
+        repondre(q.champ, v.replace(",", "."));
       };
       valider.addEventListener("click", envoyer);
       champ.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); envoyer(); } });

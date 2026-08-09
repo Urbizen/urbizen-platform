@@ -27,6 +27,10 @@ les informations transmises et rappelle sous 24 heures ouvrées.
 - Les boutons « Faire qualifier mon projet » et « Faire vérifier mon projet »
   sont supprimés. Les conclusions DP et PC annoncent le contrôle post-envoi et
   le rappel sous 24 heures ouvrées.
+- Les cartes « Modification de façade », « Toiture / fenêtres de toit » et
+  « Panneaux solaires » ouvrent directement le parcours DP, sans demander une
+  description libre sur l’accueil. La carte générique « Autre projet » est
+  retirée.
 - Le sous-texte « Garage, combles, sous-sol, dépendance… » est retiré de la
   carte « Transformer un espace existant ».
 - L’introduction des cartes ne promet plus une confirmation « après étude » :
@@ -53,8 +57,9 @@ les informations transmises et rappelle sous 24 heures ouvrées.
 
 - Corpus partagé porté à **106 cas**, équivalence navigateur/serveur,
   contrôleur réel et protections contre la falsification au vert.
-- **21 parcours Chrome** vérifient notamment garage accolé, abri accolé et
-  pergola adossée en DP et en PC prudent, sans ancien libellé de qualification.
+- **23 parcours Chrome** vérifient notamment garage accolé, abri accolé et
+  pergola adossée en DP et en PC prudent, ainsi que les accès DP directs de la
+  façade, de la toiture et des panneaux solaires, sans saisie libre préalable.
 - Le report complet vers les formulaires DP et PC, les gabarits de l’accueil,
   le retrait du sous-texte et la promesse de rappel sous 24 heures sont testés.
 

@@ -2,7 +2,7 @@
 """Banc du tunnel de qualification — rejoué dans un moteur de rendu.
 
 Le moteur de qualification est couvert hors navigateur, et son équivalence avec
-le serveur prouvée sur 100 cas. Ce qui ne l'était pas, c'est l'orchestration :
+le serveur prouvée sur 106 cas. Ce qui ne l'était pas, c'est l'orchestration :
 l'enchaînement réel des questions, et surtout l'absence de redirection avant
 conclusion.
 
@@ -15,7 +15,7 @@ Ce que le banc refuse de laisser passer :
 1. une carte de projet qui conclut sans avoir posé ses questions ;
 2. un bouton actif alors qu'une question attend une réponse ;
 3. un état hors des cinq ;
-4. « Autre » qui conclurait autrement qu'en « à confirmer » ;
+4. une carte DP directe qui ouvrirait encore une description libre ;
 5. un verdict `none` ou `confirm` qui mènerait vers un dossier payant ;
 6. des réponses recueillies puis perdues avant le formulaire ;
 7. la moindre erreur JavaScript.
@@ -168,7 +168,9 @@ ATTENDUS = {
     "pergola adossée DP": "dp",
     "pergola adossée PC prudent": "pcmi",
     "transformation garage en pièce": "dp",
-    "autre projet": "confirm",
+    "façade DP directe": "dp",
+    "toiture DP directe": "dp",
+    "solaire DP directe": "dp",
 }
 
 
@@ -194,13 +196,18 @@ def main():
 
     scenarios = {s["nom"]: s for s in donnees["scenarios"]}
 
-    check("Les 21 scénarios ont été rejoués", len(scenarios) == 21, str(sorted(scenarios)))
+    check("Les 23 scénarios ont été rejoués", len(scenarios) == 23, str(sorted(scenarios)))
     check(
         "La carte « Transformer un espace existant » existe dans le tunnel",
         "transformation" in donnees["cartes"],
         "cartes : %s" % ", ".join(donnees["cartes"]),
     )
-    check("Les onze cartes de projet sont présentes", len(donnees["cartes"]) == 11)
+    check("Les dix cartes de projet attendues sont présentes", len(donnees["cartes"]) == 10)
+    check(
+        "La carte « Autre projet » est retirée",
+        "autre" not in donnees["cartes"],
+        "cartes : %s" % ", ".join(donnees["cartes"]),
+    )
 
     # ------------------------------------------------ le verdict de chacun ---
 
@@ -226,14 +233,13 @@ def main():
     ]
     check("Aucun projet ne conclut sans avoir posé de question", not muets, " | ".join(muets))
 
-    # « Autre » demande légitimement une description : c'est ce qui lui manque.
-    # Ce qu'il ne doit jamais faire, c'est conclure « dp ».
-    autre = scenarios["autre projet"]
+    # Ces trois cartes représentent des travaux extérieurs pris en charge par le
+    # formulaire DP. Elles ne doivent jamais ouvrir une saisie libre préalable.
+    directs = [scenarios[nom] for nom in ("façade DP directe", "toiture DP directe", "solaire DP directe")]
     check(
-        "« Autre » conclut « à confirmer » et demande une description",
-        autre["statut"] == "confirm"
-        and any("écrivez" in q.lower() or "décrivez" in q.lower() for q in (autre.get("posees") or [])),
-        "%s · %s" % (autre["statut"], autre.get("posees")),
+        "Façade, toiture et solaire vont directement en DP sans description libre",
+        all(s["statut"] == "dp" and not s.get("posees") for s in directs),
+        " | ".join("%s · %s" % (s["statut"], s.get("posees")) for s in directs),
     )
 
     # Une réponse donnée ne doit jamais être redemandée : « je ne sais pas » est
