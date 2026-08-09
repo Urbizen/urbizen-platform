@@ -850,3 +850,326 @@
   .urbizen-page-dp .dp-dossier .planche { grid-template-columns: minmax(0, 1fr); }
   .urbizen-page-dp .dp-dossier-panel { padding: 16px; }
 }
+
+/* ========================================================================== */
+/* Permis de construire — guide réglementaire et commercial                   */
+/* ========================================================================== */
+
+/* Alternance stricte après le hero : grille / uni / grille / uni. */
+.urbizen-page-pc .pc-thresholds,
+.urbizen-page-pc .pc-architect,
+.urbizen-page-pc .pc-special-cases,
+.urbizen-page-pc .pc-errors,
+.urbizen-page-pc .pc-pricing,
+.urbizen-page-pc .pc-final { background: var(--u-grid-bg); }
+.urbizen-page-pc .pc-understand,
+.urbizen-page-pc .pc-procedure,
+.urbizen-page-pc .pc-preparation,
+.urbizen-page-pc .pc-dossier,
+.urbizen-page-pc .pc-faq { background: var(--u-surface-2); }
+
+.urbizen-page-pc main > section { padding: clamp(52px, 8vw, 88px) 0; }
+.urbizen-page-pc .pc-hero h1 {
+  font-size: clamp(36px, 4.4vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.urbizen-page-pc .pc-hero .lead { font-size: clamp(16.5px, 1.45vw, 18px); line-height: 1.62; }
+.urbizen-page-pc .page-hero-meta .m { font-size: 14.5px; }
+.urbizen-page-pc .seuils { font-size: 15.5px; }
+.urbizen-page-pc .note { font-size: 14.5px; line-height: 1.65; }
+.urbizen-page-pc .frise h3 { font-size: 18px; }
+.urbizen-page-pc .frise p { max-width: none; font-size: 15.5px; line-height: 1.6; }
+.urbizen-page-pc .erreurs li { font-size: 15.5px; line-height: 1.6; }
+.urbizen-page-pc .encart { font-size: 15.5px; line-height: 1.65; }
+.urbizen-page-pc .sec-head,
+.urbizen-page-pc .note,
+.urbizen-page-pc .frise,
+.urbizen-page-pc .erreurs,
+.urbizen-page-pc .encart,
+.urbizen-page-pc .pc-preparation h2,
+.urbizen-page-pc .pc-preparation-lead,
+.urbizen-page-pc .pc-price-note { width: 100%; max-width: none; }
+
+/* Hero : aperçu fonctionnel du livrable, sans fausse vue de plan. */
+.urbizen-page-pc .pc-hero .page-hero-grid { grid-template-columns: minmax(0, 1fr) minmax(360px, 430px); }
+.urbizen-page-pc .pc-hero-dossier {
+  position: relative;
+  color: var(--u-ink);
+  background: var(--u-surface);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--u-radius);
+  padding: 24px;
+  box-shadow: 12px 12px 0 rgba(84, 207, 153, 0.14), 0 28px 60px -42px rgba(0, 0, 0, 0.85);
+}
+.urbizen-page-pc .pc-hero-dossier::before {
+  content: "DOSSIER · PCMI";
+  position: absolute;
+  top: -12px;
+  right: 18px;
+  padding: 4px 9px;
+  color: var(--u-mint);
+  background: var(--u-ink);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--u-radius-sm);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+}
+.urbizen-page-pc .pc-hero-dossier-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--u-line);
+}
+.urbizen-page-pc .pc-hero-dossier-head div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-pc .pc-hero-dossier-head strong { display: block; font-family: var(--u-font-title); font-size: 20px; font-weight: 600; }
+.urbizen-page-pc .pc-hero-status {
+  padding: 5px 8px;
+  color: var(--u-brand-dk);
+  background: var(--u-brand-sf);
+  border: 1px solid var(--u-mint-surface);
+  border-radius: var(--u-radius-sm);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.urbizen-page-pc .pc-hero-dossier ul { list-style: none; margin: 12px 0 0; padding: 0; }
+.urbizen-page-pc .pc-hero-dossier li {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 41px;
+  border-bottom: 1px solid var(--u-line);
+  color: var(--u-ink-soft);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.urbizen-page-pc .pc-hero-dossier li::before {
+  content: "✓";
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  color: #fff;
+  background: var(--u-brand);
+  border-radius: 50%;
+  font-size: 10px;
+}
+.urbizen-page-pc .pc-hero-dossier li b {
+  grid-column: 1;
+  grid-row: 1;
+  margin-left: 27px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+}
+.urbizen-page-pc .pc-hero-dossier li span { grid-column: 2; }
+.urbizen-page-pc .pc-hero-dossier > p { margin: 13px 0 0; color: var(--u-ink-faint); font-size: 13.5px; line-height: 1.55; }
+.urbizen-page-pc .pc-sources { margin: 12px 0 0; color: var(--u-ink-faint); font-size: 13px; line-height: 1.55; }
+.urbizen-page-pc .pc-sources a { color: var(--u-brand-dk); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Mesures, différence DP / PC et bloc architecte. */
+.urbizen-page-pc .pc-measures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.urbizen-page-pc .pc-measures article {
+  min-height: 210px;
+  padding: 22px;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+}
+.urbizen-page-pc .pc-measure-n { display: block; margin-bottom: 30px; color: var(--u-brand); font-family: var(--u-font-mono); font-size: 11px; letter-spacing: 0.08em; }
+.urbizen-page-pc .pc-measures h3,
+.urbizen-page-pc .pc-compare h3 { margin: 0 0 9px; color: var(--u-ink); font-family: var(--u-font-title); font-size: 18px; font-weight: 600; }
+.urbizen-page-pc .pc-measures p,
+.urbizen-page-pc .pc-compare p { margin: 0; color: var(--u-ink-soft); font-size: 15.5px; line-height: 1.6; }
+.urbizen-page-pc .pc-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+.urbizen-page-pc .pc-compare-card {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 18px;
+  padding: 22px;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius);
+}
+.urbizen-page-pc .pc-compare-pc { border-color: var(--u-brand); box-shadow: inset 0 0 0 1px var(--u-brand-sf); }
+.urbizen-page-pc .pc-compare-code { display: grid; width: 50px; height: 50px; place-items: center; color: var(--u-brand-dk); background: var(--u-brand-sf); border-radius: 50%; font-family: var(--u-font-mono); font-weight: 600; }
+.urbizen-page-pc .pc-compare a { display: inline-block; margin-top: 12px; color: var(--u-brand-dk); font-family: var(--u-font-title); font-size: 14px; font-weight: 600; }
+
+.urbizen-page-pc .pc-architect-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(330px, 430px); gap: clamp(38px, 7vw, 90px); align-items: center; }
+.urbizen-page-pc .pc-architect h2 { margin: 0 0 18px; font-size: clamp(28px, 3.8vw, 42px); font-weight: 600; }
+.urbizen-page-pc .pc-architect-grid > div > p { margin: 0 0 13px; color: var(--u-ink-soft); font-size: 17px; line-height: 1.65; }
+.urbizen-page-pc .pc-architect-example {
+  position: relative;
+  min-height: 300px;
+  overflow: hidden;
+  padding: 28px;
+  color: #fff;
+  background: var(--u-ink);
+  border-radius: var(--u-radius);
+  box-shadow: 12px 12px 0 var(--u-mint-surface);
+}
+.urbizen-page-pc .pc-architect-example::after {
+  content: "";
+  position: absolute;
+  right: -40px;
+  bottom: -55px;
+  width: 190px;
+  height: 190px;
+  border: 1px solid rgba(84, 207, 153, 0.35);
+  transform: rotate(28deg);
+}
+.urbizen-page-pc .pc-architect-number { display: block; color: var(--u-mint); font-family: var(--u-font-title); font-size: 74px; font-weight: 600; line-height: 1; letter-spacing: -0.06em; }
+.urbizen-page-pc .pc-architect-number span { margin-left: 6px; font-family: var(--u-font-mono); font-size: 19px; font-weight: 500; letter-spacing: 0; }
+.urbizen-page-pc .pc-architect-kicker { display: block; margin: 28px 0 8px; color: var(--u-mint); font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; }
+.urbizen-page-pc .pc-architect-example p { position: relative; z-index: 1; margin: 0; color: rgba(255, 255, 255, 0.78); font-size: 16px; line-height: 1.6; }
+.urbizen-page-pc .pc-architect-example b { color: #fff; }
+
+/* Conditions particulières. */
+.urbizen-page-pc .pc-info-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.urbizen-page-pc .pc-info-card {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 17px;
+  padding: 22px;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  box-shadow: 0 18px 38px -34px rgba(20, 35, 59, 0.7);
+}
+.urbizen-page-pc .pc-info-icon { display: grid; width: 46px; height: 46px; place-items: center; color: var(--u-brand); background: var(--u-brand-sf); border-radius: 50%; }
+.urbizen-page-pc .pc-info-icon svg { width: 25px; height: 25px; }
+.urbizen-page-pc .pc-info-kicker { display: block; margin-bottom: 7px; color: var(--u-brand); font-family: var(--u-font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+.urbizen-page-pc .pc-info-card h3 { margin: 0 0 8px; font-size: 18px; font-weight: 600; }
+.urbizen-page-pc .pc-info-card p { margin: 0; color: var(--u-ink-soft); font-size: 15.5px; line-height: 1.6; }
+.urbizen-page-pc .pc-info-link { display: inline-block; margin-top: 11px; color: var(--u-brand-dk); font-family: var(--u-font-title); font-size: 14px; font-weight: 600; }
+
+/* Bloc de préparation et conversion. */
+.urbizen-page-pc .pc-preparation { border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+.urbizen-page-pc .pc-preparation-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 430px); gap: clamp(34px, 6vw, 76px); align-items: center; }
+.urbizen-page-pc .pc-preparation h2 { margin: 0 0 15px; font-size: clamp(26px, 3.6vw, 38px); font-weight: 600; }
+.urbizen-page-pc .pc-preparation-lead { margin: 0 0 24px; color: var(--u-ink-soft); font-size: 18px; line-height: 1.55; }
+.urbizen-page-pc .pc-check-list,
+.urbizen-page-pc .pc-service-panel ul { list-style: none; margin: 0; padding: 0; }
+.urbizen-page-pc .pc-check-list { display: grid; gap: 10px; }
+.urbizen-page-pc .pc-check-list li,
+.urbizen-page-pc .pc-service-panel li { position: relative; padding-left: 29px; line-height: 1.55; }
+.urbizen-page-pc .pc-check-list li { color: var(--u-ink); font-size: 15.5px; }
+.urbizen-page-pc .pc-check-list li::before,
+.urbizen-page-pc .pc-service-panel li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+}
+.urbizen-page-pc .pc-check-list li::before { color: var(--u-brand); background: var(--u-brand-sf); }
+.urbizen-page-pc .pc-service-panel { padding: 28px; color: #fff; background: var(--u-ink); border-radius: var(--u-radius); box-shadow: 12px 12px 0 var(--u-mint-surface); }
+.urbizen-page-pc .pc-service-panel-kicker { color: var(--u-mint); font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.urbizen-page-pc .pc-service-panel h3 { margin: 10px 0 20px; color: #fff; font-size: 24px; font-weight: 600; line-height: 1.25; }
+.urbizen-page-pc .pc-service-panel ul { display: grid; gap: 11px; margin-bottom: 24px; }
+.urbizen-page-pc .pc-service-panel li { color: rgba(255, 255, 255, 0.78); font-size: 15px; }
+.urbizen-page-pc .pc-service-panel li::before { color: var(--u-brand); background: var(--u-brand-sf); }
+
+/* Planche PCMI illustrée. */
+.urbizen-page-pc .pc-dossier-panel { padding: clamp(22px, 2.7vw, 34px); border: 1px solid rgba(18, 138, 90, 0.24); border-radius: var(--u-radius); background: var(--u-mint-surface); box-shadow: 0 24px 44px -38px rgba(20, 35, 59, 0.7); }
+.urbizen-page-pc .pc-dossier .planche { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
+.urbizen-page-pc .pc-dossier .planche-item {
+  position: relative;
+  min-height: 144px;
+  overflow: hidden;
+  padding: 16px;
+  border-color: rgba(159, 173, 188, 0.72);
+  background: rgba(251, 252, 253, 0.96);
+  box-shadow: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+}
+.urbizen-page-pc .pc-dossier .planche-item:hover { border-color: var(--u-brand); box-shadow: 0 16px 30px -26px rgba(20, 35, 59, 0.7); transform: translateY(-2px); }
+.urbizen-page-pc .pc-dossier .planche-item .code { color: var(--u-brand); font-family: var(--u-font-mono); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; }
+.urbizen-page-pc .pc-dossier .planche-t { position: relative; z-index: 1; max-width: 60%; margin-top: 4px; font-size: 15px; line-height: 1.35; }
+.urbizen-page-pc .pc-dossier .planche-fig { position: absolute; right: 10px; bottom: 9px; width: 82px; height: 58px; color: var(--u-ink); pointer-events: none; }
+.urbizen-page-pc .pc-dossier .planche-fig svg { display: block; width: 100%; height: 100%; }
+.urbizen-page-pc .pc-dossier-panel .note { margin: 18px 0 0; color: var(--u-ink-soft); }
+
+/* Tarifs, services associés et FAQ. */
+.urbizen-page-pc .pc-price-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.urbizen-page-pc .pc-price-card { position: relative; display: flex; min-height: 330px; flex-direction: column; padding: 26px 24px; background: var(--u-surface); border: 1px solid var(--u-line-strong); border-radius: var(--u-radius); }
+.urbizen-page-pc .pc-price-card.featured { border: 2px solid var(--u-brand); box-shadow: var(--u-shadow-card); }
+.urbizen-page-pc .pc-price-type { margin-bottom: 18px; color: var(--u-brand); font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.urbizen-page-pc .pc-price-badge { position: absolute; top: -12px; right: 18px; padding: 5px 9px; color: #fff; background: var(--u-brand); border-radius: var(--u-radius-sm); font-family: var(--u-font-mono); font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; }
+.urbizen-page-pc .pc-price-card h3 { min-height: 52px; margin: 0 0 18px; font-size: 19px; font-weight: 600; }
+.urbizen-page-pc .pc-price-card > p:not(.pc-price) { margin: 0 0 22px; color: var(--u-ink-soft); font-size: 15px; line-height: 1.55; }
+.urbizen-page-pc .pc-price { margin: 0 0 18px; color: var(--u-ink); font-family: var(--u-font-title); font-size: 32px; font-weight: 600; }
+.urbizen-page-pc .pc-price span { display: block; margin-bottom: 2px; color: var(--u-ink-faint); font-family: var(--u-font-body); font-size: 12px; font-weight: 400; }
+.urbizen-page-pc .pc-price-card .btn { align-self: flex-start; margin-top: auto; }
+.urbizen-page-pc .pc-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; background: var(--u-surface-2); border: 1px solid var(--u-line); border-radius: var(--u-radius); }
+.urbizen-page-pc .pc-options span { display: flex; align-items: baseline; gap: 7px; min-width: 0; padding: 15px 18px; color: var(--u-ink-soft); font-size: 15px; }
+.urbizen-page-pc .pc-options span + span { border-left: 1px solid var(--u-line); }
+.urbizen-page-pc .pc-options b { color: var(--u-brand-dk); font-family: var(--u-font-title); font-size: 16px; font-weight: 600; }
+.urbizen-page-pc .pc-price-note { margin: 18px 0 36px; color: var(--u-ink-soft); font-size: 14.5px; line-height: 1.65; }
+.urbizen-page-pc .pc-related-services { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; margin-bottom: 0; }
+.urbizen-page-pc .pc-related-services .service-route { height: 100%; }
+.urbizen-page-pc .pc-faq .faq { display: grid; gap: 12px; width: 100%; max-width: none; margin: 0; }
+.urbizen-page-pc .pc-faq .faq details { overflow: hidden; background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); }
+.urbizen-page-pc .pc-faq .faq summary { position: relative; padding: 18px 60px 18px 20px; cursor: pointer; list-style: none; color: var(--u-ink); font-family: var(--u-font-title); font-size: 16px; font-weight: 600; line-height: 1.4; }
+.urbizen-page-pc .pc-faq .faq summary::-webkit-details-marker { display: none; }
+.urbizen-page-pc .pc-faq .faq summary::after { content: "+"; position: absolute; top: 50%; right: 18px; display: grid; width: 28px; height: 28px; place-items: center; color: var(--u-brand-dk); background: var(--u-brand-sf); border-radius: 50%; font-family: var(--u-font-mono); font-size: 17px; font-weight: 400; transform: translateY(-50%); }
+.urbizen-page-pc .pc-faq .faq details[open] summary::after { content: "−"; }
+.urbizen-page-pc .pc-faq .faq .a { padding: 0 60px 22px 20px; color: var(--u-ink-soft); font-size: 15.5px; line-height: 1.65; }
+
+@media (max-width: 1040px) {
+  .urbizen-page-pc .pc-dossier .planche { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .urbizen-page-pc .pc-hero .page-hero-grid,
+  .urbizen-page-pc .pc-architect-grid,
+  .urbizen-page-pc .pc-preparation-grid { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-hero-dossier { width: min(100%, 540px); }
+  .urbizen-page-pc .pc-measures { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-measures article { min-height: 0; }
+  .urbizen-page-pc .pc-measure-n { margin-bottom: 18px; }
+  .urbizen-page-pc .pc-architect-example { min-height: 0; }
+}
+@media (max-width: 760px) {
+  .urbizen-page-pc .pc-info-grid,
+  .urbizen-page-pc .pc-compare,
+  .urbizen-page-pc .pc-price-grid,
+  .urbizen-page-pc .pc-related-services { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-price-card { min-height: 0; }
+  .urbizen-page-pc .pc-price-card h3 { min-height: 0; }
+  .urbizen-page-pc .pc-options { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-options span + span { border-top: 1px solid var(--u-line); border-left: 0; }
+}
+@media (max-width: 620px) {
+  .urbizen-page-pc .pc-info-card,
+  .urbizen-page-pc .pc-compare-card { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-dossier .planche { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .urbizen-page-pc .pc-service-panel { padding: 24px 20px; box-shadow: 7px 7px 0 var(--u-mint-surface); }
+  .urbizen-page-pc .pc-preparation-lead { font-size: 16.5px; }
+}
+@media (max-width: 480px) {
+  .urbizen-page-pc .pc-dossier .planche { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-pc .pc-dossier-panel { padding: 16px; }
+}
