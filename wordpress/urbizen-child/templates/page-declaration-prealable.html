@@ -9,46 +9,37 @@
 <main id="contenu">
 
 <!-- ===== Hero de page ===== -->
-<section class="page-hero">
+<section class="page-hero dp-hero">
   <div class="wrap page-hero-grid">
-    <div>
+    <div class="dp-hero-copy">
       <nav class="fil-ariane" aria-label="Fil d'ariane"><a href="/">Accueil</a><span class="sep">›</span>Déclaration préalable</nav>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Dossier d'urbanisme complet</span></span>
       <h1>La déclaration préalable de travaux, sans prise de tête.</h1>
-      <p class="lead">Piscine, abri, extension, façade, panneaux solaires&nbsp;: la DP est l'autorisation des projets courants. Nous vérifions si votre projet en relève, puis nous préparons le dossier complet — CERFA et pièces graphiques — prêt à déposer.</p>
+      <p class="lead">Piscine, abri, pergola, garage, extension, façade ou panneaux solaires&nbsp;: la déclaration préalable encadre de nombreux projets courants. Vous renseignez votre demande en ligne&nbsp;; Urbizen contrôle les informations après l'envoi, vous rappelle sous 24&nbsp;h ouvrées, puis prépare le CERFA, les plans et les pièces graphiques.</p>
       <div class="hero-cta">
-        <a class="btn btn-primary" href="/#localisation">Démarrer ma déclaration</a>
+        <a class="btn btn-primary" href="/formulaire-declaration-prealable/">Démarrer ma déclaration</a>
         <a class="btn btn-ghost" href="#tarifs">Voir les tarifs</a>
       </div>
-      <div class="page-hero-meta">
+      <div class="page-hero-meta" aria-label="Les engagements Urbizen">
         <span class="m"><b>Dossier complet</b></span>
-        <span class="m">à partir de <b>149&nbsp;€</b></span>
+        <span class="m">à partir de <b>189&nbsp;€</b></span>
         <span class="m"><b>100&nbsp;%</b> à distance</span>
       </div>
     </div>
-    <div class="page-hero-plan" aria-hidden="true">
-      <span class="hero-plan-tag">DP2 · PLAN DE MASSE</span>
-      <svg viewBox="0 0 380 260" xmlns="http://www.w3.org/2000/svg">
-        <defs>
-          <pattern id="dpg2" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M20 0H0V20" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-          </pattern>
-        </defs>
-        <rect width="380" height="260" fill="url(#dpg2)"/>
-        <path d="M28 36 L352 26 L360 226 L36 236 Z" fill="#54CF99" fill-opacity="0.10" stroke="#54CF99" stroke-width="2"/>
-        <rect x="72" y="84" width="128" height="88" fill="none" stroke="#FFFFFF" stroke-opacity="0.85" stroke-width="2.2"/>
-        <line x1="136" y1="84" x2="136" y2="172" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1.2"/>
-        <text x="136" y="76" font-family="IBM Plex Mono, monospace" font-size="10" fill="rgba(255,255,255,0.6)" text-anchor="middle">EXISTANT</text>
-        <rect x="232" y="104" width="96" height="60" rx="10" fill="#54CF99" fill-opacity="0.4" stroke="#54CF99" stroke-width="2.2"/>
-        <text x="280" y="96" font-family="IBM Plex Mono, monospace" font-size="10" fill="#54CF99" text-anchor="middle">PROJET</text>
-        <line x1="232" y1="180" x2="328" y2="180" stroke="#54CF99" stroke-width="1" stroke-dasharray="3 3"/>
-        <text x="280" y="196" font-family="IBM Plex Mono, monospace" font-size="10" fill="#54CF99" text-anchor="middle">8,00 m</text>
-        <g transform="translate(338,52)">
-          <text y="-16" font-family="IBM Plex Mono, monospace" font-size="9" fill="rgba(255,255,255,0.7)" text-anchor="middle">N</text>
-          <path d="M0 -11 L-4 6 L0 3 Z" fill="#FFFFFF" fill-opacity="0.85"/>
-          <path d="M0 -11 L4 6 L0 3 Z" fill="#54CF99"/>
-        </g>
-      </svg>
-    </div>
+    <aside class="dp-hero-dossier" aria-label="Aperçu du dossier préparé par Urbizen">
+      <div class="dp-hero-dossier-head">
+        <div><span>Votre dossier DP</span><strong>Prêt à déposer</strong></div>
+        <span class="dp-hero-status">Contrôlé</span>
+      </div>
+      <ul>
+        <li><b>CERFA</b><span>Formulaire officiel complété</span></li>
+        <li><b>DP1</b><span>Plan de situation</span></li>
+        <li><b>DP2</b><span>Plan de masse</span></li>
+        <li><b>DP4</b><span>Façades et toitures</span></li>
+        <li><b>DP6</b><span>Insertion graphique</span></li>
+      </ul>
+      <p>Les pièces sont sélectionnées selon la nature de votre projet.</p>
+    </aside>
   </div>
 </section>
 
@@ -56,9 +47,9 @@
 <section id="seuils">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Repères 2026</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Repères 2026</span></span>
       <h2>Quel projet relève d'une déclaration préalable&nbsp;?</h2>
-      <p>Le régime dépend de la surface créée et de la zone. Voici les repères nationaux, projet par projet.</p>
+      <p>Le régime dépend de la surface créée, de l'implantation et de la zone du terrain. Ce tableau permet de comprendre la différence entre absence de formalité, déclaration préalable et permis de construire.</p>
     </div>
     <div class="seuils-scroll">
       <table class="seuils">
@@ -72,7 +63,7 @@
         </thead>
         <tbody>
           <tr>
-            <td data-th="Projet">Abri, garage, annexe non accolée</td>
+            <td data-th="Projet">Abri, garage, pergola ou annexe non accolée</td>
             <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
             <td data-th="Déclaration préalable" class="dp">5 à 20&nbsp;m²</td>
             <td data-th="Permis de construire">plus de 20&nbsp;m²</td>
@@ -92,17 +83,17 @@
           <tr>
             <td data-th="Projet">Piscine enterrée ou semi-enterrée</td>
             <td data-th="Sans formalité">bassin jusqu'à 10&nbsp;m²</td>
-            <td data-th="Déclaration préalable" class="dp">bassin de 10 à 100&nbsp;m² (profondeur ≤&nbsp;1,80&nbsp;m)</td>
+            <td data-th="Déclaration préalable" class="dp">bassin de plus de 10 à 100&nbsp;m², avec couverture jusqu'à 1,80&nbsp;m</td>
             <td data-th="Permis de construire">bassin supérieur à 100&nbsp;m², ou abri de plus de 1,80&nbsp;m</td>
           </tr>
           <tr>
             <td data-th="Projet">Clôture, portail</td>
             <td data-th="Sans formalité" class="vide">—</td>
-            <td data-th="Déclaration préalable" class="dp">si la commune l'impose</td>
+            <td data-th="Déclaration préalable" class="dp">selon le secteur ou une délibération de la commune</td>
             <td data-th="Permis de construire" class="vide">—</td>
           </tr>
           <tr>
-            <td data-th="Projet">Façade, fenêtre de toit, ravalement</td>
+            <td data-th="Projet">Façade, toiture, fenêtre de toit</td>
             <td data-th="Sans formalité" class="vide">—</td>
             <td data-th="Déclaration préalable" class="dp">oui, dès que l'aspect extérieur change</td>
             <td data-th="Permis de construire" class="vide">—</td>
@@ -114,7 +105,7 @@
             <td data-th="Permis de construire" class="vide">—</td>
           </tr>
           <tr>
-            <td data-th="Projet">Terrasse surélevée (plus de 60&nbsp;cm)</td>
+            <td data-th="Projet">Terrasse surélevée créant une emprise au sol</td>
             <td data-th="Sans formalité">moins de 5&nbsp;m²</td>
             <td data-th="Déclaration préalable" class="dp">5 à 20&nbsp;m²</td>
             <td data-th="Permis de construire">plus de 20&nbsp;m²</td>
@@ -122,30 +113,42 @@
         </tbody>
       </table>
     </div>
-    <p class="note">* En zone urbaine, le seuil de 40&nbsp;m² suppose une surface totale après travaux inférieure ou égale à 150&nbsp;m²&nbsp;; au-delà, le recours à un architecte devient en principe obligatoire. Ces seuils sont les repères nationaux 2026 (Code de l'urbanisme). Les règles d'urbanisme de votre commune (le PLU) peuvent être plus strictes — en secteur protégé notamment, une déclaration peut être exigée dès le premier mètre carré. Nous vérifions votre cas lors de l'étude gratuite.</p>
+    <p class="note">* En zone urbaine couverte par un PLU, une extension peut relever de la DP jusqu'à 40&nbsp;m². Lorsque l'extension dépasse 20&nbsp;m² et porte la surface totale au-delà de 150&nbsp;m², un permis de construire est requis. Ces repères sont nationaux&nbsp;: le PLU, un lotissement ou un secteur protégé peuvent ajouter des règles. Après l'envoi du formulaire, Urbizen contrôle les informations communiquées et vous rappelle sous 24&nbsp;h ouvrées si un point doit être précisé.</p>
+    <p class="dp-sources">Sources officielles&nbsp;: <a href="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000050497051/" target="_blank" rel="noopener">Code de l'urbanisme, art. R.421-9</a>, <a href="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000034355355/" target="_blank" rel="noopener">art. R.421-17</a>, <a href="https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006819920/" target="_blank" rel="noopener">art. R.423-23</a> et <a href="https://www.service-public.fr/particuliers/vosdroits/F17578" target="_blank" rel="noopener">Service-Public.fr</a>.</p>
   </div>
 </section>
 
 <!-- ===== C'est quoi ===== -->
-<section class="sec-blanc">
+<section id="comprendre" class="sec-blanc dp-understand">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">L'essentiel</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">L'essentiel</span></span>
       <h2>C'est quoi, une déclaration préalable&nbsp;?</h2>
-      <p>Une autorisation d'urbanisme allégée, prévue par le Code de l'urbanisme (articles L.421-1 et suivants). Elle concerne les travaux de faible ampleur qui modifient l'aspect extérieur d'un bâtiment, créent une petite surface ou changent la destination d'un local, sans atteindre les seuils du permis de construire. La mairie vérifie que le projet respecte les règles locales (PLU, carte communale). Le dossier est plus simple qu'un permis de construire, mais il doit être complet et exact&nbsp;: c'est là que se joue l'acceptation.</p>
+      <p>La déclaration préalable est une autorisation d'urbanisme destinée aux travaux de moindre ampleur qui créent une surface, modifient l'aspect extérieur d'un bâtiment ou concernent certains aménagements. La mairie vérifie la conformité du projet au PLU, à la carte communale et aux règles applicables au terrain.</p>
     </div>
-    <div class="defs">
-      <div class="def"><span class="k">Surface de plancher</span><p>Les m² clos et couverts, sous une hauteur d'au moins 1,80&nbsp;m.</p></div>
-      <div class="def"><span class="k">Emprise au sol</span><p>La projection au sol de la construction, débords compris.</p></div>
+    <div class="dp-measures" aria-label="Notions de surface à connaître">
+      <article><span class="dp-measure-n">01</span><h3>Surface de plancher</h3><p>Somme des surfaces closes et couvertes sous une hauteur supérieure à 1,80&nbsp;m, calculée à l'intérieur des façades après les déductions prévues.</p></article>
+      <article><span class="dp-measure-n">02</span><h3>Emprise au sol</h3><p>Projection verticale du volume de la construction. Un auvent soutenu par des poteaux ou une extension ouverte peut donc créer de l'emprise sans créer de surface de plancher.</p></article>
+      <article><span class="dp-measure-n">03</span><h3>Surface existante après travaux</h3><p>Pour une extension, la surface totale du bâtiment après travaux peut modifier la formalité et déclencher le recours obligatoire à un architecte.</p></article>
+    </div>
+    <div class="dp-compare">
+      <article class="dp-compare-card dp-compare-dp">
+        <span class="dp-compare-code">DP</span>
+        <div><h3>Déclaration préalable</h3><p>Pour les projets restant sous les seuils du permis&nbsp;: dossier plus léger et délai d'instruction de droit commun d'un mois à compter d'un dossier complet.</p></div>
+      </article>
+      <article class="dp-compare-card">
+        <span class="dp-compare-code">PC</span>
+        <div><h3>Permis de construire</h3><p>Pour une maison neuve ou les projets dépassant les seuils de la DP&nbsp;: davantage de pièces et, en principe, deux mois d'instruction pour une maison individuelle.</p><a href="/permis-de-construire/">Consulter la page Permis de construire →</a></div>
+      </article>
     </div>
   </div>
 </section>
 
 <!-- ===== Procédure ===== -->
-<section>
+<section class="dp-procedure">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">La procédure</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">La procédure</span></span>
       <h2>Ce qui se passe après le dépôt</h2>
     </div>
     <ol class="frise">
@@ -160,27 +163,58 @@
 </section>
 
 <!-- ===== Cas particuliers ===== -->
-<section class="sec-blanc">
+<section id="cas-particuliers" class="sec-blanc dp-special-cases">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Bon à savoir</span>
-      <h2>Cas particuliers à connaître</h2>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Bon à savoir</span></span>
+      <h2>Les conditions qui peuvent changer votre dossier</h2>
+      <p>La surface ne suffit pas toujours à déterminer les règles. La localisation du terrain et la situation du bien comptent également.</p>
     </div>
-    <div class="infos">
-      <div class="info"><h3>Secteur protégé / avis ABF</h3><p>Aux abords d'un monument historique, en site classé ou inscrit, l'Architecte des Bâtiments de France donne son avis et le délai est allongé&nbsp;; une DP peut être exigée dès les premiers m².</p></div>
-      <div class="info"><h3>Lotissement</h3><p>Le règlement du lotissement s'ajoute au PLU (implantation, teintes, clôtures).</p></div>
-      <div class="info"><h3>Taxe d'aménagement</h3><p>La création de surface peut générer une taxe, calculée par les services fiscaux d'après votre déclaration.</p></div>
-      <div class="info"><h3>Copropriété</h3><p>L'accord de la copropriété peut être requis en plus de l'autorisation d'urbanisme.</p></div>
+    <div class="dp-info-grid">
+      <article class="dp-info-card"><span class="dp-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21V9h16v12M3 9h18M7 9V5h10v4M8 13v4M12 13v4M16 13v4"/></svg></span><div><span class="dp-info-kicker">Secteur protégé</span><h3>Architecte des Bâtiments de France</h3><p>Aux abords d'un monument historique ou dans certains sites protégés, l'ABF peut être consulté. Les matériaux, teintes et implantations sont davantage encadrés et le délai d'instruction peut être majoré.</p></div></article>
+      <article class="dp-info-card"><span class="dp-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16v12H4zM7 4h10v3M8 11h8M8 15h5"/></svg></span><div><span class="dp-info-kicker">Fiscalité</span><h3>Taxe d'aménagement</h3><p>Une construction créant une surface taxable, un abri clos ou une piscine peut générer une taxe. Son montant dépend notamment de la nature du projet, de sa surface et des taux votés localement.</p><a class="dp-info-link" href="https://www.service-public.fr/particuliers/actualites/A15416" target="_blank" rel="noopener">Consulter les montants officiels 2026 →</a></div></article>
+      <article class="dp-info-card"><span class="dp-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 20h18M5 20V9l7-5 7 5v11M9 20v-6h6v6"/><path d="M3 11h2M19 11h2"/></svg></span><div><span class="dp-info-kicker">Règles locales</span><h3>PLU et lotissement</h3><p>Implantation, hauteur, aspect des façades, couleurs ou clôtures peuvent être réglementés. Le règlement d'un lotissement peut s'ajouter aux règles communales.</p></div></article>
+      <article class="dp-info-card"><span class="dp-info-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V5h14v16M9 9h2M13 9h2M9 13h2M13 13h2M10 21v-4h4v4"/></svg></span><div><span class="dp-info-kicker">Bien collectif</span><h3>Copropriété</h3><p>L'autorisation d'urbanisme ne remplace pas l'accord de la copropriété. Une modification des parties communes ou de l'aspect extérieur peut nécessiter un vote préalable.</p></div></article>
     </div>
   </div>
 </section>
 
+<!-- ===== Informations à préparer ===== -->
+<section class="dp-preparation">
+  <div class="wrap dp-preparation-grid">
+    <div>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Avant de commencer</span></span>
+      <h2>Les renseignements utiles pour préparer le dossier</h2>
+      <p class="dp-preparation-lead">Vous n'avez pas besoin de maîtriser le vocabulaire de l'urbanisme. Rassemblez simplement les informations disponibles&nbsp;; Urbizen contrôle ensuite leur cohérence après l'envoi.</p>
+      <ul class="dp-check-list">
+        <li>Adresse du terrain et, si vous la connaissez, référence cadastrale</li>
+        <li>Nature du projet, dimensions, surfaces et distances aux limites</li>
+        <li>Matériaux, couleurs et aspect extérieur prévus</li>
+        <li>Photographies du terrain et de son environnement</li>
+        <li>Croquis, devis ou plans existants si vous en disposez</li>
+      </ul>
+    </div>
+    <aside class="dp-service-panel" aria-label="Prestation Urbizen">
+      <span class="dp-service-panel-kicker">Ce que fait Urbizen</span>
+      <h3>Nous transformons vos informations en dossier réglementaire.</h3>
+      <ul>
+        <li>Contrôle humain après l'envoi</li>
+        <li>Rappel sous 24&nbsp;h ouvrées</li>
+        <li>Réalisation du CERFA et des plans</li>
+        <li>Assemblage des pièces prêtes à déposer</li>
+      </ul>
+      <a class="btn btn-primary" href="/formulaire-declaration-prealable/">Accéder au formulaire</a>
+    </aside>
+  </div>
+</section>
+
 <!-- ===== Erreurs ===== -->
-<section>
+<section class="dp-errors">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Notre valeur ajoutée</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Points de vigilance</span></span>
       <h2>Les erreurs qui font rejeter un dossier</h2>
+      <p>Une demande de pièce complémentaire interrompt l'instruction et retarde le projet. Voici les incohérences les plus fréquentes.</p>
     </div>
     <ul class="erreurs">
       <li><b>Se tromper de surface.</b> Confondre surface habitable, surface de plancher et emprise au sol. Une dalle sous auvent compte dans l'emprise et peut faire basculer un «&nbsp;18&nbsp;m²&nbsp;» au-dessus du seuil.</li>
@@ -189,74 +223,80 @@
       <li><b>Le mauvais formulaire CERFA</b> selon la nature du projet.</li>
       <li><b>Une pièce oubliée</b> exigée par le PLU local (volet paysager, notice).</li>
     </ul>
-    <div class="encart">Un dossier incomplet, c'est une demande de pièces complémentaires — et le délai qui repart. Nous constituons un dossier <b>complet et cohérent</b> pour éviter ces allers-retours.</div>
+    <div class="encart">Un dossier incomplet entraîne une demande de pièces complémentaires et suspend le délai. Urbizen prépare un dossier <b>complet et cohérent</b> à partir des informations contrôlées après votre envoi.</div>
   </div>
 </section>
 
 <!-- ===== Pièces du dossier ===== -->
-<section class="dossier sec-blanc">
+<section id="dossier" class="dossier sec-blanc dp-dossier">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Contenu du dossier</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Contenu du dossier</span></span>
       <h2>Les pièces d'une déclaration préalable</h2>
-      <p>Les pièces sont adaptées à la nature du projet et aux exigences applicables.</p>
+      <p>Le dossier n'est pas une simple série de documents&nbsp;: les plans, les photographies et le formulaire doivent décrire exactement le même projet.</p>
     </div>
-    <div class="planche">
-      <div class="planche-item"><span class="code">DP1</span><span class="planche-t">Plan de situation</span></div>
-      <div class="planche-item"><span class="code">DP2</span><span class="planche-t">Plan de masse</span></div>
-      <div class="planche-item"><span class="code">DP3</span><span class="planche-t">Plan en coupe</span></div>
-      <div class="planche-item"><span class="code">DP4</span><span class="planche-t">Façades &amp; toitures</span></div>
-      <div class="planche-item"><span class="code">DP5</span><span class="planche-t">Aspect extérieur</span></div>
-      <div class="planche-item"><span class="code">DP6</span><span class="planche-t">Insertion graphique</span></div>
-      <div class="planche-item"><span class="code">DP7</span><span class="planche-t">Photographie — environnement proche</span></div>
-      <div class="planche-item"><span class="code">DP8</span><span class="planche-t">Photographie — paysage lointain</span></div>
-      <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span></div>
-      <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span></div>
+    <div class="dp-dossier-panel">
+      <div class="planche">
+        <div class="planche-item"><span class="code">DP1</span><span class="planche-t">Plan de situation</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 42 L92 28" stroke="currentColor" stroke-width="1.3" opacity=".55"/><path d="M36 64 L50 6" stroke="currentColor" stroke-width="1.3" opacity=".55"/><rect x="56" y="30" width="26" height="20" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M18 16 a8 8 0 1 1 16 0 c0 7 -8 15 -8 15 c0 0 -8 -8 -8 -15 z" fill="#54CF99" stroke="#14233B" stroke-width="1.2"/><circle cx="26" cy="16" r="2.6" fill="#fff"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP2</span><span class="planche-t">Plan de masse</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3" opacity=".7"/><rect x="20" y="22" width="32" height="24" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.5"/><path d="M52 40 L72 40 L72 59" stroke="currentColor" stroke-width="1.2" opacity=".65"/><circle cx="70" cy="18" r="6" fill="none" stroke="#54CF99" stroke-width="1.5"/><path d="M70 24 L70 30" stroke="currentColor" stroke-width="1.2" opacity=".65"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP3</span><span class="planche-t">Plan en coupe</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 48 L90 48" stroke="currentColor" stroke-width="1.5"/><path d="M8 53 L12 48 M18 53 L22 48 M28 53 L32 48 M38 53 L42 48 M48 53 L52 48 M58 53 L62 48 M68 53 L72 48 M78 53 L82 48" stroke="currentColor" stroke-width="1" opacity=".45"/><path d="M36 48 L36 28 L62 28 L62 48" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M31 28 L49 15 L67 28 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M22 15 L22 48" stroke="#54CF99" stroke-width="1.3"/><path d="M19 18 L22 15 L25 18 M19 45 L22 48 L25 45" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP4</span><span class="planche-t">Façades &amp; toitures</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 56 L18 30 L47 13 L76 30 L76 56 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M14 32 L47 13 L80 32" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><rect x="30" y="40" width="13" height="16" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="52" y="38" width="13" height="11" fill="#54CF99" fill-opacity=".25" stroke="currentColor" stroke-width="1.3"/><path d="M58.5 38 L58.5 49 M52 43.5 L65 43.5" stroke="currentColor" stroke-width="1"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP5</span><span class="planche-t">Aspect extérieur</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 55V28l31-17 32 17v27H15Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M11 30 46 11l36 20" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><rect x="27" y="36" width="15" height="19" fill="#fff" stroke="currentColor" stroke-width="1.2"/><rect x="53" y="34" width="14" height="12" fill="#54CF99" fill-opacity=".25" stroke="#128A5A" stroke-width="1.2"/><path d="M60 34v12M53 40h14" stroke="currentColor" stroke-width="1"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP6</span><span class="planche-t">Insertion graphique</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="15" r="6" fill="none" stroke="#54CF99" stroke-width="1.2" opacity=".7"/><path d="M2 52 L92 52" stroke="currentColor" stroke-width="1.4"/><path d="M2 52 q22 -7 46 -5 q26 2 44 -3" fill="none" stroke="#128A5A" stroke-width="1.2" opacity=".55"/><path d="M30 52 L30 33 L45 23 L60 33 L60 52 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M30 33 L45 23 L60 33" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.3"/><rect x="40" y="42" width="9" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="76" cy="40" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.3"/><path d="M76 48 L76 52" stroke="currentColor" stroke-width="1.3"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP7</span><span class="planche-t">Photographie — environnement proche</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><path d="M8 45 q15 -9 30 -5 q17 4 48 -5 V59 H8 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.1"/><path d="M29 43 V29 H47 V43" fill="#FBFCFD" stroke="currentColor" stroke-width="1.3"/><path d="M25 29 38 19 51 29" stroke="#128A5A" stroke-width="1.4"/><circle cx="68" cy="25" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.2"/><path d="M68 33 V44" stroke="currentColor" stroke-width="1.2"/><path d="M14 13 h12 M14 13 v8 M80 13 H68 M80 13 v8 M14 53 h12 M14 53 v-8 M80 53 H68 M80 53 v-8" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
+        <div class="planche-item"><span class="code">DP8</span><span class="planche-t">Photographie — paysage lointain</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="80" height="50" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="72" cy="20" r="6" fill="#54CF99" fill-opacity=".35" stroke="#128A5A" stroke-width="1"/><path d="M8 43 25 29 38 39 52 24 86 48" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.2"/><path d="M8 49 q19 -8 37 -3 q18 5 41 -2 V58 H8 Z" fill="#14233B" fill-opacity=".06" stroke="currentColor" stroke-width="1"/><path d="M39 49 V39 H51 V49 M36 39 45 32 54 39" fill="#FBFCFD" stroke="currentColor" stroke-width="1.1"/><path d="M15 15 h11 M15 15 v7 M79 15 H68 M79 15 v7" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
+        <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="4" width="50" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M28 13 H66" stroke="#128A5A" stroke-width="1.8"/><rect x="28" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="42" width="7" height="7" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M29.5 45.6 L31.5 47.6 L34.5 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M40 46 H66" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="52" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M40 56 H66" stroke="currentColor" stroke-width="1" opacity=".55"/></svg></span></div>
+        <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span>
+          <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="6" width="58" height="54" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M25 17 L27.5 19.5 L32 14.5 M25 28 L27.5 30.5 L32 25.5 M25 39 L27.5 41.5 L32 36.5 M25 50 L27.5 52.5 L32 47.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 17 H69 M37 28 H69 M37 39 H69 M37 50 H63" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg></span></div>
+      </div>
+      <p class="note">Toutes les pièces ne sont pas requises pour chaque projet&nbsp;: elles sont sélectionnées selon sa nature et les règles applicables. Le CERFA et le bordereau des pièces sont toujours inclus.</p>
     </div>
-    <p class="note">Toutes les pièces ne sont pas requises pour chaque projet&nbsp;: elles sont sélectionnées selon sa nature et les règles applicables. Le CERFA et le bordereau des pièces sont toujours inclus.</p>
   </div>
 </section>
 
 <!-- ===== Tarifs ===== -->
-<section class="prestations" id="tarifs">
+<section class="dp-pricing" id="tarifs">
   <div class="wrap">
     <div class="sec-head">
-      <span class="eyebrow">Tarifs</span>
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Tarifs</span></span>
       <h2>Des forfaits clairs pour la déclaration préalable</h2>
+      <p>Le montant dépend du type de projet et du nombre de pièces à produire. L'estimation est affichée dans le formulaire avant son envoi.</p>
     </div>
-    <div class="tarifs">
-      <div class="tarif"><span class="tarif-badge">Déclaration préalable</span><h3>Panneaux solaires</h3><div class="tarif-price">149&nbsp;€</div></div>
-      <div class="tarif featured"><span class="tarif-badge">Le plus demandé</span><h3>Projet standard</h3><div class="tarif-price">249&nbsp;€</div></div>
-      <div class="tarif"><span class="tarif-badge">Déclaration préalable</span><h3>Extension / agrandissement</h3><div class="tarif-price">449&nbsp;€</div></div>
+    <div class="dp-price-grid">
+      <article class="dp-price-card"><span class="dp-price-type">Projet simple</span><h3>Clôture ou panneaux solaires</h3><p class="dp-price"><span>À partir de</span>189&nbsp;€</p><p>Dossier graphique ciblé pour un projet courant.</p><a class="btn btn-ghost btn-sm" href="/formulaire-declaration-prealable/">Commencer</a></article>
+      <article class="dp-price-card featured"><span class="dp-price-badge">Le plus demandé</span><span class="dp-price-type">Projet standard</span><h3>Piscine, garage, abri, pergola ou façade</h3><p class="dp-price"><span>À partir de</span>249&nbsp;€</p><p>Le forfait adapté à la majorité des déclarations préalables.</p><a class="btn btn-primary btn-sm" href="/formulaire-declaration-prealable/">Commencer</a></article>
+      <article class="dp-price-card"><span class="dp-price-type">Projet important</span><h3>Extension ou agrandissement</h3><p class="dp-price"><span>À partir de</span>549&nbsp;€</p><p>Pour une création de surface nécessitant davantage de plans.</p><a class="btn btn-ghost btn-sm" href="/formulaire-declaration-prealable/">Commencer</a></article>
     </div>
-    <p class="tarif-note">Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard, adaptés à la nature du projet. L'étude de votre projet est gratuite&nbsp;: le tarif exact est confirmé après celle-ci. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables&nbsp;: elle n'est pas garantie.</p>
-    <div class="presta-grid" style="margin-top:40px">
-      <article class="presta">
-        <h3>Permis de construire</h3>
-        <p>Pour une maison individuelle ou les projets nécessitant une autorisation plus importante.</p>
-        <p class="presta-price">À partir de <b>449&nbsp;€</b></p>
-        <a class="btn btn-ghost btn-sm" href="/permis-de-construire/">Découvrir le permis de construire</a>
-      </article>
-      <article class="presta">
-        <h3>Conception sur mesure</h3>
-        <p>Un projet particulier à préparer ou à faire étudier&nbsp;? Décrivez-le, nous vous répondons.</p>
-        <p class="presta-price">Sur <b>devis</b></p>
-        <a class="btn btn-ghost btn-sm" href="/contact/">Décrire mon projet</a>
-      </article>
+    <div class="dp-options" aria-label="Options tarifaires">
+      <span><b>+80&nbsp;€</b> secteur ABF</span><span><b>+30&nbsp;€</b> dépôt dématérialisé</span><span><b>+100&nbsp;€</b> projet supplémentaire</span>
+    </div>
+    <p class="dp-price-note">Les forfaits comprennent le CERFA, les plans et les pièces graphiques nécessaires au dossier standard. Le tarif est confirmé après le contrôle des informations transmises et avant toute commande. La décision finale appartient à l'autorité compétente.</p>
+    <div class="service-route-grid dp-related-services" aria-label="Autres prestations Urbizen">
+      <a class="service-route" href="/permis-de-construire/"><span class="service-route-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 3.5l8.5 7.5V21h-17z"/><path d="M9 21v-6h6v6"/></svg></span><span class="service-route-copy"><span class="service-route-kicker">Autre autorisation</span><strong>Permis de construire</strong><span>Pour une maison ou un projet dépassant les seuils de la DP.</span></span><span class="service-route-arrow" aria-hidden="true">→</span></a>
+      <a class="service-route" href="/conception/"><span class="service-route-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 3.5h17v17h-17z"/><path d="M10 3.5V11h10.5M3.5 15h9v5.5M16 15h4.5v5.5H16z"/></svg></span><span class="service-route-copy"><span class="service-route-kicker">Avant le dossier</span><strong>Conception de plans sur mesure</strong><span>Pour définir le projet avant la demande d'urbanisme.</span></span><span class="service-route-arrow" aria-hidden="true">→</span></a>
     </div>
   </div>
 </section>
 
 <!-- ===== FAQ ===== -->
-<section class="faq-wrap sec-blanc">
+<section class="faq-wrap sec-blanc dp-faq">
   <div class="wrap">
-    <div class="sec-head center">
-      <span class="eyebrow">Questions fréquentes</span>
+    <div class="sec-head">
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Questions fréquentes</span></span>
       <h2>Vos questions sur la déclaration préalable</h2>
     </div>
     <div class="faq">
-      <details><summary>Quelle différence entre surface de plancher et emprise au sol&nbsp;?</summary><div class="a">La surface de plancher compte les m² clos et couverts sous au moins 1,80&nbsp;m de hauteur&nbsp;; l'emprise au sol est la projection au sol de la construction, débords compris. La notion à retenir dépend de la nature du projet&nbsp;: nous calculons les deux lors de l'étude de votre dossier.</div></details>
-      <details><summary>Les règles peuvent-elles être différentes dans ma commune&nbsp;?</summary><div class="a">Oui. Les seuils présentés sont les repères nationaux&nbsp;: chaque commune applique en plus son plan local d'urbanisme (PLU), qui peut être plus strict. En secteur protégé, une déclaration peut être exigée dès le premier mètre carré. C'est pour cela que nous vérifions toujours votre cas précis.</div></details>
+      <details><summary>Quelle différence entre surface de plancher et emprise au sol&nbsp;?</summary><div class="a">La surface de plancher concerne les surfaces closes et couvertes sous une hauteur supérieure à 1,80&nbsp;m, après certaines déductions. L'emprise au sol est la projection verticale du volume construit. Un projet ouvert peut donc créer uniquement de l'emprise au sol.</div></details>
+      <details><summary>Les règles peuvent-elles être différentes dans ma commune&nbsp;?</summary><div class="a">Oui. Les seuils présentés sont nationaux, mais le PLU, une carte communale, un lotissement ou un secteur protégé peuvent imposer des règles supplémentaires sur l'implantation, la hauteur, les matériaux ou les couleurs.</div></details>
       <details><summary>Combien de temps après l'accord puis-je commencer&nbsp;?</summary><div class="a">Dès que la non-opposition est acquise. Il est toutefois prudent d'attendre la fin du délai de recours des tiers — deux mois à compter du premier jour d'affichage continu — pour sécuriser le chantier.</div></details>
       <details><summary>Dois-je afficher un panneau sur le terrain&nbsp;?</summary><div class="a">Oui, c'est obligatoire dès l'accord&nbsp;: un panneau réglementaire visible de la voie publique, maintenu pendant toute la durée des travaux et au moins deux mois continus. Un panneau absent ou incomplet laisse le droit de recours des tiers ouvert.</div></details>
       <details><summary>Une déclaration préalable peut-elle être refusée&nbsp;?</summary><div class="a">Oui&nbsp;: la mairie peut s'opposer au projet s'il ne respecte pas les règles d'urbanisme, ou demander des pièces complémentaires. D'où l'importance d'un dossier complet, cohérent et conforme dès le premier dépôt.</div></details>
@@ -265,12 +305,21 @@
 </section>
 
 <!-- ===== CTA final ===== -->
-<section class="cta-final">
+<section class="cta-final dp-final">
   <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Parlons de votre projet</span></span>
+    </div>
     <div class="cta-band">
-      <h2>Votre déclaration préalable peut commencer maintenant.</h2>
-      <p>Localisez votre terrain et laissez-vous guider.</p>
-      <a class="btn btn-primary" href="/#localisation">Démarrer mon projet</a>
+      <h2>Prêt à faire avancer votre projet&nbsp;?</h2>
+      <p>Présentez-nous votre projet et recevez une réponse adaptée à votre démarche.</p>
+      <div class="cta-actions">
+        <a class="btn btn-primary" href="/formulaire-declaration-prealable/">Démarrer ma déclaration</a>
+        <a class="btn btn-contact" href="/#demander-des-renseignements">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5.5h16v13H4z"/><path d="m4 7 8 6 8-6"/></svg>
+          <span>Demander des renseignements</span>
+        </a>
+      </div>
     </div>
   </div>
 </section>
