@@ -207,10 +207,138 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
 	'page-permis-de-construire',
 	'page-conception',
+	'page-tarifs',
 	'page-formulaire-declaration-prealable',
 	'page-formulaire-permis-de-construire',
 	'page-formulaire-conception',
 );
+
+/**
+ * Identifiant du gabarit de la page Tarifs.
+ */
+const URBIZEN_CHILD_TEMPLATE_TARIFS = 'page-tarifs';
+
+/**
+ * Catalogue tarifaire affiché par la page Tarifs.
+ *
+ * SOURCE UNIQUE DE LA PAGE. Avant ce catalogue, les montants étaient recopiés
+ * à la main dans cinq fichiers HTML, sans rien pour signaler qu'ils avaient
+ * divergé. Ici, un seul endroit les porte, et `tests/tarifs/test-tarifs-source.php`
+ * les compare aux constantes du greffon — celles qui chiffrent réellement les
+ * formulaires :
+ *
+ *   `Urbizen\Platform\Forms\PricingDeclarationPrealable::NATURES`
+ *   `Urbizen\Platform\Forms\PricingPermisConstruire::NATURES`
+ *   `Urbizen\Platform\Forms\PricingProjets::SUPPLEMENT_ABF`
+ *
+ * Le thème ne LIT pas ces constantes au moment du rendu, et c'est délibéré :
+ * le greffon désactivé, la page continuerait de s'afficher. C'est le banc, et
+ * non le rendu, qui interdit la divergence — un test rouge plutôt qu'une page
+ * vide.
+ *
+ * La Conception est incluse dans cette comparaison au même titre que les
+ * autres : son socle, 449 €, est celui de `Pricing::BASE`, dont part
+ * réellement le formulaire. Aucun montant n'échappe au contrôle.
+ *
+ * @return array<string, mixed>
+ */
+function urbizen_child_tarifs() {
+	return array(
+		'groupes'    => array(
+			array(
+				'ref'         => 'DP',
+				'id'          => 'dp',
+				// Surtitre de carte. Volontairement DIFFÉRENT du titre du groupe :
+				// répéter « Déclaration préalable » au-dessus de chacune des trois
+				// cartes, juste sous l'en-tête qui le dit déjà, n'apprend rien et
+				// alourdit la lecture.
+				'kicker'      => 'Forfait DP',
+				'titre'       => 'Déclaration préalable',
+				'accroche'    => 'Pour les travaux et aménagements soumis à déclaration préalable.',
+				'cta'         => '/formulaire-declaration-prealable/',
+				'cta_libelle' => 'Démarrer ma déclaration préalable',
+				'offres'      => array(
+					array(
+						'nom'      => 'Projet simple',
+						'exemples' => 'Clôtures &amp; panneaux solaires',
+						'texte'    => 'Pour les projets simples tels que la pose de panneaux solaires ou la création et la modification d’une clôture.',
+						'prix'     => 189,
+					),
+					array(
+						'nom'      => 'Projet standard',
+						'exemples' => 'Piscine, abri de jardin, carport, pergola, modification de façade, toiture, fenêtres de toit',
+						'texte'    => 'Pour les autres projets courants relevant d’une déclaration préalable.',
+						'prix'     => 249,
+						'populaire' => true,
+					),
+					array(
+						'nom'      => 'Projet important',
+						'exemples' => 'Extension, agrandissement, surélévation',
+						'texte'    => 'Lorsque le projet relève effectivement d’une déclaration préalable au regard de ses caractéristiques.',
+						'prix'     => 549,
+					),
+				),
+			),
+			array(
+				'ref'         => 'PC',
+				'id'          => 'pc',
+				'kicker'      => 'Forfait PC',
+				'titre'       => 'Permis de construire',
+				'accroche'    => 'Pour les constructions et agrandissements nécessitant un permis.',
+				'cta'         => '/formulaire-permis-de-construire/',
+				'cta_libelle' => 'Démarrer mon permis de construire',
+				'offres'      => array(
+					array(
+						'nom'      => 'Projet simple',
+						'exemples' => 'Garage, carport, annexe',
+						'texte'    => 'Pour une construction simple nécessitant un permis de construire.',
+						'prix'     => 449,
+					),
+					array(
+						'nom'      => 'Extension / agrandissement',
+						'exemples' => 'Extension, agrandissement, surélévation',
+						'texte'    => 'Dossier de permis de construire pour une extension, un agrandissement ou une surélévation selon les caractéristiques du projet.',
+						'prix'     => 649,
+					),
+					array(
+						'nom'      => 'Maison individuelle',
+						'exemples' => 'Construction neuve',
+						'texte'    => 'Préparation du dossier de permis de construire d’une maison individuelle, selon les éléments fournis et les pièces nécessaires au projet.',
+						'prix'     => 849,
+						'premium'  => true,
+					),
+				),
+			),
+		),
+		// Bloc distinct des autorisations d'urbanisme : la conception n'est pas
+		// une démarche administrative, elle la précède.
+		'conception' => array(
+			'ref'         => 'PS',
+			'id'          => 'conception',
+			'kicker'      => 'Forfait PS',
+			'titre'       => 'Conception de plans sur mesure',
+			'accroche'    => 'Pour concevoir votre projet avant de préparer votre autorisation d’urbanisme.',
+			'texte'       => 'Besoin de concevoir votre projet avant de préparer votre autorisation d’urbanisme&nbsp;? Urbizen réalise des plans adaptés à votre terrain, à vos besoins et aux informations transmises.',
+			'prix'        => 449,
+			'cta'         => '/formulaire-conception/',
+			'cta_libelle' => 'Estimer mon projet',
+		),
+		'abf'        => array(
+			'montant' => 80,
+			'titre'   => 'Secteur Bâtiments de France',
+			'texte'   => 'Supplément applicable aux déclarations préalables et permis de construire nécessitant un traitement spécifique lié au secteur protégé.',
+		),
+		// Formulations volontairement prudentes : toutes les pièces d'un dossier
+		// DP ou PC ne sont pas nécessaires à tous les projets.
+		'inclusions' => array(
+			'CERFA complété',
+			'Plans nécessaires au dossier',
+			'Pièces graphiques nécessaires',
+			'Mise en forme du dossier',
+			'Accompagnement sur les pièces complémentaires liées à la prestation',
+		),
+	);
+}
 
 /**
  * La page affichée est-elle l'un des deux formulaires d'autorisation ?
@@ -457,6 +585,75 @@ function urbizen_child_est_page_conception() {
 
 	return 'page-conception' === get_page_template_slug( $id );
 }
+
+/**
+ * La page affichée utilise-t-elle le gabarit « Tarifs » ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_tarifs() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return URBIZEN_CHILD_TEMPLATE_TARIFS === get_page_template_slug( $id );
+}
+
+/**
+ * Titre de document de la page Tarifs.
+ *
+ * Le thème ne portait jusqu'ici aucun réglage de référencement : le titre
+ * venait du nom de la page, « Tarifs », qui ne dit ni de quoi ni pour qui.
+ * On le pose donc ici, et UNIQUEMENT sur ce gabarit — aucune autre page n'est
+ * touchée. Un greffon de référencement installé plus tard reprendra la main :
+ * ces filtres s'appliquent avant lui.
+ *
+ * @param array<string, string> $parties Fragments du titre.
+ * @return array<string, string>
+ */
+function urbizen_child_titre_tarifs( $parties ) {
+	if ( ! urbizen_child_est_page_tarifs() ) {
+		return $parties;
+	}
+
+	$parties['title'] = __( 'Tarifs déclaration préalable et permis de construire', 'urbizen-child' );
+
+	return $parties;
+}
+add_filter( 'document_title_parts', 'urbizen_child_titre_tarifs' );
+
+/**
+ * Description de la page Tarifs.
+ *
+ * Émise seulement si aucun greffon de référencement n'a déjà posé la sienne :
+ * deux balises `description` concurrentes valent moins qu'une seule.
+ *
+ * @return void
+ */
+function urbizen_child_description_tarifs() {
+	if ( ! urbizen_child_est_page_tarifs() ) {
+		return;
+	}
+
+	if ( defined( 'WPSEO_VERSION' ) || defined( 'RANK_MATH_VERSION' ) || defined( 'SEOPRESS_VERSION' ) ) {
+		return;
+	}
+
+	printf(
+		'<meta name="description" content="%s" />' . "\n",
+		esc_attr__(
+			'Découvrez les tarifs Urbizen pour votre déclaration préalable, permis de construire et conception de plans. Dossiers préparés à distance partout en France.',
+			'urbizen-child'
+		)
+	);
+}
+add_action( 'wp_head', 'urbizen_child_description_tarifs', 1 );
 
 /**
  * La page affichée utilise-t-elle le gabarit de l'accueil Urbizen ?

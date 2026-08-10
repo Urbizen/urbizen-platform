@@ -57,3 +57,6 @@ tests/cadastre/fixture.html
 # Fixtures régénérées à chaque exécution des bancs : jamais versionnées,
 # pour qu'aucune divergence avec le rendu réel ne puisse s'installer.
 tests/cadastre/fixture-conception.html
+
+# Aperçu de la page Tarifs — artefact régénérable (tests/tarifs/apercu-tarifs.php)
+tests/tarifs/apercu-tarifs.html
