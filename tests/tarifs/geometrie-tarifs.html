@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc de géométrie de la page Tarifs</title>
+<!--
+  Page de mesure, chargée par `test-geometrie-tarifs.py` dans un Chrome sans
+  interface. Elle charge l'aperçu réel dans une iframe de même origine, lui
+  impose des largeurs, puis relève des rectangles réels via
+  `getBoundingClientRect()`. Le résultat est écrit dans `#resultat`, d'où le
+  banc l'extrait après `--dump-dom`.
+
+  Elle ne décide de rien : elle mesure. Les verdicts sont dans le banc Python.
+
+  Même principe et même mécanique que `tests/homepage/geometrie-entete.html`,
+  dont ce fichier est le pendant pour la page Tarifs.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style>
+</head>
+<body>
+<pre id="resultat">EN COURS</pre>
+<script>
+const VUES = [1440, 1280, 1024, 900, 768, 620, 480, 390, 360, 320];
+
+/** Ce qui peut recevoir un doigt ou le focus. */
+const INTERACTIFS = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
+
+const rect = ( el ) => {
+	const r = el.getBoundingClientRect();
+	return {
+		x: +r.left.toFixed(1), y: +r.top.toFixed(1),
+		w: +r.width.toFixed(1), h: +r.height.toFixed(1),
+		droite: +( r.left + r.width ).toFixed(1)
+	};
+};
+
+const nom = ( el ) => {
+	const cl = ( el.className || '' ).toString().trim().split( /\s+/ ).filter( Boolean ).slice( 0, 2 ).join( '.' );
+	return el.tagName.toLowerCase() + ( cl ? '.' + cl : '' );
+};
+
+const visible = ( el, vue ) => {
+	const s = vue.getComputedStyle( el );
+	if ( 'none' === s.display || 'hidden' === s.visibility ) { return false; }
+	const r = el.getBoundingClientRect();
+	return r.width > 0 && r.height > 0;
+};
+
+async function mesurer() {
+	const f = document.createElement( 'iframe' );
+	f.style.cssText = 'position:fixed;left:-30000px;top:0;height:900px;border:0;';
+	f.src = '/tests/tarifs/apercu-tarifs.html';
+	document.body.appendChild( f );
+
+	await new Promise( ( ok ) => f.addEventListener( 'load', ok, { once: true } ) );
+
+	const doc = f.contentDocument;
+	const vue = f.contentWindow;
+
+	// Les polices changent la largeur des libellés. On les attend, sans en
+	// dépendre : sous budget de temps virtuel, `fonts.ready` peut ne jamais
+	// se résoudre, d'où la course.
+	await Promise.race( [ doc.fonts.ready, new Promise( ( r ) => setTimeout( r, 4000 ) ) ] );
+
+	const releve = {};
+
+	for ( const largeur of VUES ) {
+		f.style.width = largeur + 'px';
+		// Recalcul synchrone. `requestAnimationFrame` ne se déclenche pas de
+		// façon fiable sous `--virtual-time-budget` : lire une métrique de mise
+		// en page force le moteur à recalculer tout de suite, ce qui est
+		// exactement ce dont on a besoin.
+		void doc.documentElement.offsetHeight;
+
+		const de = doc.documentElement;
+
+		// --- débordement horizontal : la mesure qui fait foi ---
+		const debordement = {
+			scrollWidth: de.scrollWidth,
+			clientWidth: de.clientWidth,
+			bodyScrollWidth: doc.body.scrollWidth
+		};
+
+		// --- ce qui dépasse réellement, nommé, pour un échec lisible ---
+		const coupables = [];
+		for ( const el of doc.querySelectorAll( 'main *' ) ) {
+			if ( ! visible( el, vue ) ) { continue; }
+			const r = rect( el );
+			if ( r.droite > largeur + 1 || r.x < -1 ) {
+				coupables.push( { nom: nom( el ), x: r.x, droite: r.droite, w: r.w } );
+			}
+		}
+
+		// --- cibles tactiles de la zone principale ---
+		const petites = [];
+		for ( const el of doc.querySelectorAll( 'main ' + INTERACTIFS ) ) {
+			if ( ! visible( el, vue ) ) { continue; }
+			const r = rect( el );
+			// Un lien en pleine phrase n'est pas une cible tactile : on ne
+			// contrôle que les commandes autonomes (boutons et résumés).
+			const commande = el.classList.contains( 'btn' ) || 'SUMMARY' === el.tagName || 'BUTTON' === el.tagName;
+			if ( commande && ( r.w < 44 || r.h < 44 ) ) {
+				petites.push( { nom: nom( el ), w: r.w, h: r.h } );
+			}
+		}
+
+		// --- boutons pleine largeur : proscrits par la charte ---
+		const pleineLargeur = [];
+		const contenu = doc.querySelector( 'main .wrap' );
+		const dispo = contenu ? rect( contenu ).w : largeur;
+		for ( const el of doc.querySelectorAll( 'main a.btn, main button.btn' ) ) {
+			if ( ! visible( el, vue ) ) { continue; }
+			const r = rect( el );
+			if ( r.w > dispo * 0.92 ) {
+				pleineLargeur.push( { nom: nom( el ), w: r.w, dispo: +dispo.toFixed(1) } );
+			}
+		}
+
+		// --- colonnes effectives des grilles qui doivent se replier ---
+		const colonnes = {};
+		for ( const sel of [ '.tarif-offers-3', '.tar-compris-grid', '.tar-pourquoi-grid', '.tar-devis-liste', '.tarif-groups' ] ) {
+			const g = doc.querySelector( sel );
+			if ( g && visible( g, vue ) ) {
+				colonnes[ sel ] = vue.getComputedStyle( g ).gridTemplateColumns.split( /\s+/ ).length;
+			}
+		}
+
+		// --- repères de structure ---
+		const entete = doc.querySelector( 'header.site' );
+		const pied = doc.querySelector( 'footer.site-footer' );
+		const h1 = doc.querySelectorAll( 'h1' ).length;
+
+		releve[ largeur ] = {
+			debordement: debordement,
+			coupables: coupables.slice( 0, 12 ),
+			petites: petites.slice( 0, 12 ),
+			pleineLargeur: pleineLargeur.slice( 0, 12 ),
+			colonnes: colonnes,
+			entete: entete ? rect( entete ).h : null,
+			pied: !! pied,
+			h1: h1
+		};
+	}
+
+	return releve;
+}
+
+mesurer()
+	.then( ( d ) => { document.getElementById( 'resultat' ).textContent = 'JSON:' + JSON.stringify( d ); } )
+	.catch( ( e ) => { document.getElementById( 'resultat' ).textContent = 'ERREUR:' + ( e && e.message ? e.message : e ); } );
+</script>
+</body>
+</html>

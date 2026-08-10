@@ -94,6 +94,13 @@
       ]
     },
     {
+      "name": "page-tarifs",
+      "title": "Tarifs",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
       "name": "page-formulaire-declaration-prealable",
       "title": "Formulaire de déclaration préalable",
       "postTypes": [

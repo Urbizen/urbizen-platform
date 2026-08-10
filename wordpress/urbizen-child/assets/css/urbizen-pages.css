@@ -1195,3 +1195,481 @@
   .urbizen-page-pc .pc-dossier .planche { grid-template-columns: minmax(0, 1fr); }
   .urbizen-page-pc .pc-dossier-panel { padding: 16px; }
 }
+
+/* ========================================================================== */
+/* Tarifs — grille commerciale                                                */
+/* ========================================================================== */
+
+/*
+ * Cette section ne redéfinit AUCUN composant. Les cartes tarifaires, le
+ * cartouche ABF, les boutons, les surtitres et l'accordéon de FAQ sont ceux de
+ * l'accueil et des pages internes ; on se contente d'en régler l'échelle et la
+ * disposition pour une page qui leur consacre toute sa largeur, là où l'accueil
+ * les serre dans une seule bande.
+ *
+ * Deux différences de fond avec l'accueil, et seulement deux :
+ *
+ *   1. les groupes s'empilent au lieu de se partager une ligne — trois offres
+ *      dans un tiers de page ne laissent pas la place aux exemples, aux
+ *      inclusions et au bouton que demande une page de tarifs ;
+ *   2. l'échelle typographique monte d'un cran, comme `.urbizen-page-dp` le
+ *      fait déjà pour les tableaux et les frises qu'elle emprunte à l'accueil.
+ *
+ * Aucun palier de rupture nouveau : 1040 / 900 / 760 / 620 / 480 px sont ceux
+ * qu'emploient déjà les sections DP et PC de cette feuille.
+ */
+
+/* --- Alternance de surfaces, comme sur les parcours DP et PC -------------- */
+.urbizen-page-tarifs .tar-grille,
+.urbizen-page-tarifs .tar-orientation,
+.urbizen-page-tarifs .tar-savoir,
+.urbizen-page-tarifs .tar-final { background: var(--u-grid-bg); }
+.urbizen-page-tarifs .tar-compris,
+.urbizen-page-tarifs .tar-devis,
+.urbizen-page-tarifs .tar-pourquoi,
+.urbizen-page-tarifs .tar-faq { background: var(--u-surface-2); }
+.urbizen-page-tarifs .tar-compris,
+.urbizen-page-tarifs .tar-devis,
+.urbizen-page-tarifs .tar-pourquoi,
+.urbizen-page-tarifs .tar-faq { border-top: 1px solid var(--u-line); border-bottom: 1px solid var(--u-line); }
+
+.urbizen-page-tarifs main > section { padding: clamp(52px, 8vw, 88px) 0; }
+.urbizen-page-tarifs .sec-head { max-width: 760px; margin-bottom: 28px; }
+.urbizen-page-tarifs .sec-head h2 { margin-top: 12px; font-size: clamp(26px, 3.6vw, 38px); font-weight: 600; }
+.urbizen-page-tarifs .sec-head p { margin-top: 10px; color: var(--u-ink-soft); font-size: 16.5px; line-height: 1.6; }
+
+/* --- Hero ---------------------------------------------------------------- */
+.urbizen-page-tarifs .tar-hero h1 {
+  font-size: clamp(34px, 4.2vw, 50px);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+}
+.urbizen-page-tarifs .tar-hero .lead { font-size: clamp(16.5px, 1.45vw, 18px); line-height: 1.62; }
+.urbizen-page-tarifs .tar-hero .page-hero-meta .m { font-size: 14.5px; }
+.urbizen-page-tarifs .tar-hero .page-hero-grid { grid-template-columns: minmax(0, 1fr) minmax(320px, 390px); }
+
+/* Repères tarifaires : même fiche que les héros DP et PC, sans en recopier le
+   contenu — trois lignes, un socle par famille de prestation. */
+.urbizen-page-tarifs .tar-hero-carte {
+  position: relative;
+  padding: 24px;
+  color: var(--u-ink);
+  background: var(--u-surface);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--u-radius);
+  box-shadow: 12px 12px 0 rgba(84, 207, 153, 0.14), 0 28px 60px -42px rgba(0, 0, 0, 0.85);
+}
+.urbizen-page-tarifs .tar-hero-carte-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 17px;
+  border-bottom: 1px solid var(--u-line);
+}
+.urbizen-page-tarifs .tar-hero-carte-head div > span {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-tarifs .tar-hero-carte-head strong { display: block; font-family: var(--u-font-title); font-size: 20px; font-weight: 600; }
+.urbizen-page-tarifs .tar-hero-status {
+  padding: 5px 8px;
+  color: var(--u-brand-dk);
+  background: var(--u-brand-sf);
+  border: 1px solid var(--u-mint-surface);
+  border-radius: var(--u-radius-sm);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+}
+.urbizen-page-tarifs .tar-hero-carte ul { list-style: none; margin: 12px 0 0; padding: 0; }
+.urbizen-page-tarifs .tar-hero-carte li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-height: 42px;
+  border-bottom: 1px solid var(--u-line);
+  color: var(--u-ink-soft);
+  font-size: 15px;
+}
+.urbizen-page-tarifs .tar-hero-carte li b {
+  flex: none;
+  width: 30px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+.urbizen-page-tarifs .tar-hero-carte li span { min-width: 0; }
+.urbizen-page-tarifs .tar-hero-carte li em {
+  margin-left: auto;
+  flex: none;
+  color: var(--u-ink);
+  font-family: var(--u-font-title);
+  font-size: 17px;
+  font-weight: 600;
+  font-style: normal;
+}
+.urbizen-page-tarifs .tar-hero-carte > p { margin: 13px 0 0; color: var(--u-ink-faint); font-size: 13.5px; line-height: 1.55; }
+
+/* --- Grille tarifaire ---------------------------------------------------- */
+/* Un groupe par ligne : les trois offres disposent alors chacune d'un tiers
+   de la page, et non d'un tiers d'un tiers. */
+.urbizen-page-tarifs .tarif-groups { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.urbizen-page-tarifs .tarif-group { padding: clamp(20px, 2.4vw, 28px); }
+.urbizen-page-tarifs .tarif-group-solo { margin-top: 20px; }
+.urbizen-page-tarifs .tarif-group-head { min-height: 0; margin-bottom: 22px; align-items: center; }
+.urbizen-page-tarifs .tarif-group-ref { width: 42px; height: 42px; font-size: 12px; }
+.urbizen-page-tarifs .tarif-group-head h3 {
+  color: #fff;
+  font-family: var(--u-font-title);
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.urbizen-page-tarifs .tarif-group-head p { margin-top: 5px; color: rgba(255, 255, 255, 0.68); font-size: 14px; line-height: 1.45; }
+.urbizen-page-tarifs .tarif-offers { gap: 14px; }
+.urbizen-page-tarifs .tarif-offers-1 { grid-template-columns: minmax(0, 1fr); }
+
+.urbizen-page-tarifs .tarif-group .tarif { min-height: 0; padding: 22px; }
+.urbizen-page-tarifs .tarif-type {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-tarifs .tarif-group .tarif h4 { max-width: none; font-size: 18px; line-height: 1.25; }
+.urbizen-page-tarifs .tarif-detail { margin-top: 7px; font-size: 13.5px; line-height: 1.45; }
+/* Le prix ne descend plus en pied de carte : c'est le bouton qui y va, et le
+   prix se lit juste après les exemples, là où l'œil le cherche. */
+.urbizen-page-tarifs .tarif-group .tarif-price {
+  margin-top: 16px;
+  font-family: var(--u-font-title);
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1;
+}
+.urbizen-page-tarifs .tarif-group .tarif-from { margin-bottom: 5px; font-size: 12px; }
+.urbizen-page-tarifs .tarif-texte { margin-top: 12px; color: var(--u-ink-soft); font-size: 14.5px; line-height: 1.55; }
+.urbizen-page-tarifs .tarif-inclus { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 7px; }
+.urbizen-page-tarifs .tarif-inclus li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--u-ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.urbizen-page-tarifs .tarif-inclus li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--u-brand);
+  background: var(--u-brand-sf);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+}
+/* Bouton compact et aligné en pied, jamais pleine largeur.
+   `margin-top: auto` le pousse au bas de la carte : les cartes d'une même
+   ligne ayant la même hauteur, leurs boutons se retrouvent alignés, quelle
+   que soit la longueur des textes au-dessus. */
+.urbizen-page-tarifs .tarif-inclus { margin-bottom: 18px; }
+.urbizen-page-tarifs .tarif-cta { align-self: flex-start; margin-top: auto; }
+
+/* Cibles tactiles : le `.btn` de la charte mesure 42,4 px de haut, sous les
+   44 px que le projet s'impose. La charte elle-même corrige au cas par cas
+   (`.nav-right .js-start`, `.qualif-choix .btn` portent déjà ce min-height) :
+   on suit la même convention plutôt que de toucher au composant global, qui
+   servirait alors tout le site. */
+.urbizen-page-tarifs .btn { min-height: 44px; }
+
+/* La pastille « le plus demandé » est SORTIE du flux. Dans le flux, elle
+   décalait vers le bas tout le contenu de la carte mise en avant : son titre
+   et son prix ne s'alignaient plus sur ceux de ses voisines. */
+.urbizen-page-tarifs .tarif-popular {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  margin: 0;
+  padding: 4px 9px;
+  font-size: 9.5px;
+  background: var(--u-brand);
+  color: #fff;
+}
+/* Hors du flux, la pastille ne pousse plus rien — mais elle peut recouvrir.
+   On lui réserve donc sa place en marge droite du surtitre et du titre, sur
+   la seule carte qui la porte. */
+.urbizen-page-tarifs .tarif.featured .tarif-type,
+.urbizen-page-tarifs .tarif.featured h4 { padding-right: 104px; }
+
+/* Traitement premium de la carte haut de gamme. Le sélecteur inclut
+   `.tarif-group` : sans lui, il perdait contre `.urbizen-accueil .tarif-group
+   .tarif`, qui pose déjà `border-color`, et la carte restait indistincte. */
+.urbizen-page-tarifs .tarif-group .tarif-premium {
+  border-color: var(--u-mint);
+  box-shadow: inset 0 3px 0 var(--u-mint);
+}
+
+/* Conception : une seule offre, donc une carte en largeur plutôt qu'une
+   colonne isolée qui laisserait deux tiers de vide. */
+.urbizen-page-tarifs .tarif-large {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 260px);
+  gap: clamp(20px, 4vw, 46px);
+  align-items: center;
+}
+.urbizen-page-tarifs .tarif-large-aside { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.urbizen-page-tarifs .tarif-large .tarif-price { margin-top: 0; }
+.urbizen-page-tarifs .tarif-large .tarif-cta { margin-top: 0; }
+
+/* Cartouche ABF : information secondaire, et qui le reste. */
+.urbizen-page-tarifs .tarif-supplement-global { margin-top: 20px; padding: 16px 18px; font-size: 14px; }
+.urbizen-page-tarifs .tarif-supplement-global strong { font-size: 15.5px; }
+.urbizen-page-tarifs .tarif-supplement-global b { font-size: 20px; }
+
+/* --- Ce qui est compris -------------------------------------------------- */
+.urbizen-page-tarifs .tar-compris-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.urbizen-page-tarifs .tar-compris-grid .info { padding: 22px; }
+.urbizen-page-tarifs .tar-compris-grid .k {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.urbizen-page-tarifs .tar-compris-grid h3 { font-size: 17.5px; }
+.urbizen-page-tarifs .tar-compris-grid p { font-size: 14.5px; line-height: 1.6; }
+
+/* --- Orientation --------------------------------------------------------- */
+.urbizen-page-tarifs .tar-orientation-panneau {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: clamp(24px, 5vw, 60px);
+  align-items: center;
+  padding: clamp(26px, 3.4vw, 40px);
+  color: #fff;
+  background: var(--u-ink);
+  border-radius: var(--u-radius);
+  box-shadow: 12px 12px 0 var(--u-mint-surface);
+}
+.urbizen-page-tarifs .tar-orientation-panneau h2 {
+  margin: 12px 0 12px;
+  color: #fff;
+  font-size: clamp(24px, 3.2vw, 34px);
+  font-weight: 600;
+  line-height: 1.15;
+}
+.urbizen-page-tarifs .tar-orientation-panneau p { max-width: 62ch; color: rgba(255, 255, 255, 0.78); font-size: 16.5px; line-height: 1.6; }
+.urbizen-page-tarifs .tar-orientation-panneau .eyebrow-highlight-text { background: rgba(84, 207, 153, 0.18); color: var(--u-mint); }
+.urbizen-page-tarifs .tar-reassurance {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 16px;
+  color: var(--u-mint);
+  font-family: var(--u-font-title);
+  font-size: 15px;
+  font-weight: 600;
+}
+.urbizen-page-tarifs .tar-orientation-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* --- Projets particuliers ------------------------------------------------ */
+.urbizen-page-tarifs .tar-devis-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: start;
+}
+.urbizen-page-tarifs .tar-devis-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.urbizen-page-tarifs .tar-devis-liste li {
+  position: relative;
+  padding: 13px 16px 13px 40px;
+  color: var(--u-ink);
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  font-size: 15px;
+  line-height: 1.4;
+}
+.urbizen-page-tarifs .tar-devis-liste li::before {
+  content: "›";
+  position: absolute;
+  left: 17px;
+  top: 12px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 16px;
+  font-weight: 600;
+}
+.urbizen-page-tarifs .tar-devis-panneau {
+  padding: 26px;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-top: 3px solid var(--u-brand);
+  border-radius: var(--u-radius);
+  box-shadow: var(--u-shadow-card);
+}
+.urbizen-page-tarifs .tar-devis-panneau .k {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-tarifs .tar-devis-panneau strong {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--u-ink);
+  font-family: var(--u-font-title);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1;
+}
+.urbizen-page-tarifs .tar-devis-panneau p { margin-bottom: 20px; color: var(--u-ink-soft); font-size: 14.5px; line-height: 1.6; }
+
+/* --- Bon à savoir -------------------------------------------------------- */
+.urbizen-page-tarifs .tar-savoir-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  max-width: 900px;
+}
+.urbizen-page-tarifs .tar-savoir-liste li {
+  position: relative;
+  padding: 16px 20px 16px 50px;
+  color: var(--u-ink-soft);
+  background: var(--u-surface);
+  border: 1px solid var(--u-line);
+  border-left: 3px solid var(--u-mint);
+  border-radius: var(--u-radius);
+  font-size: 15px;
+  line-height: 1.6;
+}
+.urbizen-page-tarifs .tar-savoir-liste li::before {
+  content: "i";
+  position: absolute;
+  left: 19px;
+  top: 16px;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  color: var(--u-brand-dk);
+  background: var(--u-brand-sf);
+  border-radius: 50%;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* --- Réassurance --------------------------------------------------------- */
+.urbizen-page-tarifs .tar-pourquoi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.urbizen-page-tarifs .tar-pourquoi-grid .info { padding: 22px; }
+.urbizen-page-tarifs .tar-pourquoi-grid h3 { font-size: 17.5px; }
+.urbizen-page-tarifs .tar-pourquoi-grid p { font-size: 14.5px; line-height: 1.6; }
+
+/* --- FAQ ------------------------------------------------------------------
+   Même accordéon que les parcours DP et PC, aux mêmes valeurs. On aurait pu
+   ajouter `.urbizen-page-tarifs` aux groupes de sélecteurs de la section DP
+   plutôt que de réécrire ces huit règles — mais les bancs de la page DP
+   vérifient ses déclarations par correspondance littérale, et modifier ses
+   lignes pour la commodité d'une autre page reviendrait à retoucher un test
+   qui ne protège pas ce lot. Le dépôt duplique déjà cet accordéon entre DP et
+   PC : on suit la convention en place plutôt que de l'entamer de biais. */
+.urbizen-page-tarifs .tar-faq .faq { display: grid; gap: 12px; width: 100%; max-width: none; margin: 0; }
+.urbizen-page-tarifs .tar-faq .faq details { overflow: hidden; background: var(--u-surface); border: 1px solid var(--u-line); border-radius: var(--u-radius); }
+.urbizen-page-tarifs .tar-faq .faq summary {
+  position: relative;
+  padding: 18px 60px 18px 20px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--u-ink);
+  font-family: var(--u-font-title);
+  font-size: 16.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.urbizen-page-tarifs .tar-faq .faq summary::-webkit-details-marker { display: none; }
+.urbizen-page-tarifs .tar-faq .faq summary::after {
+  content: "+";
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--u-brand-dk);
+  background: var(--u-brand-sf);
+  border-radius: 50%;
+  font-family: var(--u-font-mono);
+  font-size: 17px;
+  font-weight: 400;
+  transform: translateY(-50%);
+}
+.urbizen-page-tarifs .tar-faq .faq details[open] summary::after { content: "−"; }
+.urbizen-page-tarifs .tar-faq .faq .a { padding: 0 60px 22px 20px; color: var(--u-ink-soft); font-size: 15.5px; line-height: 1.65; }
+
+/* --- CTA final ------------------------------------------------------------ */
+.urbizen-page-tarifs .tar-final { border-top: 1px solid var(--u-line); }
+
+/* --- Paliers de rupture — ceux déjà employés par DP et PC ----------------- */
+@media (max-width: 1040px) {
+  .urbizen-page-tarifs .tar-compris-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .urbizen-page-tarifs .tar-hero .page-hero-grid { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tar-hero-carte { width: min(100%, 520px); }
+  .urbizen-page-tarifs .tar-orientation-panneau { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tar-pourquoi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .urbizen-page-tarifs .tarif-offers-3 { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tar-devis-grid { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tar-devis-liste { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tarif-large { grid-template-columns: minmax(0, 1fr); align-items: start; }
+  .urbizen-page-tarifs .tarif-large-aside { flex-direction: row; align-items: center; gap: 18px; }
+}
+
+@media (max-width: 620px) {
+  .urbizen-page-tarifs .tar-compris-grid,
+  .urbizen-page-tarifs .tar-pourquoi-grid { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-tarifs .tar-orientation-panneau { box-shadow: 7px 7px 0 var(--u-mint-surface); }
+  .urbizen-page-tarifs .tarif-supplement-global { align-items: flex-start; }
+  .urbizen-page-tarifs .tarif-supplement-global b { margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+  .urbizen-page-tarifs .tarif-group { padding: 18px; }
+  .urbizen-page-tarifs .tarif-group .tarif { padding: 18px; }
+  .urbizen-page-tarifs .tar-hero-carte { padding: 18px; box-shadow: 7px 7px 0 rgba(84, 207, 153, 0.14); }
+  .urbizen-page-tarifs .tarif-large-aside { flex-direction: column; align-items: flex-start; gap: 14px; }
+}

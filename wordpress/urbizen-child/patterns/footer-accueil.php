@@ -30,7 +30,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <ul>
         <li><a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a></li>
         <li><a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a></li>
-        <li><a href="<?php echo $pfx; ?>#tarifs">Tarifs</a></li>
+        <li><a href="https://urbizen.fr/tarifs/">Tarifs</a></li>
       </ul>
     </div>
     <div>

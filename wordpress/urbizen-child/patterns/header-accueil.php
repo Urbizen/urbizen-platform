@@ -43,7 +43,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
       <a href="https://urbizen.fr/conception/">Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
-      <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
+      <a href="https://urbizen.fr/tarifs/">Tarifs</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -94,7 +94,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
       <a href="https://urbizen.fr/conception/">Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
-      <a href="<?php echo $pfx; ?>#tarifs">Tarifs</a>
+      <a href="https://urbizen.fr/tarifs/">Tarifs</a>
       <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
