@@ -167,7 +167,7 @@ check( 'JavaScript : la description libre est disponible pour « Autre projet »
 check( 'JavaScript : la carte Conception ouvre directement son formulaire',
 	str_contains( $js_wp, 'if (selectedProjet === "conception")')
 	&& str_contains( $js_wp, 'window.location.href = FORM_URLS.conception')
-	&& str_contains( $js_wp, 'conception: "/conception/#formulaire-conception"' ) );
+	&& str_contains( $js_wp, 'conception: "/formulaire-conception/"' ) );
 
 // --------------------------------------------------------------- le CSS ----
 $css_src = file_get_contents( $racine . '/frontend/homepage/homepage.css' );

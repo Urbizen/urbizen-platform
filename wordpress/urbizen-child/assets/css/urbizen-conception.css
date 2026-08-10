@@ -16,18 +16,48 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 46%);
 }
 .urbizen-page-conception .page-hero .eyebrow {
-  display: inline-block;
-  font-family: var(--u-font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
   color: var(--u-mint);
   margin-bottom: 14px;
 }
-.urbizen-page-conception .cpx-reassure {
+.urbizen-page-conception .cpx-hero h1 {
+  font-size: clamp(36px, 4.4vw, 52px);
+  line-height: 1.05;
+  letter-spacing: -0.035em;
+}
+.urbizen-page-conception .cpx-hero .lead {
+  font-size: clamp(16.5px, 1.45vw, 18px);
+  line-height: 1.62;
+}
+.urbizen-page-conception .cpx-hero-trust {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  list-style: none;
+  margin: 24px 0 0;
+  padding: 0;
+}
+.urbizen-page-conception .cpx-hero-trust li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 15px;
+  line-height: 1.45;
+}
+.urbizen-page-conception .cpx-hero-trust li:first-child { color: #fff; }
+.urbizen-page-conception .cpx-hero-trust li::before {
+  content: "✓";
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  flex: none;
+  color: var(--u-brand);
+  background: var(--u-brand-sf);
+  border-radius: 50%;
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 22px 0 0;
+  font-weight: 700;
+  line-height: 1;
 }
 .urbizen-page-conception .cpx-hero-media {
   border-radius: var(--u-radius);
@@ -44,6 +74,18 @@
   .urbizen-page-conception .cpx-hero .page-hero-grid { grid-template-columns: minmax(0, 1fr); }
   .urbizen-page-conception .cpx-hero-media { max-width: 560px; }
 }
+@media (max-width: 560px) {
+  .urbizen-page-conception .cpx-hero-trust { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+
+/* ===== Rythme et typographie ===== */
+.urbizen-page-conception main > section { padding: clamp(52px, 8vw, 88px) 0; }
+.urbizen-page-conception .sec-head,
+.urbizen-page-conception .cpx-liste,
+.urbizen-page-conception .cpx-note,
+.urbizen-page-conception .cpx-faq { max-width: none; }
+.urbizen-page-conception .sec-head h2 { line-height: 1.08; letter-spacing: -0.025em; }
+.urbizen-page-conception .sec-head > p { font-size: 18px; line-height: 1.55; }
 
 /* ===== Cartes de présentation ===== */
 .urbizen-page-conception .cpx-cards {
@@ -56,17 +98,28 @@
   border: 1px solid var(--u-line);
   border-top: 3px solid var(--u-brand);
   border-radius: var(--u-radius);
-  padding: 20px 20px 22px;
+  padding: 22px 22px 24px;
   box-shadow: var(--u-shadow-card);
 }
+.urbizen-page-conception .cpx-card-ico {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 22px;
+  place-items: center;
+  color: var(--u-brand);
+  background: var(--u-brand-sf);
+  border-radius: 50%;
+}
+.urbizen-page-conception .cpx-card-ico svg { width: 25px; height: 25px; }
 .urbizen-page-conception .cpx-card h3 {
   font-family: var(--u-font-title);
   font-weight: 600;
-  font-size: 16px;
+  font-size: 18px;
   color: var(--u-ink);
   margin: 0 0 8px;
 }
-.urbizen-page-conception .cpx-card p { font-size: 14.5px; line-height: 1.6; color: var(--u-ink-soft); margin: 0; }
+.urbizen-page-conception .cpx-card p { font-size: 15.5px; line-height: 1.6; color: var(--u-ink-soft); margin: 0; }
 @media (max-width: 900px) { .urbizen-page-conception .cpx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .urbizen-page-conception .cpx-cards { grid-template-columns: minmax(0, 1fr); } }
 
@@ -92,13 +145,45 @@
   height: auto;
 }
 .urbizen-page-conception .cpx-g figcaption {
-  font-family: var(--u-font-mono);
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
-  color: var(--u-ink-soft);
-  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 76px;
+  padding: 12px 14px;
   background: var(--u-surface);
   border-top: 1px solid var(--u-line);
+}
+.urbizen-page-conception .cpx-g-label {
+  color: var(--u-ink-soft);
+  font-family: var(--u-font-mono);
+  font-size: 11.5px;
+  line-height: 1.45;
+  letter-spacing: 0.04em;
+}
+.urbizen-page-conception .cpx-g-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  color: var(--u-brand-dk);
+  font-family: var(--u-font-title);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.urbizen-page-conception .cpx-g-action:hover { color: var(--u-brand); text-decoration: underline; text-underline-offset: 3px; }
+.urbizen-page-conception .cpx-g-action span { font-family: var(--u-font-mono); }
+.urbizen-page-conception .cpx-g:not(.cpx-g-lead) figcaption {
+  align-items: flex-start;
+  flex-direction: column;
+  justify-content: flex-start;
+  min-height: 116px;
+}
+.urbizen-page-conception .cpx-g:not(.cpx-g-lead) .cpx-g-action {
+  justify-content: space-between;
+  width: 100%;
 }
 .urbizen-page-conception .cpx-galerie-note {
   margin: 18px 0 0;
@@ -107,7 +192,13 @@
   color: var(--u-ink-faint);
   text-align: center;
 }
-@media (max-width: 760px) { .urbizen-page-conception .cpx-galerie { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 960px) {
+  .urbizen-page-conception .cpx-g figcaption { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 760px) {
+  .urbizen-page-conception .cpx-galerie { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-conception .cpx-g figcaption { min-height: 0; }
+}
 
 /* ===== Livrables ===== */
 .urbizen-page-conception .cpx-liste {
@@ -121,8 +212,8 @@
 }
 .urbizen-page-conception .cpx-liste li {
   position: relative;
-  padding: 6px 0 6px 30px;
-  font-size: 15px;
+  padding: 7px 0 7px 36px;
+  font-size: 16px;
   line-height: 1.55;
   color: var(--u-ink);
 }
@@ -130,14 +221,21 @@
   content: "✓";
   position: absolute;
   left: 0;
-  top: 6px;
+  top: 7px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  background: var(--u-brand-sf);
+  border-radius: 50%;
   font-family: var(--u-font-mono);
+  font-size: 12px;
   font-weight: 600;
   color: var(--u-brand);
 }
 .urbizen-page-conception .cpx-note {
   margin-top: 22px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--u-ink-faint);
   max-width: 82ch;
@@ -176,11 +274,11 @@
 .urbizen-page-conception .cpx-step h3 {
   font-family: var(--u-font-title);
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 18px;
   color: var(--u-ink);
   margin: 0 0 6px;
 }
-.urbizen-page-conception .cpx-step p { font-size: 14px; line-height: 1.55; color: var(--u-ink-soft); margin: 0; }
+.urbizen-page-conception .cpx-step p { font-size: 15.5px; line-height: 1.6; color: var(--u-ink-soft); margin: 0; }
 @media (max-width: 900px) { .urbizen-page-conception .cpx-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .urbizen-page-conception .cpx-steps { grid-template-columns: minmax(0, 1fr); } }
 
@@ -195,8 +293,8 @@
 }
 .urbizen-page-conception .cpx-reassure-grid li {
   position: relative;
-  padding: 8px 0 8px 30px;
-  font-size: 14.5px;
+  padding: 8px 0 8px 36px;
+  font-size: 16px;
   line-height: 1.5;
   color: var(--u-ink);
 }
@@ -205,7 +303,14 @@
   position: absolute;
   left: 0;
   top: 8px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  background: var(--u-brand-sf);
+  border-radius: 50%;
   font-family: var(--u-font-mono);
+  font-size: 12px;
   font-weight: 600;
   color: var(--u-brand);
 }
@@ -224,17 +329,17 @@
   padding: 14px 0;
   font-family: var(--u-font-title);
   font-weight: 600;
-  font-size: 15.5px;
+  font-size: 17px;
   color: var(--u-ink);
   list-style: none;
 }
 .urbizen-page-conception .cpx-faq summary::-webkit-details-marker { display: none; }
 .urbizen-page-conception .cpx-faq summary::after { content: "+"; float: right; color: var(--u-brand); font-family: var(--u-font-mono); }
 .urbizen-page-conception .cpx-faq details[open] summary::after { content: "–"; }
-.urbizen-page-conception .cpx-faq p { margin: 0 0 14px; font-size: 14.5px; line-height: 1.65; color: var(--u-ink-soft); }
+.urbizen-page-conception .cpx-faq p { margin: 0 0 14px; font-size: 15.5px; line-height: 1.65; color: var(--u-ink-soft); }
 
-/* ===== Formulaire ===== */
-.urbizen-page-conception .cpx-form-sec { padding-bottom: clamp(24px, 4vw, 40px) !important; }
+/* ===== Conversion finale ===== */
+.urbizen-page-conception .cpx-final { background: var(--u-grid-bg); }
 
 /* ===== Protection des visuels (dissuasive) ===== */
 .urbizen-page-conception [data-urbizen-protected-media],

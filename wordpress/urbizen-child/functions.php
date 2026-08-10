@@ -209,6 +209,7 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-conception',
 	'page-formulaire-declaration-prealable',
 	'page-formulaire-permis-de-construire',
+	'page-formulaire-conception',
 );
 
 /**

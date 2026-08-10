@@ -328,6 +328,28 @@
   .urbizen-page * { transition: none !important; animation: none !important; }
 }
 
+/* ===== Formulaire Conception — page dédiée =====
+   Le moteur du formulaire porte son propre cartouche et son quadrillage. La
+   page WordPress ne lui ajoute aucun bloc commercial : seulement l'en-tête et
+   le pied de page communs, comme les parcours DP et PC. */
+.urbizen-page-formulaire-conception .cpx-form-page {
+  min-height: 70vh;
+  padding: clamp(18px, 3vw, 36px) 0 clamp(36px, 6vw, 72px);
+  background: var(--u-paper);
+}
+.urbizen-page-formulaire-conception .cpx-form-page-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.urbizen-page-formulaire-conception .cpx-form-host { width: 100%; }
+
 /* ===== Planche : codes plus lisibles sur les pages internes ===== */
 .urbizen-page .planche-item .code {
   font-size: 13.5px;

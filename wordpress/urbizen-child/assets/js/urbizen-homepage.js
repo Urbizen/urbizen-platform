@@ -363,7 +363,7 @@
   var FORM_URLS = {
     dp:         "/formulaire-declaration-prealable/",
     pcmi:       "/formulaire-permis-de-construire/",
-    conception: "/conception/#formulaire-conception"
+    conception: "/formulaire-conception/"
   };
 
   /* Les questions que le moteur peut réclamer. Chacune répond à un nom de
