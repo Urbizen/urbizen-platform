@@ -1673,3 +1673,352 @@
   .urbizen-page-tarifs .tar-hero-carte { padding: 18px; box-shadow: 7px 7px 0 rgba(84, 207, 153, 0.14); }
   .urbizen-page-tarifs .tarif-large-aside { flex-direction: column; align-items: flex-start; gap: 14px; }
 }
+
+/* ========================================================================== */
+/* Documents légaux — mentions, CGV, confidentialité                          */
+/* ========================================================================== */
+
+/*
+ * Trois documents, une seule famille visuelle. `.urbizen-page-legal` porte tout
+ * ce qui leur est commun ; les variantes `.urbizen-page-mentions`,
+ * `.urbizen-page-cgv` et `.urbizen-page-confidentialite` n'existent que pour
+ * pouvoir cibler l'une d'elles si le besoin apparaît — elles ne portent
+ * volontairement aucune règle aujourd'hui.
+ *
+ * Ces pages sont éditoriales, pas commerciales : pas de hero marketing, pas de
+ * bouton pleine largeur, pas d'aplat de couleur inutile. Le confort de lecture
+ * prime, d'où une largeur de texte bornée à 68 caractères et un interlignage
+ * plus généreux qu'ailleurs.
+ *
+ * Aucun composant nouveau n'est introduit : l'en-tête, le pied de page, le fil
+ * d'ariane, les surtitres et les tokens sont ceux du reste du site.
+ */
+
+/* --- Cadre général -------------------------------------------------------- */
+.urbizen-page-legal .legal-hero {
+  padding: clamp(28px, 4vw, 52px) 0 clamp(20px, 3vw, 32px);
+  background: var(--u-grid-bg);
+  border-bottom: 1px solid var(--u-line);
+}
+.urbizen-page-legal .legal-hero h1 {
+  margin-top: 12px;
+  font-size: clamp(28px, 3.6vw, 40px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+.urbizen-page-legal .legal-lead {
+  max-width: 62ch;
+  margin-top: 12px;
+  color: var(--u-ink-soft);
+  font-size: 16.5px;
+  line-height: 1.6;
+}
+.urbizen-page-legal .legal-maj {
+  margin-top: 14px;
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.urbizen-page-legal .legal-corps { padding: clamp(32px, 5vw, 60px) 0 clamp(40px, 6vw, 72px); }
+
+/* Le fil d'ariane de `.urbizen-page` est composé pour le bandeau ENCRE des
+   pages DP et PC : menthe et blanc translucide. Sur le hero clair des pages
+   légales, il devenait illisible. On le repasse donc en encre — même
+   composant, contraste rétabli. */
+.urbizen-page-legal .legal-hero .fil-ariane { color: var(--u-ink-faint); }
+.urbizen-page-legal .legal-hero .fil-ariane a { color: var(--u-ink-soft); text-decoration: underline; text-underline-offset: 2px; }
+.urbizen-page-legal .legal-hero .fil-ariane a:hover { color: var(--u-brand-dk); }
+.urbizen-page-legal .legal-hero .fil-ariane .sep { color: var(--u-line-strong); }
+
+/* --- Deux colonnes : sommaire à gauche, texte à droite -------------------- */
+.urbizen-page-legal .legal-grille {
+  display: grid;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: start;
+}
+
+/* Le sommaire suit la lecture sans la gêner : discret, collant sous l'en-tête
+   collante du site — d'où le décalage de 96 px, hauteur de l'en-tête plus une
+   respiration. */
+.urbizen-page-legal .legal-sommaire {
+  position: sticky;
+  top: 96px;
+  padding: 20px;
+  background: var(--u-surface-2);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+}
+.urbizen-page-legal .legal-sommaire h2 {
+  margin: 0 0 12px;
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-legal .legal-sommaire ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: sommaire;
+  display: grid;
+  gap: 7px;
+}
+.urbizen-page-legal .legal-sommaire li { counter-increment: sommaire; }
+.urbizen-page-legal .legal-sommaire a {
+  display: block;
+  padding-left: 26px;
+  position: relative;
+  color: var(--u-ink-soft);
+  font-size: 13.5px;
+  line-height: 1.4;
+  text-decoration: none;
+}
+.urbizen-page-legal .legal-sommaire a::before {
+  content: counter(sommaire);
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--u-brand);
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+}
+.urbizen-page-legal .legal-sommaire a:hover { color: var(--u-brand-dk); }
+
+/* --- Le texte juridique --------------------------------------------------- */
+/* 68 caractères : au-delà, l'œil perd la ligne suivante. C'est la seule raison
+   de cette limite, et elle prime sur l'envie de remplir la largeur. */
+.urbizen-page-legal .legal-texte { max-width: 68ch; }
+.urbizen-page-legal .legal-texte h2 {
+  margin: 40px 0 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--u-line);
+  color: var(--u-ink);
+  font-family: var(--u-font-title);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+  scroll-margin-top: 96px;
+}
+.urbizen-page-legal .legal-texte h2:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.urbizen-page-legal .legal-texte h3 {
+  margin: 26px 0 10px;
+  color: var(--u-ink);
+  font-family: var(--u-font-title);
+  font-size: 17px;
+  font-weight: 600;
+}
+.urbizen-page-legal .legal-texte p {
+  margin: 0 0 14px;
+  color: var(--u-ink-soft);
+  font-size: 16px;
+  line-height: 1.75;
+}
+.urbizen-page-legal .legal-texte strong { color: var(--u-ink); }
+.urbizen-page-legal .legal-texte a { color: var(--u-brand-dk); text-decoration: underline; text-underline-offset: 2px; }
+.urbizen-page-legal .legal-texte a:hover { color: var(--u-brand); }
+.urbizen-page-legal .legal-texte ul,
+.urbizen-page-legal .legal-texte ol {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.urbizen-page-legal .legal-texte li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--u-ink-soft);
+  font-size: 16px;
+  line-height: 1.7;
+}
+.urbizen-page-legal .legal-texte li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 11px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--u-mint);
+}
+
+/* --- Fiche d'identité (pattern partagé) ----------------------------------- */
+.urbizen-page-legal .legal-identite { margin: 0 0 20px; }
+.urbizen-page-legal .legal-fiche {
+  margin: 0;
+  padding: 20px 22px;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-left: 3px solid var(--u-brand);
+  border-radius: var(--u-radius);
+  display: grid;
+  gap: 10px;
+}
+.urbizen-page-legal .legal-fiche-ligne {
+  display: grid;
+  grid-template-columns: minmax(0, 150px) minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: baseline;
+}
+.urbizen-page-legal .legal-fiche dt {
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.urbizen-page-legal .legal-fiche dd {
+  margin: 0;
+  color: var(--u-ink);
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+.urbizen-page-legal .legal-fiche .legal-mono { font-family: var(--u-font-mono); font-size: 14px; }
+
+/* --- Encadrés ------------------------------------------------------------- */
+.urbizen-page-legal .legal-encart {
+  margin: 0 0 18px;
+  padding: 18px 20px;
+  background: var(--u-surface-2);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+}
+.urbizen-page-legal .legal-encart p:last-child { margin-bottom: 0; }
+/* Signale à qui s'applique une section — la distinction consommateur /
+   professionnel est la plus lourde de conséquences du document. */
+.urbizen-page-legal .legal-encart-inline {
+  padding: 12px 16px;
+  background: var(--u-brand-sf);
+  border-left: 3px solid var(--u-brand);
+  border-radius: var(--u-radius-sm);
+  color: var(--u-ink);
+  font-size: 15px;
+}
+
+/* --- Tableaux ------------------------------------------------------------- */
+.urbizen-page-legal .legal-tableau-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 18px; }
+.urbizen-page-legal .legal-tableau {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--u-surface);
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius);
+  overflow: hidden;
+  font-size: 14.5px;
+}
+.urbizen-page-legal .legal-tableau th {
+  padding: 12px 14px;
+  background: var(--u-surface-2);
+  border-bottom: 1px solid var(--u-line-strong);
+  color: var(--u-ink-soft);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+.urbizen-page-legal .legal-tableau td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--u-line);
+  color: var(--u-ink-soft);
+  line-height: 1.55;
+  vertical-align: top;
+}
+.urbizen-page-legal .legal-tableau tr:last-child td { border-bottom: 0; }
+
+/* --- Formulaire type de rétractation -------------------------------------- */
+.urbizen-page-legal .legal-formulaire {
+  margin: 18px 0 0;
+  padding: 22px;
+  background: var(--u-surface-2);
+  border: 1px dashed var(--u-line-strong);
+  border-radius: var(--u-radius);
+}
+.urbizen-page-legal .legal-formulaire-note {
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.urbizen-page-legal .legal-formulaire li::before { display: none; }
+.urbizen-page-legal .legal-formulaire li { padding-left: 0; }
+/* Les pointillés à remplir forment un mot insécable : sans cela, ils
+   débordaient la fenêtre en dessous de 360 px. Mesuré à 320 px avant
+   correction : 342 px de large pour 320 disponibles. */
+.urbizen-page-legal .legal-formulaire { overflow-wrap: anywhere; }
+
+/* --- Navigation entre documents ------------------------------------------- */
+.urbizen-page-legal .legal-nav {
+  padding: clamp(26px, 4vw, 40px) var(--u-pad);
+  max-width: var(--u-maxw);
+  margin: 0 auto;
+  border-top: 1px solid var(--u-line);
+}
+.urbizen-page-legal .legal-nav-titre {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.urbizen-page-legal .legal-nav ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.urbizen-page-legal .legal-nav a,
+.urbizen-page-legal .legal-nav .legal-nav-courant {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius);
+  font-family: var(--u-font-title);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.urbizen-page-legal .legal-nav a { color: var(--u-ink); background: var(--u-surface); }
+.urbizen-page-legal .legal-nav a:hover { border-color: var(--u-brand); color: var(--u-brand-dk); }
+/* Le document courant n'est pas un lien : il est marqué, pas cliquable. */
+.urbizen-page-legal .legal-nav .legal-nav-courant {
+  color: var(--u-ink-faint);
+  background: var(--u-surface-2);
+  border-style: dashed;
+}
+
+/* --- Paliers de rupture — ceux déjà employés par le reste de la feuille ---- */
+@media (max-width: 900px) {
+  /* Le sommaire passe au-dessus du texte et cesse d'être collant : sur un
+     écran étroit, une colonne fixe mangerait la hauteur utile. */
+  .urbizen-page-legal .legal-grille { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-legal .legal-sommaire { position: static; top: auto; }
+  .urbizen-page-legal .legal-sommaire ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .urbizen-page-legal .legal-texte { max-width: none; }
+}
+
+@media (max-width: 620px) {
+  .urbizen-page-legal .legal-sommaire ol { grid-template-columns: minmax(0, 1fr); }
+  .urbizen-page-legal .legal-fiche-ligne { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .urbizen-page-legal .legal-texte h2 { font-size: 19px; }
+  .urbizen-page-legal .legal-texte p,
+  .urbizen-page-legal .legal-texte li { font-size: 15.5px; }
+}
+
+@media (max-width: 480px) {
+  .urbizen-page-legal .legal-sommaire { padding: 16px; }
+  .urbizen-page-legal .legal-fiche { padding: 16px; }
+  .urbizen-page-legal .legal-formulaire { padding: 16px; }
+}

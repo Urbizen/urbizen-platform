@@ -211,6 +211,9 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-formulaire-declaration-prealable',
 	'page-formulaire-permis-de-construire',
 	'page-formulaire-conception',
+	'page-mentions-legales',
+	'page-cgv',
+	'page-confidentialite',
 );
 
 /**
@@ -338,6 +341,167 @@ function urbizen_child_tarifs() {
 			'Accompagnement sur les pièces complémentaires liées à la prestation',
 		),
 	);
+}
+
+/**
+ * Identifiants des gabarits des trois documents légaux.
+ */
+const URBIZEN_CHILD_TEMPLATES_LEGAL = array(
+	'page-mentions-legales',
+	'page-cgv',
+	'page-confidentialite',
+);
+
+/**
+ * Données légales d'Urbizen — source unique des trois documents.
+ *
+ * POURQUOI UNE SOURCE UNIQUE
+ *
+ * L'identité, l'adresse, les immatriculations et l'hébergeur se répètent entre
+ * les mentions légales, les CGV et la politique de confidentialité. Recopiés
+ * dans trois fichiers, ils divergent : c'est exactement ce qui est arrivé aux
+ * tarifs, restés à 149 € dans les CGV longtemps après leur passage à 189 €.
+ *
+ * RÈGLE ABSOLUE : `null` SIGNIFIE « INCONNU »
+ *
+ * Une donnée non vérifiée vaut `null`, jamais une chaîne vide, jamais un
+ * « à compléter », jamais une valeur plausible. Les gabarits **omettent** la
+ * ligne correspondante plutôt que d'afficher un trou, et
+ * `urbizen_child_donnees_legales_manquantes()` la remonte au contrôle de
+ * préparation. Une page légale qui affiche « [À COMPLÉTER] » est pire qu'une
+ * page absente : elle donne l'apparence de la conformité.
+ *
+ * Les valeurs présentes ci-dessous ont été confirmées par la propriétaire le
+ * 10 août 2026. Celles qui manquent sont documentées dans
+ * `docs/AUDIT_PAGES_LEGALES.md`.
+ *
+ * @return array<string, mixed>
+ */
+function urbizen_child_donnees_legales() {
+	return array(
+		// --- Éditeur, confirmé ---
+		'entrepreneur'           => 'Anaïs Bacarisse',
+		'forme'                  => 'Entrepreneur individuel (EI)',
+		'nom_commercial'         => 'Urbizen',
+		'siren'                  => '105 253 132',
+		'siret'                  => '105 253 132 00010',
+		'rcs'                    => '105 253 132 R.C.S. Paris',
+		'adresse'                => array( '59 rue de Ponthieu', '75008 Paris', 'France' ),
+		'email'                  => 'contact@urbizen.fr',
+		'telephone'              => '06 64 89 58 15',
+		'telephone_lien'         => '+33664895815',
+		'site'                   => 'https://urbizen.fr',
+		'directeur_publication'  => 'Anaïs Bacarisse',
+
+		// --- Hébergeur ---
+		// Entité contractante publiée par Hostinger pour l'Union européenne.
+		// Le téléphone reste `null` : Hostinger ne publie pas de numéro
+		// contractuel rattaché à cette entité, et en inventer un serait pire
+		// que de n'en afficher aucun.
+		'hebergeur'              => array(
+			'raison_sociale' => 'Hostinger International Ltd',
+			'adresse'        => array( '61 Lordou Vironos str.', '6023 Larnaca', 'Chypre' ),
+			'site'           => 'https://www.hostinger.fr',
+			'telephone'      => null,
+		),
+
+		// --- Non vérifié : `null`, et rien d'autre ---
+		// Le numéro de TVA et surtout le RÉGIME applicable aux prix ne se
+		// déduisent d'aucune source interne : ni devis, ni facture, ni code.
+		// Déduire un régime d'un numéro trouvé dans un registre serait une
+		// affirmation fiscale inventée.
+		'tva_numero'             => null,
+		'tva_regime'             => null,
+
+		// Assurances : leur existence est confirmée, leur contenu non. On ne
+		// publie aucune affirmation précise sans attestation.
+		'assurance_rcp'          => null,
+		'assurance_decennale'    => null,
+
+		// Médiateur de la consommation : aucune convention connue.
+		'mediateur'              => null,
+	);
+}
+
+/**
+ * Données légales manquantes, classées par gravité.
+ *
+ * DEUX NIVEAUX, ET LA DIFFÉRENCE COMPTE
+ *
+ * `bloquant`   — sans cette donnée, le document est en défaut vis-à-vis d'une
+ *                obligation qui lui est propre. Il ne doit pas être publié.
+ * `a_verifier` — l'absence appauvrit le document sans le rendre irrégulier.
+ *                La publication reste possible.
+ *
+ * Confondre les deux conduit soit à publier un document non conforme, soit à
+ * bloquer indéfiniment une page pour une information facultative.
+ *
+ * @return array<int, array<string, string>>
+ */
+function urbizen_child_donnees_legales_manquantes() {
+	$d       = urbizen_child_donnees_legales();
+	$absents = array();
+
+	if ( null === $d['mediateur'] ) {
+		$absents[] = array(
+			'cle'       => 'mediateur',
+			'document'  => 'CGV',
+			'niveau'    => 'bloquant',
+			'pourquoi'  => 'Le professionnel qui vend à des consommateurs doit garantir un recours à un médiateur de la consommation et en communiquer les coordonnées (code de la consommation, art. L.616-1). Une CGV qui annonce un médiateur sans le désigner ne satisfait pas cette obligation.',
+			'ou'        => 'CGV, section « Médiation de la consommation », et rappel dans les mentions légales.',
+		);
+	}
+
+	if ( null === $d['tva_regime'] ) {
+		$absents[] = array(
+			'cle'       => 'tva_regime',
+			'document'  => 'CGV',
+			'niveau'    => 'bloquant',
+			'pourquoi'  => 'Le prix doit être annoncé de façon non équivoque : soit TTC, soit avec la mention de franchise en base (CGI, art. 293 B) qui impose « TVA non applicable, art. 293 B du CGI ». Publier des prix sans indiquer lequel des deux régimes s\'applique laisse le consommateur dans l\'incertitude.',
+			'ou'        => 'CGV, section « Prix », et cohérence avec la page /tarifs/.',
+		);
+	}
+
+	if ( null === $d['assurance_rcp'] && null === $d['assurance_decennale'] ) {
+		$absents[] = array(
+			'cle'       => 'assurances',
+			'document'  => 'Mentions légales',
+			'niveau'    => 'a_verifier',
+			'pourquoi'  => 'L\'activité déclarée d\'Urbizen est une assistance administrative et graphique, sans maîtrise d\'œuvre ni travaux : l\'affichage des assurances n\'est pas, à ce titre, une mention obligatoire des mentions légales. Son absence ne rend donc pas la page irrégulière. En revanche, la page /tarifs/ met en avant « RCP et assurance décennale » : cette affirmation commerciale doit pouvoir être justifiée.',
+			'ou'        => 'Mentions légales, section « Assurances » — omise tant que l\'attestation n\'est pas fournie.',
+		);
+	}
+
+	if ( null === $d['hebergeur']['telephone'] ) {
+		$absents[] = array(
+			'cle'       => 'hebergeur_telephone',
+			'document'  => 'Mentions légales',
+			'niveau'    => 'a_verifier',
+			'pourquoi'  => 'La LCEN impose de mentionner le nom et l\'adresse de l\'hébergeur, ainsi que ses coordonnées. Le nom, l\'adresse et le site d\'Hostinger sont publiés ; Hostinger ne publie pas de numéro contractuel rattaché à l\'entité européenne. L\'absence de numéro n\'invalide pas la mention dès lors qu\'un moyen de contact reste indiqué.',
+			'ou'        => 'Mentions légales, section « Hébergement ».',
+		);
+	}
+
+	return $absents;
+}
+
+/**
+ * La page affichée est-elle l'un des trois documents légaux ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_legale() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return in_array( get_page_template_slug( $id ), URBIZEN_CHILD_TEMPLATES_LEGAL, true );
 }
 
 /**
