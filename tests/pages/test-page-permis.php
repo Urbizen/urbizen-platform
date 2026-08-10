@@ -19,6 +19,9 @@ function check_pc( $label, $condition ) {
 check_pc( 'Un seul titre principal', 1 === preg_match_all( '/<h1[\s>]/', $tpl ) );
 check_pc( 'Le titre éditorial historique est conservé', str_contains( $tpl, 'Votre permis de construire, préparé de A à Z.' ) );
 check_pc( 'Les CTA ouvrent directement le formulaire PC', substr_count( $tpl, 'href="/formulaire-permis-de-construire/"' ) >= 5 );
+check_pc( 'Les CTA principaux nomment le permis de construire en toutes lettres',
+	2 === substr_count( $tpl, '>Démarrer mon permis de construire</a>' )
+	&& ! str_contains( $tpl, '>Démarrer mon permis</a>' ) );
 check_pc( 'Aucun CTA ne renvoie vers le tunnel de localisation', ! str_contains( $tpl, 'href="/#localisation"' ) );
 check_pc( 'Aucune promesse de qualification ou étude préalable',
 	! str_contains( strtolower( $tpl ), 'qualifier mon projet' )
