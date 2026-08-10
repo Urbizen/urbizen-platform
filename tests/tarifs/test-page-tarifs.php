@@ -160,8 +160,13 @@ check( 'Titre de document posé pour la seule page Tarifs',
 	&& str_contains( $fns, 'Tarifs déclaration préalable et permis de construire' ) );
 check( 'Description posée pour la seule page Tarifs',
 	str_contains( $fns, 'function urbizen_child_description_tarifs' ) );
-check( 'La description s\'efface devant un greffon de référencement',
-	str_contains( $fns, 'WPSEO_VERSION' ) );
+// Le comportement réel du garde-fou est éprouvé par `test-seo-tarifs.php`,
+// qui exécute les fonctions. Ici on vérifie seulement qu'il est bien branché.
+check( 'Titre et description passent par le détecteur de greffon SEO',
+	str_contains( $fns, 'function urbizen_child_seo_gere_ailleurs' )
+	&& 2 === substr_count( $fns, 'if ( urbizen_child_seo_gere_ailleurs() ) {' ) );
+check( 'All in One SEO Pack est couvert (greffon réellement actif sur le site)',
+	str_contains( $fns, 'AIOSEO_VERSION' ) );
 
 // --- Contenus obligatoires du brief -----------------------------------------
 foreach ( array(

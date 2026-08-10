@@ -611,14 +611,23 @@ function urbizen_child_est_page_tarifs() {
  * Le thème ne portait jusqu'ici aucun réglage de référencement : le titre
  * venait du nom de la page, « Tarifs », qui ne dit ni de quoi ni pour qui.
  * On le pose donc ici, et UNIQUEMENT sur ce gabarit — aucune autre page n'est
- * touchée. Un greffon de référencement installé plus tard reprendra la main :
- * ces filtres s'appliquent avant lui.
+ * touchée.
+ *
+ * Comme la description, ce titre est un REPLI : dès qu'un greffon de
+ * référencement est actif, le thème se retire. En pratique un tel greffon
+ * court-circuite déjà `document_title_parts` par `pre_get_document_title`,
+ * et notre filtre resterait sans effet — mais mieux vaut un retrait explicite
+ * qu'un filtre qu'on croit actif et qui ne l'est pas.
  *
  * @param array<string, string> $parties Fragments du titre.
  * @return array<string, string>
  */
 function urbizen_child_titre_tarifs( $parties ) {
 	if ( ! urbizen_child_est_page_tarifs() ) {
+		return $parties;
+	}
+
+	if ( urbizen_child_seo_gere_ailleurs() ) {
 		return $parties;
 	}
 
@@ -629,10 +638,78 @@ function urbizen_child_titre_tarifs( $parties ) {
 add_filter( 'document_title_parts', 'urbizen_child_titre_tarifs' );
 
 /**
- * Description de la page Tarifs.
+ * Un greffon de référencement gère-t-il déjà les métadonnées de la page ?
  *
- * Émise seulement si aucun greffon de référencement n'a déjà posé la sienne :
- * deux balises `description` concurrentes valent moins qu'une seule.
+ * POURQUOI CETTE FONCTION EXISTE
+ *
+ * La première version de ce garde-fou énumérait trois constantes — Yoast,
+ * Rank Math, SEOPress — et se croyait complète. Le site utilise **All in One
+ * SEO Pack**, qui n'y figurait pas : la page Tarifs a servi DEUX balises
+ * `<meta name="description">` en production, celle d'AIOSEO et la nôtre.
+ *
+ * La leçon n'est pas « il manquait une constante », c'est qu'une énumération
+ * est fausse par construction : elle ne connaît que le passé. Trois choses la
+ * rendent tenable ici :
+ *
+ *   1. la détection est **nommée**, donc testable et vérifiable d'un coup
+ *      d'œil, au lieu d'être noyée dans une condition ;
+ *   2. chaque greffon est cherché par **plusieurs marqueurs** (constante,
+ *      fonction, classe) : un greffon qui renomme sa constante reste vu ;
+ *   3. le filtre `urbizen_child_seo_gere_ailleurs` permet de trancher sans
+ *      toucher au code, le jour où un greffon inconnu apparaît.
+ *
+ * Le thème reste volontairement en retrait : il ne cherche pas à concurrencer
+ * un greffon de référencement, il comble seulement un vide s'il n'y en a pas.
+ *
+ * @return bool Vrai si un greffon SEO est actif.
+ */
+function urbizen_child_seo_gere_ailleurs() {
+	$marqueurs = array(
+		// All in One SEO Pack — celui qu'emploie le site, et que la première
+		// version de ce contrôle ignorait.
+		'AIOSEO_VERSION',
+		'AIOSEO_PLUGIN_NAME',
+		// Yoast SEO.
+		'WPSEO_VERSION',
+		// Rank Math.
+		'RANK_MATH_VERSION',
+		// SEOPress.
+		'SEOPRESS_VERSION',
+		// The SEO Framework.
+		'THE_SEO_FRAMEWORK_VERSION',
+		// Slim SEO.
+		'SLIM_SEO_VER',
+		// Squirrly SEO.
+		'SQUIRRLY_PLUGIN_VERSION',
+	);
+
+	foreach ( $marqueurs as $constante ) {
+		if ( defined( $constante ) ) {
+			return (bool) apply_filters( 'urbizen_child_seo_gere_ailleurs', true, $constante );
+		}
+	}
+
+	foreach ( array( 'aioseo', 'rank_math', 'wpseo_init' ) as $fonction ) {
+		if ( function_exists( $fonction ) ) {
+			return (bool) apply_filters( 'urbizen_child_seo_gere_ailleurs', true, $fonction );
+		}
+	}
+
+	foreach ( array( 'WPSEO_Frontend', 'RankMath', 'SEOPress' ) as $classe ) {
+		if ( class_exists( $classe ) ) {
+			return (bool) apply_filters( 'urbizen_child_seo_gere_ailleurs', true, $classe );
+		}
+	}
+
+	return (bool) apply_filters( 'urbizen_child_seo_gere_ailleurs', false, '' );
+}
+
+/**
+ * Description de la page Tarifs — repli, jamais doublon.
+ *
+ * Émise seulement si aucun greffon de référencement ne gère déjà la page :
+ * deux balises `description` concurrentes valent moins qu'une seule, et c'est
+ * le greffon qui doit rester la source du référencement.
  *
  * @return void
  */
@@ -641,7 +718,7 @@ function urbizen_child_description_tarifs() {
 		return;
 	}
 
-	if ( defined( 'WPSEO_VERSION' ) || defined( 'RANK_MATH_VERSION' ) || defined( 'SEOPRESS_VERSION' ) ) {
+	if ( urbizen_child_seo_gere_ailleurs() ) {
 		return;
 	}
 

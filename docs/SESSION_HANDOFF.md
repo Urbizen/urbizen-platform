@@ -109,6 +109,20 @@ Détail dans l'issue #28.
 1. **Gabarit de thème à blocs = deux endroits.** Une nouvelle page interne exige
    son fichier `templates/…html` **et** sa déclaration dans `theme.json →
    customTemplates`, sinon elle n'est ni assignable ni rendue (leçon de #30).
+1bis. **Nouveau pattern = montée de version du thème.** WordPress indexe son
+   cache de patterns sur l'en-tête `Version:` de `style.css`. Déployer un
+   fichier dans `patterns/` sans incrémenter cette version laisse le pattern
+   **invisible** : le bloc `wp:pattern` qui l'appelle ne rend rien, en silence.
+   Constaté en production sur la page Tarifs (#74) — la grille tarifaire est
+   sortie vide, gabarit et fichiers pourtant corrects. `style.css` est la seule
+   source de cette version ; `URBIZEN_CHILD_FORMS_VERSION` en est une autre,
+   sans rapport, à ne pas confondre.
+1ter. **Le thème ne concurrence pas le greffon SEO.** All in One SEO Pack est
+   actif sur le site. `urbizen_child_seo_gere_ailleurs()` détecte les greffons
+   de référencement et fait taire le titre et la description du thème, qui ne
+   sont qu'un repli. Sa première version énumérait trois greffons et ignorait
+   AIOSEO : la page Tarifs a servi deux balises `description` en production.
+   Toute nouvelle métadonnée émise par le thème doit passer par ce garde-fou.
 2. **Script d'accueil partagé (D-048).** `urbizen-homepage.js` est une copie
    manuelle de la source `frontend/homepage/homepage.js`, avec deux écarts
    documentés dans son en-tête. Une recopie naïve les effacerait.

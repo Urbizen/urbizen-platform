@@ -49,15 +49,19 @@ command -v "$PY_BIN" >/dev/null 2>&1 || {
 	exit 2
 }
 
-titre "1/3 — Cohérence de la source tarifaire"
+titre "1/4 — Cohérence de la source tarifaire"
 "$PHP_BIN" test-tarifs-source.php
 verdict $? "test-tarifs-source.php"
 
-titre "2/3 — Gabarit, composants et référencement"
+titre "2/4 — Gabarit, composants et référencement"
 "$PHP_BIN" test-page-tarifs.php
 verdict $? "test-page-tarifs.php"
 
-titre "3/3 — Géométrie, de 1440 à 320 px"
+titre "3/4 — Repli SEO et version du thème"
+"$PHP_BIN" test-seo-tarifs.php
+verdict $? "test-seo-tarifs.php"
+
+titre "4/4 — Géométrie, de 1440 à 320 px"
 "$PY_BIN" test-geometrie-tarifs.py
 code_geometrie=$?
 if [ "$code_geometrie" -eq 2 ]; then
@@ -73,7 +77,7 @@ if [ "$prerequis_absents" -eq 1 ] && [ "$echecs" -eq 0 ]; then
 	exit 2
 fi
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 3 bancs passent.\033[0m\n'
+	printf '\033[32mLes 4 bancs passent.\033[0m\n'
 	exit 0
 fi
 
