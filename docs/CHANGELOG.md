@@ -139,6 +139,19 @@ les informations transmises et rappelle sous 24 heures ouvrées.
   `156067d`. Après purge LiteSpeed, l’accueil, la page DP et son formulaire
   répondent en HTTP 200. La recette réelle confirme le nouveau contenu, les six
   accès directs au formulaire et l’absence des anciens termes de qualification.
+- La PR [#70](https://github.com/Urbizen/urbizen-platform/pull/70) refond la page
+  « Permis de construire » en guide commercial et réglementaire : seuils,
+  surfaces, architecte, PLU, ABF, RE2020, taxe, procédure, pièces PCMI et appels
+  directs au formulaire, sans qualification préalable.
+- Sauvegarde préalable vérifiée dans
+  `~/backups/urbizen-page-pc-20260810-054301/` : base, thème enfant, extension,
+  configuration, inventaire et sommes de contrôle.
+- Les **2 fichiers du thème enfant** concernés ont été publiés sans suppression ;
+  leurs empreintes locales et distantes correspondent au commit fusionné
+  `0a8af82`. Après purge LiteSpeed, l’accueil, la page PC et son formulaire
+  répondent en HTTP 200. La recette réelle confirme le nouveau titre, les six
+  accès directs au formulaire, l’absence des anciens termes de qualification et
+  une largeur de page sans débordement horizontal.
 
 ## [0.14.0] — Déclaration préalable et permis de construire raccordés
 
