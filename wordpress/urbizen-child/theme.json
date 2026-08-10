@@ -106,6 +106,13 @@
       "postTypes": [
         "page"
       ]
+    },
+    {
+      "name": "page-formulaire-conception",
+      "title": "Formulaire de conception de plans",
+      "postTypes": [
+        "page"
+      ]
     }
   ],
   "templateParts": [
