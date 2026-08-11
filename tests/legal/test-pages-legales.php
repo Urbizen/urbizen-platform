@@ -154,15 +154,28 @@ check( '3 · aucune coordonnée de médiateur recopiée dans les gabarits',
 check( '3 · le pattern d\'assurance lit la source, sans valeur en dur',
 	str_contains( $assur, 'urbizen_child_donnees_legales()' )
 	&& ! preg_match( '/Zurich|7400042329/i', $assur ) );
-// On contrôle ce que le pattern ÉMET, pas ce qu'il explique : son en-tête cite
-// l'article 293 B pour justifier la rédaction, et cette citation ne doit pas
-// être confondue avec une valeur recopiée. Même distinction qu'au contrôle 7
-// entre émetteurs et mentions.
-$tva_emis = preg_replace( '#/\*.*?\*/|//[^\n]*#s', '', $tva );
+check( '3 · le pattern de TVA lit la source, sans texte recopié',
+	str_contains( $tva, 'urbizen_child_donnees_legales()' ) );
 
-check( '3 · le pattern de TVA lit la source, sans mention recopiée',
-	str_contains( $tva, 'urbizen_child_donnees_legales()' )
-	&& ! preg_match( '/293\s?B/i', (string) $tva_emis ) );
+// LA RÉFÉRENCE RÉGLEMENTAIRE NE DOIT ATTEINDRE AUCUNE PAGE PUBLIQUE
+//
+// Celle applicable aux factures en franchise en base change au 1er septembre
+// 2026. Une page légale est permanente : l'y inscrire programmerait une
+// inexactitude datée. Le contrôle porte donc sur TOUT ce qui peut s'afficher —
+// gabarits, patterns, et la source elle-même, dont chaque chaîne est destinée
+// à une page. Les commentaires de code sont exclus : ils expliquent la
+// décision, ils ne l'affichent pas.
+$sans_commentaires = static fn( $php ) => (string) preg_replace( '#/\*.*?\*/|//[^\n]*#s', '', $php );
+
+$affichable = $sans_commentaires( $ident ) . $sans_commentaires( $tva )
+	. $sans_commentaires( $assur ) . $sans_commentaires( $mediat )
+	. $sans_commentaires( $fns ) . implode( '', $tpl );
+
+check( '3 · aucune référence réglementaire figée dans ce qui peut s\'afficher',
+	! preg_match( '/293\s?B|CIBS|code général des impôts/i', $affichable ) );
+check( '3 · le régime est énoncé par son effet, durable',
+	preg_match( '/nets de TVA/i', $fns )
+	&& preg_match( '/étant pas facturée/i', $fns ) );
 check( '3 · aucune coordonnée d\'assurance recopiée dans les gabarits',
 	! preg_match( '/Zurich|7400042329/i', implode( '', $tpl ) ) );
 check( '3 · aucune mention fiscale recopiée dans les gabarits',

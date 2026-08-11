@@ -60,7 +60,7 @@ $u = urbizen_child_donnees_legales();
 <?php if ( null !== $u['tva'] ) : ?>
     <div class="legal-fiche-ligne">
       <dt>TVA</dt>
-      <dd><?php echo esc_html( $u['tva']['regime'] ); ?> — <?php echo esc_html( $u['tva']['mention'] ); ?></dd>
+      <dd><?php echo esc_html( $u['tva']['regime'] ); ?>. <?php echo esc_html( $u['tva']['effet'] ); ?></dd>
     </div>
 <?php endif; ?>
 <?php if ( null !== $u['tva'] && null !== $u['tva']['numero'] ) : ?>

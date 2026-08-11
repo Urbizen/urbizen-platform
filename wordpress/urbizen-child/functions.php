@@ -410,14 +410,28 @@ function urbizen_child_donnees_legales() {
 		// elle se range ici, et non dans `forme`, qui reste « Entrepreneur
 		// individuel (EI) ».
 		//
+		// AUCUNE RÉFÉRENCE RÉGLEMENTAIRE ICI, ET C'EST VOLONTAIRE
+		//
+		// La référence à citer sur les factures en franchise en base change au
+		// 1er septembre 2026. Une page légale est un document permanent : y
+		// figer un article de loi, c'est programmer une inexactitude datée que
+		// personne ne pensera à corriger. Ces pages énoncent donc le RÉGIME,
+		// qui ne change pas, et la conséquence pour le client, qui ne change
+		// pas non plus — les prix ne supportent pas de TVA.
+		//
+		// La mention réglementaire précise relève du devis et de la facture,
+		// où elle s'apprécie à la date d'émission du document. Elle n'a donc
+		// pas sa place dans cette source, qui n'alimente que des pages
+		// publiques.
+		//
 		// `numero` reste `null` : la franchise en base n'impose pas d'afficher
 		// un numéro de TVA intracommunautaire, et aucun n'a été communiqué.
 		// Absent veut dire absent, pas « à retrouver ».
 		'tva'                    => array(
-			'statut'  => 'Micro-entreprise',
-			'regime'  => 'Franchise en base de TVA',
-			'mention' => 'TVA non applicable, article 293 B du code général des impôts',
-			'numero'  => null,
+			'statut' => 'Micro-entreprise',
+			'regime' => 'Franchise en base de TVA',
+			'effet'  => 'Les prix sont indiqués nets de TVA, celle-ci n\'étant pas facturée dans le cadre de ce régime.',
+			'numero' => null,
 		),
 
 		// --- Assurance, confirmée le 11 août 2026 sur attestation ---
@@ -499,7 +513,7 @@ function urbizen_child_donnees_legales_manquantes() {
 			'cle'       => 'tva',
 			'document'  => 'CGV',
 			'niveau'    => 'bloquant',
-			'pourquoi'  => 'Le prix doit être annoncé de façon non équivoque : soit TTC, soit avec la mention de franchise en base (CGI, art. 293 B) qui impose « TVA non applicable, art. 293 B du CGI ». Publier des prix sans indiquer lequel des deux régimes s\'applique laisse le consommateur dans l\'incertitude.',
+			'pourquoi'  => 'Le prix doit être annoncé de façon non équivoque : soit TTC, soit en indiquant que le vendeur relève de la franchise en base et que les prix ne supportent pas de TVA. Publier des prix sans indiquer lequel des deux régimes s\'applique laisse le consommateur dans l\'incertitude. La référence réglementaire à porter sur les factures s\'apprécie à leur date d\'émission et ne se fige pas dans une page permanente.',
 			'ou'        => 'CGV, section « Prix », et cohérence avec la page /tarifs/.',
 		);
 	}

@@ -163,14 +163,37 @@ La micro-entreprise est un régime **fiscal** : elle est portée par la clé `tv
 de la source commune, et non par `forme`, qui reste « Entrepreneur individuel
 (EI) ». L'identité juridique du site demeure **Anaïs Bacarisse**.
 
-Les prix ne sont pas soumis à la TVA et aucune taxe ne s'ajoute au montant
-annoncé. Les documents portent la mention « TVA non applicable, article 293 B du
-code général des impôts ». La franchise est un régime **établi**, énoncé au
-présent : les CGV ne la présentent ni comme une réserve, ni comme une
-incertitude renvoyée au devis — c'était la rédaction précédente, faute de régime
-confirmé. Aucun numéro de TVA intracommunautaire n'a été communiqué, et la
-franchise n'en impose pas l'affichage : la clé reste `null`, donc la ligne reste
-absente.
+La franchise est un régime **établi**, énoncé au présent : les CGV ne la
+présentent ni comme une réserve, ni comme une incertitude renvoyée au devis —
+c'était la rédaction précédente, faute de régime confirmé.
+
+Aucun numéro de TVA intracommunautaire n'a été communiqué, et la franchise n'en
+impose pas l'affichage : la clé reste `null`, donc la ligne reste absente.
+
+#### Aucune référence réglementaire n'est affichée, et c'est délibéré
+
+La référence à citer sur les factures en franchise en base **change au
+1er septembre 2026**. Une page légale est un document permanent : y inscrire un
+article de loi, c'est programmer une inexactitude datée que personne ne pensera
+à corriger — le même mécanisme qui avait laissé 149 € dans les CGV longtemps
+après le passage à 189 €.
+
+Les pages énoncent donc le **régime**, qui ne change pas, et son **effet pour le
+client**, qui ne change pas non plus :
+
+> Urbizen relève du régime de la franchise en base de TVA. Les prix sont
+> indiqués nets de TVA, celle-ci n'étant pas facturée dans le cadre de ce
+> régime.
+
+La mention réglementaire précise relève du **devis et de la facture**, où elle
+s'apprécie à la date d'émission du document. Les pages le disent sans la citer :
+« les devis et factures portent la mention réglementaire applicable à leur date
+d'émission ».
+
+Un banc vérifie qu'aucune référence de ce type — `293 B`, `CIBS`, « code général
+des impôts » — n'atteint un gabarit, un pattern ou une chaîne de la source
+commune. Les commentaires de code sont exclus du contrôle : ils expliquent la
+décision, ils ne l'affichent pas.
 
 **Conséquence : la TVA n'est plus un bloquant.**
 
