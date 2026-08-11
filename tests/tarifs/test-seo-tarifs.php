@@ -158,7 +158,20 @@ $style = (string) file_get_contents( $theme . '/style.css' );
 preg_match( '/^Version:\s*(.+)$/m', $style, $v );
 $version = isset( $v[1] ) ? trim( $v[1] ) : '';
 
-check( '4 · version du thème = 0.2.1', '0.2.1' === $version, 'lue : ' . $version );
+// On contrôle un PLANCHER, pas une égalité. 0.2.1 est la version qui a corrigé
+// l'incident de cache de patterns : la garantie utile est qu'on ne redescende
+// jamais en dessous. Figer l'égalité obligerait à retoucher ce banc à chaque
+// montée légitime — et un test qu'on modifie par habitude ne protège plus rien.
+check(
+	'4 · version du thème ≥ 0.2.1 (plancher de l\'incident de cache)',
+	'' !== $version && version_compare( $version, '0.2.1', '>=' ),
+	'lue : ' . $version
+);
+check(
+	'4 · version du thème au format sémantique',
+	1 === preg_match( '/^\d+\.\d+\.\d+$/', $version ),
+	'lue : ' . $version
+);
 check(
 	'4 · la version du thème n\'a qu\'une source de vérité',
 	1 === preg_match_all( '/^Version:/m', $style )
@@ -174,9 +187,18 @@ check(
 $tpl     = (string) file_get_contents( $theme . '/templates/page-tarifs.html' );
 $pattern = (string) file_get_contents( $theme . '/patterns/tarifs-grille.php' );
 
+// On vise les CHAÎNES ÉMISES, pas le fichier entier : `functions.php` explique
+// en commentaire pourquoi une source unique existe, et cette explication cite
+// justement l'ancien tarif. Chercher « 149 » partout revenait à interdire d'en
+// parler, y compris pour documenter la correction.
+preg_match_all( "/esc_attr__\(\s*\n?\s*'([^']+)'/", $src, $descriptions );
+preg_match_all( "/\\\$parties\['title'\] = __\( '([^']+)'/", $src, $titres );
+$chaines_seo = implode( ' ', array_merge( $descriptions[1], $titres[1] ) );
+
 check(
-	'5 · aucune référence à 149 € dans le titre ni la description du thème',
-	! preg_match( '/149/', $src )
+	'5 · aucune référence à 149 € dans les chaînes SEO émises par le thème',
+	'' !== $chaines_seo && ! preg_match( '/\b149\b/', $chaines_seo ),
+	'chaînes contrôlées : ' . substr( $chaines_seo, 0, 90 )
 );
 check( '5 · aucune référence à 149 € dans le gabarit', ! preg_match( '/\b149\b/', $tpl ) );
 check( '5 · aucune référence à 149 € dans la grille', ! preg_match( '/\b149\b/', $pattern ) );

@@ -101,6 +101,27 @@
       ]
     },
     {
+      "name": "page-mentions-legales",
+      "title": "Mentions légales",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-cgv",
+      "title": "Conditions générales de vente",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
+      "name": "page-confidentialite",
+      "title": "Politique de confidentialité",
+      "postTypes": [
+        "page"
+      ]
+    },
+    {
       "name": "page-formulaire-declaration-prealable",
       "title": "Formulaire de déclaration préalable",
       "postTypes": [

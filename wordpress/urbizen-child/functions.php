@@ -211,6 +211,9 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-formulaire-declaration-prealable',
 	'page-formulaire-permis-de-construire',
 	'page-formulaire-conception',
+	'page-mentions-legales',
+	'page-cgv',
+	'page-confidentialite',
 );
 
 /**
@@ -338,6 +341,251 @@ function urbizen_child_tarifs() {
 			'Accompagnement sur les pièces complémentaires liées à la prestation',
 		),
 	);
+}
+
+/**
+ * Identifiants des gabarits des trois documents légaux.
+ */
+const URBIZEN_CHILD_TEMPLATES_LEGAL = array(
+	'page-mentions-legales',
+	'page-cgv',
+	'page-confidentialite',
+);
+
+/**
+ * Données légales d'Urbizen — source unique des trois documents.
+ *
+ * POURQUOI UNE SOURCE UNIQUE
+ *
+ * L'identité, l'adresse, les immatriculations et l'hébergeur se répètent entre
+ * les mentions légales, les CGV et la politique de confidentialité. Recopiés
+ * dans trois fichiers, ils divergent : c'est exactement ce qui est arrivé aux
+ * tarifs, restés à 149 € dans les CGV longtemps après leur passage à 189 €.
+ *
+ * RÈGLE ABSOLUE : `null` SIGNIFIE « INCONNU »
+ *
+ * Une donnée non vérifiée vaut `null`, jamais une chaîne vide, jamais un
+ * « à compléter », jamais une valeur plausible. Les gabarits **omettent** la
+ * ligne correspondante plutôt que d'afficher un trou, et
+ * `urbizen_child_donnees_legales_manquantes()` la remonte au contrôle de
+ * préparation. Une page légale qui affiche « [À COMPLÉTER] » est pire qu'une
+ * page absente : elle donne l'apparence de la conformité.
+ *
+ * Les valeurs présentes ci-dessous ont été confirmées par la propriétaire les
+ * 10 et 11 août 2026. Celles qui manquent sont documentées dans
+ * `docs/AUDIT_PAGES_LEGALES.md`.
+ *
+ * @return array<string, mixed>
+ */
+function urbizen_child_donnees_legales() {
+	return array(
+		// --- Éditeur, confirmé ---
+		'entrepreneur'           => 'Anaïs Bacarisse',
+		'forme'                  => 'Entrepreneur individuel (EI)',
+		'nom_commercial'         => 'Urbizen',
+		'siren'                  => '105 253 132',
+		'siret'                  => '105 253 132 00010',
+		'rcs'                    => '105 253 132 R.C.S. Paris',
+		'adresse'                => array( '59 rue de Ponthieu', '75008 Paris', 'France' ),
+		'email'                  => 'contact@urbizen.fr',
+		'telephone'              => '06 64 89 58 15',
+		'telephone_lien'         => '+33664895815',
+		'site'                   => 'https://urbizen.fr',
+		'directeur_publication'  => 'Anaïs Bacarisse',
+
+		// --- Hébergeur ---
+		// Entité contractante publiée par Hostinger pour l'Union européenne.
+		// Le téléphone reste `null` : Hostinger ne publie pas de numéro
+		// contractuel rattaché à cette entité, et en inventer un serait pire
+		// que de n'en afficher aucun.
+		'hebergeur'              => array(
+			'raison_sociale' => 'Hostinger International Ltd',
+			'adresse'        => array( '61 Lordou Vironos str.', '6023 Larnaca', 'Chypre' ),
+			'site'           => 'https://www.hostinger.fr',
+			'telephone'      => null,
+		),
+
+		// --- Régime fiscal, confirmé le 11 août 2026 ---
+		// La micro-entreprise est un RÉGIME FISCAL, pas une forme juridique :
+		// elle se range ici, et non dans `forme`, qui reste « Entrepreneur
+		// individuel (EI) ».
+		//
+		// AUCUNE RÉFÉRENCE RÉGLEMENTAIRE ICI, ET C'EST VOLONTAIRE
+		//
+		// La référence à citer sur les factures en franchise en base change au
+		// 1er septembre 2026. Une page légale est un document permanent : y
+		// figer un article de loi, c'est programmer une inexactitude datée que
+		// personne ne pensera à corriger. Ces pages énoncent donc le RÉGIME,
+		// qui ne change pas, et la conséquence pour le client, qui ne change
+		// pas non plus — les prix ne supportent pas de TVA.
+		//
+		// La mention réglementaire précise relève du devis et de la facture,
+		// où elle s'apprécie à la date d'émission du document. Elle n'a donc
+		// pas sa place dans cette source, qui n'alimente que des pages
+		// publiques.
+		//
+		// `numero` reste `null` : la franchise en base n'impose pas d'afficher
+		// un numéro de TVA intracommunautaire, et aucun n'a été communiqué.
+		// Absent veut dire absent, pas « à retrouver ».
+		'tva'                    => array(
+			'statut' => 'Micro-entreprise',
+			'regime' => 'Franchise en base de TVA',
+			'effet'  => 'Les prix sont indiqués nets de TVA, celle-ci n\'étant pas facturée dans le cadre de ce régime.',
+			'numero' => null,
+		),
+
+		// --- Assurance, confirmée le 11 août 2026 sur attestation ---
+		// UN SEUL CONTRAT COUVRE LES DEUX GARANTIES. D'où une seule entrée :
+		// deux clés séparées recopieraient le même numéro à deux endroits,
+		// c'est-à-dire exactement la divergence que cette source existe pour
+		// empêcher.
+		//
+		// Les dates ne sont PAS destinées au public : les gabarits ne les
+		// affichent pas. Elles servent uniquement d'alerte de fraîcheur à
+		// `urbizen_child_donnees_legales_manquantes()`, pour qu'une attestation
+		// échue soit signalée avant un déploiement plutôt que découverte par un
+		// client.
+		'assurance'              => array(
+			'assureur'          => 'Zurich Insurance Europe AG, succursale française',
+			'contrat'           => '7400042329-199800202',
+			'garanties'         => array(
+				'Responsabilité Civile Professionnelle',
+				'Responsabilité Civile Décennale',
+			),
+			'activites'         => array(
+				'Assistant à la maîtrise d\'ouvrage technique',
+				'Dessinateur projeteur',
+			),
+			'territoire'        => 'France métropolitaine et Corse',
+			'attestation_debut' => '2026-07-01',
+			'attestation_fin'   => '2026-12-31',
+		),
+
+		// --- Médiateur de la consommation, adhésion finalisée le 11 août 2026 ---
+		// Le professionnel qui vend à des consommateurs doit garantir un
+		// recours à un médiateur ET en communiquer les coordonnées
+		// (code de la consommation, art. L.616-1). Les deux conditions sont
+		// désormais remplies : la CGV nomme le médiateur au lieu d'annoncer
+		// qu'il sera désigné.
+		'mediateur'              => array(
+			'nom'     => 'Centre de la Médiation de la Consommation de Conciliateurs de Justice',
+			'sigle'   => 'CM2C',
+			'adresse' => array( '49 rue de Ponthieu', '75008 Paris', 'France' ),
+			'site'    => 'https://www.cm2c.net',
+		),
+	);
+}
+
+/**
+ * Données légales manquantes, classées par gravité.
+ *
+ * DEUX NIVEAUX, ET LA DIFFÉRENCE COMPTE
+ *
+ * `bloquant`   — sans cette donnée, le document est en défaut vis-à-vis d'une
+ *                obligation qui lui est propre. Il ne doit pas être publié.
+ * `a_verifier` — l'absence appauvrit le document sans le rendre irrégulier.
+ *                La publication reste possible.
+ *
+ * Confondre les deux conduit soit à publier un document non conforme, soit à
+ * bloquer indéfiniment une page pour une information facultative.
+ *
+ * @return array<int, array<string, string>>
+ */
+function urbizen_child_donnees_legales_manquantes() {
+	$d       = urbizen_child_donnees_legales();
+	$absents = array();
+
+	if ( null === $d['mediateur'] ) {
+		$absents[] = array(
+			'cle'       => 'mediateur',
+			'document'  => 'CGV',
+			'niveau'    => 'bloquant',
+			'pourquoi'  => 'Le professionnel qui vend à des consommateurs doit garantir un recours à un médiateur de la consommation et en communiquer les coordonnées (code de la consommation, art. L.616-1). Une CGV qui annonce un médiateur sans le désigner ne satisfait pas cette obligation.',
+			'ou'        => 'CGV, section « Médiation de la consommation », et rappel dans les mentions légales.',
+		);
+	}
+
+	// La branche subsiste alors que la donnée est renseignée : elle décrit
+	// l'obligation, pas l'état du jour. La retirer ferait disparaître le
+	// contrôle en même temps que le problème qu'il surveille.
+	if ( null === $d['tva'] ) {
+		$absents[] = array(
+			'cle'       => 'tva',
+			'document'  => 'CGV',
+			'niveau'    => 'bloquant',
+			'pourquoi'  => 'Le prix doit être annoncé de façon non équivoque : soit TTC, soit en indiquant que le vendeur relève de la franchise en base et que les prix ne supportent pas de TVA. Publier des prix sans indiquer lequel des deux régimes s\'applique laisse le consommateur dans l\'incertitude. La référence réglementaire à porter sur les factures s\'apprécie à leur date d\'émission et ne se fige pas dans une page permanente.',
+			'ou'        => 'CGV, section « Prix », et cohérence avec la page /tarifs/.',
+		);
+	}
+
+	if ( null === $d['assurance'] ) {
+		$absents[] = array(
+			'cle'       => 'assurance',
+			'document'  => 'Mentions légales',
+			'niveau'    => 'a_verifier',
+			'pourquoi'  => 'L\'activité déclarée d\'Urbizen est une assistance administrative et graphique, sans maîtrise d\'œuvre ni travaux : l\'affichage des assurances n\'est pas, à ce titre, une mention obligatoire des mentions légales. Son absence ne rend donc pas la page irrégulière. En revanche, la page /tarifs/ met en avant « RCP et assurance décennale » : cette affirmation commerciale doit pouvoir être justifiée.',
+			'ou'        => 'Mentions légales, section « Assurances » — omise tant que l\'attestation n\'est pas fournie.',
+		);
+	}
+
+	// FRAÎCHEUR DE L'ATTESTATION
+	//
+	// Une attestation d'assurance est datée, et les pages affirment une
+	// couverture au présent. Passé le terme, l'affirmation n'est plus
+	// justifiée : ce n'est pas un défaut de rédaction, c'est une pièce à
+	// renouveler. Signalé sans bloquer — le contrat peut être en cours de
+	// reconduction alors que la nouvelle attestation n'est pas encore émise.
+	//
+	// Ce contrôle dépend volontairement de la date du jour : c'est ce qui
+	// empêche le site d'entrer dans l'année suivante en affichant une
+	// couverture dont la pièce justificative a expiré.
+	if ( is_array( $d['assurance'] ) && null !== $d['assurance']['attestation_fin'] ) {
+		$fin = $d['assurance']['attestation_fin'];
+
+		if ( gmdate( 'Y-m-d' ) > $fin ) {
+			$absents[] = array(
+				'cle'       => 'assurance_attestation',
+				'document'  => 'Mentions légales',
+				'niveau'    => 'a_verifier',
+				'pourquoi'  => sprintf(
+					'L\'attestation d\'assurance couvre la période s\'achevant le %s, désormais passée. Les mentions légales, les CGV et la page /tarifs/ affirment une couverture au présent : il faut obtenir l\'attestation de la période en cours, ou retirer ces affirmations.',
+					$fin
+				),
+				'ou'        => 'Source commune `urbizen_child_donnees_legales()`, clé `assurance` — mettre à jour `attestation_debut` et `attestation_fin`.',
+			);
+		}
+	}
+
+	if ( null === $d['hebergeur']['telephone'] ) {
+		$absents[] = array(
+			'cle'       => 'hebergeur_telephone',
+			'document'  => 'Mentions légales',
+			'niveau'    => 'a_verifier',
+			'pourquoi'  => 'La LCEN impose de mentionner le nom et l\'adresse de l\'hébergeur, ainsi que ses coordonnées. Le nom, l\'adresse et le site d\'Hostinger sont publiés ; Hostinger ne publie pas de numéro contractuel rattaché à l\'entité européenne. L\'absence de numéro n\'invalide pas la mention dès lors qu\'un moyen de contact reste indiqué.',
+			'ou'        => 'Mentions légales, section « Hébergement ».',
+		);
+	}
+
+	return $absents;
+}
+
+/**
+ * La page affichée est-elle l'un des trois documents légaux ?
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_legale() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	return in_array( get_page_template_slug( $id ), URBIZEN_CHILD_TEMPLATES_LEGAL, true );
 }
 
 /**
