@@ -1874,6 +1874,10 @@
 }
 .urbizen-page-legal .legal-fiche dd {
   margin: 0;
+  /* Le numéro de contrat d'assurance est une chaîne insécable de vingt
+     caractères : sans cette règle il déborde de la colonne à 320 px, comme
+     l'avaient fait les pointillés du formulaire de rétractation. */
+  overflow-wrap: anywhere;
   color: var(--u-ink);
   font-size: 15.5px;
   line-height: 1.55;

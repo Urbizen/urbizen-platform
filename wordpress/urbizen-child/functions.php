@@ -371,8 +371,8 @@ const URBIZEN_CHILD_TEMPLATES_LEGAL = array(
  * préparation. Une page légale qui affiche « [À COMPLÉTER] » est pire qu'une
  * page absente : elle donne l'apparence de la conformité.
  *
- * Les valeurs présentes ci-dessous ont été confirmées par la propriétaire le
- * 10 août 2026. Celles qui manquent sont documentées dans
+ * Les valeurs présentes ci-dessous ont été confirmées par la propriétaire les
+ * 10 et 11 août 2026. Celles qui manquent sont documentées dans
  * `docs/AUDIT_PAGES_LEGALES.md`.
  *
  * @return array<string, mixed>
@@ -405,20 +405,51 @@ function urbizen_child_donnees_legales() {
 			'telephone'      => null,
 		),
 
+		// --- Régime fiscal, confirmé le 11 août 2026 ---
+		// La micro-entreprise est un RÉGIME FISCAL, pas une forme juridique :
+		// elle se range ici, et non dans `forme`, qui reste « Entrepreneur
+		// individuel (EI) ».
+		//
+		// `numero` reste `null` : la franchise en base n'impose pas d'afficher
+		// un numéro de TVA intracommunautaire, et aucun n'a été communiqué.
+		// Absent veut dire absent, pas « à retrouver ».
+		'tva'                    => array(
+			'statut'  => 'Micro-entreprise',
+			'regime'  => 'Franchise en base de TVA',
+			'mention' => 'TVA non applicable, article 293 B du code général des impôts',
+			'numero'  => null,
+		),
+
+		// --- Assurance, confirmée le 11 août 2026 sur attestation ---
+		// UN SEUL CONTRAT COUVRE LES DEUX GARANTIES. D'où une seule entrée :
+		// deux clés séparées recopieraient le même numéro à deux endroits,
+		// c'est-à-dire exactement la divergence que cette source existe pour
+		// empêcher.
+		//
+		// Les dates ne sont PAS destinées au public : les gabarits ne les
+		// affichent pas. Elles servent uniquement d'alerte de fraîcheur à
+		// `urbizen_child_donnees_legales_manquantes()`, pour qu'une attestation
+		// échue soit signalée avant un déploiement plutôt que découverte par un
+		// client.
+		'assurance'              => array(
+			'assureur'          => 'Zurich Insurance Europe AG, succursale française',
+			'contrat'           => '7400042329-199800202',
+			'garanties'         => array(
+				'Responsabilité Civile Professionnelle',
+				'Responsabilité Civile Décennale',
+			),
+			'activites'         => array(
+				'Assistant à la maîtrise d\'ouvrage technique',
+				'Dessinateur projeteur',
+			),
+			'territoire'        => 'France métropolitaine et Corse',
+			'attestation_debut' => '2026-07-01',
+			'attestation_fin'   => '2026-12-31',
+		),
+
 		// --- Non vérifié : `null`, et rien d'autre ---
-		// Le numéro de TVA et surtout le RÉGIME applicable aux prix ne se
-		// déduisent d'aucune source interne : ni devis, ni facture, ni code.
-		// Déduire un régime d'un numéro trouvé dans un registre serait une
-		// affirmation fiscale inventée.
-		'tva_numero'             => null,
-		'tva_regime'             => null,
-
-		// Assurances : leur existence est confirmée, leur contenu non. On ne
-		// publie aucune affirmation précise sans attestation.
-		'assurance_rcp'          => null,
-		'assurance_decennale'    => null,
-
-		// Médiateur de la consommation : aucune convention connue.
+		// Médiateur de la consommation : aucune convention connue. Seul
+		// blocage juridique documentaire restant.
 		'mediateur'              => null,
 	);
 }
@@ -452,9 +483,12 @@ function urbizen_child_donnees_legales_manquantes() {
 		);
 	}
 
-	if ( null === $d['tva_regime'] ) {
+	// La branche subsiste alors que la donnée est renseignée : elle décrit
+	// l'obligation, pas l'état du jour. La retirer ferait disparaître le
+	// contrôle en même temps que le problème qu'il surveille.
+	if ( null === $d['tva'] ) {
 		$absents[] = array(
-			'cle'       => 'tva_regime',
+			'cle'       => 'tva',
 			'document'  => 'CGV',
 			'niveau'    => 'bloquant',
 			'pourquoi'  => 'Le prix doit être annoncé de façon non équivoque : soit TTC, soit avec la mention de franchise en base (CGI, art. 293 B) qui impose « TVA non applicable, art. 293 B du CGI ». Publier des prix sans indiquer lequel des deux régimes s\'applique laisse le consommateur dans l\'incertitude.',
@@ -462,14 +496,42 @@ function urbizen_child_donnees_legales_manquantes() {
 		);
 	}
 
-	if ( null === $d['assurance_rcp'] && null === $d['assurance_decennale'] ) {
+	if ( null === $d['assurance'] ) {
 		$absents[] = array(
-			'cle'       => 'assurances',
+			'cle'       => 'assurance',
 			'document'  => 'Mentions légales',
 			'niveau'    => 'a_verifier',
 			'pourquoi'  => 'L\'activité déclarée d\'Urbizen est une assistance administrative et graphique, sans maîtrise d\'œuvre ni travaux : l\'affichage des assurances n\'est pas, à ce titre, une mention obligatoire des mentions légales. Son absence ne rend donc pas la page irrégulière. En revanche, la page /tarifs/ met en avant « RCP et assurance décennale » : cette affirmation commerciale doit pouvoir être justifiée.',
 			'ou'        => 'Mentions légales, section « Assurances » — omise tant que l\'attestation n\'est pas fournie.',
 		);
+	}
+
+	// FRAÎCHEUR DE L'ATTESTATION
+	//
+	// Une attestation d'assurance est datée, et les pages affirment une
+	// couverture au présent. Passé le terme, l'affirmation n'est plus
+	// justifiée : ce n'est pas un défaut de rédaction, c'est une pièce à
+	// renouveler. Signalé sans bloquer — le contrat peut être en cours de
+	// reconduction alors que la nouvelle attestation n'est pas encore émise.
+	//
+	// Ce contrôle dépend volontairement de la date du jour : c'est ce qui
+	// empêche le site d'entrer dans l'année suivante en affichant une
+	// couverture dont la pièce justificative a expiré.
+	if ( is_array( $d['assurance'] ) && null !== $d['assurance']['attestation_fin'] ) {
+		$fin = $d['assurance']['attestation_fin'];
+
+		if ( gmdate( 'Y-m-d' ) > $fin ) {
+			$absents[] = array(
+				'cle'       => 'assurance_attestation',
+				'document'  => 'Mentions légales',
+				'niveau'    => 'a_verifier',
+				'pourquoi'  => sprintf(
+					'L\'attestation d\'assurance couvre la période s\'achevant le %s, désormais passée. Les mentions légales, les CGV et la page /tarifs/ affirment une couverture au présent : il faut obtenir l\'attestation de la période en cours, ou retirer ces affirmations.',
+					$fin
+				),
+				'ou'        => 'Source commune `urbizen_child_donnees_legales()`, clé `assurance` — mettre à jour `attestation_debut` et `attestation_fin`.',
+			);
+		}
 	}
 
 	if ( null === $d['hebergeur']['telephone'] ) {

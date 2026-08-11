@@ -24,6 +24,15 @@
  * lancer — le contraire du but recherché. On le lance explicitement, avant un
  * déploiement, et son verdict figure dans le compte rendu.
  *
+ * IL DÉPEND DE LA DATE DU JOUR, ET C'EST VOULU
+ *
+ * L'attestation d'assurance porte un terme. Passé celui-ci, les pages
+ * continueraient d'affirmer une couverture au présent sans pièce à l'appui.
+ * Le banc signale donc l'attestation échue — en « à vérifier », le contrat
+ * pouvant se reconduire avant que la nouvelle attestation ne soit émise. Un
+ * banc qui ne regarderait pas le calendrier laisserait passer cette péremption
+ * en silence.
+ *
  *     php tests/legal/test-legal-readiness.php
  *
  * Codes de sortie : 0 publiable · 1 au moins un blocage.
@@ -93,8 +102,15 @@ foreach ( array( 'page-mentions-legales', 'page-cgv', 'page-confidentialite' ) a
 		$fuites[] = "$slug affiche des coordonnées de médiateur alors qu'aucune n'est connue";
 	}
 
-	if ( null === $donnees['assurance_decennale'] && preg_match( '/assur\w+ (en )?décennale|police n°/i', $t ) ) {
+	if ( null === $donnees['assurance'] && preg_match( '/assur\w+ (en )?décennale|police n°/i', $t ) ) {
 		$fuites[] = "$slug affirme une couverture d'assurance non attestée";
+	}
+
+	// Le numéro de contrat et le nom de l'assureur ne doivent exister qu'à un
+	// seul endroit : la source commune, lue par le pattern. Recopiés dans un
+	// gabarit, ils survivraient à un changement d'assureur.
+	if ( preg_match( '/Zurich|7400042329/i', $t ) ) {
+		$fuites[] = "$slug recopie les coordonnées d'assurance au lieu de lire la source commune";
 	}
 
 	if ( preg_match( '/à compléter|à venir|sera communiqué/i', $t ) ) {

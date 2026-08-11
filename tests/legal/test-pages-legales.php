@@ -50,6 +50,8 @@ $css   = (string) file_get_contents( $theme . '/assets/css/urbizen-pages.css' );
 $style = (string) file_get_contents( $theme . '/style.css' );
 $ident = (string) file_get_contents( $theme . '/patterns/legal-identite.php' );
 $nav   = (string) file_get_contents( $theme . '/patterns/legal-navigation.php' );
+$assur = (string) file_get_contents( $theme . '/patterns/legal-assurance.php' );
+$tva   = (string) file_get_contents( $theme . '/patterns/legal-tva.php' );
 
 $pages = array(
 	'page-mentions-legales' => 'Mentions légales',
@@ -133,8 +135,26 @@ check( '3 · le pattern d\'identité lit la source, sans valeur en dur',
 check( '3 · aucune coordonnée recopiée dans les gabarits',
 	! preg_match( '/105\s?253\s?132/', implode( '', $tpl ) ) );
 check( '3 · les données non vérifiées valent null, jamais une chaîne',
-	preg_match( "/'mediateur'\s*=> null/", $fns )
-	&& preg_match( "/'tva_regime'\s*=> null/", $fns ) );
+	1 === preg_match( "/'mediateur'\s*=> null/", $fns ) );
+check( '3 · le régime de TVA et l\'assurance sont renseignés, non plus null',
+	! preg_match( "/'tva'\s*=> null/", $fns )
+	&& ! preg_match( "/'assurance'\s*=> null/", $fns ) );
+check( '3 · le pattern d\'assurance lit la source, sans valeur en dur',
+	str_contains( $assur, 'urbizen_child_donnees_legales()' )
+	&& ! preg_match( '/Zurich|7400042329/i', $assur ) );
+// On contrôle ce que le pattern ÉMET, pas ce qu'il explique : son en-tête cite
+// l'article 293 B pour justifier la rédaction, et cette citation ne doit pas
+// être confondue avec une valeur recopiée. Même distinction qu'au contrôle 7
+// entre émetteurs et mentions.
+$tva_emis = preg_replace( '#/\*.*?\*/|//[^\n]*#s', '', $tva );
+
+check( '3 · le pattern de TVA lit la source, sans mention recopiée',
+	str_contains( $tva, 'urbizen_child_donnees_legales()' )
+	&& ! preg_match( '/293\s?B/i', (string) $tva_emis ) );
+check( '3 · aucune coordonnée d\'assurance recopiée dans les gabarits',
+	! preg_match( '/Zurich|7400042329/i', implode( '', $tpl ) ) );
+check( '3 · aucune mention fiscale recopiée dans les gabarits',
+	! preg_match( '/293\s?B/i', implode( '', $tpl ) ) );
 check( '3 · aucun « à compléter » dans les gabarits',
 	! preg_match( '/à compléter|A COMPLETER|\[…\]|XXXX/i', implode( '', $tpl ) ) );
 
@@ -147,7 +167,16 @@ check( '4 · CGV : aucun ancien tarif 149 €', ! preg_match( '/\b149\b/', $cgv 
 check( '4 · CGV : aucun ancien tarif 349 €', ! preg_match( '/\b349\b/', $cgv ) );
 check( '4 · CGV : aucune grille tarifaire recopiée',
 	! preg_match( '/\b(189|249|449|549|649|849)\b/', $cgv ) );
-check( '4 · CGV : renvoi vers la page Tarifs', str_contains( $cgv, 'href="/tarifs/"' ) );
+check( '4 · CGV : renvoi vers la page Tarifs',
+	str_contains( $cgv, '"slug":"urbizen-child/legal-tva"' ) && str_contains( $tva, 'href="/tarifs/"' ) );
+check( '4 · CGV : le régime de TVA est tranché, non renvoyé au devis',
+	str_contains( $cgv, '"slug":"urbizen-child/legal-tva"' )
+	&& ! preg_match( '/régime de taxe sur la valeur ajoutée applicable est celui indiqué/i', $cgv ) );
+check( '4 · CGV : la TVA n\'est présentée ni comme une réserve ni comme un obstacle',
+	! preg_match( '/sous réserve|le cas échéant.{0,40}TVA|TVA.{0,40}sera précisé|en attente/i', $tva ) );
+check( '4 · CGV : assurance professionnelle alimentée par la source commune',
+	str_contains( $cgv, '"slug":"urbizen-child/legal-assurance"' )
+	&& preg_match( '/Assurance professionnelle/i', $cgv ) );
 check( '4 · CGV : aucune promesse générale de 48 heures', ! preg_match( '/48\s*h/i', $cgv ) );
 check( '4 · CGV : aucun médiateur nommé tant qu\'il n\'est pas désigné',
 	! preg_match( '/médiateur\s*:\s*\w|www\.[a-z-]+médiation|CNPM|MEDICYS|AME CONSO/i', $cgv ) );
@@ -196,8 +225,17 @@ check( '4 · Mentions : Urbizen n\'est pas présentée comme architecte',
 	preg_match( "/n'est pas un cabinet d'architecture/i", $mentions ) );
 check( '4 · Mentions : pas d\'exclusion générale de responsabilité',
 	! preg_match( /* phpcs:ignore */ '/décline toute responsabilité|en aucun cas responsable/i', $mentions ) );
-check( '4 · Mentions : aucune affirmation d\'assurance sans attestation',
-	! preg_match( '/décennale|RCP/i', $mentions ) );
+// L'attestation étant fournie, l'affirmation est justifiée : le contrôle
+// s'inverse. Ce qui reste interdit, c'est de la recopier — le pattern lit la
+// source, et le contrôle 3 vérifie qu'aucune valeur ne migre vers un gabarit.
+check( '4 · Mentions : section Assurances alimentée par la source commune',
+	str_contains( $mentions, 'id="assurances"' )
+	&& str_contains( $mentions, '"slug":"urbizen-child/legal-assurance"' ) );
+check( '4 · Mentions : les deux garanties énoncées',
+	preg_match( '/responsabilité civile professionnelle/i', $mentions )
+	&& preg_match( '/responsabilité civile décennale/i', $mentions ) );
+check( '4 · Mentions : la couverture ne déborde pas sur la maîtrise d\'œuvre',
+	preg_match( "/ne couvrent ni la maîtrise d'œuvre/i", $mentions ) );
 check( '4 · Mentions : lien vers la politique de confidentialité',
 	str_contains( $mentions, 'href="/privacy-policy/"' ) );
 
@@ -249,7 +287,7 @@ check( '5 · aucune image ajoutée sur les pages légales',
 preg_match( '/^Version:\s*(.+)$/m', $style, $v );
 $version = isset( $v[1] ) ? trim( $v[1] ) : '';
 
-check( '6 · version du thème = 0.3.0 (deux nouveaux patterns déployés)', '0.3.0' === $version, 'lue : ' . $version );
+check( '6 · version du thème = 0.3.0 (quatre nouveaux patterns déployés)', '0.3.0' === $version, 'lue : ' . $version );
 check( '6 · une seule source de vérité pour la version', 1 === preg_match_all( '/^Version:/m', $style ) );
 
 // ======================================================================

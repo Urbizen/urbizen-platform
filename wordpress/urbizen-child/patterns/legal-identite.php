@@ -57,10 +57,16 @@ $u = urbizen_child_donnees_legales();
       <dt>Immatriculation</dt>
       <dd class="legal-mono"><?php echo esc_html( $u['rcs'] ); ?></dd>
     </div>
-<?php if ( null !== $u['tva_numero'] ) : ?>
+<?php if ( null !== $u['tva'] ) : ?>
+    <div class="legal-fiche-ligne">
+      <dt>TVA</dt>
+      <dd><?php echo esc_html( $u['tva']['regime'] ); ?> — <?php echo esc_html( $u['tva']['mention'] ); ?></dd>
+    </div>
+<?php endif; ?>
+<?php if ( null !== $u['tva'] && null !== $u['tva']['numero'] ) : ?>
     <div class="legal-fiche-ligne">
       <dt>TVA intracommunautaire</dt>
-      <dd class="legal-mono"><?php echo esc_html( $u['tva_numero'] ); ?></dd>
+      <dd class="legal-mono"><?php echo esc_html( $u['tva']['numero'] ); ?></dd>
     </div>
 <?php endif; ?>
     <div class="legal-fiche-ligne">

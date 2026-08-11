@@ -1,7 +1,11 @@
-# Audit des pages légales — état au 10 août 2026
+# Audit des pages légales — état au 10 août 2026, complété le 11 août
 
 > Audit **en lecture seule**. Aucune écriture en production, aucun contenu
 > modifié. Ce document est la base du lot `feat/legal-pages-redesign`.
+>
+> Les sections 1 à 8 sont le constat du 10 août, conservé tel quel. La
+> **section 9** enregistre les données confirmées le 11 août et ce qu'elles
+> débloquent.
 
 ## 1 · État initial des trois pages
 
@@ -124,13 +128,13 @@ rédactionnelle.
 | Adresse 59 rue de Ponthieu, Bureau 326, 75008 Paris | oui (CGV, politique) | vérifié côté site |
 | SIRET 105 253 132 00010 | oui (CGV, politique) | vérifié côté site |
 | `contact@urbizen.fr` · 06 64 89 58 15 | oui | vérifié |
-| Nom et prénom de l'entrepreneur | **non** | à confirmer |
-| Mention « entrepreneur individuel » / EI | **non** | à confirmer |
-| SIREN | **non** | à confirmer |
-| RCS / RNE et ville | **non** | à confirmer |
-| Numéro de TVA / régime fiscal | **non** — aucune occurrence | à confirmer |
-| Assureur RCP et décennale | **non** | à confirmer |
-| Médiateur de la consommation | **non** — aucune occurrence | **bloquant** |
+| Nom et prénom de l'entrepreneur | **non** | confirmé le 10/08 — voir §9 |
+| Mention « entrepreneur individuel » / EI | **non** | confirmé le 10/08 — voir §9 |
+| SIREN | **non** | confirmé le 10/08 — voir §9 |
+| RCS / RNE et ville | **non** | confirmé le 10/08 — voir §9 |
+| Numéro de TVA / régime fiscal | **non** — aucune occurrence | confirmé le 11/08 — voir §9 |
+| Assureur RCP et décennale | **non** | confirmé le 11/08 sur attestation — voir §9 |
+| Médiateur de la consommation | **non** — aucune occurrence | **bloquant, toujours ouvert** |
 
 Les éléments cités dans le brief (Anais Bacarisse, EI, SIREN 105 253 132, RCS
 Paris) **n'apparaissent nulle part dans le dépôt** : ils ne sont donc pas
@@ -143,3 +147,73 @@ Le site est hébergé chez Hostinger — confirmé par les greffons Hostinger ac
 et l'environnement serveur. L'entité contractante applicable au contrat Urbizen
 et ses coordonnées téléphoniques **restent à confirmer** : elles ne figurent
 dans aucune source interne, et il ne faut pas en inventer.
+
+## 9 · Mise à jour du 11 août 2026 — données confirmées
+
+> Les sections 1 à 8 restent le constat d'audit du 10 août, inchangé. Cette
+> section enregistre ce que la propriétaire a confirmé depuis, et ce que cela
+> déplace. Le constat initial n'est pas réécrit : c'est lui qui explique
+> pourquoi ces pages ont été refaites.
+
+### Régime fiscal
+
+Micro-entreprise, entrepreneur individuel, **franchise en base de TVA**.
+
+La micro-entreprise est un régime **fiscal** : elle est portée par la clé `tva`
+de la source commune, et non par `forme`, qui reste « Entrepreneur individuel
+(EI) ». L'identité juridique du site demeure **Anaïs Bacarisse**.
+
+Les prix ne sont pas soumis à la TVA et aucune taxe ne s'ajoute au montant
+annoncé. Les documents portent la mention « TVA non applicable, article 293 B du
+code général des impôts ». La franchise est un régime **établi**, énoncé au
+présent : les CGV ne la présentent ni comme une réserve, ni comme une
+incertitude renvoyée au devis — c'était la rédaction précédente, faute de régime
+confirmé. Aucun numéro de TVA intracommunautaire n'a été communiqué, et la
+franchise n'en impose pas l'affichage : la clé reste `null`, donc la ligne reste
+absente.
+
+**Conséquence : la TVA n'est plus un bloquant.**
+
+### Assurance
+
+| Élément | Valeur |
+|---|---|
+| Assureur | Zurich Insurance Europe AG, succursale française |
+| Contrat | 7400042329-199800202 |
+| Garanties | Responsabilité Civile Professionnelle · Responsabilité Civile Décennale |
+| Activités assurées | Assistant à la maîtrise d'ouvrage technique · Dessinateur projeteur |
+| Couverture géographique | France métropolitaine et Corse |
+| Validité de l'attestation | 01/07/2026 → 31/12/2026 |
+
+Un seul contrat couvre les deux garanties : la source ne comporte donc qu'une
+clé `assurance`, et non deux. Deux clés recopieraient le même numéro à deux
+endroits — la divergence que cette source existe pour empêcher.
+
+**Les dates de validité ne sont pas publiées.** Publier « attestation valable
+jusqu'au 31/12/2026 » ferait paraître la page périmée dès le lendemain du terme,
+alors que le contrat, lui, se reconduit. Elles restent dans la source, où elles
+servent d'**alerte de fraîcheur documentaire** : passé le terme,
+`test-legal-readiness.php` signale l'attestation échue en « à vérifier » avant
+tout déploiement. Le banc dépend donc de la date du jour, délibérément.
+
+L'affirmation commerciale « RCP et assurance décennale » de `/tarifs/`, de
+`/conception/` et de l'accueil est **désormais justifiée** — le point 9 du
+tableau §3 et la réserve du §7 sont levés. Ces pages ne sont pas modifiées :
+leur rédaction devient exacte, elle n'a pas à changer.
+
+Les pages précisent en revanche que les garanties s'appliquent aux activités
+assurées et **ne couvrent ni la maîtrise d'œuvre, ni l'exécution ou la
+coordination de travaux** — cohérent avec le §4 des CGV et avec l'activité
+réellement exercée.
+
+### Ce qui reste ouvert
+
+| Sujet | État |
+|---|---|
+| **Médiateur de la consommation** | **seul blocage juridique documentaire.** Aucune convention connue, aucun médiateur inventé. La section 23 des CGV énonce le droit du client sans en désigner un. |
+| Téléphone de l'hébergeur | à vérifier, non bloquant — inchangé §8 |
+| Consentement cookies / traceurs | chantier séparé — §5, correction technique |
+| Mentions RGPD au point de collecte | chantier séparé — §6 |
+| Démarrage anticipé / rétractation | chantier séparé — §6 |
+
+`READY FOR PRODUCTION` reste **NON**, sur un seul bloquant.
