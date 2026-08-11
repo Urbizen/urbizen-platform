@@ -9,10 +9,11 @@
  * anciens tarifs, distinction consommateurs / professionnels.
  *
  * Il ne dit RIEN de la préparation juridique au déploiement. Un document peut
- * être techniquement irréprochable et rester impubliable faute de médiateur
- * désigné. Cette question relève de `test-legal-readiness.php`, délibérément
- * séparé : mélanger les deux rendrait ce banc rouge en permanence et
- * empêcherait tout développement local.
+ * être techniquement irréprochable et rester impubliable faute d'une donnée
+ * juridique — c'est ce qui s'est passé jusqu'au 11 août 2026, faute de
+ * médiateur désigné. Cette question relève de `test-legal-readiness.php`,
+ * délibérément séparé : mélanger les deux rendrait ce banc rouge en permanence
+ * et empêcherait tout développement local.
  *
  * Aucune donnée réelle de client, aucun réseau, aucune base.
  */
@@ -50,8 +51,9 @@ $css   = (string) file_get_contents( $theme . '/assets/css/urbizen-pages.css' );
 $style = (string) file_get_contents( $theme . '/style.css' );
 $ident = (string) file_get_contents( $theme . '/patterns/legal-identite.php' );
 $nav   = (string) file_get_contents( $theme . '/patterns/legal-navigation.php' );
-$assur = (string) file_get_contents( $theme . '/patterns/legal-assurance.php' );
-$tva   = (string) file_get_contents( $theme . '/patterns/legal-tva.php' );
+$assur  = (string) file_get_contents( $theme . '/patterns/legal-assurance.php' );
+$tva    = (string) file_get_contents( $theme . '/patterns/legal-tva.php' );
+$mediat = (string) file_get_contents( $theme . '/patterns/legal-mediateur.php' );
 
 $pages = array(
 	'page-mentions-legales' => 'Mentions légales',
@@ -134,11 +136,21 @@ check( '3 · le pattern d\'identité lit la source, sans valeur en dur',
 	&& ! preg_match( '/105\s?253\s?132/', $ident ) );
 check( '3 · aucune coordonnée recopiée dans les gabarits',
 	! preg_match( '/105\s?253\s?132/', implode( '', $tpl ) ) );
+// La règle « null = inconnu » ne se vérifie plus sur le médiateur, désormais
+// connu : elle se vérifie sur ce qui reste inconnu. Deux données le sont, et
+// elles doivent le rester tant que personne ne les a confirmées.
 check( '3 · les données non vérifiées valent null, jamais une chaîne',
-	1 === preg_match( "/'mediateur'\s*=> null/", $fns ) );
-check( '3 · le régime de TVA et l\'assurance sont renseignés, non plus null',
+	1 === preg_match( "/'telephone'\s*=> null/", $fns )
+	&& 1 === preg_match( "/'numero'\s*=> null/", $fns ) );
+check( '3 · TVA, assurance et médiateur sont renseignés, non plus null',
 	! preg_match( "/'tva'\s*=> null/", $fns )
-	&& ! preg_match( "/'assurance'\s*=> null/", $fns ) );
+	&& ! preg_match( "/'assurance'\s*=> null/", $fns )
+	&& ! preg_match( "/'mediateur'\s*=> null/", $fns ) );
+check( '3 · le pattern de médiation lit la source, sans coordonnée en dur',
+	str_contains( $mediat, 'urbizen_child_donnees_legales()' )
+	&& ! preg_match( '/CM2C|cm2c\.net|49 rue de Ponthieu/i', $mediat ) );
+check( '3 · aucune coordonnée de médiateur recopiée dans les gabarits',
+	! preg_match( '/CM2C|cm2c\.net/i', implode( '', $tpl ) ) );
 check( '3 · le pattern d\'assurance lit la source, sans valeur en dur',
 	str_contains( $assur, 'urbizen_child_donnees_legales()' )
 	&& ! preg_match( '/Zurich|7400042329/i', $assur ) );
@@ -178,11 +190,20 @@ check( '4 · CGV : assurance professionnelle alimentée par la source commune',
 	str_contains( $cgv, '"slug":"urbizen-child/legal-assurance"' )
 	&& preg_match( '/Assurance professionnelle/i', $cgv ) );
 check( '4 · CGV : aucune promesse générale de 48 heures', ! preg_match( '/48\s*h/i', $cgv ) );
-check( '4 · CGV : aucun médiateur nommé tant qu\'il n\'est pas désigné',
-	! preg_match( '/médiateur\s*:\s*\w|www\.[a-z-]+médiation|CNPM|MEDICYS|AME CONSO/i', $cgv ) );
+// L'adhésion étant finalisée, le contrôle s'inverse : la section doit NOMMER
+// le médiateur. Ce qui reste interdit, c'est la formule d'attente — un
+// médiateur « à désigner » ne satisfait pas l'article L.616-1.
 check( '4 · CGV : aucune formule « médiateur à désigner »',
 	! preg_match( '/une fois le médiateur désigné|à désigner|sera désigné/i', $cgv ) );
 check( '4 · CGV : section Médiation présente structurellement', str_contains( $cgv, 'id="mediation"' ) );
+check( '4 · CGV : le médiateur est nommé via la source commune',
+	str_contains( $cgv, '"slug":"urbizen-child/legal-mediateur"' ) );
+check( '4 · CGV : la réclamation préalable reste une condition de saisine',
+	preg_match( '/réclamation écrite préalable/i', $cgv )
+	&& preg_match( '/délai d\'un an/i', $cgv ) );
+check( '4 · CGV : la médiation reste facultative et gratuite',
+	preg_match( '/gratuitement/i', $cgv )
+	&& preg_match( '/la médiation étant facultative/i', $cgv ) );
 
 check( '4 · CGV : délai de rétractation de 14 jours énoncé',
 	preg_match( '/quatorze jours/i', $cgv ) );
@@ -287,7 +308,7 @@ check( '5 · aucune image ajoutée sur les pages légales',
 preg_match( '/^Version:\s*(.+)$/m', $style, $v );
 $version = isset( $v[1] ) ? trim( $v[1] ) : '';
 
-check( '6 · version du thème = 0.3.0 (quatre nouveaux patterns déployés)', '0.3.0' === $version, 'lue : ' . $version );
+check( '6 · version du thème = 0.3.0 (cinq nouveaux patterns déployés)', '0.3.0' === $version, 'lue : ' . $version );
 check( '6 · une seule source de vérité pour la version', 1 === preg_match_all( '/^Version:/m', $style ) );
 
 // ======================================================================

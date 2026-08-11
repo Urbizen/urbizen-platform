@@ -46,7 +46,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
       <ul>
         <li><a href="https://urbizen.fr/mentions-legales/">Mentions légales</a></li>
         <li><a href="https://urbizen.fr/privacy-policy/">Politique de confidentialité</a></li>
-        <li><a href="https://urbizen.fr/refund_returns/">Conditions générales de service</a></li>
+        <li><a href="https://urbizen.fr/refund_returns/">Conditions générales de vente</a></li>
       </ul>
     </div>
   </div>

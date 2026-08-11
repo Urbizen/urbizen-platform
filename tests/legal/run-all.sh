@@ -5,10 +5,12 @@
 #   ./run-all.sh
 #
 # Ce lanceur ne contient PAS `test-legal-readiness.php`, et c'est délibéré.
-# Ce dernier est fait pour être rouge tant qu'une donnée juridique manque —
-# aujourd'hui le médiateur et le régime de TVA. L'inclure ici rendrait la suite
-# technique rouge en permanence, et une suite toujours rouge finit par ne plus
-# être lancée. On le lance donc à part, avant tout déploiement :
+# Ce dernier est fait pour être rouge tant qu'une donnée juridique manque — il
+# l'a été jusqu'au 11 août 2026 pour le médiateur et le régime de TVA, et le
+# redeviendra si l'attestation d'assurance vient à échoir. L'inclure ici
+# exposerait la suite technique à un rouge d'origine juridique, et une suite
+# qu'on n'ose plus lancer ne sert plus. On le lance donc à part, avant tout
+# déploiement :
 #
 #   php tests/legal/test-legal-readiness.php
 #

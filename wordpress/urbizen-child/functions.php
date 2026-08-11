@@ -447,10 +447,18 @@ function urbizen_child_donnees_legales() {
 			'attestation_fin'   => '2026-12-31',
 		),
 
-		// --- Non vérifié : `null`, et rien d'autre ---
-		// Médiateur de la consommation : aucune convention connue. Seul
-		// blocage juridique documentaire restant.
-		'mediateur'              => null,
+		// --- Médiateur de la consommation, adhésion finalisée le 11 août 2026 ---
+		// Le professionnel qui vend à des consommateurs doit garantir un
+		// recours à un médiateur ET en communiquer les coordonnées
+		// (code de la consommation, art. L.616-1). Les deux conditions sont
+		// désormais remplies : la CGV nomme le médiateur au lieu d'annoncer
+		// qu'il sera désigné.
+		'mediateur'              => array(
+			'nom'     => 'Centre de la Médiation de la Consommation de Conciliateurs de Justice',
+			'sigle'   => 'CM2C',
+			'adresse' => array( '49 rue de Ponthieu', '75008 Paris', 'France' ),
+			'site'    => 'https://www.cm2c.net',
+		),
 	);
 }
 

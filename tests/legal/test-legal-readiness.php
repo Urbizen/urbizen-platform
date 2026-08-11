@@ -113,6 +113,11 @@ foreach ( array( 'page-mentions-legales', 'page-cgv', 'page-confidentialite' ) a
 		$fuites[] = "$slug recopie les coordonnées d'assurance au lieu de lire la source commune";
 	}
 
+	// Même raison pour le médiateur : une adhésion se résilie et se remplace.
+	if ( preg_match( '/CM2C|cm2c\.net/i', $t ) ) {
+		$fuites[] = "$slug recopie les coordonnées du médiateur au lieu de lire la source commune";
+	}
+
 	if ( preg_match( '/à compléter|à venir|sera communiqué/i', $t ) ) {
 		$fuites[] = "$slug contient une mention d'attente destinée au public";
 	}

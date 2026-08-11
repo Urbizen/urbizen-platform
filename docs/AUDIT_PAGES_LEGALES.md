@@ -134,7 +134,7 @@ rédactionnelle.
 | RCS / RNE et ville | **non** | confirmé le 10/08 — voir §9 |
 | Numéro de TVA / régime fiscal | **non** — aucune occurrence | confirmé le 11/08 — voir §9 |
 | Assureur RCP et décennale | **non** | confirmé le 11/08 sur attestation — voir §9 |
-| Médiateur de la consommation | **non** — aucune occurrence | **bloquant, toujours ouvert** |
+| Médiateur de la consommation | **non** — aucune occurrence | adhésion finalisée le 11/08 — voir §9 |
 
 Les éléments cités dans le brief (Anais Bacarisse, EI, SIREN 105 253 132, RCS
 Paris) **n'apparaissent nulle part dans le dépôt** : ils ne sont donc pas
@@ -206,14 +206,49 @@ assurées et **ne couvrent ni la maîtrise d'œuvre, ni l'exécution ou la
 coordination de travaux** — cohérent avec le §4 des CGV et avec l'activité
 réellement exercée.
 
+### Médiateur de la consommation — adhésion finalisée
+
+| Élément | Valeur |
+|---|---|
+| Médiateur | CM2C — Centre de la Médiation de la Consommation de Conciliateurs de Justice |
+| Adresse | 49 rue de Ponthieu, 75008 Paris |
+| Site | www.cm2c.net |
+
+L'article L.616-1 du code de la consommation impose **deux** choses : garantir
+le recours à un médiateur, et en **communiquer les coordonnées**. C'est la
+seconde qui manquait. La section 23 des CGV énonçait déjà le droit du client ;
+elle nomme désormais le médiateur, par le pattern `legal-mediateur` qui lit la
+source commune.
+
+Le point 3 du tableau §3 — « Médiateur non désigné : *seront communiquées une
+fois le médiateur désigné* » — est **levé**. Aucune formule d'attente ne subsiste
+dans les gabarits : un médiateur « à désigner » ne satisfait pas l'article
+L.616-1, et c'est précisément pourquoi cette formule avait été retirée plutôt que
+conservée.
+
+Les CGV précisent les conditions de recevabilité de la saisine : réclamation
+écrite préalable adressée à Urbizen, délai d'un an à compter de celle-ci,
+médiation gratuite et facultative, faculté de saisir le juge préservée.
+
+**Les mentions légales ne référencent pas le médiateur** et n'ont donc pas été
+complétées : la médiation relève du rapport contractuel, traité par les CGV, et
+non des mentions obligatoires de l'éditeur au sens de la LCEN. Un rappel y reste
+possible, sans obligation.
+
 ### Ce qui reste ouvert
 
 | Sujet | État |
 |---|---|
-| **Médiateur de la consommation** | **seul blocage juridique documentaire.** Aucune convention connue, aucun médiateur inventé. La section 23 des CGV énonce le droit du client sans en désigner un. |
+| **Blocages juridiques documentaires** | **aucun.** |
 | Téléphone de l'hébergeur | à vérifier, non bloquant — inchangé §8 |
+| Fraîcheur de l'attestation d'assurance | alerte automatique après le 31/12/2026 |
 | Consentement cookies / traceurs | chantier séparé — §5, correction technique |
 | Mentions RGPD au point de collecte | chantier séparé — §6 |
 | Démarrage anticipé / rétractation | chantier séparé — §6 |
+| Migration des slugs `/refund_returns/` et `/privacy-policy/` | chantier séparé, touche la production |
 
-`READY FOR PRODUCTION` reste **NON**, sur un seul bloquant.
+`READY FOR PRODUCTION` passe à **OUI**. Les trois documents peuvent être publiés.
+
+Cela ne rend pas le **site** conforme pour autant : le défaut de consentement aux
+traceurs (§5) demeure, et il ne se corrige pas par la rédaction. La distinction
+importe — ces documents sont publiables, la couche technique reste à poser.
