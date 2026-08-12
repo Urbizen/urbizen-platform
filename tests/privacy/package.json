@@ -1,0 +1,13 @@
+{
+  "name": "urbizen-tests-privacy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Bancs de consentement aux traceurs — observation réseau et stockage dans un navigateur réel.",
+  "scripts": {
+    "audit": "node audit-traceurs.mjs",
+    "audit:chatway": "node audit-chatway.mjs",
+    "consentement": "node test-consentement.mjs"
+  },
+  "devDependencies": { "playwright": "^1.62.0" }
+}
