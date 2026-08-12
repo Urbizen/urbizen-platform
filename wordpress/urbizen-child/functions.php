@@ -1235,3 +1235,66 @@ function urbizen_child_cmp_safe_mode( $valeur ) {
 	return urbizen_child_cmp_apercu() ? $valeur : 1;
 }
 add_filter( 'cmplz_option_safe_mode', 'urbizen_child_cmp_safe_mode' );
+
+/* -------------------------------------------------------------------------
+ * CHATWAY — CHARGEMENT CONDITIONNÉ AU CONSENTEMENT
+ *
+ * POURQUOI UN CONDITIONNEMENT MAISON
+ *
+ * Complianz ne connaît pas Chatway : ni intégration, ni entrée dans sa base de
+ * services. Son bloqueur ne peut donc pas l'arrêter. On le retient ici, sans
+ * modifier le greffon Chatway lui-même — qui serait écrasé à sa prochaine mise
+ * à jour.
+ *
+ * POURQUOI LA CATÉGORIE « MARKETING »
+ *
+ * Décidée par le comportement observé, non par la nature du service. Un chat en
+ * direct pourrait passer pour fonctionnel ; l'analyse de `widget.js` montre
+ * autre chose : un identifiant de visiteur persistant (`ch_visitor_details_*`,
+ * `ch_session_info_*`), des points de terminaison nommés `/pixel/`, un appel à
+ * `cdn-cgi/trace` qui récupère l'adresse IP et le pays, et un stockage sur
+ * `s3.us-west-2` — hors EEE. Détail dans `docs/AUDIT_CONSENTEMENT.md`.
+ *
+ * CE QUE CELA NE COUVRE PAS
+ *
+ * Le retrait du consentement en cours de page ne décharge pas un script déjà
+ * exécuté : Complianz recharge la page, et c'est ce rechargement qui rétablit
+ * l'état. Le contrôle porte donc sur la page suivante, pas sur l'instant du
+ * clic.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Marque les scripts Chatway comme retenus, en toutes circonstances.
+ *
+ * POURQUOI PAS DE CONDITION CÔTÉ SERVEUR
+ *
+ * Une décision prise en PHP est figée dans le cache de page : LiteSpeed sert
+ * la même réponse à un visiteur consentant et à un visiteur qui a refusé.
+ * Mesuré — `x-litespeed-cache: hit` sur les deux. Un verrou côté serveur
+ * bloquerait donc Chatway pour tout le monde, définitivement.
+ *
+ * La balise est donc TOUJOURS neutralisée en `text/plain`, ce qui est
+ * cachable sans risque, et c'est le script de Complianz qui la réactive dans
+ * le navigateur dès que la catégorie « marketing » est acceptée. Même
+ * mécanisme que pour tous les services qu'il connaît déjà.
+ *
+ * @param string $balise Balise complète.
+ * @param string $handle Identifiant du script.
+ * @return string
+ */
+function urbizen_child_neutralise_chatway( $balise, $handle ) {
+	if ( false === stripos( $balise, 'chatway' ) ) {
+		return $balise;
+	}
+
+	if ( false !== stripos( $balise, 'text/plain' ) ) {
+		return $balise;
+	}
+
+	return str_replace(
+		'<script ',
+		'<script type="text/plain" data-service="chatway" data-category="marketing" ',
+		$balise
+	);
+}
+add_filter( 'script_loader_tag', 'urbizen_child_neutralise_chatway', 20, 2 );
