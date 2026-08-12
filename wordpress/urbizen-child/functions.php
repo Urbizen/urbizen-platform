@@ -1291,9 +1291,14 @@ function urbizen_child_neutralise_chatway( $balise, $handle ) {
 		return $balise;
 	}
 
+	// `data-category` SANS `data-service` : le consentement par service est
+	// activé, et Complianz n'a pas Chatway à son catalogue. Un service inconnu
+	// ne peut jamais être consenti — les balises restaient donc inertes après
+	// acceptation. Le marquage par catégorie, lui, est libéré dès que
+	// « marketing » est accepté.
 	return str_replace(
 		'<script ',
-		'<script type="text/plain" data-service="chatway" data-category="marketing" ',
+		'<script type="text/plain" data-category="marketing" ',
 		$balise
 	);
 }
