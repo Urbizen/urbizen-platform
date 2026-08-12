@@ -1264,19 +1264,37 @@ add_filter( 'cmplz_option_safe_mode', 'urbizen_child_cmp_safe_mode' );
  * ------------------------------------------------------------------------- */
 
 /**
- * Marque les scripts Chatway comme retenus, en toutes circonstances.
+ * Marque les scripts Chatway comme retenus, selon le balisage de Complianz.
  *
  * POURQUOI PAS DE CONDITION CÔTÉ SERVEUR
  *
- * Une décision prise en PHP est figée dans le cache de page : LiteSpeed sert
- * la même réponse à un visiteur consentant et à un visiteur qui a refusé.
- * Mesuré — `x-litespeed-cache: hit` sur les deux. Un verrou côté serveur
- * bloquerait donc Chatway pour tout le monde, définitivement.
+ * Une décision prise en PHP est figée dans le cache de page : LiteSpeed sert la
+ * même réponse à un visiteur consentant et à un visiteur qui a refusé. Mesuré —
+ * `x-litespeed-cache: hit` sur les deux. Un verrou PHP bloquerait donc Chatway
+ * pour tout le monde, définitivement. La balise est neutralisée en toutes
+ * circonstances, ce qui se cache sans risque, et c'est le navigateur qui décide.
  *
- * La balise est donc TOUJOURS neutralisée en `text/plain`, ce qui est
- * cachable sans risque, et c'est le script de Complianz qui la réactive dans
- * le navigateur dès que la catégorie « marketing » est acceptée. Même
- * mécanisme que pour tous les services qu'il connaît déjà.
+ * LE BALISAGE EXACT COMPTE
+ *
+ * Complianz ne lit PAS `src` : il cherche `data-cmplz-src`, et à défaut le
+ * contenu en ligne.
+ *
+ *     const src = obj.getAttribute( 'data-cmplz-src' );
+ *
+ * Une balise laissée en `type="text/plain"` avec son `src` d'origine n'est donc
+ * jamais réexécutée — pire, un bloc de nettoyage la retire du document. C'est
+ * ce qui a fait échouer deux tentatives : le chat restait bloqué même après
+ * acceptation. La source doit migrer vers `data-cmplz-src`.
+ *
+ * CATÉGORIE « MARKETING »
+ *
+ * Décidée par le comportement observé, non par la nature du service. Un chat en
+ * direct pourrait passer pour fonctionnel ; `widget.js` porte un identifiant de
+ * visiteur persistant (`ch_visitor_details_*`), appelle des points de
+ * terminaison `/pixel/`, récupère l'IP via `cdn-cgi/trace` et stocke hors EEE —
+ * tout cela avant la moindre interaction. Détail dans
+ * `docs/AUDIT_CONSENTEMENT.md`. À revoir si ce suivi passif devient
+ * désactivable.
  *
  * @param string $balise Balise complète.
  * @param string $handle Identifiant du script.
@@ -1287,15 +1305,12 @@ function urbizen_child_neutralise_chatway( $balise, $handle ) {
 		return $balise;
 	}
 
-	if ( false !== stripos( $balise, 'text/plain' ) ) {
+	if ( false !== stripos( $balise, 'data-cmplz-src' ) ) {
 		return $balise;
 	}
 
-	// `data-category` SANS `data-service` : le consentement par service est
-	// activé, et Complianz n'a pas Chatway à son catalogue. Un service inconnu
-	// ne peut jamais être consenti — les balises restaient donc inertes après
-	// acceptation. Le marquage par catégorie, lui, est libéré dès que
-	// « marketing » est accepté.
+	$balise = preg_replace( '/\ssrc=/i', ' data-cmplz-src=', $balise, 1 );
+
 	return str_replace(
 		'<script ',
 		'<script type="text/plain" data-category="marketing" ',
