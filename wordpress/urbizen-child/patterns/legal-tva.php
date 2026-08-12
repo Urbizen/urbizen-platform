@@ -36,7 +36,13 @@ $u = urbizen_child_donnees_legales();
 <!-- wp:html -->
 <p>Les prix en vigueur sont consultables sur la page <a href="/tarifs/">Tarifs</a>. Ils sont exprimés en euros.</p>
 <?php if ( null !== $u['tva'] ) : ?>
-<p>Urbizen relève du régime de la <strong><?php echo esc_html( strtolower( $u['tva']['regime'] ) ); ?></strong>. <?php echo esc_html( $u['tva']['effet'] ); ?></p>
+<?php
+// `lcfirst` et non `strtolower` : seule l'initiale doit tomber pour enchaîner
+// « du régime de la… ». `strtolower` écrasait aussi le sigle et produisait
+// « franchise en base de tva », visible en production le 11 août 2026.
+$regime_en_phrase = lcfirst( $u['tva']['regime'] );
+?>
+<p>Urbizen relève du régime de la <strong><?php echo esc_html( $regime_en_phrase ); ?></strong>. <?php echo esc_html( $u['tva']['effet'] ); ?></p>
 <p>Les devis et factures portent la mention réglementaire applicable à leur date d'émission.</p>
 <?php endif; ?>
 <!-- /wp:html -->
