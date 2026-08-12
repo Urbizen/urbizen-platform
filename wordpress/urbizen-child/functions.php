@@ -1148,3 +1148,90 @@ function urbizen_child_body_class( $classes ) {
 	return $classes;
 }
 add_filter( 'body_class', 'urbizen_child_body_class' );
+
+/* -------------------------------------------------------------------------
+ * APERÇU ISOLÉ DU CONSENTEMENT — DISPOSITIF TEMPORAIRE
+ *
+ * À RETIRER lors de l'activation publique du bandeau. Tant qu'il est en place,
+ * Complianz n'agit QUE pour une session d'aperçu ; le public voit exactement le
+ * comportement d'avant son installation.
+ *
+ * POURQUOI DEUX VERROUS ET NON UN
+ *
+ * Masquer le bandeau ne suffit pas. Le bloqueur de scripts de Complianz ne
+ * dépend pas du filtre d'affichage : il ne teste que `is_admin()`. Un bandeau
+ * seulement masqué laisserait donc les traceurs bloqués SANS moyen de
+ * consentir — analytics muet et chat indisponible pour de vrais visiteurs.
+ * D'où le second verrou sur `safe_mode`, qui court-circuite le bloqueur.
+ *
+ * COMMENT OUVRIR UNE SESSION D'APERÇU
+ *
+ *   https://urbizen.fr/?cmp-apercu=<jeton>
+ *
+ * Le jeton est défini par la constante `URBIZEN_CMP_APERCU` dans wp-config.php.
+ * Sans constante, l'aperçu est fermé : pas de valeur par défaut, pour qu'un
+ * oubli de configuration ne l'ouvre pas à tous.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * La requête courante est-elle une session d'aperçu du consentement ?
+ *
+ * @return bool
+ */
+function urbizen_child_cmp_apercu() {
+	static $apercu = null;
+
+	if ( null !== $apercu ) {
+		return $apercu;
+	}
+
+	$apercu = false;
+
+	if ( ! defined( 'URBIZEN_CMP_APERCU' ) || '' === (string) URBIZEN_CMP_APERCU ) {
+		return $apercu;
+	}
+
+	$attendu = (string) URBIZEN_CMP_APERCU;
+
+	// Le jeton arrive par l'URL, puis persiste par cookie le temps du parcours :
+	// les bancs doivent pouvoir recharger la page et suivre un lien.
+	$fourni = isset( $_GET['cmp-apercu'] ) ? sanitize_text_field( wp_unslash( $_GET['cmp-apercu'] ) ) : '';
+
+	if ( '' === $fourni && isset( $_COOKIE['urbizen_cmp_apercu'] ) ) {
+		$fourni = sanitize_text_field( wp_unslash( $_COOKIE['urbizen_cmp_apercu'] ) );
+	}
+
+	$apercu = '' !== $fourni && hash_equals( $attendu, $fourni );
+
+	if ( $apercu && ! isset( $_COOKIE['urbizen_cmp_apercu'] ) && ! headers_sent() ) {
+		setcookie( 'urbizen_cmp_apercu', $attendu, time() + 3 * HOUR_IN_SECONDS, '/', '', is_ssl(), true );
+	}
+
+	return $apercu;
+}
+
+/**
+ * Retient le bandeau hors des sessions d'aperçu.
+ *
+ * @param bool $besoin Décision de Complianz.
+ * @return bool
+ */
+function urbizen_child_cmp_bandeau( $besoin ) {
+	return urbizen_child_cmp_apercu() ? $besoin : false;
+}
+add_filter( 'cmplz_site_needs_cookiewarning', 'urbizen_child_cmp_bandeau' );
+
+/**
+ * Court-circuite le bloqueur de scripts hors des sessions d'aperçu.
+ *
+ * `safe_mode = 1` fait sortir `cmplz_cookie_blocker` avant tout traitement.
+ * Sans cela, un visiteur ordinaire verrait ses traceurs bloqués sans bandeau
+ * pour y consentir.
+ *
+ * @param mixed $valeur Valeur enregistrée.
+ * @return mixed
+ */
+function urbizen_child_cmp_safe_mode( $valeur ) {
+	return urbizen_child_cmp_apercu() ? $valeur : 1;
+}
+add_filter( 'cmplz_option_safe_mode', 'urbizen_child_cmp_safe_mode' );
