@@ -13,15 +13,25 @@
  * l'effet recherché. La suppression définitive, si elle est souhaitée, est une
  * décision distincte à prendre plus tard.
  *
- * CE QUI N'EST PAS FAIT ICI, ET POURQUOI
+ * `/commander-un-dossier/` : CONSERVÉE, MAIS HORS INDEX
  *
- * `/commander-un-dossier/` (page 12) est **retirée de ce lot**. Le contrôle de
- * valeur préalable a montré qu'elle porte le formulaire Fluent Forms n° 6
- * (« Demande de déclaration préalable de travaux »), qui compte 3 soumissions
- * réelles et n'est rendu **nulle part ailleurs**. La requête en base laissait
- * croire qu'il figurait aussi sur l'accueil, mais c'était dans le `post_content`
- * hérité de la page 4, que le gabarit de blocs ne rend jamais. Supprimer la page
- * couperait donc le seul accès public à ce formulaire.
+ * La page 12 n'est pas supprimée. Le contrôle de valeur préalable a montré
+ * qu'elle porte le formulaire Fluent Forms n° 6 (« Demande de déclaration
+ * préalable de travaux »), qui compte 3 soumissions réelles et n'est rendu
+ * **nulle part ailleurs**. La requête en base laissait croire qu'il figurait
+ * aussi sur l'accueil, mais c'était dans le `post_content` hérité de la page 4,
+ * que le gabarit de blocs ne rend jamais. Supprimer la page couperait donc le
+ * seul accès public à ce formulaire.
+ *
+ * Elle passe en revanche en `noindex` : c'est une page de tunnel, pas une page
+ * de recherche. L'intention « déclaration préalable » appartient à
+ * `/declarations-prealables/`, qui la travaille sur 1 724 mots. Deux pages qui
+ * visent la même requête se font concurrence ; celle qui perd doit être celle
+ * qui n'a pas été écrite pour ça.
+ *
+ * Le formulaire, ses champs et ses soumissions ne sont pas touchés, et aucun
+ * appel à l'action pointant vers la page n'est retiré : `noindex` ne concerne
+ * que les moteurs, pas les visiteurs.
  *
  * @package Urbizen\Scripts
  */
@@ -88,6 +98,7 @@ foreach ( $commentaires as $c ) {
 
 $a_desindexer = array(
 	8    => '/autres-projets/ — matière des clusters clôtures, abris, panneaux solaires (lot G)',
+	12   => '/commander-un-dossier/ — page de tunnel ; conservée pour le formulaire n° 6',
 	1171 => '/formulaire-declaration-prealable/ — coque d\'application, 0 mot',
 	1172 => '/formulaire-permis-de-construire/ — coque d\'application, 0 mot',
 	1190 => '/formulaire-conception/ — étape de tunnel ; la page Conception reste la référence',

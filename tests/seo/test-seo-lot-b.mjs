@@ -61,6 +61,7 @@ console.log(`\n════ LOT B — ${BASE} ════`);
   console.log('\n── 2 · URL conservées, hors index');
   for (const chemin of [
     '/autres-projets/',
+    '/commander-un-dossier/',
     '/formulaire-declaration-prealable/',
     '/formulaire-permis-de-construire/',
     '/formulaire-conception/',
@@ -68,6 +69,20 @@ console.log(`\n════ LOT B — ${BASE} ════`);
     const r = await lire(chemin);
     check(`${chemin} reste accessible`, r.code === 200, `code ${r.code}`);
     check(`${chemin} est en noindex`, r.code === 200 && !r.indexable, `robots : ${r.robots ?? '(absent)'}`);
+    // `noindex, follow` : AIOSEO n'écrit pas `follow`, qui est la valeur par
+    // défaut des moteurs. Ce qui se contrôle est donc l'absence de `nofollow` —
+    // les liens portés par ces pages doivent rester suivis.
+    check(`${chemin} laisse suivre ses liens`, !/nofollow/i.test(r.robots || ''), `robots : ${r.robots}`);
+  }
+
+  // La page de commande est conservée pour son formulaire : sa mise hors index
+  // ne doit toucher ni au formulaire, ni à son rendu.
+  {
+    const r = await lire('/commander-un-dossier/');
+    check('le formulaire n° 6 est toujours rendu sur /commander-un-dossier/',
+      /data-form_id="6"/.test(r.html), 'formulaire absent de la page');
+    const champs = (r.html.match(/<input[^>]*type="(?:text|email|tel)"/g) || []).length;
+    check('le formulaire n° 6 a conservé ses champs', champs >= 8, `${champs} champ(s) de saisie`);
   }
 
   // Les archives de date ne sont pas contrôlées sur un code précis, et c'est
@@ -164,8 +179,9 @@ console.log(`\n════ LOT B — ${BASE} ════`);
   }
 
   for (const absent of ['/shop/', '/cart/', '/checkout/', '/my-account/', '/hello-world/',
-    '/espace-professionnels/', '/autres-projets/', '/category/', '/author/', '/2026/',
-    '/formulaire-declaration-prealable/', '/formulaire-permis-de-construire/', '/formulaire-conception/']) {
+    '/espace-professionnels/', '/autres-projets/', '/commander-un-dossier/', '/category/',
+    '/author/', '/2026/', '/formulaire-declaration-prealable/',
+    '/formulaire-permis-de-construire/', '/formulaire-conception/']) {
     check(`plan de site sans ${absent}`, !urls.some((u) => u.includes(absent)),
       urls.filter((u) => u.includes(absent)).join(', '));
   }
