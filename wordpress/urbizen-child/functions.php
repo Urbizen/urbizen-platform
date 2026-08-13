@@ -1420,3 +1420,198 @@ function urbizen_child_noindex_archives_vides( $attributs ) {
 	return $attributs;
 }
 add_filter( 'aioseo_robots_meta', 'urbizen_child_noindex_archives_vides', 20 );
+
+/* -------------------------------------------------------------------------
+ * DONNÉES STRUCTURÉES — CORRECTIONS DU GRAPHE AIOSEO
+ *
+ * AIOSEO produit un graphe correct dans ses grandes lignes : un seul émetteur,
+ * aucun doublon, des `@id` qui se répondent. Trois choses lui manquent ou lui
+ * échappent, et se corrigent ici plutôt que par un réglage — parce qu'aucun
+ * réglage ne les expose.
+ *
+ * 1 · LE NŒUD `Person` DES ARTICLES POINTE VERS UNE PAGE 404
+ *
+ * `app/Common/Schema/Graphs/WebPage/PersonAuthor.php` construit l'auteur avec
+ * `get_author_posts_url()`, soit `/author/anais-bacarisse/`. Or le thème sert
+ * cette adresse en 404 depuis le lot A, délibérément : elle exposait l'adresse
+ * de courriel de la propriétaire dans son `<title>`.
+ *
+ * Aucun article n'étant publié, le nœud n'apparaît nulle part aujourd'hui. Il
+ * reviendra au premier article du blog, et personne ne s'en apercevrait. La
+ * correction est donc posée maintenant, pour être en place le jour venu.
+ *
+ * Le nom est conservé, l'`url` retirée, et l'`@id` remplacé par un identifiant
+ * stable qui n'est pas une adresse de page. Un `Person` sans `url` reste
+ * valide : schema.org ne l'exige pas, et Google non plus.
+ *
+ * 2 · L'ORGANISATION N'A NI COURRIEL NI ADRESSE
+ *
+ * AIOSEO Free n'expose aucun champ d'adresse — les clés disponibles sont
+ * `websiteName`, `siteRepresents`, `organizationName`, `organizationDescription`,
+ * `organizationLogo`, `personName`, `personLogo`, `phone`, `email`,
+ * `foundingDate` et `numberOfEmployees`. C'est tout. L'adresse passe donc par
+ * ce filtre.
+ *
+ * Elle est lue dans `urbizen_child_donnees_legales()`, la source unique déjà
+ * employée par les pages légales. La recopier ici la ferait diverger de ce que
+ * les mentions légales publient — exactement ce que cette source existe pour
+ * empêcher.
+ *
+ * `PostalAddress` sur une `Organization`, et non `LocalBusiness` : une
+ * organisation peut avoir un siège sans recevoir de clientèle. Urbizen prépare
+ * des dossiers à distance, partout en France ; déclarer un établissement
+ * recevant du public serait une affirmation fausse. Aucune coordonnée
+ * géographique, aucun horaire d'ouverture, pour la même raison.
+ *
+ * LE FIL D'ARIANE N'EST PAS TRAITÉ ICI
+ *
+ * Il annonçait « Home » sur un site francophone. La correction n'est pas un
+ * filtre mais un réglage : `breadcrumbs.homepageLabel`, posé par
+ * `scripts/seo-lot-e.php`.
+ *
+ * Le filtre `aioseo_schema_breadcrumbs_home`, qu'AIOSEO expose pourtant à
+ * l'endroit exact où la chaîne est écrite, **ne produit aucun effet** : le
+ * graphe ne passe pas par là. `Schema/Graphs/BreadcrumbList.php` ligne 23 lit
+ * `aioseo()->breadcrumbs->frontend->getBreadcrumbs()`, c'est-à-dire le même
+ * fil d'Ariane que celui affiché, dont le libellé d'accueil vient de l'option.
+ * Essayé et mesuré : le filtre laissait « Home » en place.
+ *
+ * CE QUI N'EST DÉLIBÉRÉMENT PAS FAIT
+ *
+ * Aucun `Service`, aucune `Offer`, aucun `FAQPage`. Baliser un prix
+ * réintroduirait le mécanisme du P0 du lot A — un montant périmé resté des mois
+ * dans les résultats. Le `FAQPage` n'apporterait rien : depuis août 2023 Google
+ * réserve ces enrichissements aux sites d'autorité reconnue.
+ *
+ * L'`@id` du premier maillon du fil d'Ariane, `https://urbizen.fr#listItem`
+ * sans barre finale, n'est pas retouché : il est valide, cohérent avec les
+ * autres références, et un filtre pour une barre oblique serait du bruit.
+ *
+ * `foundingDate` reste vide : aucune date de fondation n'est confirmée, et en
+ * déduire une serait inventer une donnée publiée.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Identifiant stable de l'autrice dans le graphe.
+ *
+ * Ce n'est pas une URL de page : c'est un identifiant de nœud. Il ne doit
+ * jamais pointer vers `/author/…`, qui répond 404 par décision.
+ */
+const URBIZEN_CHILD_ID_AUTRICE = 'https://urbizen.fr/#anais-bacarisse';
+
+/**
+ * Remplace toute référence à l'archive d'auteur par l'identifiant stable.
+ *
+ * Traite le nœud en profondeur plutôt que d'énumérer les propriétés connues.
+ * La première version ne corrigeait que `author` : le banc du futur article a
+ * relevé que `WebPage` porte aussi un `creator`, construit de la même façon.
+ * Énumérer les noms de propriétés, c'est parier sur ceux qu'AIOSEO emploie
+ * aujourd'hui ; viser la valeur — une URL d'archive d'auteur — vaut pour ceux
+ * qu'il emploiera demain.
+ *
+ * @param mixed $valeur Fragment de graphe.
+ * @return mixed
+ */
+function urbizen_child_remplace_archive_autrice( $valeur ) {
+	if ( is_string( $valeur ) ) {
+		return false !== strpos( $valeur, '/author/' ) ? URBIZEN_CHILD_ID_AUTRICE : $valeur;
+	}
+
+	if ( ! is_array( $valeur ) ) {
+		return $valeur;
+	}
+
+	foreach ( $valeur as $cle => $sous ) {
+		$valeur[ $cle ] = urbizen_child_remplace_archive_autrice( $sous );
+	}
+
+	return $valeur;
+}
+
+/**
+ * Corrige le graphe de données structurées émis par AIOSEO.
+ *
+ * @param array<int, array<string, mixed>> $graphe Nœuds du graphe.
+ * @return array<int, array<string, mixed>>
+ */
+function urbizen_child_corrige_schema( $graphe ) {
+	if ( ! is_array( $graphe ) ) {
+		return $graphe;
+	}
+
+	$legales = function_exists( 'urbizen_child_donnees_legales' ) ? urbizen_child_donnees_legales() : array();
+
+	foreach ( $graphe as &$noeud ) {
+		if ( ! is_array( $noeud ) || empty( $noeud['@type'] ) ) {
+			continue;
+		}
+
+		$types = (array) $noeud['@type'];
+
+		// --- Person : ni url, ni @id vers l'archive d'auteur ---------------
+		if ( in_array( 'Person', $types, true ) ) {
+			// L'`@id` est déjà ramené sur l'identifiant stable par le
+			// remplacement en profondeur. Reste `url`, qui doit disparaître
+			// plutôt que d'être réécrite : un `Person` sans `url` est valide,
+			// et il n'existe aucune page d'autrice à désigner.
+			unset( $noeud['url'] );
+		}
+
+		// --- Toute référence à l'archive d'auteur, où qu'elle soit ---------
+		//
+		// `Person` n'est pas le seul nœud concerné : `WebPage` porte un `author`
+		// ET un `creator`, tous deux construits par `get_author_posts_url()`.
+		// Le premier correctif n'avait traité que `author`, et le banc du futur
+		// article a relevé le `creator` resté en 404.
+		$noeud = urbizen_child_remplace_archive_autrice( $noeud );
+
+		// --- Organization : courriel et adresse postale --------------------
+		if ( in_array( 'Organization', $types, true ) ) {
+			if ( ! empty( $legales['email'] ) && empty( $noeud['email'] ) ) {
+				$noeud['email'] = $legales['email'];
+			}
+
+			if ( ! empty( $legales['adresse'] ) && is_array( $legales['adresse'] ) && empty( $noeud['address'] ) ) {
+				// La source donne l'adresse en lignes : rue, code postal et
+				// ville, pays. On la découpe selon cette convention plutôt que
+				// de dupliquer les valeurs.
+				$lignes = array_values( $legales['adresse'] );
+				$rue    = $lignes[0] ?? '';
+				$ville  = $lignes[1] ?? '';
+				$pays   = $lignes[2] ?? '';
+
+				$code    = '';
+				$localite = $ville;
+
+				if ( preg_match( '/^\s*(\d{5})\s+(.+)$/u', $ville, $m ) ) {
+					$code     = $m[1];
+					$localite = $m[2];
+				}
+
+				$adresse = array( '@type' => 'PostalAddress' );
+
+				if ( '' !== $rue ) {
+					$adresse['streetAddress'] = $rue;
+				}
+				if ( '' !== $code ) {
+					$adresse['postalCode'] = $code;
+				}
+				if ( '' !== $localite ) {
+					$adresse['addressLocality'] = $localite;
+				}
+				if ( '' !== $pays ) {
+					$adresse['addressCountry'] = $pays;
+				}
+
+				if ( count( $adresse ) > 1 ) {
+					$noeud['address'] = $adresse;
+				}
+			}
+		}
+	}
+
+	unset( $noeud );
+
+	return $graphe;
+}
+add_filter( 'aioseo_schema_output', 'urbizen_child_corrige_schema' );
