@@ -55,6 +55,13 @@ $assur  = (string) file_get_contents( $theme . '/patterns/legal-assurance.php' )
 $tva    = (string) file_get_contents( $theme . '/patterns/legal-tva.php' );
 $mediat = (string) file_get_contents( $theme . '/patterns/legal-mediateur.php' );
 
+// Les trois pieds de page que le thème sait rendre. Ils portent les liens vers
+// les documents légaux et sont, avec les gabarits, la surface où une adresse
+// périmée reste visible pour un visiteur.
+$pied_accueil = (string) file_get_contents( $theme . '/patterns/footer-accueil.php' );
+$pied_fse     = (string) file_get_contents( $theme . '/parts/footer.html' );
+$pied_landing = (string) file_get_contents( $theme . '/parts/footer-landing.html' );
+
 $pages = array(
 	'page-mentions-legales' => 'Mentions légales',
 	'page-cgv'              => 'Conditions générales de vente',
@@ -271,7 +278,7 @@ check( '4 · Mentions : les deux garanties énoncées',
 check( '4 · Mentions : la couverture ne déborde pas sur la maîtrise d\'œuvre',
 	preg_match( "/ne couvrent ni la maîtrise d'œuvre/i", $mentions ) );
 check( '4 · Mentions : lien vers la politique de confidentialité',
-	str_contains( $mentions, 'href="/privacy-policy/"' ) );
+	str_contains( $mentions, 'href="/politique-de-confidentialite/"' ) );
 
 $conf = $tpl['page-confidentialite'];
 
@@ -366,8 +373,40 @@ check( '8 · la navigation marque le document courant sans le lier',
 	str_contains( $nav, 'aria-current="page"' ) && str_contains( $nav, 'legal-nav-courant' ) );
 check( '8 · les trois documents figurent dans la navigation',
 	str_contains( $nav, '/mentions-legales/' )
-	&& str_contains( $nav, '/refund_returns/' )
-	&& str_contains( $nav, '/privacy-policy/' ) );
+	&& str_contains( $nav, '/conditions-generales-de-vente/' )
+	&& str_contains( $nav, '/politique-de-confidentialite/' ) );
+
+// Les anciennes adresses héritées de WooCommerce ont été migrées le 13 août
+// 2026 et répondent 404 : aucune redirection n'a été demandée. Un lien resté
+// en arrière est donc un lien mort, pas une simple imprécision — d'où ce
+// contrôle, qui balaie tout ce que le thème publie, gabarits et pieds compris.
+//
+// POURQUOI UN DÉCOMMENTEUR LOCAL
+//
+// `$sans_commentaires`, plus haut, retire aussi les commentaires `//`. Sur une
+// source qui contient des URL absolues, il ampute `https://urbizen.fr/...`
+// après `https:` — et masquerait donc exactement la fuite qu'on cherche. Ici
+// seuls les blocs `/* */` tombent : c'est là que vit la note d'historique de
+// `legal-navigation.php`, qui cite les anciennes adresses pour dire qu'elles
+// sont mortes.
+$sans_blocs = static fn( $src ) => (string) preg_replace( '#/\*.*?\*/#s', '', $src );
+
+$sources_publiees = $tpl + array(
+	'navigation'    => $nav,
+	'pied-accueil'  => $pied_accueil,
+	'pied-fse'      => $pied_fse,
+	'pied-landing'  => $pied_landing,
+);
+$fuites = array();
+
+foreach ( $sources_publiees as $nom => $source ) {
+	if ( preg_match( '#(refund_returns|privacy-policy)#', $sans_blocs( $source ) ) ) {
+		$fuites[] = $nom;
+	}
+}
+
+check( '8 · aucune ancienne adresse légale ne subsiste dans ce que le thème publie',
+	array() === $fuites, 'trouvée dans : ' . implode( ', ', $fuites ) );
 
 echo "\n";
 

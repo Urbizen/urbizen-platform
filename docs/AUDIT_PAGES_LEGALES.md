@@ -275,3 +275,56 @@ possible, sans obligation.
 Cela ne rend pas le **site** conforme pour autant : le défaut de consentement aux
 traceurs (§5) demeure, et il ne se corrige pas par la rédaction. La distinction
 importe — ces documents sont publiables, la couche technique reste à poser.
+
+---
+
+## 10 · Mise à jour du 13 août 2026 — migration des slugs
+
+Le dernier chantier listé comme séparé au §9 est soldé. Les sections 1 à 9
+ci-dessus restent telles qu'écrites : elles décrivent un état daté, et
+l'inventaire du §1 cite les anciens slugs parce que c'étaient les slugs du jour
+de l'audit.
+
+### Ce qui a changé en production
+
+| ID | Titre | Ancien slug | Nouveau slug | Gabarit |
+|---|---|---|---|---|
+| 26 | Conditions générales de vente | `refund_returns` | `conditions-generales-de-vente` | `page-cgv` (inchangé) |
+| 3 | Politiques de confidentialités | `privacy-policy` | `politique-de-confidentialite` | `page-confidentialite` (inchangé) |
+| 14 | Mentions Légales | — | `mentions-legales` (inchangé) | `page-mentions-legales` (inchangé) |
+
+Mêmes identifiants de page, mêmes gabarits, même contenu : c'est une
+renomination d'adresse, pas une recréation. Modification faite à la main dans
+WordPress par la propriétaire.
+
+### Aucune redirection 301, et c'est une décision
+
+Le site ayant encore très peu de trafic, la propriétaire a écarté les
+redirections. Les deux anciennes adresses répondent donc **404**, ce qui est
+assumé et non un oubli. Aucune extension de redirection n'a été installée.
+
+Conséquence directe : un lien interne resté en arrière n'est pas une
+imprécision mais un lien mort. Entre la migration et sa répercussion dans le
+dépôt, le pied de page du site a pointé vers deux 404 — constaté puis corrigé le
+même jour.
+
+### Ce qui a suivi dans le dépôt
+
+Toutes les références internes ont été reprises : le pied de page de la maquette
+et ses trois déclinaisons dans le thème, la navigation entre documents légaux,
+les renvois croisés des gabarits CGV et mentions légales, les bancs et la
+documentation. Un contrôle a été ajouté à `tests/legal/test-pages-legales.php` :
+il balaie gabarits, navigation et pieds de page, et échoue si l'une des deux
+anciennes adresses y réapparaît.
+
+### Référencement
+
+Vérifié après migration, sans intervention nécessaire : AIOSEO a suivi de
+lui-même. Canonique, `og:url`, titres, descriptions, cartes Twitter et JSON-LD
+portent les nouvelles adresses ; le plan de site les liste et ne contient plus
+les anciennes.
+
+Un seul écart relevé : le titre de la page 3 était resté au pluriel,
+« Politiques de confidentialités », ce que reprenait le fil d'Ariane JSON-LD. Il
+a été aligné sur « Politique de confidentialité », déjà porté par le gabarit et
+par la balise de titre.
