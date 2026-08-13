@@ -36,6 +36,8 @@ if command -v "$NODE_BIN" >/dev/null 2>&1; then
 	verdict $? "test-seo-lot-b.mjs"
 	"$NODE_BIN" test-seo-lot-c.mjs "$BASE"
 	verdict $? "test-seo-lot-c.mjs"
+	"$NODE_BIN" test-seo-lot-d.mjs "$BASE"
+	verdict $? "test-seo-lot-d.mjs"
 else
 	printf '\033[33m⚠ Node introuvable : volet en ligne non exécuté.\033[0m\n'
 fi

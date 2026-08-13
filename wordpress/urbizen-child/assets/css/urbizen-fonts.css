@@ -62,9 +62,35 @@
 	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* --- IBM Plex Mono — références techniques (400 seulement) --- */
+/* --- IBM Plex Mono, sous un nom propre à la charte ---
+
+   La famille s'appelle « IBM Plex Mono Urbizen » et non « IBM Plex Mono ».
+   Ce n'est pas une coquetterie.
+
+   Le thème parent déclare « IBM Plex Mono » à la même graisse, et WordPress
+   imprime ses `@font-face` en priorité 50 sur `wp_head`, après nos feuilles
+   mises en file en priorité 8. À nom et graisse égaux, la dernière déclaration
+   l'emporte : la sienne. Son `.ttf` de 49,8 Ko était donc téléchargé à la place
+   de nos 9,8 Ko de `.woff2`, qui restaient `unloaded`.
+
+   Déclarer après lui a été essayé, en priorité 60 : l'accueil est passé à un
+   seul fichier, mais les pages internes continuaient de charger les deux, sans
+   qu'aucun caractère ne sorte des plages Unicode déclarées ni qu'une graisse
+   explique l'écart. Un correctif qui ne marche qu'à moitié est plus dangereux
+   qu'aucun correctif — il faudrait le vérifier page par page à chaque
+   publication.
+
+   Un nom distinct supprime la concurrence au lieu de l'arbitrer. Toutes les
+   règles qui demandent cette police ont été reprises en même temps : le jeton
+   `--u-font-mono` et les attributs `font-family` des plans en SVG de l'accueil.
+
+   Les documents de formulaire — `assets/forms/*.html` — gardent « IBM Plex
+   Mono » : ce sont des pages autonomes, chargées dans une iframe, avec leurs
+   propres `@font-face`. Le thème parent n'y entre pas, il n'y a donc rien à y
+   départager. */
+
 @font-face {
-	font-family: "IBM Plex Mono";
+	font-family: "IBM Plex Mono Urbizen";
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
@@ -73,10 +99,46 @@
 }
 
 @font-face {
-	font-family: "IBM Plex Mono";
+	font-family: "IBM Plex Mono Urbizen";
 	font-style: normal;
 	font-weight: 400;
 	font-display: swap;
 	src: url("../fonts/ibm-plex-mono-latin.woff2") format("woff2");
 	unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ============================================================================
+   FAMILLE DU DOCUMENT — POUR QUE OPEN SANS NE SOIT PLUS RÉSOLUE
+
+   Les styles globaux du thème parent posent `body { font-family: Open Sans }`.
+   Sur les gabarits Urbizen, deux éléments seulement en héritaient — le lien
+   d'évitement et le conteneur de blocs, dont aucun ne porte de texte propre —
+   et cela suffisait à faire télécharger `OpenSans-Variable.ttf`, 331,8 Ko, sur
+   chaque page. Un navigateur ne charge une police qu'au moment de peindre un
+   caractère : il suffit donc qu'aucun élément ne la demande.
+
+   La règle vit dans cette feuille parce qu'elle n'est mise en file que sur les
+   gabarits Urbizen. Les pages héritées — `/contact/`, `/autres-projets/`,
+   `/commander-un-dossier/` — ne la reçoivent pas et gardent Open Sans, qui y
+   est la police du contenu et non un résidu. C'est voulu : les alléger
+   reviendrait à les redessiner, ce qui relève de leur reprise.
+
+   POURQUOI `html body` ET NON `body`
+
+   L'ordre des feuilles n'est pas le même sur toutes les pages. Sur les gabarits
+   de contenu, cette feuille est imprimée après les styles globaux — position
+   33 493 contre 6 992 sur les mentions légales — et `body` seul suffirait. Sur
+   le gabarit de formulaire, elle est imprimée **avant** : 5 946 contre 6 877.
+   Là, `body` seul perdait, et la page continuait de télécharger Open Sans.
+
+   `html body` vaut (0,0,2) contre (0,0,1) pour la règle des styles globaux :
+   la spécificité tranche, quel que soit l'ordre. C'est moins élégant qu'un
+   sélecteur simple, mais cela ne dépend plus de l'ordre d'impression des
+   feuilles, qui varie d'un gabarit à l'autre sans que rien ne le garantisse.
+
+   Aucun `!important` : la spécificité suffit, et elle se raisonne.
+   ========================================================================== */
+
+html body {
+	font-family: var(--u-font-body, "IBM Plex Sans", system-ui, sans-serif);
 }
