@@ -38,7 +38,7 @@
   /* --- Typographies --- */
   --u-font-title:  "Space Grotesk", system-ui, sans-serif;   /* titres, boutons */
   --u-font-body:   "IBM Plex Sans", system-ui, sans-serif;   /* textes courants */
-  --u-font-mono:   "IBM Plex Mono", ui-monospace, monospace; /* références techniques */
+  --u-font-mono:   "IBM Plex Mono Urbizen", ui-monospace, monospace; /* références techniques */
 
   /* --- Rythme --- */
   --u-maxw:        1120px;
