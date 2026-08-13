@@ -162,3 +162,116 @@
 #cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-documents:not(:has(li > a:not(:empty):not(.cmplz-hidden))) {
   display: none;
 }
+
+/* ---------------------------------------------------------------------------
+   5 · Contrôles de catégories
+
+   CE QUI N'ALLAIT PAS, ET POURQUOI
+
+   Trois défauts distincts se cumulaient sur la ligne d'une catégorie.
+
+   1. DEUX CHEVRONS SUPERPOSÉS. Complianz peint le chevron deux fois : un `<svg>`
+      dans le balisage, ET une image de fond sur le `<span>` qui le contient —
+      `background: var(--cmplz_category_open_icon_url)`, c'est-à-dire
+      `assets/images/down.png`. Mesuré : SVG de 16×18 à y=536, PNG de 25×25 à
+      y=542. Six pixels d'écart, d'où l'impression de flèche dédoublée.
+
+   2. UN CARRÉ GRIS BORDÉ. `background: rgb(239, 239, 239)`, `border: 2px outset`
+      — ce ne sont pas les styles de Complianz mais ceux du navigateur pour un
+      `<button>` nu. Le bandeau vit hors de la portée des réinitialisations du
+      thème, personne ne les neutralisait.
+
+   3. AUCUNE ROTATION, ET UNE LIGNE ROMPUE EN DESSOUS DE 768 px. La règle de
+      rotation de Complianz vise `.cmplz-category[open]`, or la catégorie est un
+      `<div>` qui ne reçoit jamais d'attribut `open` : le chevron restait fixe,
+      section ouverte comme fermée. Et une règle `grid-template-columns: 1fr
+      !important` empilait titre, interrupteur et chevron sur trois rangées, le
+      bouton occupant alors toute la largeur — la « grosse case grise ».
+
+   Aucun de ces trois défauts ne venait de cette feuille : elle ne touchait au
+   bouton d'expansion que par son contour de focus.
+   ------------------------------------------------------------------------ */
+
+/* 5.1 · La ligne tient sur une seule rangée à toutes les largeurs :
+   titre · interrupteur · chevron. Le `!important` répond à celui de Complianz,
+   qui ne peut pas être contourné par la seule spécificité. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-categories .cmplz-category .cmplz-category-header {
+  grid-template-columns: 1fr auto auto !important;
+  align-items: center;
+  column-gap: 14px;
+}
+
+/* Surface de la ligne : le gris neutre de Complianz laisse la place à la
+   surface alternée de la charte. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-categories .cmplz-category {
+  background-color: var(--u-surface-2, #F2F5F8);
+}
+
+/* 5.2 · Le bouton perd la chrome native : ni fond, ni bordure permanente,
+   ni relief. Il ne reste qu'une cible de clic. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: var(--u-radius-sm, 3px);
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--u-ink, #14233B);
+}
+
+/* 5.3 · Un seul chevron. On éteint l'image de fond et on garde le SVG, qui est
+   vectoriel, prend la couleur du texte et se prête à la rotation. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle .cmplz-icon.cmplz-open {
+  background: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: none;
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle svg {
+  display: block;
+  height: 11px;
+  width: auto;
+  fill: var(--u-ink, #14233B);
+  transition: transform 0.25s ease;
+}
+
+/* 5.4 · Rotation pilotée par `aria-expanded`, que Complianz tient à jour sur le
+   bouton — et non par `[open]`, qui n'arrive jamais sur un `<div>`. L'état
+   visible et l'état annoncé aux technologies d'assistance ont ainsi une seule
+   et même source. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* 5.5 · Interrupteurs : le halo de focus de Complianz est un bleu écrit en dur
+   (`#245fcc`) et il apparaît aussi à la souris. On le remplace par le vert
+   Urbizen, réservé au parcours clavier. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-banner-checkbox input.cmplz-consent-checkbox:focus + .cmplz-label::before {
+  box-shadow: none;
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-banner-checkbox input.cmplz-consent-checkbox:focus-visible + .cmplz-label::before {
+  box-shadow: 0 0 0 2px var(--u-brand, #128A5A);
+}
+
+/* 5.6 · Le mouvement du chevron reste une commodité : il disparaît si le
+   système demande à réduire les animations. La règle globale de la charte ne
+   couvre pas le bandeau sur les pages qui ne chargent pas `urbizen-tokens.css`. */
+@media (prefers-reduced-motion: reduce) {
+  #cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle svg {
+    transition: none;
+  }
+}
