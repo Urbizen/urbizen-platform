@@ -17,7 +17,13 @@ function check_pc( $label, $condition ) {
 }
 
 check_pc( 'Un seul titre principal', 1 === preg_match_all( '/<h1[\s>]/', $tpl ) );
-check_pc( 'Le titre éditorial historique est conservé', str_contains( $tpl, 'Votre permis de construire, préparé de A à Z.' ) );
+// Le H1 a gagné le mot « dossier » au lot C, le 13 août 2026. Ce n'est pas un
+// ajustement de style : « Votre permis de construire, préparé de A à Z » pouvait
+// se lire comme une promesse d'obtention de l'autorisation. Avec « dossier », le
+// verbe « préparé » porte sur ce qui est réellement livré — et le H1 s'aligne
+// sur le title « Dossier de permis de construire à distance ».
+check_pc( 'Le titre éditorial est conservé', str_contains( $tpl, 'Votre dossier de permis de construire, préparé de A à Z.' ) );
+check_pc( 'Le titre ne promet pas l\'obtention du permis', ! preg_match( '/<h1[^>]*>\s*Votre permis de construire/', $tpl ) );
 check_pc( 'Les CTA ouvrent directement le formulaire PC', substr_count( $tpl, 'href="/formulaire-permis-de-construire/"' ) >= 5 );
 check_pc( 'Les CTA principaux nomment le permis de construire en toutes lettres',
 	2 === substr_count( $tpl, '>Démarrer mon permis de construire</a>' )
