@@ -288,8 +288,25 @@ check( '4 · Confidentialité : prestataires réellement observés, nommés',
 check( '4 · Confidentialité : transferts hors EEE traités', str_contains( $conf, 'id="transferts"' ) );
 check( '4 · Confidentialité : aucune formule vague sur les cookies',
 	! preg_match( "/lorsqu'un module de gestion est disponible/i", $conf ) );
-check( '4 · Confidentialité : aucun bandeau de consentement affirmé',
-	! preg_match( '/bandeau de consentement|notre gestionnaire de cookies|en cliquant sur « Accepter »/i', $conf ) );
+// L'assertion s'inverse : un gestionnaire de consentement existe désormais.
+// Ce qui était mensonger hier — l'affirmer — deviendrait mensonger aujourd'hui
+// de le taire.
+check( '4 · Confidentialité : le gestionnaire de consentement est décrit',
+	preg_match( '/Complianz/i', $conf )
+	&& preg_match( '/accepter/i', $conf )
+	&& preg_match( '/refuser/i', $conf ) );
+check( '4 · Confidentialité : retrait du consentement et lien permanent',
+	preg_match( '/Gérer le consentement/i', $conf )
+	&& preg_match( '/retirer votre choix|retrait/i', $conf ) );
+check( '4 · Confidentialité : AdSense annoncé comme non inséré',
+	preg_match( "/n'est pas inséré dans les pages/i", $conf )
+	&& preg_match( '/Aucune publicité n.est diffusée/i', $conf ) );
+check( '4 · Confidentialité : Chatway annoncé comme retiré',
+	preg_match( "/Chatway.{0,40}n'est plus utilisé/i", $conf ) );
+// Complianz gratuit fournit une preuve de consentement, pas le registre
+// individuel du module Premium. La page ne doit pas laisser croire l'inverse.
+check( '4 · Confidentialité : aucun registre individuel revendiqué',
+	! preg_match( '/registre des consentements|records of consent|registre individuel/i', $conf ) );
 check( '4 · Confidentialité : les cases des formulaires ne sont pas présentées comme un consentement RGPD',
 	preg_match( '/ne constituent pas un consentement au sens du règlement/i', $conf ) );
 check( '4 · Confidentialité : CNIL et voie de réclamation', str_contains( $conf, 'cnil.fr' ) );

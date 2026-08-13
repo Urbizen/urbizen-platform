@@ -1148,3 +1148,131 @@ function urbizen_child_body_class( $classes ) {
 	return $classes;
 }
 add_filter( 'body_class', 'urbizen_child_body_class' );
+
+/* -------------------------------------------------------------------------
+ * CHATWAY — CHARGEMENT CONDITIONNÉ AU CONSENTEMENT
+ *
+ * POURQUOI UN CONDITIONNEMENT MAISON
+ *
+ * Complianz ne connaît pas Chatway : ni intégration, ni entrée dans sa base de
+ * services. Son bloqueur ne peut donc pas l'arrêter. On le retient ici, sans
+ * modifier le greffon Chatway lui-même — qui serait écrasé à sa prochaine mise
+ * à jour.
+ *
+ * POURQUOI LA CATÉGORIE « MARKETING »
+ *
+ * Décidée par le comportement observé, non par la nature du service. Un chat en
+ * direct pourrait passer pour fonctionnel ; l'analyse de `widget.js` montre
+ * autre chose : un identifiant de visiteur persistant (`ch_visitor_details_*`,
+ * `ch_session_info_*`), des points de terminaison nommés `/pixel/`, un appel à
+ * `cdn-cgi/trace` qui récupère l'adresse IP et le pays, et un stockage sur
+ * `s3.us-west-2` — hors EEE. Détail dans `docs/AUDIT_CONSENTEMENT.md`.
+ *
+ * CE QUE CELA NE COUVRE PAS
+ *
+ * Le retrait du consentement en cours de page ne décharge pas un script déjà
+ * exécuté : Complianz recharge la page, et c'est ce rechargement qui rétablit
+ * l'état. Le contrôle porte donc sur la page suivante, pas sur l'instant du
+ * clic.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Marque les scripts Chatway comme retenus, selon le balisage de Complianz.
+ *
+ * POURQUOI PAS DE CONDITION CÔTÉ SERVEUR
+ *
+ * Une décision prise en PHP est figée dans le cache de page : LiteSpeed sert la
+ * même réponse à un visiteur consentant et à un visiteur qui a refusé. Mesuré —
+ * `x-litespeed-cache: hit` sur les deux. Un verrou PHP bloquerait donc Chatway
+ * pour tout le monde, définitivement. La balise est neutralisée en toutes
+ * circonstances, ce qui se cache sans risque, et c'est le navigateur qui décide.
+ *
+ * LE BALISAGE EXACT COMPTE
+ *
+ * Complianz ne lit PAS `src` : il cherche `data-cmplz-src`, et à défaut le
+ * contenu en ligne.
+ *
+ *     const src = obj.getAttribute( 'data-cmplz-src' );
+ *
+ * Une balise laissée en `type="text/plain"` avec son `src` d'origine n'est donc
+ * jamais réexécutée — pire, un bloc de nettoyage la retire du document. C'est
+ * ce qui a fait échouer deux tentatives : le chat restait bloqué même après
+ * acceptation. La source doit migrer vers `data-cmplz-src`.
+ *
+ * LE GREFFON CHATWAY EST DÉSACTIVÉ DEPUIS LE 12 AOÛT 2026
+ *
+ * Ce filtre ne s'applique donc plus à rien. Il est conservé comme filet : si
+ * le greffon était réactivé, ses scripts seraient retenus d'emblée plutôt que
+ * chargés sans consentement le temps qu'on s'en aperçoive.
+ *
+ * CATÉGORIE « MARKETING »
+ *
+ * Décidée par le comportement observé, non par la nature du service. Un chat en
+ * direct pourrait passer pour fonctionnel ; `widget.js` porte un identifiant de
+ * visiteur persistant (`ch_visitor_details_*`), appelle des points de
+ * terminaison `/pixel/`, récupère l'IP via `cdn-cgi/trace` et stocke hors EEE —
+ * tout cela avant la moindre interaction. Détail dans
+ * `docs/AUDIT_CONSENTEMENT.md`. À revoir si ce suivi passif devient
+ * désactivable.
+ *
+ * @param string $balise Balise complète.
+ * @param string $handle Identifiant du script.
+ * @return string
+ */
+function urbizen_child_neutralise_chatway( $balise, $handle ) {
+	if ( false === stripos( $balise, 'chatway' ) ) {
+		return $balise;
+	}
+
+	if ( false !== stripos( $balise, 'data-cmplz-src' ) ) {
+		return $balise;
+	}
+
+	$balise = preg_replace( '/\ssrc=/i', ' data-cmplz-src=', $balise, 1 );
+
+	return str_replace(
+		'<script ',
+		'<script type="text/plain" data-category="marketing" ',
+		$balise
+	);
+}
+add_filter( 'script_loader_tag', 'urbizen_child_neutralise_chatway', 20, 2 );
+
+/**
+ * Charge l'habillage Urbizen du bandeau de consentement.
+ *
+ * CHARGEMENT GLOBAL, ET C'EST NÉCESSAIRE
+ *
+ * Contrairement aux feuilles de la maquette, celle-ci n'est pas conditionnée au
+ * gabarit : le bandeau s'affiche sur toutes les pages, y compris celles qui
+ * n'utilisent pas les gabarits Urbizen. Elle est en revanche conditionnée à la
+ * présence de Complianz — sans lui, elle n'aurait rien à peindre.
+ *
+ * `cmplz-general` est le seul style que Complianz met en file côté serveur ; la
+ * feuille du bandeau, elle, est injectée par JavaScript et arrive donc toujours
+ * après. La déclaration de dépendance ne sert pas à gagner la cascade — cela,
+ * c'est la feuille elle-même qui s'en charge par sa spécificité — mais à ne
+ * charger l'habillage que là où le gestionnaire est réellement présent.
+ *
+ * @return void
+ */
+function urbizen_child_enqueue_consentement() {
+	if ( ! wp_style_is( 'cmplz-general', 'registered' ) && ! wp_style_is( 'cmplz-general', 'enqueued' ) ) {
+		return;
+	}
+
+	$dir     = get_stylesheet_directory();
+	$chemin  = '/assets/css/urbizen-consentement.css';
+
+	if ( ! file_exists( $dir . $chemin ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'urbizen-consentement',
+		get_stylesheet_directory_uri() . $chemin,
+		array( 'cmplz-general' ),
+		(string) filemtime( $dir . $chemin )
+	);
+}
+add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_consentement', 40 );

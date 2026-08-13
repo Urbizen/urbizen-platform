@@ -1,0 +1,277 @@
+/* ============================================================================
+   urbizen-consentement.css
+   Habillage du gestionnaire de consentement (Complianz) aux couleurs Urbizen.
+
+   PÉRIMÈTRE : RENDU UNIQUEMENT
+   Cette feuille ne touche à rien d'autre que la peinture du bandeau. Aucune
+   catégorie, aucun service, aucun signal de Consent Mode, aucun script bloqué
+   ou débloqué ne dépend d'elle : la logique reste entièrement chez Complianz,
+   WP Consent API et Site Kit.
+
+   COMMENT ELLE S'IMPOSE À COMPLIANZ
+   Complianz déclare ses couleurs en variables CSS sur `:root`, dans une feuille
+   (`cookiebanner/css/defaults/banner-optin.css`) injectée par JavaScript — donc
+   toujours APRÈS un `<link>` du thème. Lutter à coups d'ordre de cascade serait
+   perdu d'avance. On redéclare donc les mêmes variables sur `.cmplz-cookiebanner`
+   lui-même : une propriété personnalisée définie sur l'élément l'emporte sur
+   celle héritée de `:root`, quel que soit l'ordre des feuilles. Les rares règles
+   directes ci-dessous sont préfixées de l'identifiant du conteneur, pour la même
+   raison.
+
+   POURQUOI LES COULEURS SONT ÉCRITES EN DUR
+   `urbizen-tokens.css` n'est chargé que sur les gabarits Urbizen ; le bandeau,
+   lui, s'affiche sur toutes les pages. Chaque valeur est donc donnée sous la
+   forme `var(--u-token, #valeur)` : le jeton quand il est là, la valeur littérale
+   sinon. Les littéraux sont la copie exacte de `urbizen-tokens.css` — toute
+   évolution de la charte se répercute ici.
+
+   ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+   1 · Palette et formes du bandeau
+   ------------------------------------------------------------------------ */
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner,
+#cmplz-manage-consent .cmplz-manage-consent {
+  /* Surface, traits, angles */
+  --cmplz_banner_background_color: var(--u-surface, #FBFCFD);
+  --cmplz_banner_border_color: var(--u-line, #C9D3DD);
+  --cmplz_banner_border_width: 1px;
+  --cmplz_banner_border_radius: var(--u-radius, 4px);
+
+  /* Texte et liens */
+  --cmplz_text_color: var(--u-ink, #14233B);
+  --cmplz_hyperlink_color: var(--u-brand, #128A5A);
+
+  /* Lisibilité : le 12 px par défaut de Complianz est en deçà du reste du site */
+  --cmplz_text_font_size: 13px;
+  --cmplz_link_font_size: 13px;
+  --cmplz_title_font_size: 17px;
+  --cmplz_button_font_size: 14px;
+
+  /* ACCEPTER ET REFUSER : STRICTEMENT LE MÊME BOUTON.
+     Refuser doit être aussi immédiat qu'accepter ; un bouton plein face à un
+     bouton fantôme oriente le choix. Les deux jeux de variables reçoivent donc
+     les mêmes valeurs, et non deux nuances d'un même vert. */
+  --cmplz_button_accept_background_color: #FFFFFF;
+  --cmplz_button_accept_border_color: var(--u-brand, #128A5A);
+  --cmplz_button_accept_text_color: var(--u-brand-dk, #0E6E48);
+  --cmplz_button_deny_background_color: #FFFFFF;
+  --cmplz_button_deny_border_color: var(--u-brand, #128A5A);
+  --cmplz_button_deny_text_color: var(--u-brand-dk, #0E6E48);
+
+  /* « Voir les préférences » n'est pas un choix, c'est une navigation : elle
+     reste en retrait. « Enregistrer les préférences », qui EST un choix,
+     retrouve plus bas l'aspect des deux boutons ci-dessus. */
+  --cmplz_button_settings_background_color: transparent;
+  --cmplz_button_settings_border_color: var(--u-line, #C9D3DD);
+  --cmplz_button_settings_text_color: var(--u-ink-soft, #55617A);
+
+  --cmplz_button_border_radius: var(--u-radius, 4px);
+
+  /* Interrupteurs de catégories */
+  --cmplz_slider_active_color: var(--u-brand, #128A5A);
+  --cmplz_slider_inactive_color: var(--u-line-strong, #9FADBC);
+  --cmplz_slider_bullet_color: #FFFFFF;
+  --cmplz_category_header_always_active_color: var(--u-brand-dk, #0E6E48);
+}
+
+/* ---------------------------------------------------------------------------
+   2 · Typographie
+
+   Les polices Urbizen ne sont mises en file que sur les gabarits Urbizen ; le
+   bandeau, global, hérite sinon de la police par défaut du thème parent (Arial,
+   mesuré). Les familles sont donc nommées explicitement, avec repli système.
+   ------------------------------------------------------------------------ */
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner,
+#cmplz-manage-consent .cmplz-manage-consent {
+  font-family: var(--u-font-body, "IBM Plex Sans", system-ui, sans-serif);
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-title,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-btn {
+  font-family: var(--u-font-title, "Space Grotesk", system-ui, sans-serif);
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   3 · Boutons : survol, focus, et le cas d'« Enregistrer les préférences »
+   ------------------------------------------------------------------------ */
+
+/* Complianz range « Enregistrer les préférences » avec les boutons de réglage,
+   alors que c'est une décision de consentement au même titre qu'accepter ou
+   refuser. On lui rend l'aspect des deux autres. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-buttons .cmplz-btn.cmplz-save-preferences {
+  background-color: #FFFFFF;
+  border-color: var(--u-brand, #128A5A);
+  color: var(--u-brand-dk, #0E6E48);
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-buttons .cmplz-btn.cmplz-accept:hover,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-buttons .cmplz-btn.cmplz-deny:hover,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-buttons .cmplz-btn.cmplz-save-preferences:hover {
+  background-color: var(--u-brand-sf, #E4F5EC);
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-buttons .cmplz-btn.cmplz-view-preferences:hover {
+  background-color: var(--u-surface-2, #F2F5F8);
+}
+
+/* Le bandeau est modal : il doit rester parcourable au clavier, ce que le
+   contour par défaut du navigateur ne garantit pas sur fond clair. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-btn:focus-visible,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-close:focus-visible,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle:focus-visible,
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-link:focus-visible {
+  outline: 2px solid var(--u-brand, #128A5A);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   4 · Les trois puces vides sous les boutons
+
+   Le bloc « documents » du bandeau porte trois entrées de liste :
+
+       <li><a class="cmplz-link cookie-statement" href="…"></a></li>
+       <li><a class="cmplz-link privacy-statement cmplz-hidden" …>{title}</a></li>
+       <li><a class="cmplz-link impressum cmplz-hidden"        …>{title}</a></li>
+
+   La première n'a aucun libellé — aucune déclaration de cookies n'est générée
+   par Complianz Free ici, et son lien pointe sur l'accueil. Les deux autres sont
+   neutralisées par Complianz via `cmplz-hidden`, mais c'est l'ancre qui est
+   masquée, pas l'élément de liste : la puce, elle, continue d'être peinte.
+   Résultat mesuré : 104 px de vide surmontés de trois puces, sous les boutons,
+   à toutes les largeurs.
+
+   Le masquage porte sur les entrées effectivement vides, jamais sur le bloc en
+   bloc : si une déclaration de cookies venait à être publiée, son lien
+   réapparaîtrait de lui-même.
+
+   Les pages légales restent atteignables depuis le pied de page du site ; rien
+   n'est retiré à l'internaute ici, seulement du vide.
+   ------------------------------------------------------------------------ */
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-documents li:has(> a:empty),
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-documents li:has(> a.cmplz-hidden) {
+  display: none;
+}
+
+/* Quand il ne reste plus aucune entrée affichable, le bloc lui-même ne doit
+   plus occuper de place — sinon il ne reste que sa gouttière. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-documents:not(:has(li > a:not(:empty):not(.cmplz-hidden))) {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   5 · Contrôles de catégories
+
+   CE QUI N'ALLAIT PAS, ET POURQUOI
+
+   Trois défauts distincts se cumulaient sur la ligne d'une catégorie.
+
+   1. DEUX CHEVRONS SUPERPOSÉS. Complianz peint le chevron deux fois : un `<svg>`
+      dans le balisage, ET une image de fond sur le `<span>` qui le contient —
+      `background: var(--cmplz_category_open_icon_url)`, c'est-à-dire
+      `assets/images/down.png`. Mesuré : SVG de 16×18 à y=536, PNG de 25×25 à
+      y=542. Six pixels d'écart, d'où l'impression de flèche dédoublée.
+
+   2. UN CARRÉ GRIS BORDÉ. `background: rgb(239, 239, 239)`, `border: 2px outset`
+      — ce ne sont pas les styles de Complianz mais ceux du navigateur pour un
+      `<button>` nu. Le bandeau vit hors de la portée des réinitialisations du
+      thème, personne ne les neutralisait.
+
+   3. AUCUNE ROTATION, ET UNE LIGNE ROMPUE EN DESSOUS DE 768 px. La règle de
+      rotation de Complianz vise `.cmplz-category[open]`, or la catégorie est un
+      `<div>` qui ne reçoit jamais d'attribut `open` : le chevron restait fixe,
+      section ouverte comme fermée. Et une règle `grid-template-columns: 1fr
+      !important` empilait titre, interrupteur et chevron sur trois rangées, le
+      bouton occupant alors toute la largeur — la « grosse case grise ».
+
+   Aucun de ces trois défauts ne venait de cette feuille : elle ne touchait au
+   bouton d'expansion que par son contour de focus.
+   ------------------------------------------------------------------------ */
+
+/* 5.1 · La ligne tient sur une seule rangée à toutes les largeurs :
+   titre · interrupteur · chevron. Le `!important` répond à celui de Complianz,
+   qui ne peut pas être contourné par la seule spécificité. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-categories .cmplz-category .cmplz-category-header {
+  grid-template-columns: 1fr auto auto !important;
+  align-items: center;
+  column-gap: 14px;
+}
+
+/* Surface de la ligne : le gris neutre de Complianz laisse la place à la
+   surface alternée de la charte. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-categories .cmplz-category {
+  background-color: var(--u-surface-2, #F2F5F8);
+}
+
+/* 5.2 · Le bouton perd la chrome native : ni fond, ni bordure permanente,
+   ni relief. Il ne reste qu'une cible de clic. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-radius: var(--u-radius-sm, 3px);
+  box-shadow: none;
+  margin: 0;
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--u-ink, #14233B);
+}
+
+/* 5.3 · Un seul chevron. On éteint l'image de fond et on garde le SVG, qui est
+   vectoriel, prend la couleur du texte et se prête à la rotation. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle .cmplz-icon.cmplz-open {
+  background: none;
+  width: auto;
+  height: auto;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: none;
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle svg {
+  display: block;
+  height: 11px;
+  width: auto;
+  fill: var(--u-ink, #14233B);
+  transition: transform 0.25s ease;
+}
+
+/* 5.4 · Rotation pilotée par `aria-expanded`, que Complianz tient à jour sur le
+   bouton — et non par `[open]`, qui n'arrive jamais sur un `<div>`. L'état
+   visible et l'état annoncé aux technologies d'assistance ont ainsi une seule
+   et même source. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* 5.5 · Interrupteurs : le halo de focus de Complianz est un bleu écrit en dur
+   (`#245fcc`) et il apparaît aussi à la souris. On le remplace par le vert
+   Urbizen, réservé au parcours clavier. */
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-banner-checkbox input.cmplz-consent-checkbox:focus + .cmplz-label::before {
+  box-shadow: none;
+}
+
+#cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-banner-checkbox input.cmplz-consent-checkbox:focus-visible + .cmplz-label::before {
+  box-shadow: 0 0 0 2px var(--u-brand, #128A5A);
+}
+
+/* 5.6 · Le mouvement du chevron reste une commodité : il disparaît si le
+   système demande à réduire les animations. La règle globale de la charte ne
+   couvre pas le bandeau sur les pages qui ne chargent pas `urbizen-tokens.css`. */
+@media (prefers-reduced-motion: reduce) {
+  #cmplz-cookiebanner-container .cmplz-cookiebanner .cmplz-category-toggle svg {
+    transition: none;
+  }
+}
