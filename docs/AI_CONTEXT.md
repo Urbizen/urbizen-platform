@@ -325,8 +325,11 @@ scripts/                 à créer
   aucun champ n'est réellement rempli aujourd'hui.
 - `POST /api/dp` du service Python n'est pas authentifié et son CORS vaut `*`.
 - `requirements.txt` et `.env.example` sont absents du dépôt.
-- Les CGV sont publiées sur le slug `refund_returns` : à corriger avec une
-  redirection 301, jamais sans.
+- ~~Les CGV sont publiées sur le slug `refund_returns`~~ : **soldé le
+  13/08/2026.** Les deux slugs hérités de WooCommerce ont été migrés vers
+  `conditions-generales-de-vente` et `politique-de-confidentialite`, sans
+  redirection 301 — décision de la propriétaire, le trafic étant encore très
+  faible. Les anciennes adresses répondent 404, ce qui est assumé.
 - Les 4 entrées Fluent Forms sont des données personnelles réelles : à exporter
   chiffrées, hors dépôt, avant toute désactivation.
 - Aucune pièce graphique (DP1–DP8, PCMI1–PCMI8) n'est produite à ce jour, et

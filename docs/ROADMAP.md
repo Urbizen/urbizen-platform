@@ -138,7 +138,10 @@ conservant les URL existantes.
 - [ ] Tarifs · Autres projets · Espace professionnels
 - [ ] Commander un dossier · Contact
 - [ ] Pages légales : mentions, confidentialité, CGV
-- [ ] Correction du slug `refund_returns` avec redirection 301
+- [x] Correction des slugs `refund_returns` et `privacy-policy` — *migrés le
+      13/08/2026 vers `conditions-generales-de-vente` et
+      `politique-de-confidentialite`, sans redirection 301 (trafic très faible,
+      décision assumée) ; les anciennes adresses répondent 404*
 - [ ] Futures pages SEO et blog
 - [ ] Nettoyage du CSS personnalisé hérité de l'éditeur
 
@@ -283,7 +286,7 @@ réglementaire est offert.
 | `_image_to_pdf()` détruit l'EXIF utile : orientation et données GPS perdues | constaté le 23/07/2026 | 5 (lot 3) |
 | HEIC refusé par `UploadPolicy` (format iPhone par défaut) | constaté le 23/07/2026 | 5 (lot 3) |
 | CSS personnalisé dupliqué et caractère parasite | hérité de l'éditeur | 6 |
-| Slug CGV `refund_returns` | héritage WooCommerce | 6 |
+| ~~Slugs `refund_returns` et `privacy-policy`~~ | héritage WooCommerce | **soldé le 13/08/2026** |
 | 393 Mo de médias non optimisés | existant | 6 |
 | Pages WooCommerce publiées, extension inactive | existant | 7 |
 | Triple analytics, 5 extensions marketing | existant | 7 |

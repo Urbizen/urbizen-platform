@@ -11,12 +11,17 @@
  * Le document courant est marqué `aria-current="page"` et n'est pas cliquable :
  * un lien qui ramène à la page qu'on lit est un lien mort déguisé.
  *
- * Les URL sont celles réellement en service. Deux d'entre elles — héritées
- * d'un thème WooCommerce — sont impropres (`/refund_returns/`,
- * `/privacy-policy/`). Leur migration vers des adresses lisibles est proposée
- * dans `docs/AUDIT_PAGES_LEGALES.md` : elle suppose des redirections 301 et
- * une validation, et n'est donc pas décidée ici. Les changer sans redirection
- * casserait les liens existants et l'indexation.
+ * Les URL sont celles réellement en service. Les deux adresses héritées d'un
+ * thème WooCommerce — `/refund_returns/` et `/privacy-policy/` — ont été
+ * migrées le 13 août 2026 vers des adresses lisibles, directement dans
+ * WordPress. Les identifiants de page n'ont pas changé (26 et 3), les gabarits
+ * non plus.
+ *
+ * Aucune redirection 301 n'a été mise en place : décision de la propriétaire,
+ * le site ayant encore très peu de trafic. Les anciennes adresses répondent
+ * donc 404. C'est ce qui rend la mise à jour de ce tableau nécessaire et non
+ * cosmétique — le pied de page a pointé vers deux liens morts entre la
+ * migration et cette correction.
  *
  * @package Urbizen\Child
  */
@@ -25,8 +30,8 @@ defined( 'ABSPATH' ) || exit;
 
 $urbizen_docs = array(
 	'mentions'         => array( '/mentions-legales/', 'Mentions légales' ),
-	'cgv'              => array( '/refund_returns/', 'Conditions générales de vente' ),
-	'confidentialite'  => array( '/privacy-policy/', 'Politique de confidentialité' ),
+	'cgv'              => array( '/conditions-generales-de-vente/', 'Conditions générales de vente' ),
+	'confidentialite'  => array( '/politique-de-confidentialite/', 'Politique de confidentialité' ),
 );
 
 // Le gabarit courant sert à repérer le document affiché, sans dépendre de
