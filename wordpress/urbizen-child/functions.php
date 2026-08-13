@@ -1276,3 +1276,94 @@ function urbizen_child_enqueue_consentement() {
 	);
 }
 add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_consentement', 40 );
+
+/* -------------------------------------------------------------------------
+ * ARCHIVES D'AUTEUR — DÉSACTIVÉES
+ *
+ * CE QUE L'AUDIT DU 13 AOÛT 2026 A TROUVÉ
+ *
+ * `/author/contact-urbizengmail-com/` répondait 200, était indexable, et
+ * portait l'adresse de courriel de la propriétaire dans son `<title>` :
+ * WordPress construit le slug d'auteur à partir de `user_nicename`, lui-même
+ * dérivé de l'identifiant de connexion, qui est l'adresse. La page était donc
+ * éligible à l'affichage dans les résultats de recherche, adresse comprise, et
+ * offerte aux moissonneurs.
+ *
+ * POURQUOI PAS SEULEMENT AIOSEO
+ *
+ * AIOSEO 5.0.0.1 n'offre aucune option de désactivation. Son réglage
+ * `searchAppearance.archives.author.show` fait deux choses, vérifiées dans son
+ * code : il exclut l'archive du plan de site (`Sitemap/Content.php`,
+ * `Sitemap/Root.php`) et lui applique `noindex` (`Meta/Robots.php`, branche
+ * `is_author()`). L'URL, elle, continue de répondre 200 et d'afficher la page.
+ *
+ * `noindex` est une demande faite aux moteurs. Elle ne retire pas la page du
+ * web : un moissonneur d'adresses ne lit pas `robots`. Pour une donnée
+ * personnelle, la seule mesure qui vaut est que la page n'existe plus.
+ *
+ * Les deux couches sont donc posées : ce filtre supprime l'URL, le réglage
+ * AIOSEO reste en second rideau si ce filtre disparaissait un jour.
+ *
+ * CE QUE CELA N'EMPÊCHE PAS
+ *
+ * Rien du côté rédactionnel. `the_author()`, `get_the_author_meta()` et le
+ * `Person` des données structurées d'un article continuent de fonctionner : un
+ * futur blog affichera son autrice normalement. Seule disparaît la page
+ * d'archive listant ses publications — sans valeur pour un site mono-auteur,
+ * puisqu'elle duplique la liste des articles.
+ *
+ * PAS DE REDIRECTION
+ *
+ * Décision de la propriétaire, cohérente avec celle prise pour les anciens
+ * slugs légaux : le trafic est trop faible pour qu'une redirection se
+ * justifie, et rediriger une page qui n'aurait jamais dû exister reviendrait à
+ * lui reconnaître une légitimité. Elle répond 404.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Retire les archives d'auteur de la hiérarchie de requêtes publiques.
+ *
+ * Intervient sur `parse_query` : la requête est corrigée avant d'être exécutée,
+ * plus tôt que `template_redirect`, qui ne pourrait plus qu'habiller après coup
+ * une page déjà résolue.
+ *
+ * POURQUOI `set_404()` ET PAS `is_404 = true`
+ *
+ * Première version mesurée en production le 13 août 2026 : le gabarit 404
+ * s'affichait — `body.error404`, « Page non trouvée », `robots: noindex` — mais
+ * la réponse partait en **200**. Un *soft 404*, c'est-à-dire le seul cas que
+ * Google traite plus mal qu'un 404 franc.
+ *
+ * La cause tient à l'ordre d'exécution. Poser `is_404` à la main ne change que
+ * le drapeau ; c'est `WP::handle_404()` qui envoie l'en-tête, et il ne le fait
+ * que si la requête ne rapporte aucun article. Or vider les variables d'auteur
+ * transforme la requête en requête générique, qui rapporte les articles
+ * récents : `handle_404()` conclut donc qu'il n'y a pas lieu de renvoyer 404.
+ *
+ * `set_404()` pose les drapeaux dans les règles, et `status_header( 404 )`
+ * envoie l'en-tête sans dépendre de ce que la requête a ramené.
+ * `nocache_headers()` évite qu'un 404 soit mis en cache comme une page valide.
+ *
+ * Le flux d'administration et les requêtes internes ne sont pas touchés : la
+ * garde `is_admin()` et le test de requête principale y veillent.
+ *
+ * @param WP_Query $requete Requête en cours de résolution.
+ * @return void
+ */
+function urbizen_child_desactive_archives_auteur( $requete ) {
+	if ( is_admin() || ! $requete->is_main_query() ) {
+		return;
+	}
+
+	if ( ! $requete->is_author() ) {
+		return;
+	}
+
+	$requete->set( 'author', '' );
+	$requete->set( 'author_name', '' );
+	$requete->set_404();
+
+	status_header( 404 );
+	nocache_headers();
+}
+add_action( 'parse_query', 'urbizen_child_desactive_archives_auteur' );
