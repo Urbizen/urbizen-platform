@@ -1237,3 +1237,42 @@ function urbizen_child_neutralise_chatway( $balise, $handle ) {
 	);
 }
 add_filter( 'script_loader_tag', 'urbizen_child_neutralise_chatway', 20, 2 );
+
+/**
+ * Charge l'habillage Urbizen du bandeau de consentement.
+ *
+ * CHARGEMENT GLOBAL, ET C'EST NÉCESSAIRE
+ *
+ * Contrairement aux feuilles de la maquette, celle-ci n'est pas conditionnée au
+ * gabarit : le bandeau s'affiche sur toutes les pages, y compris celles qui
+ * n'utilisent pas les gabarits Urbizen. Elle est en revanche conditionnée à la
+ * présence de Complianz — sans lui, elle n'aurait rien à peindre.
+ *
+ * `cmplz-general` est le seul style que Complianz met en file côté serveur ; la
+ * feuille du bandeau, elle, est injectée par JavaScript et arrive donc toujours
+ * après. La déclaration de dépendance ne sert pas à gagner la cascade — cela,
+ * c'est la feuille elle-même qui s'en charge par sa spécificité — mais à ne
+ * charger l'habillage que là où le gestionnaire est réellement présent.
+ *
+ * @return void
+ */
+function urbizen_child_enqueue_consentement() {
+	if ( ! wp_style_is( 'cmplz-general', 'registered' ) && ! wp_style_is( 'cmplz-general', 'enqueued' ) ) {
+		return;
+	}
+
+	$dir     = get_stylesheet_directory();
+	$chemin  = '/assets/css/urbizen-consentement.css';
+
+	if ( ! file_exists( $dir . $chemin ) ) {
+		return;
+	}
+
+	wp_enqueue_style(
+		'urbizen-consentement',
+		get_stylesheet_directory_uri() . $chemin,
+		array( 'cmplz-general' ),
+		(string) filemtime( $dir . $chemin )
+	);
+}
+add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_consentement', 40 );

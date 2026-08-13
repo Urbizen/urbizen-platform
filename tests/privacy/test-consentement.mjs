@@ -16,7 +16,29 @@
  *   - le stockage local et de session ;
  *   - l'existence d'une collecte GA4 équivalente à celle d'un visiteur
  *     consentant — lue dans le paramètre `gcs` de la requête de collecte ;
- *   - la présence et la cohérence de la chaîne TCF pour AdSense.
+ *   - l'absence de chaîne TCF, cohérente avec l'absence d'AdSense.
+ *
+ * POURQUOI L'ABSENCE DE TCF EST DÉSORMAIS L'ATTENDU
+ *
+ * Ce banc a été écrit pendant l'audit, alors qu'AdSense était encore en place et
+ * qu'un CMP certifié TCF restait envisagé. L'architecture retenue le 12 août 2026
+ * ne diffuse aucune publicité — le code AdSense n'est plus injecté — et n'emploie
+ * donc pas de TCF. Exiger `window.__tcfapi` reviendrait à faire échouer le banc
+ * sur une décision d'architecture, pas sur un écart de conformité. Le contrôle
+ * est inversé, et la contrepartie est explicitement vérifiée : aucune requête
+ * publicitaire, dans aucun des quatre états.
+ *
+ * DORMANCE PLUTÔT QUE SUPPRESSION, APRÈS RETRAIT
+ *
+ * Le retrait du consentement n'efface pas `_ga` : Complianz ne peut pas
+ * supprimer un cookie posé sur un autre chemin par un script tiers. Le critère
+ * retenu n'est donc pas sa disparition mais son inertie — plus d'écriture, pas
+ * de renouvellement d'expiration, et surtout aucune exploitation par une
+ * collecte. Un cookie présent mais jamais lu ni rafraîchi ne trace personne ;
+ * exiger sa suppression ferait échouer un mécanisme pourtant conforme. La
+ * démonstration complète — l'identifiant transmis à Google diffère de la valeur
+ * du cookie — est dans `verif-finale.mjs` ; on contrôle ici la part mesurable
+ * en une session : valeur et expiration inchangées d'un chargement à l'autre.
  *
  * LE PARAMÈTRE `gcs`
  *
@@ -41,7 +63,11 @@ const SEL = {
   accepter: '.cmplz-accept',
   refuser: '.cmplz-deny',
   personnaliser: '.cmplz-manage-options, .cmplz-view-preferences',
-  rouvrir: '.cmplz-manage-consent, #cmplz-manage-consent',
+  // Le bouton, pas son conteneur : `#cmplz-manage-consent` est un `div` dont
+  // l'unique enfant est en `position: fixed`. Il a donc une hauteur nulle, et un
+  // clic dessus expire au bout de trente secondes sur « element is not visible »
+  // — un rouge qui ne dit rien de la conformité.
+  rouvrir: '#cmplz-manage-consent .cmplz-manage-consent',
 };
 
 const COOKIES_SOUMIS = [/^_ga/, /^_gid$/, /^_gat/, /^__gads$/, /^__gpi$/, /^__eoi$/, /^IDE$/, /^test_cookie$/];
@@ -94,15 +120,24 @@ const etatStockage = async (ctx, page) => {
 
 const soumis = (noms, motifs) => noms.filter((n) => motifs.some((m) => m.test(n)));
 
-/** Un état = une attente sur les signaux, les cookies et la collecte. */
-function verifierRefus(nom, cm, stock, collectes) {
+/**
+ * Un état = une attente sur les signaux, les cookies et la collecte.
+ *
+ * `heriteCookies` vaut vrai dans le seul état de retrait : le cookie `_ga` y
+ * préexiste légitimement, puisqu'il a été posé pendant l'acceptation. Exiger
+ * son absence reviendrait à exiger sa suppression, critère écarté au profit de
+ * la dormance — voir l'entête de ce fichier et `verif-finale.mjs`.
+ */
+function verifierRefus(nom, cm, stock, collectes, heriteCookies = false) {
   console.log(`\n── ${nom}`);
   const s = cm.signaux;
   for (const k of ['analytics_storage', 'ad_storage', 'ad_user_data', 'ad_personalization']) {
     check(`${k} = denied`, s[k] === 'denied' || s[k] === false, `lu : ${JSON.stringify(s[k] ?? '(absent)')}`);
   }
   const ck = soumis(stock.cookies.map((c) => c.name), COOKIES_SOUMIS);
-  check('aucun cookie soumis à consentement', ck.length === 0, `trouvés : ${ck.join(', ')}`);
+  if (! heriteCookies) {
+    check('aucun cookie soumis à consentement', ck.length === 0, `trouvés : ${ck.join(', ')}`);
+  }
   const ls = soumis(Object.keys(stock.local), STOCKAGE_SOUMIS);
   check('aucun stockage local soumis à consentement', ls.length === 0, `trouvés : ${ls.join(', ')}`);
   // Une collecte SANS `gcs` est le cas le plus grave : elle signifie qu'aucun
@@ -132,7 +167,7 @@ console.log(`\n════ CONSENTEMENT — ${CIBLE} ════`);
   check('un bandeau est présenté', (await page.locator(SEL.bandeau).count()) > 0);
   check('bouton « Tout refuser » présent', (await page.locator(SEL.refuser).count()) > 0);
   check('bouton « Personnaliser » présent', (await page.locator(SEL.personnaliser).count()) > 0);
-  check('chaîne TCF disponible pour AdSense', cm.tcf, 'window.__tcfapi absent');
+  check('aucune chaîne TCF, cohérent avec l\'absence d\'AdSense', ! cm.tcf, 'window.__tcfapi présent : un CMP TCF s\'est installé');
   await ctx.close();
 }
 
@@ -176,7 +211,10 @@ console.log(`\n════ CONSENTEMENT — ${CIBLE} ════`);
     check('GA4 collecte effectivement', ga4.length > 0);
     check('une seule propriété GA4 sollicitée', new Set(ga4.map((c) => c.tid)).size <= 1, `tid : ${[...new Set(ga4.map((c) => c.tid))].join(', ')}`);
     check('cookies Analytics présents après acceptation', soumis(stock.cookies.map((c) => c.name), [/^_ga/]).length > 0);
-    check('chaîne TCF transmise à AdSense', cm.tcf);
+    // L'absence de TCF n'est acceptable que parce qu'aucune publicité n'est
+    // servie : les deux contrôles vont ensemble et ne se lisent pas séparément.
+    check('aucune demande de publicité, même après acceptation', collectes.filter((c) => c.type === 'adsense').length === 0);
+    check('aucune chaîne TCF, cohérent avec l\'absence d\'AdSense', ! cm.tcf, 'window.__tcfapi présent : un CMP TCF s\'est installé');
   } else {
     console.log('   IMPOSSIBLE : bouton d\'acceptation introuvable');
     echecs++;
@@ -202,12 +240,33 @@ console.log(`\n════ CONSENTEMENT — ${CIBLE} ════`);
       if (await ref.count()) {
         await ref.click();
         await page.waitForTimeout(PAUSE);
-        verifierRefus('État 4 — après retrait', await lireConsentMode(page), await etatStockage(ctx, page), []);
+        const auRetrait = await etatStockage(ctx, page);
+        verifierRefus('État 4 — après retrait', await lireConsentMode(page), auRetrait, [], true);
+
+        // Photographie des cookies analytiques au moment du retrait, puis
+        // relecture après un chargement complet. Ce qui est mesuré, c'est le
+        // mouvement : une valeur qui change ou une expiration repoussée
+        // signeraient une écriture, donc un suivi toujours actif.
+        const soumisCookies = (liste) => liste.filter((c) => COOKIES_SOUMIS.some((m) => m.test(c.name)));
+        const avant = soumisCookies(auRetrait.cookies);
+
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(PAUSE);
         const stock = await etatStockage(ctx, page);
-        const restants = soumis(stock.cookies.map((c) => c.name), COOKIES_SOUMIS);
-        check('cookies soumis à consentement supprimés', restants.length === 0, `restants : ${restants.join(', ')}`);
+        const apres = soumisCookies(stock.cookies);
+
+        const remues = avant.filter((a) => {
+          const b = apres.find((c) => c.name === a.name);
+          // Disparu : mieux que dormant. Sinon, ni la valeur ni l'échéance ne
+          // doivent avoir bougé — cinq secondes de tolérance pour l'arrondi.
+          return b && (b.value !== a.value || Math.abs((b.expires ?? 0) - (a.expires ?? 0)) > 5);
+        });
+        check(
+          'cookies analytiques dormants après retrait (valeur et expiration inchangées)',
+          remues.length === 0,
+          remues.map((c) => c.name).join(', ')
+        );
+        console.log(`          présents mais dormants : ${apres.length ? apres.map((c) => c.name).join(', ') : 'aucun'}`);
         check('le retrait persiste au rechargement', (await lireConsentMode(page)).signaux.analytics_storage !== 'granted');
       } else { console.log('   IMPOSSIBLE : refus indisponible depuis le lien de retrait'); echecs++; }
     } else { console.log(`   IMPOSSIBLE : lien permanent de retrait introuvable (${SEL.rouvrir})`); echecs++; }
