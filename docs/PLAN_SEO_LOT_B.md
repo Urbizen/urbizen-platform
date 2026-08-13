@@ -87,7 +87,7 @@ anciens slugs légaux.
 | URL | État | Action | Justification |
 |---|---|---|---|
 | `/hello-world/` | 200, **indexable**, 2 mots | **supprimer** | Article créé par l'installation de WordPress. Deux mots, en anglais, indexable : c'est le signal le plus net qu'un site n'est pas fini. Il porte aussi le commentaire de démonstration « A WordPress Commenter », à supprimer avec lui. |
-| `/category/uncategorized/` | 200, **indexable**, 24 mots | **renommer**, puis laisser `noindex` | WordPress interdit de supprimer la catégorie par défaut. Elle doit donc être **renommée en français** — « Non classé » ou le nom d'une future rubrique. Une fois `/hello-world/` supprimé, elle devient vide, et l'option AIOSEO `noIndexEmptyCat`, **déjà active**, la passera automatiquement en `noindex`. Aucune action supplémentaire n'est requise. |
+| `/category/uncategorized/` | 200, **indexable**, 24 mots | **renommer** + `noindex` explicite | WordPress interdit de supprimer la catégorie par défaut : elle est **renommée en français**, slug compris. ⚠️ **Correction apportée à l'exécution** — ce plan annonçait que l'option AIOSEO `noIndexEmptyCat`, active, la désindexerait une fois vide. C'est faux : dans la version 5.0.0.1, l'option n'existe que comme définition et **n'est lue nulle part**. Mesuré : catégorie à zéro article, toujours indexable. Poser le `noindex` sur le terme est impossible en Free (ni modèle ni table pour les termes). Un filtre `aioseo_robots_meta` du thème applique donc la règle à **toute archive de taxonomie vide** — durable pour le blog du lot G, et sans effet dès le premier article publié. |
 
 ### Archives de date
 

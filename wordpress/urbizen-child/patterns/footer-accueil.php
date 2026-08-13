@@ -36,6 +36,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
     <div>
       <h4>Contact</h4>
       <ul>
+        <li><a href="https://urbizen.fr/contact/">Nous contacter</a></li>
         <li><a href="mailto:contact@urbizen.fr">contact@urbizen.fr</a></li>
         <li><a href="tel:+33664895815">+33 6 64 89 58 15</a></li>
         <li><a href="#" title="Espace client — bientôt disponible">Espace client (bientôt)</a></li>

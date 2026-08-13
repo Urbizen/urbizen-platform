@@ -1367,3 +1367,56 @@ function urbizen_child_desactive_archives_auteur( $requete ) {
 	nocache_headers();
 }
 add_action( 'parse_query', 'urbizen_child_desactive_archives_auteur' );
+
+/* -------------------------------------------------------------------------
+ * ARCHIVES DE TAXONOMIE VIDES — HORS INDEX
+ *
+ * AIOSEO expose un réglage nommé `noIndexEmptyCat`, actif par défaut, qui
+ * promet exactement cela. Il ne fait rien : dans la version 5.0.0.1, l'option
+ * n'existe que comme définition dans `Common/Options/Options.php` et n'est lue
+ * nulle part ailleurs — un reste des versions 3. Mesuré en production le
+ * 13 août 2026 : catégorie à zéro article, `robots: max-image-preview:large`,
+ * donc parfaitement indexable.
+ *
+ * Poser le `noindex` sur le terme lui-même n'est pas possible non plus :
+ * AIOSEO Free n'a ni modèle ni table pour les termes, c'est une fonction
+ * Premium.
+ *
+ * D'où cette règle, qui vise l'état plutôt que le terme : **une archive sans
+ * article n'a rien à montrer**. Elle vaut pour la catégorie par défaut vide
+ * d'aujourd'hui comme pour n'importe quelle rubrique créée demain et pas
+ * encore alimentée — et elle s'efface d'elle-même dès le premier article
+ * publié. Une règle qui viserait « la catégorie non-classe » deviendrait
+ * fausse au premier renommage ; une règle qui viserait « toutes les
+ * catégories » casserait le blog du lot G.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Ajoute `noindex` aux archives de taxonomie ne contenant aucun contenu.
+ *
+ * S'accroche à `aioseo_robots_meta` et non à `wp_robots` : AIOSEO retire la
+ * balise du cœur et émet la sienne, un filtre sur `wp_robots` n'aurait donc
+ * aucun effet visible.
+ *
+ * `follow` est conservé : la page ne doit pas être indexée, mais rien ne
+ * justifie d'empêcher le suivi des liens qu'elle porte.
+ *
+ * @param array<string, string> $attributs Directives calculées par AIOSEO.
+ * @return array<string, string>
+ */
+function urbizen_child_noindex_archives_vides( $attributs ) {
+	if ( is_admin() || ! ( is_category() || is_tag() || is_tax() ) ) {
+		return $attributs;
+	}
+
+	$terme = get_queried_object();
+
+	if ( ! ( $terme instanceof WP_Term ) || (int) $terme->count > 0 ) {
+		return $attributs;
+	}
+
+	$attributs['noindex'] = 'noindex';
+
+	return $attributs;
+}
+add_filter( 'aioseo_robots_meta', 'urbizen_child_noindex_archives_vides', 20 );
