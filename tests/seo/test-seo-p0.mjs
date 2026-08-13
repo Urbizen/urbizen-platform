@@ -93,13 +93,18 @@ console.log(`\n════ P0 SEO — ${BASE} ════`);
 {
   console.log('\n── P0.2 — identité publique de l\'autrice');
 
+  // 404 franc exigé, pas seulement « autre chose que 200 » : un gabarit 404
+  // servi avec un statut 200 est un soft 404, que Google traite plus mal qu'un
+  // 404 net. C'est l'état qu'avait la première version du filtre.
   const archive = await lire(`/author/${ANCIEN_SLUG}/`, { suivre: false });
-  check('l\'ancienne archive d\'auteur ne répond plus 200', archive.code !== 200, `code ${archive.code}`);
+  check('l\'ancienne archive d\'auteur répond 404', archive.code === 404, `code ${archive.code}`);
   check('et ne redirige pas', !(archive.code >= 300 && archive.code < 400),
     `code ${archive.code} → ${archive.vers}`);
 
   const nouvelle = await lire('/author/anais-bacarisse/', { suivre: false });
-  check('la nouvelle archive d\'auteur n\'est pas non plus servie', nouvelle.code !== 200, `code ${nouvelle.code}`);
+  check('la nouvelle archive d\'auteur répond 404 elle aussi', nouvelle.code === 404, `code ${nouvelle.code}`);
+  check('le gabarit servi est bien celui d\'une page absente',
+    /error404|Page non trouv/i.test(nouvelle.html), 'contenu d\'archive encore rendu');
 
   // Énumération d'auteur par identifiant : ne doit plus mener nulle part.
   const parId = await lire('/?author=1', { suivre: false });

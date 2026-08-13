@@ -1323,9 +1323,26 @@ add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_consentement', 40 );
 /**
  * Retire les archives d'auteur de la hiérarchie de requêtes publiques.
  *
- * Intervient sur `parse_query` plutôt que sur `template_redirect` : la requête
- * est corrigée avant d'être exécutée, donc WordPress sert un vrai 404 — en-tête
- * et gabarit — au lieu d'une page d'auteur habillée en 404.
+ * Intervient sur `parse_query` : la requête est corrigée avant d'être exécutée,
+ * plus tôt que `template_redirect`, qui ne pourrait plus qu'habiller après coup
+ * une page déjà résolue.
+ *
+ * POURQUOI `set_404()` ET PAS `is_404 = true`
+ *
+ * Première version mesurée en production le 13 août 2026 : le gabarit 404
+ * s'affichait — `body.error404`, « Page non trouvée », `robots: noindex` — mais
+ * la réponse partait en **200**. Un *soft 404*, c'est-à-dire le seul cas que
+ * Google traite plus mal qu'un 404 franc.
+ *
+ * La cause tient à l'ordre d'exécution. Poser `is_404` à la main ne change que
+ * le drapeau ; c'est `WP::handle_404()` qui envoie l'en-tête, et il ne le fait
+ * que si la requête ne rapporte aucun article. Or vider les variables d'auteur
+ * transforme la requête en requête générique, qui rapporte les articles
+ * récents : `handle_404()` conclut donc qu'il n'y a pas lieu de renvoyer 404.
+ *
+ * `set_404()` pose les drapeaux dans les règles, et `status_header( 404 )`
+ * envoie l'en-tête sans dépendre de ce que la requête a ramené.
+ * `nocache_headers()` évite qu'un 404 soit mis en cache comme une page valide.
  *
  * Le flux d'administration et les requêtes internes ne sont pas touchés : la
  * garde `is_admin()` et le test de requête principale y veillent.
@@ -1344,8 +1361,9 @@ function urbizen_child_desactive_archives_auteur( $requete ) {
 
 	$requete->set( 'author', '' );
 	$requete->set( 'author_name', '' );
-	$requete->is_author  = false;
-	$requete->is_archive = false;
-	$requete->is_404     = true;
+	$requete->set_404();
+
+	status_header( 404 );
+	nocache_headers();
 }
 add_action( 'parse_query', 'urbizen_child_desactive_archives_auteur' );

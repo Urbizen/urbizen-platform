@@ -67,8 +67,23 @@ check(
 );
 
 check(
-	'1 · il pose bien un 404',
-	preg_match( '/function urbizen_child_desactive_archives_auteur.*?is_404\s*=\s*true/s', $fns )
+	'1 · il pose les drapeaux via set_404(), pas à la main',
+	// Poser `is_404 = true` directement ne change que le drapeau : l'en-tête
+	// HTTP reste 200, parce que c'est `WP::handle_404()` qui l'envoie et qu'il
+	// ne le fait que si la requête ne rapporte aucun article. Mesuré en
+	// production le 13 août 2026 — gabarit 404, statut 200, soit un soft 404.
+	preg_match( '/function urbizen_child_desactive_archives_auteur.*?set_404\(\)/s', $fns )
+	&& ! preg_match( '/function urbizen_child_desactive_archives_auteur.*?is_404\s*=\s*true/s', $fns )
+);
+
+check(
+	'1 · il envoie l\'en-tête 404 sans dépendre de la requête',
+	preg_match( '/function urbizen_child_desactive_archives_auteur.*?status_header\(\s*404\s*\)/s', $fns )
+);
+
+check(
+	'1 · il interdit la mise en cache de ce 404',
+	preg_match( '/function urbizen_child_desactive_archives_auteur.*?nocache_headers\(\)/s', $fns )
 );
 
 check(
