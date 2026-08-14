@@ -114,40 +114,61 @@ foreach ( $sources as $nom => $chemin ) {
 		3 === substr_count( $s, 'class="service-route-icon"' )
 		&& 3 === preg_match_all( '#class="service-route-icon"[^>]*aria-hidden="true"#', $s ) );
 
-	/* --------------------------------------------- les dix planches du dossier */
+	// L'explorateur est une SECTION à part depuis le 14 août 2026 : il ne fallait
+	// pas le loger dans « Nos services », qui porte les parcours et les tarifs.
+	$d = section( $h, 'dossier' );
+	check( "[$nom] la section de l'explorateur est repérée", '' !== $d );
 
-	check( "[$nom] exactement dix planches",
-		10 === substr_count( $s, 'class="planche-item"' )
-		&& 10 === substr_count( $s, 'class="planche-fig"' )
-		&& 10 === substr_count( $s, 'class="planche-t"' ) );
+	/* ------------------------------------ l'explorateur de pièces du dossier ---
 
-	check( "[$nom] l'intitulé de la liste est conservé",
-		str_contains( $s, 'Votre dossier peut comprendre' )
-		&& str_contains( $s, '>CONTENU DU DOSSIER<' ) );
+	   Les dix « planches » — dix vignettes SVG et leur libellé — ont été
+	   remplacées le 14 août 2026 par un explorateur à deux niveaux d'onglets.
+	   Ce que les anciens contrôles protégeaient reste protégé : les dix pièces
+	   sont toujours nommées, avec leurs codes réglementaires, et rien n'y est
+	   présenté comme systématiquement fourni. Ce sont les moyens qui changent.  */
 
-	$ecarts = array();
+	check( "[$nom] trois familles de pièces, en onglets",
+		3 === substr_count( $d, 'class="dx-tab"' )
+		&& 3 === preg_match_all( '#class="dx-tab" role="tab"#', $d ) );
 
-	foreach ( $planches as $code => $intitule ) {
-		if ( ! str_contains( $s, '>' . $code . '</span>' ) ) { $ecarts[] = "code $code"; }
-		if ( ! str_contains( $s, '>' . $intitule . '</span>' ) ) { $ecarts[] = "intitulé $code"; }
+	check( "[$nom] dix pièces réparties dans les trois familles",
+		10 === substr_count( $d, 'class="dx-item"' )
+		&& 10 === substr_count( $d, 'class="dx-vue"' ) );
+
+	// Les mêmes codes qu'avant, aux mêmes intitulés : c'est la donnée métier,
+	// elle ne dépend pas du composant qui l'affiche.
+	$pieces = array(
+		'DP1 · PCMI1' => 'Plan de situation',
+		'DP2 · PCMI2' => 'Plan de masse',
+		'DP3 · PCMI3' => 'Plan en coupe',
+		'DP4 · PCMI5' => 'Façades et toitures',
+		'DP6 · PCMI6' => 'Insertion graphique',
+		'DP7 · PCMI7' => 'Environnement proche',
+		'DP8 · PCMI8' => 'Paysage lointain',
+		'PCMI4'       => 'Notice descriptive',
+		'CERFA'       => 'Formulaire administratif',
+		'BORDEREAU'   => 'Bordereau des pièces',
+	);
+	$manquants = array();
+	foreach ( $pieces as $code => $intitule ) {
+		if ( ! str_contains( $d, $code ) || ! str_contains( $d, $intitule ) ) {
+			$manquants[] = $code;
+		}
 	}
+	check( "[$nom] les dix codes réglementaires et leurs intitulés", array() === $manquants,
+		'absents : ' . implode( ', ', $manquants ) );
 
-	check( "[$nom] les dix codes réglementaires et leurs intitulés", array() === $ecarts );
+	// Le contrat ARIA : sans lui, l'explorateur n'est qu'une pile de boutons.
+	check( "[$nom] les onglets déclarent leur état et leur panneau",
+		13 === preg_match_all( '#role="tab"[^>]*aria-controls="#', $d )
+		&& 13 === preg_match_all( '#role="tab"[^>]*aria-selected="#', $d ) );
 
-	if ( array() !== $ecarts ) { echo '    écart : ' . implode( ' | ', $ecarts ) . "\n"; }
+	// Aucune pièce ne doit être présentée comme systématiquement fournie.
+	check( "[$nom] le contenu du dossier reste annoncé comme variable",
+		str_contains( $d, "dépend de la nature du projet" ) );
 
-	// Les codes se suivent dans l'ordre du dossier déposé en mairie.
-	$positions = array_map( static fn( $c ) => strpos( $s, '>' . $c . '</span>' ), array_keys( $planches ) );
-	$triees    = $positions;
-	sort( $triees );
-
-	check( "[$nom] les dix planches se suivent dans l'ordre du dossier", $positions === $triees );
-
-	// Chaque figure est une illustration décorative : aucun texte alternatif à
-	// lire, aucun gestionnaire en ligne.
-	check( "[$nom] les figures sont décoratives et inertes",
-		10 === preg_match_all( '#class="planche-fig" aria-hidden="true"><svg#', $s )
-		&& ! preg_match( '#\son(click|load|mouse\w+)=#', $s ) );
+	check( "[$nom] les documents montrés sont annoncés comme des exemples",
+		str_contains( $d, 'projet fictif' ) );
 
 	// Le dépôt dématérialisé est une option annoncée, pas une promesse ferme.
 	check( "[$nom] le dépôt dématérialisé reste annoncé comme option",

@@ -213,11 +213,11 @@ foreach ( $sources as $nom => $chemin ) {
 		&& str_contains( $h, '>DP2 · PLAN DE MASSE</text>' ) );
 	// Les dix planches de « Votre dossier peut comprendre » sont le pendant
 	// documentaire des cartes : même section, même risque de retouche.
-	check( "[$nom] les dix planches du dossier sont intactes",
-		10 === substr_count( $h, 'class="planche-item"' )
-		&& 10 === substr_count( $h, 'class="planche-fig"' )
-		&& str_contains( $h, '>DP1 · PCMI1</span>' )
-		&& str_contains( $h, '>Bordereau des pièces</span>' ) );
+	// Les dix planches ont laissé place à l'explorateur le 14 août 2026. Ce que
+	// cette garde protégeait — dix pièces nommées, aucune icône porteuse de sens —
+	// est vérifié par `test-services.php` sur le nouveau composant.
+	check( "[$nom] l'explorateur porte les dix pièces",
+		10 === substr_count( $h, 'class="dx-item"' ) );
 	// Trois parcours tarifaires, un par prestation, chacun vers sa page.
 	check( "[$nom] les trois parcours de prestation sont intacts",
 		3 === substr_count( $h, 'class="service-route"' )

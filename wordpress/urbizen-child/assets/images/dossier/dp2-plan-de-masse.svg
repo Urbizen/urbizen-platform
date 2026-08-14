@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560"
+     role="img" aria-labelledby="t-dp2 d-dp2" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="t-dp2">Plan de masse</title>
+  <desc id="d-dp2">Extrait de plan de masse : la limite de propriété en tirets, la maison existante, et le projet figuré en vert avec sa surface. Deux cotes indiquent les distances aux limites séparatives. Projet fictif.</desc>
+  <rect width="760" height="560" fill="#FBFCFD"/>
+  <rect x="14" y="14" width="732" height="532" fill="none" stroke="#9FADBC" stroke-width="1"/>
+  <rect x="22" y="22" width="716" height="516" fill="none" stroke="#C9D3DD" stroke-width=".8"/>
+  <g stroke="#C9D3DD" stroke-width=".6" opacity=".7">
+    <path d="M22 100H738M22 180H738M22 260H738M22 340H738M22 420H738M140 22V490M260 22V490M380 22V490M500 22V490M620 22V490"/>
+  </g>
+  <path d="M70 70 L690 70 L690 450 L70 450 Z" fill="none" stroke="#14233B" stroke-width="2.2" stroke-dasharray="12 6"/>
+  <text x="80" y="60" fill="#55617A" font-size="11">Limite de propriété</text>
+  <rect x="150" y="140" width="240" height="180" fill="#EAEEF2" stroke="#14233B" stroke-width="2"/>
+  <text x="270" y="238" text-anchor="middle" fill="#14233B" font-size="13" font-weight="600">Maison existante</text>
+  <rect x="430" y="180" width="150" height="120" fill="#E4F5EC" stroke="#128A5A" stroke-width="2.5"/>
+  <text x="505" y="232" text-anchor="middle" fill="#0E6E48" font-size="13" font-weight="600">Projet</text>
+  <text x="505" y="252" text-anchor="middle" fill="#0E6E48" font-size="11.5">18,0 m²</text>
+  <g stroke="#55617A" stroke-width="1.2">
+    <path d="M580 240H690" marker-start="url(#a)" marker-end="url(#a)"/>
+    <path d="M505 300V450" marker-start="url(#a)" marker-end="url(#a)"/>
+  </g>
+  <defs><marker id="a" markerWidth="8" markerHeight="8" refX="4" refY="4" orient="auto"><path d="M1 1L7 4L1 7Z" fill="#55617A"/></marker></defs>
+  <text x="635" y="232" text-anchor="middle" fill="#55617A" font-size="11" font-family="IBM Plex Mono, monospace">4,20 m</text>
+  <text x="516" y="380" fill="#55617A" font-size="11" font-family="IBM Plex Mono, monospace">6,00 m</text>
+  <path d="M70 450 L690 450" stroke="#55617A" stroke-width="1"/>
+  <text x="380" y="474" text-anchor="middle" fill="#55617A" font-size="11">Distances aux limites séparatives cotées</text>
+  <!-- cartouche -->
+  <g transform="translate(22,490)">
+    <rect x="0" y="0" width="716" height="48" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".8"/>
+    <text x="14" y="20" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1.2">DP2 · PCMI2</text>
+    <text x="14" y="37" fill="#14233B" font-size="13" font-weight="600">Plan de masse</text>
+    <text x="702" y="20" text-anchor="end" fill="#8791A6" font-family="IBM Plex Mono, monospace" font-size="9.5">EXEMPLE URBIZEN</text>
+    <text x="702" y="37" text-anchor="end" fill="#8791A6" font-size="10.5">Illustration — projet fictif</text>
+  </g>
+</svg>

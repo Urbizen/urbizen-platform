@@ -94,13 +94,10 @@ check( 'front-page : SVG animé du hero — quatre tracés hp-draw',
  * en avant promettant « Votre CERFA, gratuitement » ; l'accueil retenu ne porte
  * pas cette promesse, et le banc vérifie qu'elle ne revient pas.
  */
-check( 'front-page : dix mini-illustrations de pièces du dossier',
-	10 === substr_count( $front, 'class="planche-fig"' ) );
+check( 'front-page : l\'explorateur porte les dix pièces du dossier',
+	10 === substr_count( $front, 'class="dx-item"' ) );
 check( 'front-page : le CERFA est une pièce du dossier, sans promesse de gratuité',
-	str_contains( $front, '>CERFA</span>' )
-	&& str_contains( $front, '>Formulaire officiel</span>' )
-	&& ! str_contains( $front, 'parcours-card featured' )
-	&& ! str_contains( $front, 'Votre CERFA, gratuitement' ) );
+	str_contains( $front, 'CERFA' ) && ! preg_match( '/CERFA[^<]{0,60}(gratuit|offert)/i', $front ) );
 
 $css_accueil = file_get_contents( $theme . '/assets/css/urbizen-homepage.css' );
 $css_source  = file_get_contents( dirname( __DIR__, 2 ) . '/frontend/homepage/homepage.css' );

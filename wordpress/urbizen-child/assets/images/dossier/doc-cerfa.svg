@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560"
+     role="img" aria-labelledby="t-cerfa d-cerfa" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="t-cerfa">Formulaire administratif</title>
+  <desc id="d-cerfa">Extrait schématique d'un formulaire de déclaration préalable : bandeau bleu nuit, rubriques d'identité, de terrain et de surfaces, la plupart renseignées. Aucune donnée réelle.</desc>
+  <rect width="760" height="560" fill="#EAEEF2"/>
+  <rect x="70" y="26" width="620" height="508" fill="#FBFCFD" stroke="#C9D3DD" stroke-width="1"
+        rx="2"/>
+  <rect x="70" y="26" width="620" height="70" fill="#14233B"/>
+  <text x="110" y="56" fill="#fff" font-size="14" font-weight="600">Déclaration préalable de travaux</text>
+  <text x="110" y="76" fill="#C9D3DD" font-size="11">Formulaire administratif — rempli par Urbizen à partir de vos éléments</text>
+  <text x="650" y="62" text-anchor="end" fill="#C9D3DD" font-family="IBM Plex Mono, monospace" font-size="10.5">CERFA</text>
+  <text x="110" y="132" fill="#55617A" font-size="11.5">Identité du demandeur</text>
+  <rect x="330" y="118" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="124" width="120" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="170" fill="#55617A" font-size="11.5">Coordonnées</text>
+  <rect x="330" y="156" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="162" width="157" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="208" fill="#55617A" font-size="11.5">Adresse du terrain</text>
+  <rect x="330" y="194" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="200" width="194" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="246" fill="#55617A" font-size="11.5">Références cadastrales</text>
+  <rect x="330" y="232" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="238" width="231" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="284" fill="#55617A" font-size="11.5">Superficie du terrain</text>
+  <rect x="330" y="270" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="276" width="268" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="322" fill="#55617A" font-size="11.5">Nature des travaux</text>
+  <rect x="330" y="308" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="314" width="145" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="360" fill="#55617A" font-size="11.5">Surface de plancher créée</text>
+  <rect x="330" y="346" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="352" width="182" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="398" fill="#55617A" font-size="11.5">Emprise au sol créée</text>
+  <rect x="330" y="384" width="330" height="22" fill="#fff" stroke="#128A5A" stroke-width="1.4" rx="2"/>
+  <rect x="340" y="390" width="219" height="7" rx="3" fill="#0E6E48" opacity=".55"/>
+  <text x="110" y="436" fill="#55617A" font-size="11.5">Destination des constructions</text>
+  <rect x="330" y="422" width="330" height="22" fill="#EAEEF2" stroke="#C9D3DD" stroke-width="0.9" rx="2"/>
+  <rect x="110" y="472" width="550" height="40" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.2" rx="6"/>
+  <text x="126" y="497" fill="#0E6E48" font-size="11.5">Les rubriques sont renseignées selon la nature réelle du projet.</text>
+  <g transform="translate(70,516)">
+    <text x="0" y="12" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1.2">CERFA</text>
+    <text x="620" y="12" text-anchor="end" fill="#8791A6" font-family="IBM Plex Mono, monospace" font-size="9.5">EXEMPLE URBIZEN</text><text x="620" y="26" text-anchor="end" fill="#8791A6" font-size="10.5">Illustration — projet fictif</text>
+  </g>
+</svg>

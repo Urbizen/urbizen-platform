@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560"
+     role="img" aria-labelledby="t-dp1 d-dp1" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="t-dp1">Plan de situation</title>
+  <desc id="d-dp1">Extrait de plan de situation : le terrain du projet est figuré en vert au centre, relié à son repérage. Les voies, les constructions voisines, la flèche du nord et l'échelle graphique 1:2000 l'entourent. Projet fictif, aucune donnée réelle.</desc>
+  <rect width="760" height="560" fill="#FBFCFD"/>
+  <rect x="14" y="14" width="732" height="532" fill="none" stroke="#9FADBC" stroke-width="1"/>
+  <rect x="22" y="22" width="716" height="516" fill="none" stroke="#C9D3DD" stroke-width=".8"/>
+  <g stroke="#C9D3DD" stroke-width=".7" opacity=".8">
+    <path d="M22 120H738M22 200H738M22 280H738M22 360H738M120 22V490M240 22V490M360 22V490M480 22V490M600 22V490"/>
+  </g>
+  <path d="M40 300 L200 250 L340 268 L520 210 L720 240" stroke="#55617A" stroke-width="7" fill="none" opacity=".5"/>
+  <path d="M180 480 L230 300 L300 180 L340 60" stroke="#55617A" stroke-width="5" fill="none" opacity=".45"/>
+  <text x="560" y="232" fill="#55617A" font-size="11">Route départementale</text>
+  <text x="252" y="150" fill="#55617A" font-size="11">Rue des Tilleuls</text>
+  <g opacity=".45" fill="#9FADBC">
+    <rect x="90" y="330" width="70" height="52" rx="2"/><rect x="200" y="350" width="60" height="46" rx="2"/>
+    <rect x="420" y="300" width="66" height="50" rx="2"/><rect x="520" y="340" width="58" height="44" rx="2"/>
+    <rect x="120" y="120" width="62" height="48" rx="2"/><rect x="430" y="120" width="70" height="46" rx="2"/>
+  </g>
+  <rect x="300" y="300" width="110" height="86" fill="#E4F5EC" stroke="#128A5A" stroke-width="2.5"/>
+  <circle cx="355" cy="343" r="6" fill="#128A5A"/>
+  <path d="M355 343 L470 250" stroke="#128A5A" stroke-width="1.6" stroke-dasharray="5 4"/>
+  <text x="478" y="248" fill="#0E6E48" font-size="12.5" font-weight="600">Terrain du projet</text>
+  <text x="478" y="266" fill="#55617A" font-size="11">Parcelle cadastrale</text>
+  <g transform="translate(660,60)">
+    <circle r="26" fill="#FBFCFD" stroke="#9FADBC" stroke-width="1.2"/>
+    <path d="M0 -18 L6 4 L0 0 L-6 4 Z" fill="#14233B"/>
+    <text y="-30" text-anchor="middle" fill="#55617A" font-size="10" font-family="IBM Plex Mono, monospace">N</text>
+  </g>
+  <g transform="translate(46,470)">
+    <path d="M0 0H120" stroke="#14233B" stroke-width="1.6"/>
+    <path d="M0 -5V5M60 -4V4M120 -5V5" stroke="#14233B" stroke-width="1.6"/>
+    <text x="60" y="-11" text-anchor="middle" fill="#55617A" font-size="10" font-family="IBM Plex Mono, monospace">1:2000</text>
+  </g>
+  <!-- cartouche -->
+  <g transform="translate(22,490)">
+    <rect x="0" y="0" width="716" height="48" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".8"/>
+    <text x="14" y="20" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1.2">DP1 · PCMI1</text>
+    <text x="14" y="37" fill="#14233B" font-size="13" font-weight="600">Plan de situation</text>
+    <text x="702" y="20" text-anchor="end" fill="#8791A6" font-family="IBM Plex Mono, monospace" font-size="9.5">EXEMPLE URBIZEN</text>
+    <text x="702" y="37" text-anchor="end" fill="#8791A6" font-size="10.5">Illustration — projet fictif</text>
+  </g>
+</svg>

@@ -299,19 +299,95 @@
   </ul>
 </aside>
 
-<!-- ===== Comment ça marche ===== -->
+<!-- ===== Section — Comment ça marche ===== -->
 <section class="methode" id="methode">
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Comment ça marche</span></span>
-      <h2>Votre dossier en quatre étapes</h2>
+      <h2>Votre dossier, préparé étape par étape</h2>
+      <p>Tout se fait à distance, avec un interlocuteur dédié. Vous nous transmettez les éléments de votre projet, nous préparons votre dossier, et vous recevez les documents prêts à être déposés.</p>
     </div>
-    <ol class="steps">
-      <li class="step"><span class="step-n">1</span><h3>Vous décrivez votre projet</h3></li>
-      <li class="step"><span class="step-n">2</span><h3>Vous transmettez les documents disponibles</h3></li>
-      <li class="step"><span class="step-n">3</span><h3>Urbizen prépare et vérifie votre dossier</h3></li>
-      <li class="step"><span class="step-n">4</span><h3>Vous recevez les documents prêts à être déposés</h3></li>
-    </ol>
+    <div class="etapes">
+      <div class="etapes-nav" role="tablist" aria-orientation="vertical" aria-label="Les quatre étapes">
+        <button type="button" class="etape-lien" role="tab" id="et-t-projet" aria-controls="et-p-projet" aria-selected="true" tabindex="0">
+          <span class="etape-n">01</span>
+          <span class="etape-court">Décrivez votre projet</span>
+        </button>
+        <button type="button" class="etape-lien" role="tab" id="et-t-documents" aria-controls="et-p-documents" aria-selected="false" tabindex="-1">
+          <span class="etape-n">02</span>
+          <span class="etape-court">Envoyez vos documents</span>
+        </button>
+        <button type="button" class="etape-lien" role="tab" id="et-t-preparation" aria-controls="et-p-preparation" aria-selected="false" tabindex="-1">
+          <span class="etape-n">03</span>
+          <span class="etape-court">Préparation du dossier</span>
+        </button>
+        <button type="button" class="etape-lien" role="tab" id="et-t-remise" aria-controls="et-p-remise" aria-selected="false" tabindex="-1">
+          <span class="etape-n">04</span>
+          <span class="etape-court">Dossier prêt</span>
+        </button>
+      </div>
+      <div class="etape-panel" role="tabpanel" id="et-p-projet" aria-labelledby="et-t-projet" tabindex="0">
+        <div class="etape-corps">
+          <span class="etape-rang">Étape 1 sur 4</span>
+          <h3>Vous nous expliquez votre projet</h3>
+          <p>Adresse du projet, type de travaux, dimensions, photos et premières informations disponibles. L'objectif est de comprendre rapidement le projet et d'identifier la démarche adaptée.</p>
+          <p class="etape-retenir"><span>À retenir</span>Quelques informations précises dès le départ permettent de cadrer rapidement votre demande.</p>
+        </div>
+        <figure class="etape-visuel">
+          <img src="/wp-content/themes/urbizen-child/assets/images/blog/extension-maison.webp" alt="Une maison individuelle et son extension, illustrant le type de projet décrit lors de la prise de contact." loading="lazy" decoding="async" width="760" height="560">
+        </figure>
+      </div>
+      <div class="etape-panel" role="tabpanel" id="et-p-documents" aria-labelledby="et-t-documents" tabindex="0" hidden>
+        <div class="etape-corps">
+          <span class="etape-rang">Étape 2 sur 4</span>
+          <h3>Vous nous transmettez les éléments disponibles</h3>
+          <p>Photos, croquis, plans existants, dimensions et documents nécessaires à la compréhension du projet. Si quelque chose manque, Urbizen indique clairement ce qui doit être transmis.</p>
+          <p class="etape-retenir"><span>À retenir</span>Vous n'avez pas besoin de savoir seul quelles pièces fournir&nbsp;: nous vous indiquons les éléments nécessaires.</p>
+        </div>
+        <figure class="etape-visuel">
+          <img src="/wp-content/themes/urbizen-child/assets/images/dossier/doc-bordereau.svg" alt="Bordereau listant les pièces d'un dossier, illustrant les éléments à réunir." loading="lazy" decoding="async" width="760" height="560">
+        </figure>
+      </div>
+      <div class="etape-panel" role="tabpanel" id="et-p-preparation" aria-labelledby="et-t-preparation" tabindex="0" hidden>
+        <div class="etape-corps">
+          <span class="etape-rang">Étape 3 sur 4</span>
+          <h3>Nous réalisons votre dossier</h3>
+          <p>Selon le projet, Urbizen prépare les plans, documents administratifs, pièces graphiques et autres éléments nécessaires à la demande d'urbanisme.</p>
+          <div class="etape-delai">
+            <p class="etape-delai-chiffre"><span>7</span> jours</p>
+            <div class="etape-delai-txt">
+              <p class="etape-delai-t">Délai de préparation</p>
+              <p>Votre dossier est préparé sous 7&nbsp;jours après réception de l'ensemble des pièces nécessaires.</p>
+            </div>
+          </div>
+          <p class="etape-delai-note">Ce délai est celui de la préparation par Urbizen. Il commence lorsque nous disposons de tous les éléments nécessaires, et il ne se confond pas avec le délai d'instruction de la mairie.</p>
+          <p class="etape-retenir"><span>À retenir</span>Une fois les éléments réunis, vous savez quand votre dossier sera prêt.</p>
+        </div>
+        <figure class="etape-visuel">
+          <img src="/wp-content/themes/urbizen-child/assets/images/dossier/dp2-plan-de-masse.svg" alt="Plan de masse en cours de préparation, illustrant le travail réalisé par Urbizen." loading="lazy" decoding="async" width="760" height="560">
+        </figure>
+      </div>
+      <div class="etape-panel" role="tabpanel" id="et-p-remise" aria-labelledby="et-t-remise" tabindex="0" hidden>
+        <div class="etape-corps">
+          <span class="etape-rang">Étape 4 sur 4</span>
+          <h3>Vous recevez les documents prêts à être déposés</h3>
+          <p>Après vérification, les documents vous sont remis dans un dossier structuré et prêt à être utilisé pour votre démarche.</p>
+          <p class="etape-retenir"><span>À retenir</span>Votre dossier est préparé et organisé pour être transmis au service urbanisme.</p>
+        </div>
+        <figure class="etape-visuel">
+          <img src="/wp-content/themes/urbizen-child/assets/images/dossier/doc-cerfa.svg" alt="Formulaire administratif renseigné, illustrant le dossier remis au client." loading="lazy" decoding="async" width="760" height="560">
+        </figure>
+      </div>
+      <div class="etapes-pied">
+        <p class="etapes-compteur" aria-live="polite">Étape <b>1</b> sur 4</p>
+        <div class="etapes-points" aria-hidden="true">
+          <span class="etapes-point is-actif"></span>
+          <span class="etapes-point"></span>
+          <span class="etapes-point"></span>
+          <span class="etapes-point"></span>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -390,37 +466,6 @@
       </a>
     </div>
 
-    <div class="dossier-panel" id="dossier">
-      <div class="dossier-panel-head">
-        <div>
-          <span class="code">CONTENU DU DOSSIER</span>
-          <h3>Votre dossier peut comprendre</h3>
-        </div>
-        <p>Les pièces sont sélectionnées selon la nature de votre projet et les exigences applicables.</p>
-      </div>
-      <div class="planche">
-      <div class="planche-item"><span class="code">DP1 · PCMI1</span><span class="planche-t">Plan de situation</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M2 42 L92 28" stroke="currentColor" stroke-width="1.3" opacity=".55"/><path d="M36 64 L50 6" stroke="currentColor" stroke-width="1.3" opacity=".55"/><rect x="56" y="30" width="26" height="20" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M18 16 a8 8 0 1 1 16 0 c0 7 -8 15 -8 15 c0 0 -8 -8 -8 -15 z" fill="#54CF99" stroke="#14233B" stroke-width="1.2"/><circle cx="26" cy="16" r="2.6" fill="#fff"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP2 · PCMI2</span><span class="planche-t">Plan de masse</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3" opacity=".7"/><rect x="20" y="22" width="32" height="24" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.5"/><path d="M52 40 L72 40 L72 59" stroke="currentColor" stroke-width="1.2" opacity=".65"/><circle cx="70" cy="18" r="6" fill="none" stroke="#54CF99" stroke-width="1.5"/><path d="M70 24 L70 30" stroke="currentColor" stroke-width="1.2" opacity=".65"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP3 · PCMI3</span><span class="planche-t">Plan en coupe</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 48 L90 48" stroke="currentColor" stroke-width="1.5"/><path d="M8 53 L12 48 M18 53 L22 48 M28 53 L32 48 M38 53 L42 48 M48 53 L52 48 M58 53 L62 48 M68 53 L72 48 M78 53 L82 48" stroke="currentColor" stroke-width="1" opacity=".45"/><path d="M36 48 L36 28 L62 28 L62 48" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M31 28 L49 15 L67 28 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><path d="M22 15 L22 48" stroke="#54CF99" stroke-width="1.3"/><path d="M19 18 L22 15 L25 18 M19 45 L22 48 L25 45" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP4 · PCMI5</span><span class="planche-t">Façades &amp; toitures</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 56 L18 30 L47 13 L76 30 L76 56 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M14 32 L47 13 L80 32" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.4"/><rect x="30" y="40" width="13" height="16" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="52" y="38" width="13" height="11" fill="#54CF99" fill-opacity=".25" stroke="currentColor" stroke-width="1.3"/><path d="M58.5 38 L58.5 49 M52 43.5 L65 43.5" stroke="currentColor" stroke-width="1"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP6 · PCMI6</span><span class="planche-t">Insertion graphique</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="16" cy="15" r="6" fill="none" stroke="#54CF99" stroke-width="1.2" opacity=".7"/><path d="M2 52 L92 52" stroke="currentColor" stroke-width="1.4"/><path d="M2 52 q22 -7 46 -5 q26 2 44 -3" fill="none" stroke="#128A5A" stroke-width="1.2" opacity=".55"/><path d="M30 52 L30 33 L45 23 L60 33 L60 52 Z" fill="rgba(20,35,59,.03)" stroke="currentColor" stroke-width="1.4"/><path d="M30 33 L45 23 L60 33" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.3"/><rect x="40" y="42" width="9" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="76" cy="40" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.3"/><path d="M76 48 L76 52" stroke="currentColor" stroke-width="1.3"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP7 · PCMI7</span><span class="planche-t">Photographie de l'environnement proche</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="7" width="78" height="52" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><path d="M8 45 q15 -9 30 -5 q17 4 48 -5 V59 H8 Z" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.1"/><path d="M29 43 V29 H47 V43" fill="#FBFCFD" stroke="currentColor" stroke-width="1.3"/><path d="M25 29 38 19 51 29" stroke="#128A5A" stroke-width="1.4"/><circle cx="68" cy="25" r="8" fill="#54CF99" fill-opacity=".3" stroke="#128A5A" stroke-width="1.2"/><path d="M68 33 V44" stroke="currentColor" stroke-width="1.2"/><path d="M14 13 h12 M14 13 v8 M80 13 H68 M80 13 v8 M14 53 h12 M14 53 v-8 M80 53 H68 M80 53 v-8" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
-      <div class="planche-item"><span class="code">DP8 · PCMI8</span><span class="planche-t">Photographie du paysage lointain</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="8" width="80" height="50" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.2"/><circle cx="72" cy="20" r="6" fill="#54CF99" fill-opacity=".35" stroke="#128A5A" stroke-width="1"/><path d="M8 43 25 29 38 39 52 24 86 48" fill="#E4F5EC" stroke="#128A5A" stroke-width="1.2"/><path d="M8 49 q19 -8 37 -3 q18 5 41 -2 V58 H8 Z" fill="#14233B" fill-opacity=".06" stroke="currentColor" stroke-width="1"/><path d="M39 49 V39 H51 V49 M36 39 45 32 54 39" fill="#FBFCFD" stroke="currentColor" stroke-width="1.1"/><path d="M15 15 h11 M15 15 v7 M79 15 H68 M79 15 v7" stroke="#9FADBC" stroke-width="1"/></svg></span></div>
-      <div class="planche-item"><span class="code">PCMI4</span><span class="planche-t">Notice descriptive</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="24" y="4" width="46" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><rect x="30" y="10" width="24" height="8" fill="#E4F5EC" stroke="#128A5A" stroke-width="1"/><path d="M30 27 H64 M30 33 H64 M30 39 H58 M30 45 H64 M30 51 H52" stroke="currentColor" stroke-width="1.2" opacity=".5"/><circle cx="58" cy="51" r="4.5" fill="none" stroke="#54CF99" stroke-width="1.3"/></svg></span></div>
-      <div class="planche-item"><span class="code">CERFA</span><span class="planche-t">Formulaire officiel</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="4" width="50" height="58" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M28 13 H66" stroke="#128A5A" stroke-width="1.8"/><rect x="28" y="20" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="30" width="38" height="6" fill="none" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="42" width="7" height="7" fill="#54CF99" stroke="#14233B" stroke-width="1"/><path d="M29.5 45.6 L31.5 47.6 L34.5 44" stroke="#fff" stroke-width="1.3" fill="none"/><path d="M40 46 H66" stroke="currentColor" stroke-width="1" opacity=".55"/><rect x="28" y="52" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M40 56 H66" stroke="currentColor" stroke-width="1" opacity=".55"/></svg></span></div>
-      <div class="planche-item"><span class="code">BORDEREAU</span><span class="planche-t">Bordereau des pièces</span>
-        <span class="planche-fig" aria-hidden="true"><svg viewBox="0 0 94 66" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="18" y="6" width="58" height="54" rx="2" fill="#fff" stroke="currentColor" stroke-width="1.3"/><path d="M25 17 L27.5 19.5 L32 14.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 17 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 28 L27.5 30.5 L32 25.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 28 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 39 L27.5 41.5 L32 36.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 39 H69" stroke="currentColor" stroke-width="1.2" opacity=".55"/><path d="M25 50 L27.5 52.5 L32 47.5" stroke="#54CF99" stroke-width="1.7" fill="none"/><path d="M37 50 H63" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg></span></div>
-      </div>
-    </div>
 
     <aside class="depot-option">
       <span class="depot-option-check" aria-hidden="true">✓</span>
@@ -509,6 +554,293 @@
       <p>Tarifs maison individuelle et extension indiqués hors étude BBIO, hors étude thermique / RE2020, hors mission d'architecte, et sous réserve que le projet ne nécessite pas le recours obligatoire à un architecte (généralement au-delà de 150&nbsp;m² de surface de plancher après travaux). Les forfaits comprennent le CERFA, les plans et les pièces graphiques du dossier standard. L'obtention de l'autorisation dépend de l'instruction de la mairie et des règles d'urbanisme applicables.</p>
     </details>
     </div>
+  </div>
+</section>
+
+<!-- ===== Section — Contenu du dossier ===== -->
+<section class="dossier-explorer" id="dossier">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Contenu de votre dossier</span></span>
+      <h2>Découvrez les pièces préparées pour votre dossier d'urbanisme</h2>
+      <p>Plans, documents administratifs et visuels&nbsp;: découvrez concrètement les pièces qui peuvent composer votre dossier selon votre projet.</p>
+    </div>
+    <div class="dx">
+      <div class="dx-tabs" role="tablist" aria-label="Familles de pièces">
+        <button type="button" class="dx-tab" role="tab" id="dx-t-plans" aria-controls="dx-p-plans" aria-selected="true" tabindex="0">Plans techniques</button>
+        <button type="button" class="dx-tab" role="tab" id="dx-t-documents" aria-controls="dx-p-documents" aria-selected="false" tabindex="-1">Documents administratifs</button>
+        <button type="button" class="dx-tab" role="tab" id="dx-t-visuels" aria-controls="dx-p-visuels" aria-selected="false" tabindex="-1">Visuels du projet</button>
+      </div>
+      <div class="dx-panel" role="tabpanel" id="dx-p-plans" aria-labelledby="dx-t-plans" tabindex="0">
+        <div class="dx-grid">
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp1" aria-labelledby="dx-i-dp1" tabindex="0">
+            <div class="dx-info">
+              <span class="dx-badge">DP1 · PCMI1</span>
+              <h3>Plan de situation</h3>
+              <p>Le plan de situation localise précisément le terrain dans la commune et situe le projet dans son environnement.</p>
+              <ul class="dx-points">
+                <li>Localisation de la parcelle</li>
+                <li>Situation dans la commune</li>
+                <li>Repérage de l'environnement</li>
+              </ul>
+              <p class="dx-encart">C'est la première pièce que le service instructeur regarde : elle lui dit où se trouve le terrain avant même de savoir ce qui s'y construit.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Plan de situation">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/dp1-plan-de-situation.svg" alt="Extrait de plan de situation : le terrain du projet figuré en vert, les voies, les constructions voisines, la flèche du nord et l'échelle graphique." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Plan de situation — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp2" aria-labelledby="dx-i-dp2" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">DP2 · PCMI2</span>
+              <h3>Plan de masse</h3>
+              <p>Le plan de masse montre l'implantation du projet sur le terrain, coté dans les trois dimensions.</p>
+              <ul class="dx-points">
+                <li>Position sur la parcelle</li>
+                <li>Distances aux limites séparatives</li>
+                <li>Surfaces créées</li>
+              </ul>
+              <p class="dx-encart">C'est la pièce qui revient le plus souvent en demande de complément : une cote manquante suffit à suspendre l'instruction.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Plan de masse">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/dp2-plan-de-masse.svg" alt="Extrait de plan de masse : la limite de propriété en tirets, la maison existante, le projet en vert avec sa surface, et deux cotes vers les limites séparatives." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Plan de masse — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp3" aria-labelledby="dx-i-dp3" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">DP3 · PCMI3</span>
+              <h3>Plan en coupe</h3>
+              <p>Le plan en coupe montre le profil du terrain et la façon dont la construction s'y inscrit, avant et après travaux.</p>
+              <ul class="dx-points">
+                <li>Profil du terrain</li>
+                <li>Hauteur de la construction</li>
+                <li>Rapport au terrain naturel</li>
+              </ul>
+              <p class="dx-encart">C’est la pièce qui montre si le terrain est remanié : déblais, remblais et hauteur se lisent d’un seul coup d’œil.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Plan en coupe">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/dp3-plan-en-coupe.svg" alt="Extrait de plan en coupe : le profil du terrain avant et après travaux, l'existant et le projet en vert, avec la hauteur cotée." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Plan en coupe — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp4" aria-labelledby="dx-i-dp4" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">DP4 · PCMI5</span>
+              <h3>Façades et toitures</h3>
+              <p>Le plan des façades et des toitures montre l'aspect extérieur du projet, sur chacune de ses faces.</p>
+              <ul class="dx-points">
+                <li>Aspect de chaque façade</li>
+                <li>Ouvertures et toiture</li>
+                <li>Matériaux et teintes</li>
+              </ul>
+              <p class="dx-encart">Les matériaux et les couleurs y sont portés : c'est sur cette pièce que se juge l'insertion dans le bâti existant.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Façades et toitures">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/dp4-facades-toitures.svg" alt="Extrait de plan de façades : trois élévations, dont la partie créée en vert, et la liste des matériaux et teintes." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Façades et toitures — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-nav" role="tablist" aria-orientation="vertical" aria-label="Pièces — Plans techniques">
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp1" aria-controls="dx-v-dp1" aria-selected="true" tabindex="0">
+              <span class="dx-item-n">01</span>
+              <span class="dx-item-t">Plan de situation</span>
+              <span class="dx-item-c">DP1 · PCMI1</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp2" aria-controls="dx-v-dp2" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">02</span>
+              <span class="dx-item-t">Plan de masse</span>
+              <span class="dx-item-c">DP2 · PCMI2</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp3" aria-controls="dx-v-dp3" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">03</span>
+              <span class="dx-item-t">Plan en coupe</span>
+              <span class="dx-item-c">DP3 · PCMI3</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp4" aria-controls="dx-v-dp4" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">04</span>
+              <span class="dx-item-t">Façades et toitures</span>
+              <span class="dx-item-c">DP4 · PCMI5</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="dx-panel" role="tabpanel" id="dx-p-documents" aria-labelledby="dx-t-documents" tabindex="0" hidden>
+        <div class="dx-grid">
+          <div class="dx-vue" role="tabpanel" id="dx-v-cerfa" aria-labelledby="dx-i-cerfa" tabindex="0">
+            <div class="dx-info">
+              <span class="dx-badge">CERFA</span>
+              <h3>Formulaire administratif</h3>
+              <p>Le formulaire officiel de la demande, renseigné à partir des éléments que vous nous transmettez.</p>
+              <ul class="dx-points">
+                <li>Identité et coordonnées</li>
+                <li>Références cadastrales</li>
+                <li>Surfaces et nature des travaux</li>
+              </ul>
+              <p class="dx-encart">Un formulaire mal renseigné ne se voit pas tout de suite : il ressort en demande de pièces, plusieurs semaines plus tard.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Formulaire administratif">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/doc-cerfa.svg" alt="Extrait schématique d'un formulaire de déclaration préalable : bandeau bleu nuit et rubriques d'identité, de terrain et de surfaces." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Formulaire administratif — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-bordereau" aria-labelledby="dx-i-bordereau" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">BORDEREAU</span>
+              <h3>Bordereau des pièces</h3>
+              <p>Le récapitulatif de ce que contient le dossier remis, pièce par pièce.</p>
+              <ul class="dx-points">
+                <li>Une ligne par pièce jointe</li>
+                <li>Références normalisées</li>
+                <li>Ce qui dépend du projet est signalé</li>
+              </ul>
+              <p class="dx-encart">Toutes les pièces ne sont pas exigées pour tous les projets : le bordereau dit ce que contient votre dossier, pas une liste type.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Bordereau des pièces">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/doc-bordereau.svg" alt="Extrait schématique d'un bordereau : une ligne par pièce avec sa référence, son intitulé et une coche." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Bordereau des pièces — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-notice" aria-labelledby="dx-i-notice" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">PCMI4</span>
+              <h3>Notice descriptive</h3>
+              <p>Le texte qui accompagne les plans et explique le projet : terrain, implantation, accès, matériaux.</p>
+              <ul class="dx-points">
+                <li>Description du terrain</li>
+                <li>Parti pris d'implantation</li>
+                <li>Matériaux et couleurs retenus</li>
+              </ul>
+              <p class="dx-encart">Exigée pour un permis de construire, la notice n'est pas toujours requise pour une déclaration préalable.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Notice descriptive">
+                <img src="/wp-content/themes/urbizen-child/assets/images/dossier/doc-notice.svg" alt="Extrait schématique d'une notice descriptive : cinq rubriques et un encadré sur les cas où elle est requise." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Notice descriptive — exemple Urbizen sur un projet fictif.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-nav" role="tablist" aria-orientation="vertical" aria-label="Pièces — Documents administratifs">
+            <button type="button" class="dx-item" role="tab" id="dx-i-cerfa" aria-controls="dx-v-cerfa" aria-selected="true" tabindex="0">
+              <span class="dx-item-n">01</span>
+              <span class="dx-item-t">Formulaire administratif</span>
+              <span class="dx-item-c">CERFA</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-bordereau" aria-controls="dx-v-bordereau" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">02</span>
+              <span class="dx-item-t">Bordereau des pièces</span>
+              <span class="dx-item-c">BORDEREAU</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-notice" aria-controls="dx-v-notice" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">03</span>
+              <span class="dx-item-t">Notice descriptive</span>
+              <span class="dx-item-c">PCMI4</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="dx-panel" role="tabpanel" id="dx-p-visuels" aria-labelledby="dx-t-visuels" tabindex="0" hidden>
+        <div class="dx-grid">
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp6" aria-labelledby="dx-i-dp6" tabindex="0">
+            <div class="dx-info">
+              <span class="dx-badge">DP6 · PCMI6</span>
+              <h3>Insertion graphique</h3>
+              <p>L'insertion montre le projet tel qu'il sera vu depuis l'extérieur, replacé dans son environnement réel.</p>
+              <ul class="dx-points">
+                <li>Projet replacé dans le site</li>
+                <li>Volumes et proportions</li>
+                <li>Rendu des matériaux</li>
+              </ul>
+              <p class="dx-encart">C'est la pièce qui fait comprendre le projet en un regard, à quelqu'un qui n'a jamais vu le terrain.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Insertion graphique">
+                <img src="/wp-content/themes/urbizen-child/assets/images/conception/conception-maison-plain-pied-terrasse.webp" alt="Rendu produit par Urbizen : une maison de plain-pied avec sa terrasse, replacée dans son environnement." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Insertion graphique — rendu 3D réalisé par Urbizen.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp7" aria-labelledby="dx-i-dp7" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">DP7 · PCMI7</span>
+              <h3>Environnement proche</h3>
+              <p>Une photographie situant le terrain dans son environnement immédiat : voisinage, accès, végétation.</p>
+              <ul class="dx-points">
+                <li>Abords immédiats</li>
+                <li>Accès et voirie</li>
+                <li>Constructions voisines</li>
+              </ul>
+              <p class="dx-encart">Cette photographie est prise depuis le domaine public : elle montre le terrain tel qu’on le voit depuis la rue.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Environnement proche">
+                <img src="/wp-content/themes/urbizen-child/assets/images/blog/extension-maison.webp" alt="Photographie d'une maison et de ses abords immédiats, illustrant le type de vue attendu pour cette pièce." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Photographie d’illustration : cette pièce est prise par vos soins, nous vous indiquons le cadrage attendu.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-vue" role="tabpanel" id="dx-v-dp8" aria-labelledby="dx-i-dp8" tabindex="0" hidden>
+            <div class="dx-info">
+              <span class="dx-badge">DP8 · PCMI8</span>
+              <h3>Paysage lointain</h3>
+              <p>Une photographie replaçant le terrain dans le paysage, à distance.</p>
+              <ul class="dx-points">
+                <li>Insertion dans le paysage</li>
+                <li>Covisibilités éventuelles</li>
+                <li>Contexte bâti ou naturel</li>
+              </ul>
+              <p class="dx-encart">Cette pièce prend tout son sens en secteur protégé, où l'architecte des Bâtiments de France se prononce.</p>
+            </div>
+            <figure class="dx-doc">
+              <button type="button" class="dx-zoom" aria-label="Agrandir : Paysage lointain">
+                <img src="/wp-content/themes/urbizen-child/assets/images/blog/plu-terrain.webp" alt="Vue aérienne d'un terrain dans son quartier, illustrant le type de vue attendu pour cette pièce." loading="lazy" decoding="async" width="760" height="560">
+                <span class="dx-zoom-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21M11 8v6M8 11h6"/></svg>Agrandir</span>
+              </button>
+              <figcaption>Photographie d’illustration : cette pièce est prise par vos soins, nous vous indiquons le cadrage attendu.</figcaption>
+            </figure>
+          </div>
+          <div class="dx-nav" role="tablist" aria-orientation="vertical" aria-label="Pièces — Visuels du projet">
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp6" aria-controls="dx-v-dp6" aria-selected="true" tabindex="0">
+              <span class="dx-item-n">01</span>
+              <span class="dx-item-t">Insertion graphique</span>
+              <span class="dx-item-c">DP6 · PCMI6</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp7" aria-controls="dx-v-dp7" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">02</span>
+              <span class="dx-item-t">Environnement proche</span>
+              <span class="dx-item-c">DP7 · PCMI7</span>
+            </button>
+            <button type="button" class="dx-item" role="tab" id="dx-i-dp8" aria-controls="dx-v-dp8" aria-selected="false" tabindex="-1">
+              <span class="dx-item-n">03</span>
+              <span class="dx-item-t">Paysage lointain</span>
+              <span class="dx-item-c">DP8 · PCMI8</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="dx-note">Le contenu exact d'un dossier dépend de la nature du projet et des règles applicables&nbsp;: aucune pièce n'est systématiquement exigée. Les plans et documents administratifs présentés ici sont des illustrations réalisées sur un projet fictif&nbsp;; les visuels du projet sont des rendus et photographies d'exemple.</p>
   </div>
 </section>
 

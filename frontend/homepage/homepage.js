@@ -95,6 +95,125 @@
     });
   }
 
+
+  /* ----- Onglets ARIA, mécanique unique -----
+     Trois usages sur l'accueil : les familles de pièces, les pièces elles-mêmes,
+     et les quatre étapes. Tous suivent le même contrat — un `role="tablist"`,
+     des `role="tab"` portant `aria-controls`, et un panneau par onglet. Une
+     seule fonction les sert : trois implémentations auraient dérivé.
+
+     Le `tabindex` roulant est ce qui rend la chose utilisable au clavier : un
+     seul onglet est atteignable en tabulant, les autres se rejoignent aux
+     flèches. C'est le comportement attendu d'un groupe d'onglets, et l'oublier
+     obligerait à traverser dix boutons pour atteindre le contenu. */
+  var brancherOnglets = function ( liste, apres ) {
+    if ( ! liste ) { return; }
+    var onglets = [].slice.call( liste.querySelectorAll( '[role="tab"]' ) );
+    if ( ! onglets.length ) { return; }
+    var vertical = liste.getAttribute( 'aria-orientation' ) === 'vertical';
+
+    var activer = function ( onglet, donnerLeFocus ) {
+      onglets.forEach( function ( o ) {
+        var actif = o === onglet;
+        o.setAttribute( 'aria-selected', actif ? 'true' : 'false' );
+        o.setAttribute( 'tabindex', actif ? '0' : '-1' );
+        var panneau = document.getElementById( o.getAttribute( 'aria-controls' ) );
+        if ( panneau ) { panneau.hidden = ! actif; }
+      } );
+      if ( donnerLeFocus ) {
+        try { onglet.focus( { preventScroll: true } ); } catch ( e ) { onglet.focus(); }
+      }
+      if ( apres ) { apres( onglets.indexOf( onglet ), onglet ); }
+    };
+
+    onglets.forEach( function ( onglet ) {
+      onglet.addEventListener( 'click', function () { activer( onglet, false ); } );
+      onglet.addEventListener( 'keydown', function ( e ) {
+        var i = onglets.indexOf( onglet );
+        var suivant = vertical ? 'ArrowDown' : 'ArrowRight';
+        var precedent = vertical ? 'ArrowUp' : 'ArrowLeft';
+        var cible = null;
+        if ( e.key === suivant ) { cible = onglets[ ( i + 1 ) % onglets.length ]; }
+        else if ( e.key === precedent ) { cible = onglets[ ( i - 1 + onglets.length ) % onglets.length ]; }
+        else if ( e.key === 'Home' ) { cible = onglets[ 0 ]; }
+        else if ( e.key === 'End' ) { cible = onglets[ onglets.length - 1 ]; }
+        if ( ! cible ) { return; }
+        e.preventDefault();
+        activer( cible, true );
+      } );
+    } );
+  };
+
+  /* Les familles de pièces, puis les pièces de chaque famille. */
+  brancherOnglets( document.querySelector( '.dx-tabs' ) );
+  [].forEach.call( document.querySelectorAll( '.dx-nav' ), function ( nav ) {
+    brancherOnglets( nav );
+  } );
+
+  /* Les quatre étapes, avec le compteur et les repères du bas. */
+  var compteur = document.querySelector( '.etapes-compteur b' );
+  var points = [].slice.call( document.querySelectorAll( '.etapes-point' ) );
+  brancherOnglets( document.querySelector( '.etapes-nav' ), function ( rang ) {
+    if ( compteur ) { compteur.textContent = String( rang + 1 ); }
+    points.forEach( function ( p, i ) { p.classList.toggle( 'is-actif', i === rang ); } );
+  } );
+
+  /* ----- La loupe sur un document -----
+     Un document de dossier doit pouvoir être lu, pas seulement aperçu. La
+     visionneuse est construite à la première ouverture et réutilisée ensuite :
+     l'ajouter au chargement coûterait un nœud à tout le monde pour un usage
+     qui reste minoritaire. Échap ferme, le focus revient au bouton d'origine —
+     sans quoi il retomberait en haut du document. */
+  var loupe = null, loupeImg = null, loupeOrigine = null;
+
+  var fermerLoupe = function () {
+    if ( ! loupe || loupe.hidden ) { return; }
+    loupe.hidden = true;
+    document.documentElement.style.overflow = '';
+    if ( loupeOrigine ) {
+      try { loupeOrigine.focus( { preventScroll: true } ); } catch ( e ) { loupeOrigine.focus(); }
+    }
+  };
+
+  var construireLoupe = function () {
+    loupe = document.createElement( 'div' );
+    loupe.className = 'dx-lightbox';
+    loupe.hidden = true;
+    loupe.setAttribute( 'role', 'dialog' );
+    loupe.setAttribute( 'aria-modal', 'true' );
+    loupe.setAttribute( 'aria-label', 'Document agrandi' );
+    loupeImg = document.createElement( 'img' );
+    loupeImg.alt = '';
+    var fermer = document.createElement( 'button' );
+    fermer.type = 'button';
+    fermer.className = 'dx-lightbox-fermer';
+    fermer.setAttribute( 'aria-label', 'Fermer' );
+    fermer.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    fermer.addEventListener( 'click', fermerLoupe );
+    loupe.appendChild( loupeImg );
+    loupe.appendChild( fermer );
+    loupe.addEventListener( 'click', function ( e ) { if ( e.target === loupe ) { fermerLoupe(); } } );
+    document.addEventListener( 'keydown', function ( e ) { if ( e.key === 'Escape' ) { fermerLoupe(); } } );
+    /* Le CSS de l'accueil est porté sous « .urbizen-accueil » : rattachée à
+       <body>, la loupe tomberait hors de portée et perdrait tout son style. */
+    ( document.querySelector( '.urbizen-accueil' ) || document.body ).appendChild( loupe );
+    return fermer;
+  };
+
+  [].forEach.call( document.querySelectorAll( '.dx-zoom' ), function ( bouton ) {
+    bouton.addEventListener( 'click', function () {
+      var img = bouton.querySelector( 'img' );
+      if ( ! img ) { return; }
+      var fermer = loupe ? loupe.querySelector( '.dx-lightbox-fermer' ) : construireLoupe();
+      loupeOrigine = bouton;
+      loupeImg.src = img.currentSrc || img.src;
+      loupeImg.alt = img.alt;
+      loupe.hidden = false;
+      document.documentElement.style.overflow = 'hidden';
+      try { fermer.focus( { preventScroll: true } ); } catch ( e ) { fermer.focus(); }
+    } );
+  } );
+
   /* ----- Centre de contact « Parlons de votre projet » -----
      Dialogue accessible ouvert par l'icône téléphone. À la 1re ouverture, le
      panneau ET son fond d'écran sont déplacés sous <body> : cela échappe au bloc
