@@ -149,27 +149,49 @@
 }
 .urbizen-guides .guide-hero-date { color: var(--u-ink-faint); }
 
+/* LE VISUEL D'EN-TÊTE
+   Mesuré avant reprise : la figure allait de 200 à 1240 px quand les `.wrap` du
+   hero et du corps allaient de 160 à 1280. Centrée dans la fenêtre, décalée de
+   la page — alignée sur rien. `margin-inline: 0` et `width: 100%` la remettent
+   sur la colonne, et le débord négatif la fait mordre sur le bandeau : elle
+   relie les deux zones au lieu de flotter entre elles. */
 .urbizen-guides .guide-visuel {
-	margin: 0 0 clamp(24px, 3vw, 36px);
+	width: 100%;
+	margin: clamp(-96px, -6vw, -48px) 0 clamp(28px, 3.4vw, 44px);
+	position: relative;
+	z-index: 1;
 	overflow: hidden;
 	border: 1px solid var(--u-line);
 	border-radius: var(--u-radius);
 	background: var(--u-surface-2);
+	box-shadow: 0 2px 0 rgba(20, 35, 59, .04), 0 28px 56px -34px rgba(20, 35, 59, .45);
 }
 /* Le visuel est cadré, pas laissé à sa hauteur naturelle : une image 3/2 sur
    1140 px de large fait 760 px de haut et remplit l'écran à elle seule, en
    repoussant la première ligne du guide sous la ligne de flottaison. Le rapport
    large la ramène à une bande d'ouverture. */
+/* Rapport fixe plutôt que hauteur maximale : la bande garde la même proportion
+   quelle que soit l'image fournie, et le cadrage reste centré. */
 .urbizen-guides .guide-visuel img {
 	display: block;
 	width: 100%;
 	height: auto;
-	max-height: 420px;
+	aspect-ratio: 21 / 9;
 	object-fit: cover;
+	object-position: center;
 }
 @media (max-width: 700px) {
-	.urbizen-guides .guide-visuel img { max-height: 260px; }
+	.urbizen-guides .guide-visuel { margin-top: clamp(-56px, -8vw, -32px); }
+	.urbizen-guides .guide-visuel img { aspect-ratio: 3 / 2; }
 }
+
+/* LA TRAME TECHNIQUE NE DESCEND PAS DANS L'ARTICLE
+   `u-grid-bg` est posé sur le <body> par le thème : elle traverse donc toute la
+   page. Sur l'accueil c'est l'identité ; derrière deux mille mots, c'est du
+   bruit — et elle réapparaissait dans les interstices entre les blocs opaques.
+   `main` reçoit donc la surface. Le hero garde la sienne, dessinée par
+   `.page-hero::before` : l'effet est réservé au haut de page, comme voulu. */
+.urbizen-guides main { background: var(--u-surface); }
 
 /* Le corps d'un guide se lit sur une surface unie. La trame technique
    `u-grid-bg` fait l'identité de l'accueil et des pages courtes ; derrière deux
@@ -191,16 +213,57 @@
 	font-size: 17px;
 	line-height: 1.72;
 }
-.urbizen-guides .guide-corps > * + * { margin-top: 1.15em; }
-.urbizen-guides .guide-corps h2 {
-	margin-top: 1.9em;
-	font-size: clamp(23px, 2.4vw, 28px);
+/* LE SÉLECTEUR QUI NE MORDAIT PAS
+   `wp:post-content` enveloppe tout le contenu dans un `.entry-content` : le
+   `.guide-corps` n'a donc qu'UN enfant, et `> * + *` ne s'appliquait à rien.
+   Mesuré : les paragraphes avaient 0 px de marge, haut comme bas. Les titres
+   respiraient (sélecteur descendant), le texte non — d'où l'impression de
+   page compacte et fade. On cible désormais le conteneur réel, tout en gardant
+   l'ancien sélecteur pour un contenu qui ne passerait pas par ce bloc. */
+.urbizen-guides .guide-corps > * + *,
+.urbizen-guides .guide-corps .entry-content > * + * { margin-top: 1.15em; }
+/* LES SECTIONS SE VOIENT
+   Un guide de deux mille mots sans repère visuel se lit comme un mémo. Chaque
+   H2 ouvre donc une section : un filet fin qui court sur la colonne, un espace
+   franc au-dessus, et une barre verte courte — le même signe que l'« eyebrow »
+   de l'accueil, pour que la marque se retrouve ici aussi. Le premier H2 n'a ni
+   filet ni marge haute : il suit le chapô, il n'a rien à séparer. */
+/* Spécificité alignée sur celle de la règle de rythme : sans le second
+   sélecteur, `.entry-content > * + *` (trois classes) l'emportait sur
+   `.guide-corps h2` (deux classes et un élément), et les sections perdaient
+   leur respiration — mesuré à 34,5 px au lieu de 78. */
+.urbizen-guides .guide-corps h2,
+.urbizen-guides .guide-corps .entry-content > h2 {
+	position: relative;
+	margin-top: 2.6em;
+	padding-top: 1.5em;
+	border-top: 1px solid var(--u-line);
+	color: var(--u-ink);
+	font-size: clamp(24px, 2.5vw, 30px);
 	font-weight: 600;
-	line-height: 1.25;
+	line-height: 1.22;
+	letter-spacing: -.012em;
 }
-.urbizen-guides .guide-corps h3 {
-	margin-top: 1.7em;
-	font-size: clamp(18px, 1.8vw, 21px);
+.urbizen-guides .guide-corps h2::before,
+.urbizen-guides .guide-corps .entry-content > h2::before {
+	content: "";
+	position: absolute;
+	top: -2px;
+	left: 0;
+	width: 44px;
+	height: 3px;
+	background: var(--u-brand);
+	border-radius: 2px;
+}
+/* Aucune exception pour le premier H2 : le filet le détache du chapô, ce qui
+   est exactement ce qu'on veut. La version précédente visait `:first-child`,
+   qui ne pouvait de toute façon jamais correspondre — le premier enfant du
+   contenu est le chapô, pas un titre. */
+.urbizen-guides .guide-corps h3,
+.urbizen-guides .guide-corps .entry-content > h3 {
+	margin-top: 1.9em;
+	color: var(--u-ink);
+	font-size: clamp(18.5px, 1.85vw, 21.5px);
 	font-weight: 600;
 	line-height: 1.3;
 }
@@ -354,4 +417,115 @@
 @media (prefers-reduced-motion: reduce) {
 	.urbizen-guides .blog-preview-card { transition: none; }
 	.urbizen-guides .blog-preview-card:hover { transform: none; }
+}
+
+
+/* ===========================================================================
+   5 · Blocs éditoriaux du gabarit
+   ----------------------------------------------------------------------------
+   Ces classes sont celles du GABARIT, pas d'un article : tout guide à venir les
+   emploie en posant `className` sur un bloc paragraphe. Trois formes, trois
+   fonctions, et un code couleur constant — gris pour ce qui conditionne, vert
+   pour ce qui conclut, encre pour ce qui nuance.
+   ======================================================================== */
+
+/* Ce qui conditionne un calcul : les hypothèses. Fond neutre, filet gris. */
+.urbizen-guides .guide-corps .guide-hypotheses {
+	margin-top: 1.6em;
+	padding: 16px 20px;
+	border-left: 3px solid var(--u-line-strong);
+	border-radius: 0 10px 10px 0;
+	background: var(--u-surface-2);
+	color: var(--u-ink-soft);
+	font-size: 15.5px;
+	line-height: 1.6;
+}
+.urbizen-guides .guide-corps .guide-hypotheses strong { color: var(--u-ink); }
+
+/* Ce qui conclut : le résultat. Filet vert, fond très pâle, texte encre. */
+.urbizen-guides .guide-corps .guide-resultat {
+	margin-top: 1.4em;
+	padding: 16px 20px;
+	border-left: 3px solid var(--u-brand);
+	border-radius: 0 10px 10px 0;
+	background: var(--u-brand-sf);
+	color: var(--u-ink);
+}
+.urbizen-guides .guide-corps .guide-resultat strong { color: var(--u-brand-dk); }
+
+/* Ce qui nuance : la variante si une hypothèse change. Discret, sans fond. */
+.urbizen-guides .guide-corps .guide-variante {
+	margin-top: .9em;
+	padding-left: 20px;
+	border-left: 2px dashed var(--u-line-strong);
+	color: var(--u-ink-soft);
+	font-size: 15.5px;
+}
+
+/* Les schémas : une vraie planche, pas une image posée dans le texte. */
+.urbizen-guides .guide-corps .wp-block-image {
+	margin-top: 1.9em;
+	padding: 14px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	box-shadow: var(--u-shadow-card);
+}
+.urbizen-guides .guide-corps .wp-block-image figcaption {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--u-line);
+	color: var(--u-ink-soft);
+	font-size: 13.5px;
+	line-height: 1.5;
+}
+
+/* La citation devient un « à retenir » : c'est son rôle dans ces guides. */
+.urbizen-guides .guide-corps blockquote {
+	position: relative;
+	margin-top: 1.7em;
+	padding: 20px 22px 20px 24px;
+	border-left: 4px solid var(--u-brand);
+	border-radius: 0 12px 12px 0;
+	background: var(--u-brand-sf);
+	color: var(--u-ink);
+	font-size: 17.5px;
+	line-height: 1.6;
+}
+.urbizen-guides .guide-corps blockquote p { font-weight: 500; }
+
+/* Les sources : un encadré sobre, nettement détaché du corps. */
+.urbizen-guides .guide-corps .guide-sources {
+	margin-top: 2.2em;
+	padding: 18px 22px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+	color: var(--u-ink-soft);
+	font-size: 13.5px;
+	line-height: 1.65;
+}
+.urbizen-guides .guide-corps .guide-sources strong {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--u-ink);
+	font-family: var(--u-font-mono);
+	font-size: 11px;
+	letter-spacing: .09em;
+	text-transform: uppercase;
+}
+.urbizen-guides .guide-corps .guide-sources a {
+	color: var(--u-ink-soft);
+	text-decoration-thickness: 1px;
+}
+.urbizen-guides .guide-corps .guide-sources a:hover { color: var(--u-brand-dk); }
+
+/* Le trait de séparation avant les sources : discret, il ne coupe pas. */
+.urbizen-guides .guide-corps hr { margin-top: 2.4em; border-top-color: var(--u-line); }
+
+@media (max-width: 700px) {
+	.urbizen-guides .guide-corps .guide-hypotheses,
+	.urbizen-guides .guide-corps .guide-resultat { padding: 14px 16px; }
+	.urbizen-guides .guide-corps .wp-block-image { padding: 10px; }
+	.urbizen-guides .guide-corps blockquote { padding: 16px 18px; font-size: 16.5px; }
 }
