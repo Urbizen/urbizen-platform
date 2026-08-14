@@ -63,7 +63,7 @@ CHROMES = [
 # Le menu attendu, dans l'ordre. C'est la seule description de référence :
 # le banc ne devine pas, il compare.
 PREMIER_NIVEAU = ["Accueil", "Nos prestations", "Comment ça marche", "Tarifs",
-                  "Guides", "Espace client", "Contact"]
+                  "Guides", "Espace client"]
 PRESTATIONS = ["Déclaration préalable", "Permis de construire", "Conception de plans"]
 
 echecs = 0

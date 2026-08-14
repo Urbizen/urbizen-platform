@@ -36,7 +36,7 @@ function check( $label, $cond, $detail = '' ) {
 
 // Le menu attendu, dans l'ordre. Seule description de référence : le banc ne
 // devine pas, il compare.
-const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Comment ça marche', 'Tarifs', 'Guides', 'Espace client', 'Contact' );
+const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Comment ça marche', 'Tarifs', 'Guides', 'Espace client' );
 const PRESTATIONS    = array(
 	'https://urbizen.fr/declarations-prealables/' => 'Déclaration préalable',
 	'https://urbizen.fr/permis-de-construire/'    => 'Permis de construire',

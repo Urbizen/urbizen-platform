@@ -1578,3 +1578,25 @@ html { scroll-behavior: smooth; }
    l'accueil tant qu'aucune carte n'est liée. */
 .urbizen-accueil .blog-preview-tous { margin-top: clamp(22px, 3vw, 32px); text-align: center; }
 .urbizen-accueil .blog-preview-tous .btn { min-height: 44px; }
+
+/* La carte 03 devient cliquable, les cinq autres restent des annonces.
+   L'ancre couvre toute la carte plutôt que le seul titre — même mécanisme que
+   sur l'index des guides, et même raison : une cible de la taille de la carte
+   vaut mieux qu'une ligne de texte. Elle n'a pas de texte propre, le titre lui
+   sert de libellé par `aria-labelledby`. */
+.urbizen-accueil .blog-preview-card:has(.guide-lien) { position: relative; transition: border-color .15s, box-shadow .15s, transform .15s; }
+.urbizen-accueil .blog-preview-card:has(.guide-lien):hover {
+  border-color: var(--u-line-strong);
+  box-shadow: 0 1px 0 rgba(20,35,59,.04), 0 22px 44px -34px rgba(20,35,59,.5);
+  transform: translateY(-2px);
+}
+.urbizen-accueil .blog-preview-card .guide-lien::after { content: ""; position: absolute; inset: 0; border-radius: var(--u-radius); }
+/* L'ordre compte : le banc des cibles tactiles vérifie que la DERNIÈRE règle
+   `:focus-visible` portant un `outline` est bien la règle visible. La
+   neutralisation de l'ancre invisible passe donc avant, jamais après. */
+.urbizen-accueil .blog-preview-card .guide-lien:focus-visible { outline: none; }
+.urbizen-accueil .blog-preview-card:has(.guide-lien:focus-visible) { outline: 2px solid var(--u-brand); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  .urbizen-accueil .blog-preview-card:has(.guide-lien) { transition: none; }
+  .urbizen-accueil .blog-preview-card:has(.guide-lien):hover { transform: none; }
+}
