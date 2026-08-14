@@ -83,14 +83,27 @@ function rendre_pattern( $fichier ) {
 	return $sortie;
 }
 
-/** Remet la ligne du logo dans sa forme d'origine, pour comparer le reste. */
+/**
+ * Ramène l'URL du logo à celle de la maquette, pour comparer tout le reste.
+ *
+ * Ne remplace QUE l'adresse. La version précédente réécrivait la balise
+ * entière à partir d'un motif qui figeait l'ordre et la liste des attributs —
+ * `src`, saut de ligne, `alt`, `class` facultative. Ajouter `loading` au logo
+ * le 14 août 2026 a suffi à ce que le motif ne reconnaisse plus rien : la
+ * neutralisation ne s'appliquait plus, et le banc signalait une divergence de
+ * markup là où seule l'URL différait.
+ *
+ * Un neutraliseur doit être aveugle à ce qu'il ne neutralise pas.
+ *
+ * @param string $html Sortie du pattern.
+ * @return string
+ */
 function neutraliser_logo( $html ) {
-	$html = preg_replace(
-		'#<img src="https://exemple\.test/wp-content/themes/urbizen-child/assets/img/logo-urbizen\.png"\s*\n\s*alt="([^"]*)"((?: class="[^"]*")?) />#',
-		'<img src="assets/logo-urbizen.png" alt="$1"$2 />',
+	return preg_replace(
+		'#https?://[^"\']*/wp-content/themes/urbizen-child/assets/img/logo-urbizen\.png#',
+		'assets/logo-urbizen.png',
 		$html
 	);
-	return $html;
 }
 
 // ---------------------------------------------------------------- en-tête ---
