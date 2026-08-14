@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Banc du menu principal à deux niveaux</title>
+<!--
+  Page de mesure chargée par `test-navigation.py` dans un Chrome sans interface.
+  Elle rejoue le menu « Nos prestations » dans une iframe de même origine et
+  relève des états observables : ARIA, visibilité, élément focalisé, rotation du
+  chevron, position du panneau, débordement du document.
+
+  Elle ne décide de rien. Les verdicts sont dans le banc Python.
+-->
+<style>body{font:13px/1.5 monospace;margin:0;padding:8px}</style>
+</head>
+<body>
+<pre id="resultat">EN COURS</pre>
+<script>
+/* Les largeurs encadrent la bascule : 1239 est la dernière largeur du burger,
+   1240 la première du menu déroulant. Un menu qui casse le fait au seuil. */
+const VIEWPORTS = [ 320, 360, 390, 768, 1100, 1239, 1240, 1440 ];
+
+const attendre = ( ms ) => new Promise( ( r ) => setTimeout( r, ms ) );
+
+const nom = ( el ) => {
+	if ( ! el ) { return null; }
+	if ( el.id ) { return el.tagName.toLowerCase() + '#' + el.id; }
+	const cl = ( el.className || '' ).toString().trim().split( /\s+/ ).filter( Boolean )[ 0 ];
+	return el.tagName.toLowerCase() + ( cl ? '.' + cl : '' );
+};
+
+const visible = ( el ) => {
+	if ( ! el ) { return false; }
+	const r = el.getBoundingClientRect();
+	return r.width > 0 && r.height > 0 && getComputedStyle( el ).visibility !== 'hidden';
+};
+
+/** Charge une copie neuve de la maquette : chaque largeur part d'un état vierge. */
+async function page( largeur ) {
+	const f = document.createElement( 'iframe' );
+	f.style.cssText = 'position:fixed;left:-20000px;top:0;height:800px;border:0;width:' + largeur + 'px;';
+	f.src = '/frontend/homepage/index.html';
+	document.body.appendChild( f );
+	await new Promise( ( r ) => f.addEventListener( 'load', r, { once: true } ) );
+	await Promise.race( [ f.contentDocument.fonts.ready, attendre( 3000 ) ] );
+
+	/* Chrome en temps virtuel n'anime pas les transitions : le compositeur ne
+	   tourne pas, et `getComputedStyle` renverrait indéfiniment la valeur de
+	   départ. On les neutralise pour lire la valeur d'arrivée. Ce banc vérifie
+	   que la règle mord, pas que l'animation est jolie. */
+	const style = f.contentDocument.createElement( 'style' );
+	style.textContent = '*,*::before,*::after{transition:none!important;animation:none!important}';
+	f.contentDocument.head.appendChild( style );
+	return f;
+}
+
+/* Bord gauche du TEXTE, et non de la boîte. Le décalage du sous-niveau est un
+   `padding-left` : la boîte occupant déjà toute la largeur, son bord ne bouge
+   pas d'un pixel, et une mesure de boîte conclurait à un menu à plat alors
+   qu'il est visiblement indenté. */
+function bordTexte( d, el ) {
+	const t = [ ...el.childNodes ].find( ( n ) => n.nodeType === 3 && n.textContent.trim() );
+	if ( ! t ) { return el.getBoundingClientRect().left; }
+	const r = d.createRange();
+	r.selectNodeContents( t );
+	return r.getBoundingClientRect().left;
+}
+
+/* Le sous-menu se ferme sur `focusout`, différé d'un tour d'événement. Une
+   lecture immédiate verrait l'état d'avant et le banc passerait au vert à
+   tort : on laisse la file s'écouler. */
+const tour = () => attendre( 30 );
+
+async function mesurerLargeur( largeur ) {
+	const f = await page( largeur );
+	const d = f.contentDocument;
+	const w = f.contentWindow;
+	const doc = d.documentElement;
+
+	const navLinks = d.querySelector( '.nav-links' );
+	const burger = d.querySelector( '.burger' );
+	const out = {
+		largeur: largeur,
+		desktopVisible: visible( navLinks ),
+		burgerVisible: visible( burger ),
+		debordement: doc.scrollWidth - doc.clientWidth,
+		// Aucun faux lien dans tout l'en-tête, à aucune largeur.
+		faussesAncres: d.querySelectorAll( 'header.site a[href="#"], header.site a[href=""]' ).length,
+		liensPro: d.querySelectorAll( 'header.site a[href*="espace-professionnel"]' ).length,
+	};
+
+	if ( out.desktopVisible ) {
+		const parent = d.querySelector( '.nav-parent' );
+		const sous = d.getElementById( parent.getAttribute( 'aria-controls' ) );
+		const chevron = d.querySelector( '.nav-parent-chevron' );
+
+		out.parentBalise = parent.tagName;
+		out.parentHref = parent.getAttribute( 'href' );
+		out.initial = { ouvert: visible( sous ), aria: parent.getAttribute( 'aria-expanded' ) };
+
+		parent.click();
+		await tour();
+		const r = sous.getBoundingClientRect();
+		out.ouvert = {
+			ouvert: visible( sous ),
+			aria: parent.getAttribute( 'aria-expanded' ),
+			liens: sous.querySelectorAll( 'a' ).length,
+			chevron: getComputedStyle( chevron ).transform,
+			gauche: +r.left.toFixed( 1 ),
+			droite: +( r.left + r.width ).toFixed( 1 ),
+			debordement: doc.scrollWidth - doc.clientWidth,
+		};
+
+		parent.click();
+		await tour();
+		out.secondClic = { ouvert: visible( sous ), aria: parent.getAttribute( 'aria-expanded' ) };
+
+		// Échap doit rendre le focus au parent : sinon il retombe sur <body> et
+		// la tabulation repart du début du document.
+		parent.focus();
+		parent.click();
+		await tour();
+		parent.dispatchEvent( new w.KeyboardEvent( 'keydown', { key: 'Escape', bubbles: true } ) );
+		await tour();
+		out.echap = { ouvert: visible( sous ), focus: nom( d.activeElement ) };
+
+		parent.dispatchEvent( new w.KeyboardEvent( 'keydown', { key: 'ArrowDown', bubbles: true, cancelable: true } ) );
+		await tour();
+		out.flecheBas = {
+			ouvert: visible( sous ),
+			focus: nom( d.activeElement ),
+			premier: d.activeElement === sous.querySelector( 'a' ),
+		};
+
+		// Sortie du groupe par tabulation, simulée par un focus au dehors.
+		d.querySelector( '.nav-right .js-start' ).focus();
+		await tour();
+		out.sortieFocus = { ouvert: visible( sous ) };
+
+		parent.click();
+		await tour();
+		d.body.dispatchEvent( new w.MouseEvent( 'click', { bubbles: true } ) );
+		await tour();
+		out.clicDehors = { ouvert: visible( sous ) };
+
+		/* Le libellé du groupe est celui de son bouton : lire `textContent` sur
+		   le conteneur y agrégerait tout le sous-menu. */
+		/* LE CONTRÔLE QUI MANQUAIT.
+		   Les libellés sont en `white-space: nowrap` : quand le menu ne tient
+		   plus, il ne provoque AUCUN défilement horizontal — il sort simplement
+		   de sa boîte flex, à gauche sur le logo et à droite sur les icônes.
+		   `scrollWidth` du document reste inchangé, et un banc qui ne surveille
+		   que lui passe au vert devant un en-tête illisible. C'est exactement ce
+		   qui s'est produit à 1101 px. On mesure donc la largeur intrinsèque du
+		   contenu, et les recouvrements avec les deux blocs voisins. */
+		const enfants = [ ...navLinks.children ].map( ( el ) => el.getBoundingClientRect() );
+		const ecart = parseFloat( w.getComputedStyle( navLinks ).columnGap ) || 0;
+		const boite = navLinks.getBoundingClientRect();
+		const logo = d.querySelector( '.nav .logo' ).getBoundingClientRect();
+		const droite = d.querySelector( '.nav-right' ).getBoundingClientRect();
+		out.encombrement = {
+			boite: Math.round( boite.width ),
+			contenu: Math.round( enfants.reduce( ( s, r ) => s + r.width, 0 ) + ecart * ( enfants.length - 1 ) ),
+			surLogo: Math.round( logo.right - Math.min( ...enfants.map( ( r ) => r.left ) ) ),
+			surDroite: Math.round( Math.max( ...enfants.map( ( r ) => r.right ) ) - droite.left ),
+		};
+
+		out.entrees = [ ...navLinks.children ].map( ( el ) => ( {
+			texte: ( el.querySelector( '.nav-parent' ) || el ).textContent.replace( /\s+/g, ' ' ).trim(),
+			balise: el.tagName,
+			href: el.getAttribute( 'href' ),
+		} ) );
+	}
+
+	if ( out.burgerVisible ) {
+		const mmenu = d.getElementById( 'mmenu' );
+		burger.click();
+		await tour();
+		const groupe = mmenu.querySelector( '.mmenu-groupe' );
+		const enfants = [ ...mmenu.querySelectorAll( '.mmenu-enfant' ) ];
+		const bientot = mmenu.querySelector( '.mmenu-bientot' );
+		out.tiroir = {
+			ouvert: visible( mmenu ),
+			aria: burger.getAttribute( 'aria-expanded' ),
+			groupeVisible: visible( groupe ),
+			groupeEstUnLien: groupe ? groupe.tagName === 'A' : null,
+			enfants: enfants.length,
+			enfantsVisibles: enfants.filter( visible ).length,
+			// Le décalage doit se voir : un sous-niveau à plat n'en est pas un.
+			decalage: enfants.length ? +( bordTexte( d, enfants[ 0 ] )
+				- bordTexte( d, mmenu.querySelector( 'a' ) ) ).toFixed( 1 ) : null,
+			bientotAria: bientot ? bientot.getAttribute( 'aria-disabled' ) : null,
+			bientotHref: bientot ? bientot.getAttribute( 'href' ) : null,
+			debordement: doc.scrollWidth - doc.clientWidth,
+		};
+	}
+
+	f.remove();
+	return out;
+}
+
+( async () => {
+	const sortie = document.getElementById( 'resultat' );
+	try {
+		const mesures = [];
+		for ( const w of VIEWPORTS ) {
+			mesures.push( await mesurerLargeur( w ) );
+		}
+		sortie.textContent = 'JSON:' + JSON.stringify( { mesures } );
+	} catch ( e ) {
+		sortie.textContent = 'ERREUR: ' + ( e && e.message ? e.message : e );
+	}
+} )();
+</script>
+</body>
+</html>

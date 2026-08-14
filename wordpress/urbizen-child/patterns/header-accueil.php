@@ -48,19 +48,64 @@ defined( 'ABSPATH' ) || exit;
  * préfixe, « Nos prestations », « Tarifs », etc. ne mèneraient nulle part.
  */
 $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
+
+/*
+ * Destination d'« Accueil » — et du logo, qui joue le même rôle : le sommet de
+ * la page sur l'accueil, l'accueil ailleurs. La règle est écrite une fois ; la
+ * dupliquer sur trois liens était le moyen sûr de les laisser diverger.
+ */
+$accueil = is_front_page() ? '#top' : esc_url( home_url( '/' ) );
+
+/*
+ * Page courante — `aria-current="page"`, que le CSS se contente de rendre
+ * visible. L'état est ainsi dans le balisage, donc annoncé aux lecteurs
+ * d'écran, et non pas seulement peint.
+ *
+ * L'ordre du ternaire n'est pas indifférent : sur l'accueil, la branche courte
+ * est prise et NI `is_singular()` NI `get_permalink()` ne sont appelées. Le
+ * banc de fidélité rend ce pattern hors de WordPress, avec pour seul doublon
+ * `is_front_page()` ; l'y faire appeler une fonction de plus le casserait sans
+ * rien apporter, l'accueil n'ayant de toute façon aucune URL à comparer.
+ */
+$courant = is_front_page() ? '' : ( is_singular() ? get_permalink() : '' );
+
+/** Marque l'entrée dont l'URL est celle de la page ouverte. */
+$actif = static function ( $url ) use ( $courant ) {
+	if ( ! $courant || untrailingslashit( $url ) !== untrailingslashit( $courant ) ) {
+		return '';
+	}
+	return ' aria-current="page"';
+};
+
+$url_dp         = 'https://urbizen.fr/declarations-prealables/';
+$url_pc         = 'https://urbizen.fr/permis-de-construire/';
+$url_conception = 'https://urbizen.fr/conception/';
+
+// Le groupe s'allume dès que l'une de ses trois pages est ouverte : sinon, sur
+// /conception/, le menu resterait muet sur l'endroit où l'on se trouve.
+$classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_conception ) )
+	? 'nav-parent is-actif' : 'nav-parent';
 ?>
 <!-- wp:html -->
 <header class="site" id="top">
   <div class="wrap nav">
-    <a class="logo" href="<?php echo is_front_page() ? '#top' : esc_url( home_url( '/' ) ); ?>" aria-label="Urbizen — accueil">
+    <a class="logo" href="<?php echo $accueil; ?>" aria-label="Urbizen — accueil">
       <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>" loading="eager" decoding="async" alt="Urbizen · urbanisme & projets" />
     </a>
     <nav class="nav-links" aria-label="Navigation principale">
-      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
-      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="https://urbizen.fr/conception/">Conception de plans</a>
+      <a href="<?php echo $accueil; ?>"<?php echo is_front_page() ? ' aria-current="page"' : ''; ?>>Accueil</a>
+      <div class="nav-groupe">
+        <button type="button" class="<?php echo $classe_parent; ?>" aria-expanded="false" aria-controls="sous-menu-prestations">Nos prestations<svg class="nav-parent-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9.5l6 6 6-6"/></svg></button>
+        <div class="nav-sous-menu" id="sous-menu-prestations" hidden>
+          <a href="<?php echo $url_dp; ?>"<?php echo $actif( $url_dp ); ?>>Déclaration préalable</a>
+          <a href="<?php echo $url_pc; ?>"<?php echo $actif( $url_pc ); ?>>Permis de construire</a>
+          <a href="<?php echo $url_conception; ?>"<?php echo $actif( $url_conception ); ?>>Conception de plans</a>
+        </div>
+      </div>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
-      <a href="https://urbizen.fr/tarifs/">Tarifs</a>
+      <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
+      <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
+      <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -107,11 +152,15 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
   </div>
   <div id="mmenu" class="mmenu" hidden>
     <div class="wrap">
-      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
-      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="https://urbizen.fr/conception/">Conception de plans</a>
+      <a href="<?php echo $accueil; ?>"<?php echo is_front_page() ? ' aria-current="page"' : ''; ?>>Accueil</a>
+      <p class="mmenu-groupe">Nos prestations</p>
+      <a class="mmenu-enfant" href="<?php echo $url_dp; ?>"<?php echo $actif( $url_dp ); ?>>Déclaration préalable</a>
+      <a class="mmenu-enfant" href="<?php echo $url_pc; ?>"<?php echo $actif( $url_pc ); ?>>Permis de construire</a>
+      <a class="mmenu-enfant" href="<?php echo $url_conception; ?>"<?php echo $actif( $url_conception ); ?>>Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
-      <a href="https://urbizen.fr/tarifs/">Tarifs</a>
+      <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
+      <span class="mmenu-bientot" aria-disabled="true">Espace client<span class="nav-tag">bientôt</span></span>
+      <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
       <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>

@@ -48,6 +48,53 @@
     });
   }
 
+  /* ----- Sous-menu « Nos prestations » (bureau) -----
+     Le parent est un <button aria-expanded>, pas un lien : aucune page « Nos
+     prestations » n'existe, et un faux lien mentirait au clavier.
+
+     Ouverture au clic et au clavier UNIQUEMENT. Ajouter le survol rouvrirait le
+     menu que le clic vient de fermer, le pointeur étant encore dessus.
+
+     Quatre fermetures, toutes nécessaires : le clic sur le parent, Échap (qui
+     rend le focus au parent — sinon il retombe sur <body> et la tabulation
+     repart du début), le clic au dehors, et la sortie du focus par tabulation.
+     `focusout` est différé d'un tour : au moment où il part, le focus n'est pas
+     encore arrivé sur sa cible, et `document.activeElement` vaut <body>. */
+  var navParent = document.querySelector(".nav-parent");
+  var navSousMenu = navParent && document.getElementById(navParent.getAttribute("aria-controls"));
+  if (navParent && navSousMenu) {
+    var navGroupe = navParent.closest(".nav-groupe");
+    var ouvrirSousMenu = function (ouvert) {
+      navSousMenu.hidden = !ouvert;
+      navParent.setAttribute("aria-expanded", ouvert ? "true" : "false");
+    };
+    navParent.addEventListener("click", function () {
+      ouvrirSousMenu(navSousMenu.hidden);
+    });
+    /* Flèche bas : ouvre et pose le focus sur la première prestation. Geste
+       attendu d'un menu, et le seul moyen d'y entrer sans quitter le clavier. */
+    navParent.addEventListener("keydown", function (e) {
+      if (e.key !== "ArrowDown") { return; }
+      e.preventDefault();
+      ouvrirSousMenu(true);
+      var premier = navSousMenu.querySelector("a");
+      if (premier) { premier.focus(); }
+    });
+    navGroupe.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape" || navSousMenu.hidden) { return; }
+      ouvrirSousMenu(false);
+      navParent.focus();
+    });
+    navGroupe.addEventListener("focusout", function () {
+      window.setTimeout(function () {
+        if (!navGroupe.contains(document.activeElement)) { ouvrirSousMenu(false); }
+      }, 0);
+    });
+    document.addEventListener("click", function (e) {
+      if (!navSousMenu.hidden && !navGroupe.contains(e.target)) { ouvrirSousMenu(false); }
+    });
+  }
+
   /* ----- Centre de contact « Parlons de votre projet » -----
      Dialogue accessible ouvert par l'icône téléphone. À la 1re ouverture, le
      panneau ET son fond d'écran sont déplacés sous <body> : cela échappe au bloc

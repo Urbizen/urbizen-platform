@@ -58,8 +58,23 @@ header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,25
 .nav .logo, .nav-right { flex: none; }
 .nav .logo img { height: 36px; display: block; }
 .nav-links { min-width: 0; flex: 1; display: flex; justify-content: center; gap: clamp(18px, 2.1vw, 36px); }
-.nav-links a { white-space: nowrap; font-size: 14px; color: var(--u-ink-soft); font-weight: 500; transition: color .15s; }
-.nav-links a:hover { color: var(--u-brand); }
+/* Bleu nuit de la charte (--u-ink) et 600, non plus le gris-bleu secondaire en
+   500 : les intitulés du menu sont de la navigation, pas du texte d'appoint.
+   La taille ne bouge pas — la hauteur de l'en-tête est fixée à 70 px et son
+   contenu centré, la graisse ne décale donc rien verticalement. */
+.nav-links a { white-space: nowrap; font-size: 14px; color: var(--u-ink); font-weight: 600; transition: color .15s; }
+/* Vert foncé, et non le vert d'accent : la charte le désigne comme la couleur
+   des survols, et c'est aussi le seul des deux qui reste lisible. Mesuré sur le
+   fond de l'en-tête, --u-brand tombe à 4,25:1 quand --u-brand-dk tient 6,12:1 —
+   avec des libellés désormais à 15,33:1, survoler aurait rendu le texte MOINS
+   lisible qu'au repos, l'inverse de ce qu'un survol doit faire. Le soulignement
+   ajoute une marque qui ne dépend pas de la couleur du tout. */
+.nav-links a:hover, .nav-parent:hover, .nav-parent[aria-expanded="true"] {
+  color: var(--u-brand-dk);
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 7px;
+}
 .nav-right { display: flex; align-items: center; gap: 14px; }
 .nav-right .js-start { white-space: nowrap; }
 .nav-cta-short { display: none; }
@@ -82,8 +97,16 @@ header.site { position: sticky; top: 0; z-index: 50; background: rgba(251,252,25
 .burger span { display: block; width: 22px; height: 2px; background: var(--u-ink); margin: 4px 0; transition: .2s; }
 .mmenu { border-top: 1px solid var(--u-line); background: var(--u-surface); }
 .mmenu .wrap { display: grid; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
-.mmenu a { font-size: 15px; color: var(--u-ink); }
-@media (max-width: 1100px) {
+.mmenu a { font-size: 15px; color: var(--u-ink); font-weight: 600; }
+/* Le seuil du burger est passé de 1100 à 1240 px le 14 août 2026, en même temps
+   que le menu gagnait une sixième entrée et la graisse 600. Ce n'est pas un
+   choix d'esthétique : mesuré, le menu réclame environ 670 px de large, et à
+   1101 px la barre ne lui en laisse que 581. Les libellés étant en
+   `white-space: nowrap`, ils ne débordaient pas la page — donc aucun défilement
+   horizontal, donc aucun contrôle déclenché — mais ils sortaient de leur boîte
+   flex et se superposaient au logo à gauche et à l'icône téléphone à droite.
+   La barre a besoin de 1240 px pour les six entrées ; en dessous, le burger. */
+@media (max-width: 1239px) {
   /* Menu principal dans le burger ; l'icône Espace client + le CTA restent
      visibles dans le header (logo | icône compte | Démarrer mon projet | burger). */
 .nav-links { display: none; }
@@ -1442,3 +1465,87 @@ main .hero-v7 {
   .tarif-supplement-global { align-items: flex-start; }
   .tarif-supplement-global div { display: grid; gap: 2px; }
 }
+
+/* ============================================================================
+   Menu principal à deux niveaux — « Nos prestations »
+   ----------------------------------------------------------------------------
+   Le parent n'est pas un lien : il n'existe aucune page « Nos prestations », et
+   un <a href="#"> qui n'ouvre qu'un sous-menu ment au clavier comme au lecteur
+   d'écran. C'est un <button aria-expanded>, l'élément que l'attribut décrit.
+
+   Ouverture au clic et au clavier UNIQUEMENT, pas au survol. Mêler les deux
+   produit le défaut classique : le clic ferme, le pointeur est encore dessus,
+   le survol rouvre aussitôt — le menu paraît increvable. Le clic seul est
+   prévisible et reste accessible sans pointeur.
+
+   Ces règles arrivent après `.nav-links a` (l. 61) : à spécificité égale, c'est
+   l'ordre qui tranche, et les liens du sous-menu doivent pouvoir s'en écarter.
+
+   Sous 1240 px, `.nav-links` disparaît au profit du burger : tout ce bloc
+   s'éteint avec elle, et le menu mobile porte sa propre mise en forme, un
+   groupe toujours déplié — pas un second mécanisme de dépliage à maintenir.
+   ========================================================================== */
+.nav-groupe { position: relative; display: flex; align-items: center; }
+.nav-parent {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: inherit;
+  color: var(--u-ink); white-space: nowrap; transition: color .15s;
+}
+.nav-parent-chevron { width: 13px; height: 13px; flex: none; transition: transform .18s ease; }
+.nav-parent[aria-expanded="true"] .nav-parent-chevron { transform: rotate(180deg); }
+
+/* `hidden` pose display:none par la feuille de l'agent ; une règle d'auteur qui
+   déclare `display` l'annule en silence. On le rétablit explicitement. */
+.nav-sous-menu[hidden] { display: none; }
+.nav-sous-menu {
+  position: absolute; top: calc(100% + 12px); left: 50%; transform: translateX(-50%);
+  z-index: 5; display: grid; gap: 2px; min-width: 232px; padding: 8px;
+  background: var(--u-surface); border: 1px solid var(--u-line-strong);
+  border-radius: 12px; box-shadow: var(--u-shadow-card);
+}
+.nav-sous-menu a {
+  display: block; padding: 9px 12px; border-radius: 8px;
+  color: var(--u-ink); font-size: 14px; white-space: nowrap;
+  transition: background-color .12s, color .12s;
+}
+.nav-sous-menu a:hover { background: var(--u-brand-sf); color: var(--u-brand-dk); }
+
+/* Espace client : ni lien ni bouton tant que la destination n'existe pas. Un
+   <span aria-disabled> énonce l'état sans promettre une cible. L'étiquette
+   « bientôt » est écrite, pas seulement suggérée par une couleur pâle — une
+   entrée grisée sans explication se lit comme un défaut d'affichage. */
+.nav-bientot { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; color: var(--u-ink-faint); white-space: nowrap; cursor: default; }
+.nav-tag { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--u-ink-faint); background: var(--u-grid-bg); border: 1px solid var(--u-line); border-radius: 999px; padding: 1px 6px; }
+
+/* Focus visible au clavier seulement : le clic à la souris ne doit pas laisser
+   de halo derrière lui. Même parti pris que le bandeau de consentement. */
+.nav-parent:focus-visible, .nav-sous-menu a:focus-visible, .nav-links a:focus-visible {
+  outline: 2px solid var(--u-brand); outline-offset: 3px; border-radius: 4px;
+}
+
+/* ----- Le même menu, replié dans le tiroir mobile -----
+   Le groupe y est toujours ouvert : sous le burger, la place ne manque pas, et
+   un dépliage imbriqué ajouterait un état à gérer pour aucun gain. */
+.mmenu-groupe { margin: 6px 0 0; font-size: 11.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--u-ink-faint); }
+.mmenu-enfant { padding-left: 14px; border-left: 2px solid var(--u-line); }
+.mmenu-bientot { display: flex; align-items: center; gap: 8px; font-size: 15px; color: var(--u-ink-faint); }
+
+/* ----- Page courante -----
+   Signalée par `aria-current="page"`, posé par le pattern : l'état est dans le
+   balisage, donc annoncé aux lecteurs d'écran, et le style ne fait que le
+   rendre visible. Le soulignement est porté par `text-decoration` et non par
+   une bordure : une bordure ajouterait de la hauteur et décalerait la ligne du
+   menu, ce que la barre à hauteur fixe rendrait visible d'un coup.
+   Le groupe « Nos prestations » s'allume aussi quand l'une de ses trois pages
+   est ouverte : sans cela, sur /conception/, le menu ne dirait pas où l'on est. */
+.nav-links a[aria-current="page"], .nav-parent.is-actif, .nav-sous-menu a[aria-current="page"] {
+  color: var(--u-ink);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 7px;
+  text-decoration-color: var(--u-brand);
+}
+.nav-sous-menu a[aria-current="page"] { text-underline-offset: 4px; background: var(--u-brand-sf); }
+.mmenu a[aria-current="page"] { color: var(--u-ink); font-weight: 700; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 5px; text-decoration-color: var(--u-brand); }
