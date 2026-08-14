@@ -80,11 +80,18 @@
       <img src="assets/logo-urbizen.png" loading="eager" decoding="async" alt="Urbizen · urbanisme & projets" />
     </a>
     <nav class="nav-links" aria-label="Navigation principale">
-      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
-      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="https://urbizen.fr/conception/">Conception de plans</a>
-      <a href="#methode">Comment ça marche</a>
+      <a href="#top" aria-current="page">Accueil</a>
+      <div class="nav-groupe">
+        <button type="button" class="nav-parent" aria-expanded="false" aria-controls="sous-menu-prestations">Nos prestations<svg class="nav-parent-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9.5l6 6 6-6"/></svg></button>
+        <div class="nav-sous-menu" id="sous-menu-prestations" hidden>
+          <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
+          <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
+          <a href="https://urbizen.fr/conception/">Conception de plans</a>
+        </div>
+      </div>
       <a href="https://urbizen.fr/tarifs/">Tarifs</a>
+      <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
+      <a href="https://urbizen.fr/contact/">Contact</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -131,11 +138,14 @@
   </div>
   <div id="mmenu" class="mmenu" hidden>
     <div class="wrap">
-      <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
-      <a href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
-      <a href="https://urbizen.fr/conception/">Conception de plans</a>
-      <a href="#methode">Comment ça marche</a>
+      <a href="#top" aria-current="page">Accueil</a>
+      <p class="mmenu-groupe">Nos prestations</p>
+      <a class="mmenu-enfant" href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>
+      <a class="mmenu-enfant" href="https://urbizen.fr/permis-de-construire/">Permis de construire</a>
+      <a class="mmenu-enfant" href="https://urbizen.fr/conception/">Conception de plans</a>
       <a href="https://urbizen.fr/tarifs/">Tarifs</a>
+      <span class="mmenu-bientot" aria-disabled="true">Espace client<span class="nav-tag">bientôt</span></span>
+      <a href="https://urbizen.fr/contact/">Contact</a>
       <a class="js-open-inquiry" href="#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
     </div>
