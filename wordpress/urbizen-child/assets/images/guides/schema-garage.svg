@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 460" width="840" height="460" role="img"
      aria-labelledby="t2 d2" font-family="IBM Plex Sans, system-ui, sans-serif">
   <title id="t2">Garage de 19 m² dont une dalle sous auvent porte l'emprise à 23 m²</title>
-  <desc id="d2">Le garage fermé mesure 19 m² d'emprise au sol. L'auvent qui le prolonge est
+  <desc id="d2">Le garage fermé mesure 19 m² d'emprise au sol ; sa surface de plancher est déduite s'il est aménagé pour le stationnement. L'auvent qui le prolonge est
   soutenu par des poteaux : sa dalle de 4 m² entre donc dans l'emprise au sol, qui atteint
   23 m². Le projet dépasse 20 m² et relève du permis de construire, alors que le garage seul
   serait resté en déclaration préalable.</desc>
@@ -29,7 +29,7 @@
   <rect x="110" y="140" width="230" height="176" rx="4" fill="#E4F5EC" opacity=".45"/>
   <text x="225" y="212" text-anchor="middle" fill="#0E6E48" font-size="17" font-weight="600">Garage fermé</text>
   <text x="225" y="236" text-anchor="middle" fill="#0E6E48" font-size="15">5,00 × 3,80 = 19 m²</text>
-  <text x="225" y="260" text-anchor="middle" fill="#0E6E48" font-size="13">emprise et surface de plancher</text>
+  <text x="225" y="260" text-anchor="middle" fill="#0E6E48" font-size="13">emprise au sol</text>
 
   <!-- auvent sur poteaux : dalle comptée. Largeur à l'échelle : 1,05 m = 48 px. -->
   <rect x="340" y="140" width="48" height="176" rx="4" fill="url(#h2)" stroke="#128A5A" stroke-width="2.5" stroke-dasharray="9 5"/>
