@@ -72,7 +72,7 @@ CHROMES = [
 ]
 
 # Largeurs où l'en-tête est en mode mobile (le burger y est affiché).
-MOBILES = [320, 340, 341, 360, 375, 379, 380, 381, 390, 430, 1100, 1239]
+MOBILES = [320, 340, 341, 360, 375, 379, 380, 381, 390, 430, 1100, 1319]
 
 echecs = 0
 
@@ -351,14 +351,14 @@ def verifier(etiquette, bloc):
     # Au-delà du palier mobile, la hauteur d'en-tête ne bouge pas.
     check(
         p + "Desktop : l'en-tête garde sa hauteur historique (70 px)",
-        par_largeur[1240]["nav"]["h"] == 70 and par_largeur[1280]["nav"]["h"] == 70,
-        "1240 → %s / 1280 → %s" % (par_largeur[1240]["nav"]["h"], par_largeur[1280]["nav"]["h"]),
+        par_largeur[1320]["nav"]["h"] == 70 and par_largeur[1400]["nav"]["h"] == 70,
+        "1320 → %s / 1400 → %s" % (par_largeur[1320]["nav"]["h"], par_largeur[1400]["nav"]["h"]),
     )
 
     check(
-        p + "Le burger disparaît au-delà de 1239 px",
-        not par_largeur[1240]["cibles"]["burger"]["visible"]
-        and par_largeur[1239]["cibles"]["burger"]["visible"],
+        p + "Le burger disparaît au-delà de 1319 px",
+        not par_largeur[1320]["cibles"]["burger"]["visible"]
+        and par_largeur[1319]["cibles"]["burger"]["visible"],
     )
 
 

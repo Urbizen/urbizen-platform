@@ -104,6 +104,7 @@ $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_concep
       </div>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
+      <a href="https://urbizen.fr/guides/"<?php echo $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
       <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
       <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
     </nav>
@@ -159,6 +160,7 @@ $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_concep
       <a class="mmenu-enfant" href="<?php echo $url_conception; ?>"<?php echo $actif( $url_conception ); ?>>Conception de plans</a>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
+      <a href="https://urbizen.fr/guides/"<?php echo $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
       <span class="mmenu-bientot" aria-disabled="true">Espace client<span class="nav-tag">bientôt</span></span>
       <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
       <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>

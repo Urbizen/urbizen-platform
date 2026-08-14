@@ -232,7 +232,7 @@ def main():
 
     check(
         "Menu mobile : le burger est bien masqué en desktop (scénario non applicable)",
-        not menu[1280]["burgerVisible"],
+        not menu[1400]["burgerVisible"],
     )
 
     # ------------------------------------------------ scénario panneau contact -

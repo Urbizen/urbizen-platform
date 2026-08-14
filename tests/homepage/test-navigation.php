@@ -36,7 +36,7 @@ function check( $label, $cond, $detail = '' ) {
 
 // Le menu attendu, dans l'ordre. Seule description de référence : le banc ne
 // devine pas, il compare.
-const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Comment ça marche', 'Tarifs', 'Espace client', 'Contact' );
+const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Comment ça marche', 'Tarifs', 'Guides', 'Espace client', 'Contact' );
 const PRESTATIONS    = array(
 	'https://urbizen.fr/declarations-prealables/' => 'Déclaration préalable',
 	'https://urbizen.fr/permis-de-construire/'    => 'Permis de construire',
@@ -164,11 +164,12 @@ check( 'Aucune page « Nos prestations » n\'est inventée',
 	! str_contains( $accueil, 'nos-prestations' ) && ! str_contains( $accueil, 'prestations/' ) );
 check( 'Aucun lien vers un espace professionnels',
 	! str_contains( $accueil, 'espace-professionnel' ) );
-// L'entrée « Guides » attend la page index du lot G : la poser maintenant
-// créerait un lien mort. Ce contrôle échouera le jour où elle arrivera — c'est
-// son rôle : il force à créer la page et l'entrée dans le même mouvement.
-check( 'Guides : aucune entrée tant que /guides/ n\'existe pas',
-	! str_contains( $accueil, '/guides/' ) );
+// L'entrée « Guides » n'a été posée qu'une fois /guides/ réellement servi en
+// 200, le 14 août 2026 — le contrôle inverse a tenu jusque-là. Il vérifie
+// maintenant que l'entrée pointe bien vers l'index, et nulle part ailleurs.
+check( 'Guides : l\'entrée existe et mène à l\'index des guides',
+	2 === substr_count( $accueil, '"https://urbizen.fr/guides/"' )
+	&& str_contains( $accueil, '>Guides</a>' ) );
 
 // ------------------------------------------- 4 · le tiroir mobile ------------
 
