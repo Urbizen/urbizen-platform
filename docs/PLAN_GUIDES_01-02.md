@@ -88,12 +88,13 @@ et la carte 03 pointerait alors vers le premier.
 ### Slug
 
 ```
-piscine-garage-carport-quelle-autorisation
-→ https://urbizen.fr/guides/piscine-garage-carport-quelle-autorisation/
+piscine-garage-carport-autorisation
+→ https://urbizen.fr/guides/piscine-garage-carport-autorisation/
 ```
 
-Le slug porte les trois têtes de requête et la question réellement tapée
-(« quelle autorisation »), plutôt que le mot « seuils », que personne ne cherche.
+Slug arrêté le 14 août 2026 : les trois têtes de requête et le mot que le
+lecteur cherche — « autorisation » — sans le verbe interrogatif, qui allonge sans
+rien apporter. Le mot « seuils » du titre n'y figure pas : personne ne le tape.
 
 ### Intention de recherche principale
 
@@ -328,14 +329,13 @@ publication** de l'article, dans un lot dédié aux pages commerciales.
 ### Slug
 
 ```
-extension-maison-5-verifications-avant-les-plans
-→ https://urbizen.fr/guides/extension-maison-5-verifications-avant-les-plans/
+extension-maison-verifications-avant-plans
+→ https://urbizen.fr/guides/extension-maison-verifications-avant-plans/
 ```
 
-Long, mais il porte la tête de requête (`extension-maison`) et l'angle qui le
-distingue de tout le reste (`avant-les-plans`). Un slug plus court —
-`extension-maison-5-verifications` — reste possible si vous préférez ; il perd
-la promesse temporelle, qui est justement l'argument de l'article.
+Slug arrêté le 14 août 2026 : court et durable. Le chiffre « 5 » reste dans le
+H1, où il porte la promesse, mais **pas dans l'URL** — une URL ne doit pas être
+à refaire le jour où une sixième vérification s'impose.
 
 ### Intention de recherche principale
 
@@ -594,14 +594,25 @@ commerciales **avant** de publier un guide qui les contredirait.
 
 ---
 
-## Ce qui reste à décider avant rédaction
+## Arbitrages rendus le 14 août 2026
 
-1. **Guide unique ou scindé** pour piscine / garage / carport (§ 0).
-2. **Slug du guide 2** : long avec la promesse, ou court sans elle.
-3. **CTA** : libellé de catégorie pour les deux, ou variante par article.
-4. **Longueur cible** — le repère validé au lot G est 1 000–1 500 mots pour un
-   sujet ciblé, 1 500–2 200 pour un guide complexe. Le guide 1 relève du second
-   (trois familles de projets, trois calculs), le guide 2 du premier haut.
-5. **Illustrations** : les six visuels du dossier `assets/images/blog/` sont
-   génériques. Les trois calculs du guide 1 gagneraient un schéma dédié — à
-   produire, ou à renoncer explicitement.
+1. **Guide unique** pour piscine / garage / carport, pour cette première
+   publication. La scission éventuelle sera décidée plus tard, selon la
+   profondeur du contenu et les performances.
+2. **Slugs définitifs** : `piscine-garage-carport-autorisation` et
+   `extension-maison-verifications-avant-plans`. Courts et durables ; le chiffre
+   « 5 » reste dans le H1 du guide 2, pas dans son URL.
+3. **CTA** : mécanisme simple par catégorie, sans infrastructure supplémentaire.
+4. **Longueurs** : guide 1, 1 500–2 200 mots si le contenu le justifie ;
+   guide 2, 1 000–1 500 mots, davantage si les explications réglementaires
+   l'exigent.
+5. **Illustrations** : **oui**, schémas dédiés pour les trois exemples calculés
+   du guide 1. Pédagogiques et techniques, pas décoratifs — fond clair, tracés
+   simples, surfaces comptées et non comptées clairement distinguées, cohérence
+   visuelle Urbizen.
+6. **Pages DP et PC** : rien n'en est retiré. Le carport et le local technique de
+   piscine y seront ajoutés dans un petit lot commercial dédié. Les liens
+   DP/PC → guides seront posés après publication des guides correspondants.
+
+Voir `VERIFICATION_REGLEMENTAIRE_GUIDES_01-02.md` pour le contrôle des règles et
+les cinq corrections relevées sur les pages commerciales.
