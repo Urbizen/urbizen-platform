@@ -126,7 +126,6 @@ $classe_guides = ( is_singular( 'post' ) || is_category() || is_tag() || is_date
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
       <a href="https://urbizen.fr/guides/"<?php echo $classe_guides . $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
       <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
-      <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
     </nav>
     <div class="nav-right">
       <button type="button" class="icon-btn link-tel" aria-label="Nous contacter" title="Nous contacter" aria-haspopup="dialog" aria-expanded="false" aria-controls="contact-panel">
@@ -182,7 +181,6 @@ $classe_guides = ( is_singular( 'post' ) || is_category() || is_tag() || is_date
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
       <a href="https://urbizen.fr/guides/"<?php echo $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
       <span class="mmenu-bientot" aria-disabled="true">Espace client<span class="nav-tag">bientôt</span></span>
-      <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
       <a class="js-open-inquiry" href="<?php echo $pfx; ?>#demander-des-renseignements">Écrire à Urbizen</a>
       <a class="btn btn-primary js-start" href="<?php echo $pfx; ?>#localisation">Démarrer mon projet</a>
     </div>
