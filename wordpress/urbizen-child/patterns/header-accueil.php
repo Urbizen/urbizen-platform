@@ -102,6 +102,7 @@ $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_concep
           <a href="<?php echo $url_conception; ?>"<?php echo $actif( $url_conception ); ?>>Conception de plans</a>
         </div>
       </div>
+      <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
       <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
       <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
@@ -156,6 +157,7 @@ $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_concep
       <a class="mmenu-enfant" href="<?php echo $url_dp; ?>"<?php echo $actif( $url_dp ); ?>>Déclaration préalable</a>
       <a class="mmenu-enfant" href="<?php echo $url_pc; ?>"<?php echo $actif( $url_pc ); ?>>Permis de construire</a>
       <a class="mmenu-enfant" href="<?php echo $url_conception; ?>"<?php echo $actif( $url_conception ); ?>>Conception de plans</a>
+      <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
       <span class="mmenu-bientot" aria-disabled="true">Espace client<span class="nav-tag">bientôt</span></span>
       <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>

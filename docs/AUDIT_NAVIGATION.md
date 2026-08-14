@@ -39,6 +39,7 @@ sur aucun gabarit : le jour où il le serait, deux menus seraient servis.
 | Conception de plans | · Déclaration préalable |
 | Comment ça marche | · Permis de construire |
 | Tarifs | · Conception de plans |
+| | Comment ça marche |
 | | Tarifs |
 | | Espace client *(bientôt)* |
 | | Contact |
@@ -46,20 +47,17 @@ sur aucun gabarit : le jour où il le serait, deux menus seraient servis.
 **Aucune URL de prestation ne change.** Aucune page « Nos prestations » n'a été
 créée : le parent est un `<button aria-expanded>` qui n'ouvre que le sous-menu.
 
-### Ce que le menu perd — à signaler
+### « Comment ça marche » — conservée au premier niveau
 
-L'entrée **« Comment ça marche » → `#methode` disparaît**. Elle n'était pas dans
-la liste des retraits demandés, mais le menu cible a été énoncé de façon
-exhaustive et ne la contient pas. Deux faits à connaître avant d'arbitrer :
+Signalée comme perdue dans un premier état de ce lot, puis **rétablie sur
+arbitrage** : elle présente le fonctionnement d'Urbizen et sert le parcours de
+conversion. Elle reste entre « Nos prestations » et « Tarifs ».
 
-- c'était **le seul chemin de navigation** vers la section « méthode » de
-  l'accueil ; celle-ci reste atteignable en faisant défiler la page, et rien
-  d'autre n'y renvoie ;
-- l'ancre `#methode` existe toujours dans les trois gabarits d'accueil, et
-  `/comment-ca-marche/` reste une URL morte, supprimée au lot B.
-
-La rétablir coûte une ligne dans la maquette et une dans le pattern, au premier
-niveau ou en quatrième entrée du sous-menu.
+Son ancre demande une précaution : elle vise `#methode`, une section de
+**l'accueil**. Sur l'accueil elle est nue (`#methode`, défilement en page) ;
+ailleurs elle est préfixée par l'URL de l'accueil, sans quoi elle chercherait un
+`#methode` inexistant sur la page interne et ne mènerait nulle part, en silence.
+Trois contrôles couvrent ce point, dont l'existence réelle de la section.
 
 ### Espace client
 
@@ -90,10 +88,34 @@ Quatre fermetures, chacune vérifiée séparément : second clic sur le parent,
 au parent** — sans quoi il retombe sur `<body>` et la tabulation repart du début
 du document. `Flèche bas` ouvre et pose le focus sur la première prestation.
 
-Sous 1100 px, `.nav-links` disparaît au profit du burger. Le tiroir mobile
+Sous **1240 px**, `.nav-links` disparaît au profit du burger. Le tiroir mobile
 présente « Nos prestations » comme un intitulé de groupe **toujours déplié**,
 les trois prestations décalées sous lui : pas de second mécanisme de dépliage à
 maintenir, et rien qui puisse rester coincé.
+
+### Le seuil du burger passe de 1100 à 1240 px
+
+Ce n'est pas un choix d'esthétique, et il corrige un défaut **que ce lot avait
+lui-même introduit**.
+
+Mesuré : le menu à six entrées en graisse 600 réclame environ **670 px**. À
+1101 px, la barre ne lui en laissait que **581**. Les libellés étant en
+`white-space: nowrap`, ils ne débordaient pas la page — donc aucun défilement
+horizontal, donc aucun contrôle déclenché — mais ils **sortaient de leur boîte
+flex** et se superposaient au logo à gauche et à l'icône téléphone à droite.
+
+| Largeur | Boîte disponible | Contenu | Verdict |
+|---:|---:|---:|---|
+| 1101 px *(avant correctif)* | 581 | 656 | recouvre le logo de 19 px et les icônes de 19 px |
+| 1240 px | 712 | 671 | tient |
+| 1440 px | 900 | 692 | tient |
+
+Sur `main`, le menu à cinq entrées en 500 tenait : 590 pour 602 disponibles.
+C'est bien la sixième entrée et la graisse qui ont franchi la limite.
+
+Le seuil est donc porté à 1240 px, et les quatre bancs qui l'encodaient — cibles
+tactiles, géométrie, et les deux du menu — ont été alignés. La conséquence
+visible : entre 1101 et 1239 px, le burger remplace désormais le menu déroulant.
 
 ---
 
@@ -142,7 +164,7 @@ du premier libellé est à **23,80 px** — aucun décalage vertical.
 
 ## 5 · Vérifications
 
-`tests/homepage/test-navigation.php` — 40 contrôles statiques : composition du
+`tests/homepage/test-navigation.php` — 43 contrôles statiques : composition du
 menu dans l'ordre, parent non-lien, aucun `href="#"`, aucun lien professionnels,
 absence d'entrée Guides tant que la page n'existe pas, valeurs de couleur et de
 graisse lues dans la feuille, absence de bordure sur l'état courant. Il rend
@@ -150,8 +172,8 @@ aussi le pattern **en position de page interne** — ce que `test-fidelite.php` 
 fait jamais — pour vérifier que `aria-current` atterrit sur la bonne entrée sur
 `/tarifs/` et sur `/conception/`.
 
-`tests/homepage/test-navigation.py` — 26 contrôles rejoués dans Chrome, à
-**320, 360, 390, 768, 1100, 1101, 1280 et 1440 px**. 1100 et 1101 encadrent la
+`tests/homepage/test-navigation.py` — 29 contrôles rejoués dans Chrome, à
+**320, 360, 390, 768, 1100, 1239, 1240 et 1440 px**. 1239 et 1240 encadrent la
 bascule : un menu qui casse le fait au seuil. Sont mesurés l'ouverture, les
 quatre fermetures, le retour du focus après `Échap`, l'entrée au clavier, la
 rotation du chevron, le maintien du panneau dans la fenêtre, le décalage réel du
@@ -159,7 +181,14 @@ sous-niveau mobile et l'absence de débordement horizontal dans tous les états.
 
 Les deux sont câblés dans `tests/homepage/run-all.sh` : **13 bancs, tous verts.**
 
-Deux défauts venaient du banc lui-même, pas du code : la rotation du chevron
+**Le contrôle qui manquait, et qui manque désormais moins.** Aucun banc ne
+voyait le recouvrement décrit au § 3 : tous surveillaient `scrollWidth`, que du
+texte en `nowrap` sortant de sa boîte ne modifie pas. Trois contrôles ont été
+ajoutés — largeur intrinsèque du contenu contre largeur disponible, et
+recouvrement avec le logo comme avec la barre de droite. Ce sont eux qui
+tiennent le seuil de 1240 px, et non un commentaire dans la feuille.
+
+Deux autres défauts venaient du banc lui-même, pas du code : la rotation du chevron
 était lue pendant sa transition de 0,18 s, et le décalage du sous-niveau mobile
 était mesuré sur la boîte alors qu'il est produit par un `padding-left` — la
 boîte occupant toute la largeur, son bord ne bouge pas d'un pixel. Le décalage
@@ -173,8 +202,9 @@ garantie par le banc statique, et le halo a été constaté au clavier réel.
 
 ## 6 · Reste ouvert
 
-- **« Comment ça marche »** — retiré selon le menu cible ; à rétablir sur un mot.
-- **Guides** — à poser avec la page index du lot G.
+- **Guides** — à poser avec la page index du lot G, entre « Tarifs » et
+  « Espace client ». Un contrôle du banc échoue tant que l'entrée existerait sans
+  la page.
 - **Espace client** — l'entrée restera inactive tant que la destination n'existe
   pas ; l'icône « compte » de la barre fait aujourd'hui double emploi avec elle,
   et l'une des deux pourra disparaître le jour où l'espace ouvrira.

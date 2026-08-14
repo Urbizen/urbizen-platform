@@ -112,7 +112,15 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .mmenu { border-top: 1px solid var(--u-line); background: var(--u-surface); }
 .urbizen-accueil .mmenu .wrap { display: grid; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
 .urbizen-accueil .mmenu a { font-size: 15px; color: var(--u-ink); font-weight: 600; }
-@media (max-width: 1100px) {
+/* Le seuil du burger est passé de 1100 à 1240 px le 14 août 2026, en même temps
+   que le menu gagnait une sixième entrée et la graisse 600. Ce n'est pas un
+   choix d'esthétique : mesuré, le menu réclame environ 670 px de large, et à
+   1101 px la barre ne lui en laisse que 581. Les libellés étant en
+   `white-space: nowrap`, ils ne débordaient pas la page — donc aucun défilement
+   horizontal, donc aucun contrôle déclenché — mais ils sortaient de leur boîte
+   flex et se superposaient au logo à gauche et à l'icône téléphone à droite.
+   La barre a besoin de 1240 px pour les six entrées ; en dessous, le burger. */
+@media (max-width: 1239px) {
   /* Menu principal dans le burger ; l'icône Espace client + le CTA restent
      visibles dans le header (logo | icône compte | Démarrer mon projet | burger). */
 .urbizen-accueil .nav-links { display: none; }
@@ -1487,7 +1495,7 @@ html { scroll-behavior: smooth; }
    Ces règles arrivent après `.nav-links a` (l. 61) : à spécificité égale, c'est
    l'ordre qui tranche, et les liens du sous-menu doivent pouvoir s'en écarter.
 
-   Sous 1100 px, `.nav-links` disparaît au profit du burger : tout ce bloc
+   Sous 1240 px, `.nav-links` disparaît au profit du burger : tout ce bloc
    s'éteint avec elle, et le menu mobile porte sa propre mise en forme, un
    groupe toujours déplié — pas un second mécanisme de dépliage à maintenir.
    ========================================================================== */

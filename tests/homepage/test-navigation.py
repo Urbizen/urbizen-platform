@@ -62,7 +62,8 @@ CHROMES = [
 
 # Le menu attendu, dans l'ordre. C'est la seule description de référence :
 # le banc ne devine pas, il compare.
-PREMIER_NIVEAU = ["Accueil", "Nos prestations", "Tarifs", "Espace client", "Contact"]
+PREMIER_NIVEAU = ["Accueil", "Nos prestations", "Comment ça marche", "Tarifs",
+                  "Espace client", "Contact"]
 PRESTATIONS = ["Déclaration préalable", "Permis de construire", "Conception de plans"]
 
 echecs = 0
@@ -185,9 +186,9 @@ def main():
     faux = ["%dpx" % w for w in sorted(m) if m[w]["desktopVisible"] == m[w]["burgerVisible"]]
     check("Un seul des deux menus est offert, à chaque largeur", not faux, " | ".join(faux))
     check(
-        "La bascule tombe bien entre 1100 et 1101 px",
-        m[1100]["burgerVisible"] and m[1101]["desktopVisible"],
-        "1100 burger=%s | 1101 desktop=%s" % (m[1100]["burgerVisible"], m[1101]["desktopVisible"]),
+        "La bascule tombe bien entre 1239 et 1240 px",
+        m[1239]["burgerVisible"] and m[1240]["desktopVisible"],
+        "1239 burger=%s | 1240 desktop=%s" % (m[1239]["burgerVisible"], m[1240]["desktopVisible"]),
     )
 
     # ----------------------------------------------------- aucun faux lien ----
@@ -238,6 +239,24 @@ def main():
     deb2 = ["%dpx → %d" % (w, m[w]["ouvert"]["debordement"]) for w in bureau
             if m[w]["ouvert"]["debordement"] > 0]
     check("Aucun débordement horizontal, sous-menu ouvert", not deb2, " | ".join(deb2))
+
+    # ----------------------------------------------------- encombrement ------
+    # Un menu en `nowrap` qui ne tient plus ne fait pas défiler la page : il
+    # sort de sa boîte et se superpose au logo et aux icônes. Aucun contrôle de
+    # débordement ne le voit. Ces trois-là le voient.
+
+    serres = ["%dpx : %d px de contenu pour %d de boîte"
+              % (w, m[w]["encombrement"]["contenu"], m[w]["encombrement"]["boite"])
+              for w in bureau if m[w]["encombrement"]["contenu"] > m[w]["encombrement"]["boite"]]
+    check("Le menu tient dans la largeur qui lui est laissée", not serres, " | ".join(serres))
+
+    sur_logo = ["%dpx : +%d px" % (w, m[w]["encombrement"]["surLogo"])
+                for w in bureau if m[w]["encombrement"]["surLogo"] > 0]
+    check("Le menu ne recouvre pas le logo", not sur_logo, " | ".join(sur_logo))
+
+    sur_droite = ["%dpx : +%d px" % (w, m[w]["encombrement"]["surDroite"])
+                  for w in bureau if m[w]["encombrement"]["surDroite"] > 0]
+    check("Le menu ne recouvre pas les icônes ni le CTA", not sur_droite, " | ".join(sur_droite))
 
     # ----------------------------------------------------- les 4 fermetures ---
 

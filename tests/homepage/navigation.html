@@ -16,9 +16,9 @@
 <body>
 <pre id="resultat">EN COURS</pre>
 <script>
-/* Les largeurs encadrent la bascule : 1100 est la dernière largeur du burger,
-   1101 la première du menu déroulant. Un menu qui casse le fait au seuil. */
-const VIEWPORTS = [ 320, 360, 390, 768, 1100, 1101, 1280, 1440 ];
+/* Les largeurs encadrent la bascule : 1239 est la dernière largeur du burger,
+   1240 la première du menu déroulant. Un menu qui casse le fait au seuil. */
+const VIEWPORTS = [ 320, 360, 390, 768, 1100, 1239, 1240, 1440 ];
 
 const attendre = ( ms ) => new Promise( ( r ) => setTimeout( r, ms ) );
 
@@ -145,6 +145,26 @@ async function mesurerLargeur( largeur ) {
 
 		/* Le libellé du groupe est celui de son bouton : lire `textContent` sur
 		   le conteneur y agrégerait tout le sous-menu. */
+		/* LE CONTRÔLE QUI MANQUAIT.
+		   Les libellés sont en `white-space: nowrap` : quand le menu ne tient
+		   plus, il ne provoque AUCUN défilement horizontal — il sort simplement
+		   de sa boîte flex, à gauche sur le logo et à droite sur les icônes.
+		   `scrollWidth` du document reste inchangé, et un banc qui ne surveille
+		   que lui passe au vert devant un en-tête illisible. C'est exactement ce
+		   qui s'est produit à 1101 px. On mesure donc la largeur intrinsèque du
+		   contenu, et les recouvrements avec les deux blocs voisins. */
+		const enfants = [ ...navLinks.children ].map( ( el ) => el.getBoundingClientRect() );
+		const ecart = parseFloat( w.getComputedStyle( navLinks ).columnGap ) || 0;
+		const boite = navLinks.getBoundingClientRect();
+		const logo = d.querySelector( '.nav .logo' ).getBoundingClientRect();
+		const droite = d.querySelector( '.nav-right' ).getBoundingClientRect();
+		out.encombrement = {
+			boite: Math.round( boite.width ),
+			contenu: Math.round( enfants.reduce( ( s, r ) => s + r.width, 0 ) + ecart * ( enfants.length - 1 ) ),
+			surLogo: Math.round( logo.right - Math.min( ...enfants.map( ( r ) => r.left ) ) ),
+			surDroite: Math.round( Math.max( ...enfants.map( ( r ) => r.right ) ) - droite.left ),
+		};
+
 		out.entrees = [ ...navLinks.children ].map( ( el ) => ( {
 			texte: ( el.querySelector( '.nav-parent' ) || el ).textContent.replace( /\s+/g, ' ' ).trim(),
 			balise: el.tagName,

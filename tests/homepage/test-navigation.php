@@ -36,7 +36,7 @@ function check( $label, $cond, $detail = '' ) {
 
 // Le menu attendu, dans l'ordre. Seule description de référence : le banc ne
 // devine pas, il compare.
-const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Tarifs', 'Espace client', 'Contact' );
+const PREMIER_NIVEAU = array( 'Accueil', 'Nos prestations', 'Comment ça marche', 'Tarifs', 'Espace client', 'Contact' );
 const PRESTATIONS    = array(
 	'https://urbizen.fr/declarations-prealables/' => 'Déclaration préalable',
 	'https://urbizen.fr/permis-de-construire/'    => 'Permis de construire',
@@ -192,6 +192,19 @@ check( 'Page interne : « Accueil » cesse de l\'être et pointe vers l\'accueil
 	&& ! str_contains( $tarifs, '#top" aria-current' ) );
 
 $conception = rendre( $pattern, false, 'https://urbizen.fr/conception/' );
+// « Comment ça marche » vise une section de l'ACCUEIL. Sans le préfixe, l'ancre
+// nue chercherait un #methode sur la page interne, où il n'existe pas : le lien
+// ne mènerait nulle part, en silence.
+check( 'Accueil : l\'ancre « Comment ça marche » est nue (défilement en page)',
+	str_contains( $accueil, '<a href="#methode">Comment ça marche</a>' ) );
+check( 'Page interne : la même ancre est préfixée par l\'accueil',
+	str_contains( $tarifs, '<a href="https://urbizen.fr/#methode">Comment ça marche</a>' )
+	&& ! str_contains( $tarifs, '<a href="#methode">' ) );
+// L'ancre doit exister là où elle pointe, sinon le lien est mort.
+check( 'La section #methode existe bien dans les gabarits d\'accueil',
+	str_contains( file_get_contents( $theme . '/templates/front-page.html' ), 'id="methode"' )
+	&& str_contains( $maquette, 'id="methode"' ) );
+
 check( 'Page interne : une prestation ouverte allume aussi son groupe',
 	str_contains( $conception, 'class="nav-parent is-actif"' )
 	&& str_contains( $conception, '"https://urbizen.fr/conception/" aria-current="page">Conception de plans</a>' ) );
