@@ -1283,6 +1283,31 @@ function urbizen_child_cta_guide( $id ) {
 }
 
 /**
+ * Le graphe fait-il référence à l'identifiant de l'autrice, à n'importe quelle
+ * profondeur ?
+ *
+ * @param mixed $valeur Nœud, sous-tableau ou valeur scalaire.
+ * @return bool
+ */
+function urbizen_child_graphe_reference_autrice( $valeur ) {
+	if ( is_string( $valeur ) ) {
+		return URBIZEN_CHILD_ID_AUTRICE === $valeur;
+	}
+
+	if ( ! is_array( $valeur ) ) {
+		return false;
+	}
+
+	foreach ( $valeur as $sous ) {
+		if ( urbizen_child_graphe_reference_autrice( $sous ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * Ajoute une classe au corps de page sur le gabarit de l'accueil.
  *
  * La maquette porte son quadrillage sur `<body class="u-grid-bg">`. Un gabarit
@@ -1822,6 +1847,48 @@ function urbizen_child_corrige_schema( $graphe ) {
 	}
 
 	unset( $noeud );
+
+	/*
+	 * --- Le nœud Person manquant ---------------------------------------------
+	 *
+	 * Mesuré sur le premier guide publié, le 14 août 2026 : `BlogPosting` porte
+	 * un `author` et `WebPage` un `author` ET un `creator`, tous trois pointant
+	 * vers l'identifiant de l'autrice — mais AUCUN nœud ne le définit. Vérifié
+	 * en désactivant ce filtre : le graphe brut d'AIOSEO n'en contient pas
+	 * davantage. La référence était donc pendante depuis toujours ; il fallait
+	 * un article réel pour que cela se voie.
+	 *
+	 * Une référence `@id` sans nœud correspondant est un graphe incomplet : le
+	 * lecteur automatique voit un auteur annoncé et rien pour le décrire. On
+	 * ajoute donc le nœud, avec le seul `name` — conformément à l'arbitrage du
+	 * lot E : ni `url`, ni lien vers une archive d'auteur qui répond 404.
+	 */
+	/*
+	 * La détection parcourt le TABLEAU, et non sa sérialisation JSON :
+	 * `wp_json_encode()` échappe les barres obliques, si bien que
+	 * `https:\/\/urbizen.fr\/#anais-bacarisse` ne contient jamais la constante
+	 * telle qu'elle est écrite. Le premier jet cherchait dans le JSON et ne
+	 * trouvait donc rien — le nœud n'était ajouté nulle part, en silence.
+	 */
+	$reference = urbizen_child_graphe_reference_autrice( $graphe );
+
+	$defini = false;
+	foreach ( $graphe as $noeud ) {
+		if ( is_array( $noeud )
+			&& in_array( 'Person', (array) ( $noeud['@type'] ?? array() ), true )
+			&& ( $noeud['@id'] ?? '' ) === URBIZEN_CHILD_ID_AUTRICE ) {
+			$defini = true;
+			break;
+		}
+	}
+
+	if ( $reference && ! $defini ) {
+		$graphe[] = array(
+			'@type' => 'Person',
+			'@id'   => URBIZEN_CHILD_ID_AUTRICE,
+			'name'  => 'Anaïs Bacarisse',
+		);
+	}
 
 	return $graphe;
 }
