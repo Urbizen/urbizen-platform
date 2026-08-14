@@ -1560,7 +1560,7 @@ html { scroll-behavior: smooth; }
    menu, ce que la barre à hauteur fixe rendrait visible d'un coup.
    Le groupe « Nos prestations » s'allume aussi quand l'une de ses trois pages
    est ouverte : sans cela, sur /conception/, le menu ne dirait pas où l'on est. */
-.urbizen-accueil .nav-links a[aria-current="page"], .urbizen-accueil .nav-parent.is-actif, .urbizen-accueil .nav-sous-menu a[aria-current="page"] {
+.urbizen-accueil .nav-links a[aria-current="page"], .urbizen-accueil .nav-parent.is-actif, .urbizen-accueil .nav-links a.nav-actif, .urbizen-accueil .nav-sous-menu a[aria-current="page"] {
   color: var(--u-ink);
   font-weight: 700;
   text-decoration: underline;

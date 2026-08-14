@@ -29,6 +29,25 @@ function is_front_page() {
 	return true;
 }
 
+/*
+ * Doublons ajoutés le 14 août 2026 : l'en-tête interroge désormais la page
+ * d'articles pour savoir s'il faut allumer « Guides ». Ces valeurs décrivent un
+ * site où /guides/ existe et où l'on est ailleurs que dessus.
+ */
+function get_option( $nom, $defaut = false ) {
+	return 'page_for_posts' === $nom ? 1204 : $defaut;
+}
+function get_the_title( $id = 0 ) { return 'Guides d’urbanisme'; }
+function is_home() { return $GLOBALS['banc_home'] ?? false; }
+function is_category() { return $GLOBALS['banc_category'] ?? false; }
+function is_tag() { return false; }
+function is_date() { return false; }
+
+function get_permalink( $id = 0 ) { return 'https://urbizen.fr/guides/'; }
+function is_singular( $t = '' ) { return false; }
+function untrailingslashit( $x ) { return rtrim( (string) $x, '/\\' ); }
+
+
 $fail = 0;
 function check( $label, $cond ) {
 	global $fail;
