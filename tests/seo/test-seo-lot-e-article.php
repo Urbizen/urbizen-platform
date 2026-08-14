@@ -152,8 +152,25 @@ foreach ( $graphe as $n ) {
 	}
 }
 
+/*
+ * Ce banc se contentait d'une NOTE quand le nœud manquait, et passait au vert.
+ * Publié le 14 août 2026, le premier guide a montré ce que cette indulgence
+ * cachait : `BlogPosting` et `WebPage` annoncent un `author` et un `creator`
+ * pointant vers l'identifiant de l'autrice, sans qu'aucun nœud ne le définisse.
+ * Un graphe qui référence un `@id` inexistant est incomplet. L'absence devient
+ * donc un échec, à la condition que la référence existe — c'est elle qui rend
+ * le nœud obligatoire.
+ */
+$reference = str_contains( wp_json_encode( $graphe ), URBIZEN_CHILD_ID_AUTRICE );
+
+urbizen_check_article(
+	'Le nœud Person existe dès que le graphe le référence',
+	! $reference || null !== $person,
+	'author/creator pointent vers ' . URBIZEN_CHILD_ID_AUTRICE . ' sans nœud correspondant'
+);
+
 if ( null === $person ) {
-	echo "   NOTE   aucun nœud Person dans ce graphe — les contrôles qui suivent sont sans objet\n";
+	echo "   NOTE   aucun nœud Person et aucune référence — rien à contrôler ici\n";
 } else {
 	urbizen_check_article( 'Person conserve son nom', ! empty( $person['name'] ), 'nom absent' );
 	urbizen_check_article(
