@@ -224,8 +224,40 @@ check( 'Chaque règle est scopée .urbizen-guides', array() === $non_scopees,
 check( 'La colonne de lecture est bornée', (bool) preg_match( '/\.guide-corps \{[^}]*max-width: 72ch/s', $css ) );
 check( 'Les tableaux longs défilent seuls plutôt que d’élargir la page',
 	(bool) preg_match( '/wp-block-table \{[^}]*overflow-x: auto/s', $css ) );
+// Le cadrage est passé d'une hauteur maximale à un RAPPORT fixe le 14 août
+// 2026 : la bande garde alors la même proportion quelle que soit l'image
+// fournie. Le contrôle accepte les deux, il vise l'intention — un visuel cadré,
+// qui ne remplit pas l'écran — et non un moyen particulier de l'obtenir.
 check( 'Le visuel d’article est cadré et ne remplit pas l’écran',
-	(bool) preg_match( '/\.guide-visuel img \{[^}]*max-height/s', $css ) );
+	(bool) preg_match( '/\.guide-visuel img \{[^}]*(max-height|aspect-ratio)/s', $css )
+	&& (bool) preg_match( '/\.guide-visuel img \{[^}]*object-fit: cover/s', $css ) );
+
+// Le corps de l'article ne doit pas hériter de la trame technique du <body>.
+check( 'La trame technique est bornée au haut de page',
+	(bool) preg_match( '/\.urbizen-guides main \{[^}]*background: var\(--u-surface\)/s', $css ) );
+
+// Le rythme du texte doit viser le conteneur RÉEL : `wp:post-content` enveloppe
+// tout dans un `.entry-content`, et un sélecteur d'enfant direct sur
+// `.guide-corps` ne toucherait qu'un seul nœud.
+check( 'Le rythme des paragraphes cible le conteneur réel du contenu',
+	str_contains( $css, '.guide-corps .entry-content > * + *' ) );
+
+// Les trois blocs éditoriaux du gabarit, réutilisables par tout guide à venir.
+foreach ( array( 'guide-hypotheses', 'guide-resultat', 'guide-variante' ) as $bloc ) {
+	check( "Le bloc éditorial « $bloc » est défini dans le gabarit",
+		str_contains( $css, '.guide-corps .' . $bloc ) );
+}
+
+check( 'Les sections sont marquées visuellement (filet et barre d’accent)',
+	(bool) preg_match( '/\.guide-corps h2,[^{]*\{[^}]*border-top/s', $css )
+	&& str_contains( $css, '.guide-corps h2::before' ) );
+
+// La règle de rythme porte trois classes : sans un sélecteur de titre de même
+// poids, elle l'emporte et les sections perdent leur respiration. Mesuré une
+// fois — 34,5 px au lieu de 78.
+check( 'Les titres résistent à la règle de rythme (spécificité alignée)',
+	str_contains( $css, '.guide-corps .entry-content > h2' )
+	&& str_contains( $css, '.guide-corps .entry-content > h3' ) );
 check( 'La pagination garde des cibles de 44 px',
 	(bool) preg_match( '/\.guides-pagination \.page-numbers \{[^}]*min-height: 44px/s', $css ) );
 check( 'Le focus clavier est visible sur la carte entière',
