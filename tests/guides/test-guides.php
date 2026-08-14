@@ -266,6 +266,19 @@ check( 'Le mouvement réduit est respecté', str_contains( $css, 'prefers-reduce
 
 // ------------------------------------------------- 9 · ce qui ne bouge pas ----
 
+// Le CTA de fin de guide mène au parcours de l'accueil, pas à l'ancien
+// formulaire de contact — retiré du menu, il n'a plus sa place ici non plus.
+$pied = file_get_contents( $theme . '/patterns/guide-pied.php' );
+check( 'Le CTA reprend les deux actions de l’accueil',
+	str_contains( $pied, "home_url( '/#localisation' )" )
+	&& str_contains( $pied, "home_url( '/#demander-des-renseignements' )" ) );
+check( 'Le CTA ne renvoie plus vers /contact/', ! str_contains( $pied, "home_url( '/contact/' )" ) );
+check( 'Le titre du CTA reste orienté par la catégorie',
+	str_contains( $pied, "urbizen_child_cta_guide" ) && str_contains( $pied, "\$cta['titre']" ) );
+check( 'Le lien de prestation subsiste, en lien simple',
+	str_contains( $pied, 'class="guide-cta-lien"' )
+	&& (bool) preg_match( '/\.guide-cta-lien a \{/', file_get_contents( $theme . '/assets/css/urbizen-guides.css' ) ) );
+
 // Miroir du contrôle de `test-navigation.php` : les deux ont basculé ensemble
 // le jour où /guides/ a répondu 200.
 $entete = file_get_contents( $theme . '/patterns/header-accueil.php' );
