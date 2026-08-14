@@ -67,7 +67,17 @@ $accueil = is_front_page() ? '#top' : esc_url( home_url( '/' ) );
  * `is_front_page()` ; l'y faire appeler une fonction de plus le casserait sans
  * rien apporter, l'accueil n'ayant de toute façon aucune URL à comparer.
  */
-$courant = is_front_page() ? '' : ( is_singular() ? get_permalink() : '' );
+$url_guides = ( $id_guides = (int) get_option( 'page_for_posts' ) ) ? get_permalink( $id_guides ) : '';
+
+/*
+ * L'index des guides n'est PAS une page au sens de `is_singular()` : WordPress
+ * y interroge la liste des articles. Mesuré le 14 août 2026 sur la production,
+ * juste après la bascule — aucune entrée n'était marquée courante sur
+ * /guides/. La branche `is_home()` répare cela.
+ */
+$courant = is_front_page()
+	? ''
+	: ( is_home() ? $url_guides : ( is_singular() ? get_permalink() : '' ) );
 
 /** Marque l'entrée dont l'URL est celle de la page ouverte. */
 $actif = static function ( $url ) use ( $courant ) {
@@ -85,6 +95,16 @@ $url_conception = 'https://urbizen.fr/conception/';
 // /conception/, le menu resterait muet sur l'endroit où l'on se trouve.
 $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_conception ) )
 	? 'nav-parent is-actif' : 'nav-parent';
+
+/*
+ * « Guides » s'allume aussi sur un article et sur une archive de catégorie —
+ * la rubrique où l'on se trouve, même si l'URL n'est pas celle de l'index. Même
+ * parti pris que pour « Nos prestations », qui s'allume sur ses trois pages.
+ * Une CLASSE et non `aria-current="page"` : la page courante n'est pas l'index,
+ * et le mentir aux lecteurs d'écran serait pire que de ne rien dire.
+ */
+$classe_guides = ( is_singular( 'post' ) || is_category() || is_tag() || is_date() )
+	? ' class="nav-actif"' : '';
 ?>
 <!-- wp:html -->
 <header class="site" id="top">
@@ -104,7 +124,7 @@ $classe_parent = ( $actif( $url_dp ) || $actif( $url_pc ) || $actif( $url_concep
       </div>
       <a href="<?php echo $pfx; ?>#methode">Comment ça marche</a>
       <a href="https://urbizen.fr/tarifs/"<?php echo $actif( 'https://urbizen.fr/tarifs/' ); ?>>Tarifs</a>
-      <a href="https://urbizen.fr/guides/"<?php echo $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
+      <a href="https://urbizen.fr/guides/"<?php echo $classe_guides . $actif( 'https://urbizen.fr/guides/' ); ?>>Guides</a>
       <span class="nav-bientot" aria-disabled="true" title="Espace client — bientôt disponible">Espace client<span class="nav-tag">bientôt</span></span>
       <a href="https://urbizen.fr/contact/"<?php echo $actif( 'https://urbizen.fr/contact/' ); ?>>Contact</a>
     </nav>

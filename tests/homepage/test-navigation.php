@@ -48,16 +48,42 @@ const PRESTATIONS    = array(
 // dans des positions différentes, et chaque rendu doit pouvoir les changer.
 $GLOBALS['banc_front']     = true;
 $GLOBALS['banc_permalien'] = '';
+$GLOBALS['banc_post']      = false;
+$GLOBALS['banc_home']      = false;
 
 function is_front_page() { return $GLOBALS['banc_front']; }
-function is_singular()   { return ! $GLOBALS['banc_front']; }
-function get_permalink() { return $GLOBALS['banc_permalien']; }
+function is_singular( $t = '' ) {
+	if ( 'post' === $t ) { return $GLOBALS['banc_post'] ?? false; }
+	return ! $GLOBALS['banc_front'];
+}
+function get_permalink( $id = 0 ) {
+	// L'identifiant 1204 est la page d'articles : le pattern l'interroge pour
+	// construire l'URL de « Guides ».
+	return 1204 === $id ? 'https://urbizen.fr/guides/' : $GLOBALS['banc_permalien'];
+}
 function home_url( $c = '/' ) { return 'https://urbizen.fr' . $c; }
 function untrailingslashit( $s ) { return rtrim( (string) $s, '/\\' ); }
 function esc_url( $u ) { return htmlspecialchars( (string) $u, ENT_QUOTES, 'UTF-8' ); }
 function get_theme_file_uri( $c = '' ) {
 	return 'https://urbizen.fr/wp-content/themes/urbizen-child/' . ltrim( $c, '/' );
 }
+
+/*
+ * Doublons ajoutés le 14 août 2026 : l'en-tête interroge désormais la page
+ * d'articles pour savoir s'il faut allumer « Guides ». Ces valeurs décrivent un
+ * site où /guides/ existe et où l'on est ailleurs que dessus.
+ */
+function get_option( $nom, $defaut = false ) {
+	return 'page_for_posts' === $nom ? 1204 : $defaut;
+}
+function get_the_title( $id = 0 ) { return 'Guides d’urbanisme'; }
+function is_home() { return $GLOBALS['banc_home'] ?? false; }
+function is_category() { return $GLOBALS['banc_category'] ?? false; }
+function is_tag() { return false; }
+function is_date() { return false; }
+
+function get_the_permalink_index() { return 'https://urbizen.fr/guides/'; }
+
 
 /** Rend le pattern dans une position donnée. */
 function rendre( $fichier, $front, $permalien = '' ) {
@@ -211,6 +237,23 @@ check( 'Page interne : la même ancre est préfixée par l\'accueil',
 check( 'La section #methode existe bien dans les gabarits d\'accueil',
 	str_contains( file_get_contents( $theme . '/templates/front-page.html' ), 'id="methode"' )
 	&& str_contains( $maquette, 'id="methode"' ) );
+
+// Défaut mesuré en production le 14 août 2026 : sur /guides/, AUCUNE entrée
+// n'était marquée courante. La page d'articles n'est pas `is_singular()` — le
+// calcul l'ignorait. Ces deux contrôles ferment la porte.
+$GLOBALS['banc_home'] = true;
+$index = rendre( $pattern, false, '' );
+$GLOBALS['banc_home'] = false;
+check( 'Index des guides : « Guides » est marqué page courante',
+	str_contains( $index, '"https://urbizen.fr/guides/" aria-current="page">Guides</a>' ) );
+
+$GLOBALS['banc_post'] = true;
+$guide = rendre( $pattern, false, 'https://urbizen.fr/guides/piscine/' );
+$GLOBALS['banc_post'] = false;
+check( 'Article : la rubrique « Guides » s\'allume sans mentir sur l\'URL',
+	str_contains( $guide, 'class="nav-actif" href="https://urbizen.fr/guides/">Guides</a>' )
+	|| str_contains( $guide, ' class="nav-actif">Guides</a>' )
+	|| (bool) preg_match( '#<a href="https://urbizen\.fr/guides/" class="nav-actif">Guides</a>#', $guide ) );
 
 check( 'Page interne : une prestation ouverte allume aussi son groupe',
 	str_contains( $conception, 'class="nav-parent is-actif"' )
