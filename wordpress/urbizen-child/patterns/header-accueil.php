@@ -19,6 +19,24 @@
  * 135 px, ses libellés basculant sur deux lignes. La maquette s'appuie sur la
  * compression du logo par flex-shrink : on ne la contrarie pas.
  *
+ * LE LOGO : `loading="eager"`, ET AUCUNE DIMENSION
+ *
+ * WordPress ajoute `loading="lazy"` selon un comptage interne
+ * (`wp_omit_loading_attr_threshold`) : mesuré, le logo le recevait sur
+ * /tarifs/ et pas ailleurs, alors qu'il est au-dessus de la ligne de
+ * flottaison partout. Le déclarer ici rend le comportement identique sur
+ * toutes les pages.
+ *
+ * Pas de `fetchpriority` : le logo n'est le plus grand élément peint sur aucune
+ * page, et le prioriser prendrait la bande passante de ce qui l'est.
+ *
+ * Pas de `width` ni de `height` non plus — posés puis retirés le 14 août 2026.
+ * La feuille ne fixe que la hauteur et laisse la largeur libre ; sans règle CSS
+ * sur `width`, l'attribut sert d'indication de présentation et l'emporte. Le
+ * logo est passé de 129 × 36 à 430 × 36 en desktop, et celui du pied de 122 à
+ * 328 : étirés, déformés, en production. Le décalage que ces attributs
+ * préviennent n'existe pas ici, la hauteur étant déjà fixée en CSS.
+ *
  * @package Urbizen\Child
  */
 
@@ -35,8 +53,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
 <header class="site" id="top">
   <div class="wrap nav">
     <a class="logo" href="<?php echo is_front_page() ? '#top' : esc_url( home_url( '/' ) ); ?>" aria-label="Urbizen — accueil">
-      <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>"
-           alt="Urbizen · urbanisme & projets" />
+      <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>" loading="eager" decoding="async" alt="Urbizen · urbanisme & projets" />
     </a>
     <nav class="nav-links" aria-label="Navigation principale">
       <a href="https://urbizen.fr/declarations-prealables/">Déclaration préalable</a>

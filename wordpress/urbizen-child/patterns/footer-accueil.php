@@ -21,8 +21,7 @@ $pfx = is_front_page() ? '' : esc_url( home_url( '/' ) );
 <footer class="site-footer">
   <div class="wrap foot">
     <div class="foot-brand">
-      <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>"
-           alt="Urbizen" class="foot-logo" />
+      <img src="<?php echo esc_url( get_theme_file_uri( 'assets/img/logo-urbizen.png' ) ); ?>" loading="lazy" decoding="async" alt="Urbizen" class="foot-logo" />
       <p>Dossiers d'urbanisme à distance : déclaration préalable, permis de construire, CERFA, plans, insertions paysagères et pièces graphiques prêts à déposer. Partout en France métropolitaine.</p>
     </div>
     <div>
