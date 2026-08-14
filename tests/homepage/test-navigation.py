@@ -63,7 +63,7 @@ CHROMES = [
 # Le menu attendu, dans l'ordre. C'est la seule description de référence :
 # le banc ne devine pas, il compare.
 PREMIER_NIVEAU = ["Accueil", "Nos prestations", "Comment ça marche", "Tarifs",
-                  "Espace client", "Contact"]
+                  "Guides", "Espace client", "Contact"]
 PRESTATIONS = ["Déclaration préalable", "Permis de construire", "Conception de plans"]
 
 echecs = 0
@@ -186,9 +186,9 @@ def main():
     faux = ["%dpx" % w for w in sorted(m) if m[w]["desktopVisible"] == m[w]["burgerVisible"]]
     check("Un seul des deux menus est offert, à chaque largeur", not faux, " | ".join(faux))
     check(
-        "La bascule tombe bien entre 1239 et 1240 px",
-        m[1239]["burgerVisible"] and m[1240]["desktopVisible"],
-        "1239 burger=%s | 1240 desktop=%s" % (m[1239]["burgerVisible"], m[1240]["desktopVisible"]),
+        "La bascule tombe bien entre 1319 et 1320 px",
+        m[1319]["burgerVisible"] and m[1320]["desktopVisible"],
+        "1319 burger=%s | 1320 desktop=%s" % (m[1319]["burgerVisible"], m[1320]["desktopVisible"]),
     )
 
     # ----------------------------------------------------- aucun faux lien ----

@@ -234,11 +234,10 @@ check( 'Le mouvement réduit est respecté', str_contains( $css, 'prefers-reduce
 
 // ------------------------------------------------- 9 · ce qui ne bouge pas ----
 
-// L'entrée Guides du menu n'arrivera qu'avec la page index en 200. Ce contrôle
-// est le miroir de celui de `test-navigation.php` : les deux doivent basculer
-// dans le même mouvement.
+// Miroir du contrôle de `test-navigation.php` : les deux ont basculé ensemble
+// le jour où /guides/ a répondu 200.
 $entete = file_get_contents( $theme . '/patterns/header-accueil.php' );
-check( 'Le menu ne porte toujours pas d’entrée Guides', ! str_contains( $entete, '/guides/' ) );
+check( 'Le menu porte l’entrée Guides', str_contains( $entete, '>Guides</a>' ) );
 
 echo "\n";
 if ( $fail ) {

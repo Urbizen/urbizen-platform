@@ -16,7 +16,10 @@
 <body>
 <pre id="resultat">EN COURS</pre>
 <script>
-const VIEWPORTS = [320, 360, 380, 381, 390, 430, 1280];
+/* 1400 et non 1280 comme largeur de bureau : le seuil du burger est passé à
+   1320 px le 14 août 2026 avec la septième entrée du menu, et 1280 est
+   désormais en territoire mobile. */
+const VIEWPORTS = [320, 360, 380, 381, 390, 430, 1400];
 const ANCRE = '#demander-des-renseignements';
 
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));

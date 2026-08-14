@@ -1594,6 +1594,15 @@ const URBIZEN_CHILD_CATEGORIES_GUIDES = array(
 	'autorisations-projets',
 	'regles-urbanisme',
 	'conseils-demarches',
+	/*
+	 * « Non classé » n'est pas une des trois rubriques validées : elle est la
+	 * catégorie par défaut de WordPress, celle où atterrit un article dont on a
+	 * oublié de cocher la rubrique. Mesuré le 14 août 2026 : elle est
+	 * `noindex` tant qu'elle est vide, mais redeviendrait indexable au premier
+	 * article égaré — une page d'archive qui n'a pas de sujet. On la retient
+	 * ici plutôt que de compter sur la vigilance à chaque publication.
+	 */
+	'non-classe',
 );
 
 /**

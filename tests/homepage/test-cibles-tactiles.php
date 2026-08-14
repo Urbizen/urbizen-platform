@@ -265,9 +265,9 @@ check( 'Le burger est en border-box (44 − 2×11 laisse bien 22×22 de contenu)
 /* --------------------------------------- les trois boîtes, viewport par viewport */
 
 // Le burger n'existe qu'en mode mobile ; au-delà de 1100 px il est masqué.
-// 1200 et 1239 sont dans la plage mobile depuis que le seuil du burger est
-// passé à 1240 px : le menu à six entrées ne tenait pas en dessous.
-$mobiles = array( 320, 340, 360, 375, 379, 380, 381, 390, 400, 401, 430, 500, 560, 700, 900, 1100, 1200, 1239 );
+// Tout ce qui est sous 1320 px est en mode mobile depuis que le menu compte
+// sept entrées : mesuré, il lui faut cette largeur pour tenir dans sa boîte.
+$mobiles = array( 320, 340, 360, 375, 379, 380, 381, 390, 400, 401, 430, 500, 560, 700, 900, 1100, 1200, 1280, 1319 );
 
 foreach ( $cibles as $nom => [ $classes, $anc ] ) {
 	$fautifs = array();
@@ -301,7 +301,7 @@ check( 'CTA : aucune largeur imposée (le flex existant la calcule)',
 
 /* ---------------------------------------- la correction reste mobile ------- */
 
-$desktop = array( 1240, 1280, 1440, 1920 );
+$desktop = array( 1320, 1400, 1440, 1920 );
 $fuites  = array();
 
 foreach ( $desktop as $w ) {
