@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 460" role="img"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 460" width="840" height="460" role="img"
      aria-labelledby="t1 d1" font-family="IBM Plex Sans, system-ui, sans-serif">
   <title id="t1">Piscine de 8 × 4 mètres avec plage et local technique, vue de dessus</title>
   <desc id="d1">Le bassin mesure 8 mètres sur 4, soit 32 m² : c'est la seule surface qui
@@ -38,10 +38,10 @@
 
   <!-- cotes -->
   <g stroke="#55617A" stroke-width="1.2" marker-start="url(#fl)" marker-end="url(#fl)">
-    <path d="M120 336H440"/>
+    <path d="M120 328H440"/>
     <path d="M462 150V310"/>
   </g>
-  <text x="280" y="356" text-anchor="middle" fill="#55617A" font-size="13" font-family="IBM Plex Mono, monospace">8,00 m</text>
+  <text x="280" y="344" text-anchor="middle" fill="#55617A" font-size="13" font-family="IBM Plex Mono, monospace">8,00 m</text>
   <text x="476" y="235" fill="#55617A" font-size="13" font-family="IBM Plex Mono, monospace">4,00 m</text>
 
   <!-- local technique : construction distincte -->

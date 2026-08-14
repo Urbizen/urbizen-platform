@@ -256,7 +256,31 @@
 .urbizen-guides .guide-corps blockquote p { margin: 0; }
 .urbizen-guides .guide-corps blockquote > * + * { margin-top: .6em; }
 
+/* Les schémas techniques portent des cotes et des libellés de 12 à 17 px dans un
+   dessin de 840 px de large. Ramenés à 354 px sur un téléphone, ces textes
+   tombent à cinq pixels : le schéma est là, il ne se lit plus. On leur donne
+   donc la même liberté qu'aux tableaux — une largeur minimale lisible, et un
+   défilement horizontal contenu dans leur propre boîte, jamais dans la page. */
+@media (max-width: 720px) {
+	.urbizen-guides .guide-corps .wp-block-image {
+		overflow-x: auto;
+		/* Le défilement se voit : sans cette marge, rien n'indique qu'il reste
+		   du dessin à droite. */
+		padding-bottom: 6px;
+	}
+	.urbizen-guides .guide-corps .wp-block-image img {
+		min-width: 640px;
+		max-width: none;
+	}
+	.urbizen-guides .guide-corps .wp-block-image figcaption { min-width: 0; }
+}
+
+/* `height: auto` est indispensable : les schémas portent des dimensions
+   intrinsèques pour ne pas s'écraser dans un <img>, et `max-width: 100%` seul
+   les déformerait dès que la colonne devient plus étroite que 840 px. */
 .urbizen-guides .guide-corps :is(img, .wp-block-image img) {
+	max-width: 100%;
+	height: auto;
 	border-radius: 10px;
 }
 .urbizen-guides .guide-corps figcaption {
