@@ -529,3 +529,16 @@
 	.urbizen-guides .guide-corps .wp-block-image { padding: 10px; }
 	.urbizen-guides .guide-corps blockquote { padding: 16px 18px; font-size: 16.5px; }
 }
+
+/* Le lien de prestation, sous les deux boutons de l'accueil. En lien simple et
+   non en troisième bouton : trois appels à l'action de même poids ne
+   hiérarchisent plus rien, et celui-ci est un complément, pas une alternative. */
+.urbizen-guides .guide-cta-lien { margin-top: 14px; font-size: 14.5px; }
+.urbizen-guides .guide-cta-lien a {
+	color: var(--u-brand-dk);
+	font-weight: 600;
+	text-decoration: underline;
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 3px;
+}
+.urbizen-guides .guide-cta-lien a:hover { color: var(--u-brand); }

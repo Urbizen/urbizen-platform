@@ -19,6 +19,19 @@
  * validées. Si une catégorie inconnue apparaît, le repli s'applique — aucun
  * lien mort, aucune orientation fausse.
  *
+ * LES DEUX BOUTONS SONT CEUX DE L'ACCUEIL
+ *
+ * Ils menaient vers `/contact/` et son ancien formulaire, qui n'a plus sa place
+ * dans le parcours. Ils reprennent maintenant les deux actions de l'accueil —
+ * « Démarrer mon projet » et « Demander des renseignements » — vers leurs ancres
+ * réelles, préfixées par l'URL de l'accueil puisqu'un guide n'est pas l'accueil
+ * et que ces sections n'y existent pas.
+ *
+ * Le titre et le texte restent orientés par la catégorie : c'est ce qui fait
+ * qu'un guide sur la piscine parle de déclaration préalable et non d'un
+ * argumentaire générique. Le lien vers la prestation passe sous les boutons,
+ * en lien simple : il complète le parcours sans lui faire concurrence.
+ *
  * PAS DE PROMESSE SUR LE RÉSULTAT
  *
  * Les libellés parlent de préparer et de déposer un dossier. Ils ne laissent
@@ -61,9 +74,10 @@ $url_index = $id_index ? get_permalink( $id_index ) : '';
   <h2><?php echo esc_html( $cta['titre'] ); ?></h2>
   <p><?php echo esc_html( $cta['texte'] ); ?></p>
   <div class="guide-cta-actions">
-    <a class="btn btn-primary" href="<?php echo esc_url( $cta['url'] ); ?>"><?php echo esc_html( $cta['libelle'] ); ?></a>
-    <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/contact/' ) ); ?>">Poser une question</a>
+    <a class="btn btn-primary" href="<?php echo esc_url( home_url( '/#localisation' ) ); ?>">Démarrer mon projet</a>
+    <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/#demander-des-renseignements' ) ); ?>">Demander des renseignements</a>
   </div>
+  <p class="guide-cta-lien"><a href="<?php echo esc_url( $cta['url'] ); ?>"><?php echo esc_html( $cta['libelle'] ); ?></a></p>
 </aside>
 <?php if ( $voisins->have_posts() ) : ?>
 <section class="guide-voisins">
