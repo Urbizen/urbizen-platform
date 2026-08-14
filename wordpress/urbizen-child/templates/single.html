@@ -1,0 +1,43 @@
+<!-- wp:html -->
+<div class="urbizen-accueil urbizen-page urbizen-guides urbizen-guide-article">
+<a class="u-skip" href="#contenu">Aller au contenu principal</a>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"header-urbizen","tagName":"div","className":"urbizen-entete"} /-->
+
+<!-- wp:html -->
+<main id="contenu">
+<!-- /wp:html -->
+
+<!-- Fil d'ariane, catégorie, date, titre et visuel. Aucun auteur affiché : voir
+     le pourquoi dans le docblock du pattern, qui n'est pas servi au client. -->
+<!-- wp:pattern {"slug":"urbizen-child/guide-entete"} /-->
+
+<!-- wp:html -->
+<section class="guide-contenu">
+  <div class="wrap">
+    <div class="guide-corps">
+<!-- /wp:html -->
+
+<!-- Le contenu de l'éditeur. C'est le seul endroit du gabarit où un bloc
+     dynamique du cœur est indispensable : rien d'autre ne rend le corps de
+     l'article. Sa mise en forme vient de `.guide-corps`, dans urbizen-guides.css. -->
+<!-- wp:post-content {"layout":{"type":"default"}} /-->
+
+<!-- wp:html -->
+    </div>
+<!-- /wp:html -->
+
+<!-- wp:pattern {"slug":"urbizen-child/guide-pied"} /-->
+
+<!-- wp:html -->
+  </div>
+</section>
+</main>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"footer-urbizen","tagName":"div"} /-->
+
+<!-- wp:html -->
+</div>
+<!-- /wp:html -->
