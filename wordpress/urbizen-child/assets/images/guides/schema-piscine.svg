@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 460" role="img"
+     aria-labelledby="t1 d1" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="t1">Piscine de 8 × 4 mètres avec plage et local technique, vue de dessus</title>
+  <desc id="d1">Le bassin mesure 8 mètres sur 4, soit 32 m² : c'est la seule surface qui
+  détermine la formalité de la piscine. La plage et les margelles qui l'entourent n'en font
+  pas partie. Le local technique de 2 mètres sur 3 est une construction distincte, jugée sur
+  ses propres seuils.</desc>
+
+  <defs>
+    <pattern id="hachure" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#128A5A" stroke-width="1.6" opacity=".55"/>
+    </pattern>
+    <marker id="fl" markerWidth="9" markerHeight="9" refX="4.5" refY="4.5" orient="auto">
+      <path d="M1 1 L8 4.5 L1 8 z" fill="#55617A"/>
+    </marker>
+  </defs>
+
+  <rect width="840" height="460" fill="#FBFCFD"/>
+  <!-- trame technique discrète -->
+  <g stroke="#C9D3DD" stroke-width=".5" opacity=".55">
+    <path d="M40 0V460M120 0V460M200 0V460M280 0V460M360 0V460M440 0V460M520 0V460M600 0V460M680 0V460M760 0V460"/>
+    <path d="M0 40H840M0 120H840M0 200H840M0 280H840M0 360H840M0 440H840"/>
+  </g>
+
+  <text x="40" y="44" fill="#14233B" font-size="19" font-weight="600">Piscine 8 × 4 m avec plage et local technique</text>
+  <text x="40" y="68" fill="#55617A" font-size="14">Vue de dessus · échelle 1 m = 40 px</text>
+
+  <!-- plage / margelles : hors bassin -->
+  <rect x="80" y="110" width="400" height="240" rx="6" fill="#EAEEF2" stroke="#9FADBC"
+        stroke-width="1.5" stroke-dasharray="7 5"/>
+  <text x="96" y="134" fill="#55617A" font-size="13">Plage et margelles — hors bassin</text>
+
+  <!-- bassin : la seule surface qui compte -->
+  <rect x="120" y="150" width="320" height="160" rx="4" fill="url(#hachure)" stroke="#128A5A" stroke-width="2.5"/>
+  <rect x="120" y="150" width="320" height="160" rx="4" fill="#E4F5EC" opacity=".45"/>
+  <text x="280" y="222" text-anchor="middle" fill="#0E6E48" font-size="17" font-weight="600">Bassin</text>
+  <text x="280" y="246" text-anchor="middle" fill="#0E6E48" font-size="15">8 × 4 = 32 m²</text>
+
+  <!-- cotes -->
+  <g stroke="#55617A" stroke-width="1.2" marker-start="url(#fl)" marker-end="url(#fl)">
+    <path d="M120 336H440"/>
+    <path d="M462 150V310"/>
+  </g>
+  <text x="280" y="356" text-anchor="middle" fill="#55617A" font-size="13" font-family="IBM Plex Mono, monospace">8,00 m</text>
+  <text x="476" y="235" fill="#55617A" font-size="13" font-family="IBM Plex Mono, monospace">4,00 m</text>
+
+  <!-- local technique : construction distincte -->
+  <rect x="560" y="150" width="120" height="80" rx="4" fill="#FBFCFD" stroke="#14233B" stroke-width="2.5"/>
+  <text x="620" y="185" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">Local</text>
+  <text x="620" y="205" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">technique</text>
+  <text x="620" y="250" text-anchor="middle" fill="#55617A" font-size="13">3 × 2 = 6 m²</text>
+  <text x="620" y="272" text-anchor="middle" fill="#55617A" font-size="12.5">jugé sur ses propres seuils</text>
+
+  <!-- légende -->
+  <g transform="translate(80,392)" font-size="13">
+    <rect x="0" y="-11" width="18" height="14" rx="2" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
+    <text x="26" y="0" fill="#14233B">Compté dans la superficie du bassin</text>
+    <rect x="300" y="-11" width="18" height="14" rx="2" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="326" y="0" fill="#14233B">Non compté</text>
+    <rect x="470" y="-11" width="18" height="14" rx="2" fill="#FBFCFD" stroke="#14233B" stroke-width="2"/>
+    <text x="496" y="0" fill="#14233B">Construction distincte</text>
+  </g>
+  <text x="80" y="428" fill="#0E6E48" font-size="14" font-weight="600">32 m² de bassin → déclaration préalable</text>
+</svg>
