@@ -100,9 +100,30 @@ check( 'DP : la dispense pompe à chaleur est mentionnée',
 	str_contains( $dp, "l'implantation en façade d'une pompe à chaleur sur un bâtiment existant" ) );
 check( 'DP : les trois conditions de non-visibilité sont citées',
 	str_contains( $dp, 'domaine public' ) && str_contains( $dp, 'voie ouverte au public' )
-	&& str_contains( $dp, 'autre immeuble ayant vue sur' ) );
+	&& str_contains( $dp, "autre immeuble disposant d'une vue sur" ) );
+check( 'DP : la dispense est datée par l\'engagement des travaux, pas par une date sèche',
+	str_contains( $dp, 'Pour les travaux engagés à compter de mars 2026' )
+	&& ! str_contains( $dp, 'Depuis mars 2026' ) );
+check( 'DP : la dispense est énoncée comme possible, non comme acquise',
+	str_contains( $dp, 'peut être dispensée de formalité' ) );
 check( 'DP : la dispense n\'est pas présentée comme générale',
-	str_contains( $dp, 'La dispense comporte des exclusions' ) );
+	str_contains( $dp, "Cette dispense ne s'applique notamment pas" ) );
+// R.421-13 vise plusieurs fondements distincts : les résumer par « protégés au
+// titre du PLU » en écraserait la moitié.
+foreach ( array( 'monument historique inscrit', 'réserve naturelle', 'protections prévues par le code de l\'urbanisme' ) as $exclusion ) {
+	check( "DP : l'exclusion « $exclusion » est nommée", str_contains( $dp, $exclusion ) );
+}
+check( 'DP : les protections ne sont pas réduites au seul PLU',
+	! str_contains( $dp, "protégés au titre du plan local d'urbanisme" ) );
+
+// Le tableau ne doit pas affirmer une règle absolue que la note dément ensuite.
+check( 'DP : la ligne « Façade, toiture » est nuancée et renvoie à la note',
+	str_contains( $dp, "en principe oui, dès que l'aspect extérieur change&nbsp;**" )
+	&& ! str_contains( $dp, ">oui, dès que l'aspect extérieur change<" ) );
+// Deux notes, deux marqueurs : l'astérisque simple sert déjà aux 40 m².
+check( 'DP : le renvoi de la note PAC ne se confond pas avec celui des 40 m²',
+	str_contains( $dp, '<p class="note">** Pour les travaux engagés' )
+	&& str_contains( $dp, '<p class="note">* En zone urbaine' ) );
 check( 'DP : l\'article est cité', str_contains( $dp, 'R.421-13' ) );
 
 // ------------------------------------------- 6 · les deux pages concordent --
