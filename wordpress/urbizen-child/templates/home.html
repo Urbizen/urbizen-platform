@@ -1,0 +1,56 @@
+<!-- wp:html -->
+<div class="urbizen-accueil urbizen-page urbizen-guides">
+<a class="u-skip" href="#contenu">Aller au contenu principal</a>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"header-urbizen","tagName":"div","className":"urbizen-entete"} /-->
+
+<!-- wp:html -->
+<main id="contenu">
+
+<!-- ===== Hero de l'index ===== -->
+<!--
+  LE H1 EST ÉCRIT ICI, PAS HÉRITÉ DE LA PAGE.
+
+  Sur `home.html`, WordPress interroge la liste des articles ; l'objet
+  interrogé n'est pas la page assignée à `page_for_posts`. Un bloc
+  `core/post-title` y rend donc, selon le contexte, le titre du PREMIER
+  ARTICLE de la liste, ou rien du tout — et sur une page 2 de pagination, un
+  titre encore différent. Le titre de la page n'est pas non plus une donnée
+  qu'un gabarit `.html` puisse aller chercher, faute de pouvoir exécuter du
+  PHP.
+
+  Le libellé est donc en dur. C'est le choix sûr : la page WordPress
+  « Guides d'urbanisme » sert à porter le slug `/guides/` et les métadonnées
+  AIOSEO ; le titre affiché, lui, est ici et ne dépend d'aucun mécanisme
+  incertain.
+-->
+<section class="page-hero guides-hero">
+  <div class="wrap">
+    <nav class="fil-ariane" aria-label="Fil d'ariane">
+      <a href="/">Accueil</a><span class="sep">›</span>Guides
+    </nav>
+    <span class="eyebrow eyebrow-highlight"><span class="eyebrow-highlight-text">Guides</span></span>
+    <h1>Guides d’urbanisme</h1>
+    <p class="lead">Ce qu’il faut savoir avant de déposer un dossier&nbsp;: quelle autorisation pour quel projet, quelles pièces préparer, quels délais attendre. Des repères clairs, écrits par une professionnelle de l’urbanisme.</p>
+  </div>
+</section>
+
+<section class="guides-liste">
+  <div class="wrap">
+<!-- /wp:html -->
+
+<!-- wp:pattern {"slug":"urbizen-child/guides-grille"} /-->
+
+<!-- wp:html -->
+  </div>
+</section>
+
+</main>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"footer-urbizen","tagName":"div"} /-->
+
+<!-- wp:html -->
+</div>
+<!-- /wp:html -->

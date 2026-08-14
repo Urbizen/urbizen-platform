@@ -1,0 +1,51 @@
+<!-- wp:html -->
+<div class="urbizen-accueil urbizen-page urbizen-guides urbizen-guide-archive">
+<a class="u-skip" href="#contenu">Aller au contenu principal</a>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"header-urbizen","tagName":"div","className":"urbizen-entete"} /-->
+
+<!-- wp:html -->
+<main id="contenu">
+
+<!--
+  ARCHIVE DE CATÉGORIE — POURQUOI CE GABARIT EXISTE ALORS QU'ELLE EST EN NOINDEX
+
+  Les trois catégories restent en `noindex` tant qu'elles n'ont pas assez de
+  contenu : les moteurs ne les listeront donc pas. Mais un `noindex` n'est pas
+  un mur — un visiteur qui suit le libellé de catégorie d'un guide arrive bien
+  sur cette URL. Sans ce gabarit, il y verrait le thème Hostinger : un autre
+  en-tête, un autre pied de page, et un titre en anglais.
+
+  Le titre vient d'ici plutôt que d'un bloc `core/query-title` : le rendu de ce
+  dernier dépend d'attributs et d'un préfixe (« Catégorie : ») que l'on aurait
+  dû masquer ensuite. Le nom du terme est écrit par le pattern.
+-->
+<section class="page-hero guides-hero">
+  <div class="wrap">
+<!-- /wp:html -->
+
+<!-- wp:pattern {"slug":"urbizen-child/guides-archive-entete"} /-->
+
+<!-- wp:html -->
+  </div>
+</section>
+
+<section class="guides-liste">
+  <div class="wrap">
+<!-- /wp:html -->
+
+<!-- wp:pattern {"slug":"urbizen-child/guides-grille"} /-->
+
+<!-- wp:html -->
+  </div>
+</section>
+
+</main>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"footer-urbizen","tagName":"div"} /-->
+
+<!-- wp:html -->
+</div>
+<!-- /wp:html -->

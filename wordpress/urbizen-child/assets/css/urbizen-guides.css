@@ -1,0 +1,333 @@
+/**
+ * Urbizen — guides (index, article, archive de catégorie)
+ *
+ * Feuille dédiée aux gabarits d'articles, chargée après urbizen-homepage.css
+ * et urbizen-pages.css. Elle n'écrit que ce que ces deux-là ne donnent pas.
+ *
+ * POURQUOI SI PEU DE RÈGLES
+ *
+ * Les gabarits portent `urbizen-accueil urbizen-page urbizen-guides`. Les deux
+ * premières classes sont les portées des feuilles existantes : les cartes
+ * `.blog-preview-*` de l'accueil, le hero `.page-hero`, le fil d'ariane, les
+ * boutons, `.wrap` et la typographie fonctionnent donc déjà. Réécrire une
+ * grille de cartes aurait créé un second composant à maintenir, qui aurait
+ * dérivé du premier à la première retouche. On réutilise, on n'imite pas.
+ *
+ * Ce qui reste ici : l'extrait et le lien de carte, que les cartes de l'accueil
+ * n'ont pas (elles annoncent sans lier) ; la typographie du corps d'article ;
+ * la pagination ; le pied d'article.
+ *
+ * Toutes les règles sont scopées `.urbizen-guides`, absente partout ailleurs.
+ */
+
+/* ===========================================================================
+   1 · Index et archive — la grille
+   ======================================================================== */
+
+.urbizen-guides .guides-intro {
+	max-width: 68ch;
+	margin-top: 14px;
+	color: var(--u-ink-soft);
+	font-size: 16.5px;
+}
+
+/* La carte devient cliquable en entier. L'ancre couvre la carte plutôt que le
+   seul titre : une cible de 335 × 300 px vaut mieux qu'une ligne de texte, et
+   le titre reste le libellé annoncé grâce à `aria-labelledby`. */
+.urbizen-guides .blog-preview-card {
+	position: relative;
+	transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.urbizen-guides .blog-preview-card:hover {
+	border-color: var(--u-line-strong);
+	box-shadow: 0 1px 0 rgba(20, 35, 59, .04), 0 22px 44px -34px rgba(20, 35, 59, .5);
+	transform: translateY(-2px);
+}
+.urbizen-guides .guide-lien::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	border-radius: var(--u-radius);
+}
+/* Le halo de focus doit entourer la CARTE, pas l'ancre invisible qui la couvre :
+   sans cela, le contour se dessinerait sur le seul titre et le clavier perdrait
+   de vue ce qu'il vient de sélectionner. */
+.urbizen-guides .blog-preview-card:has(.guide-lien:focus-visible) {
+	outline: 2px solid var(--u-brand);
+	outline-offset: 3px;
+}
+.urbizen-guides .guide-lien:focus-visible { outline: none; }
+
+.urbizen-guides .blog-preview-content { gap: 12px; }
+.urbizen-guides .guide-extrait {
+	margin-top: 2px;
+	color: var(--u-ink-soft);
+	font-size: 14.5px;
+	line-height: 1.55;
+}
+/* La date reste discrète : sur un guide réglementaire, elle informe de la
+   fraîcheur sans devenir un argument. */
+.urbizen-guides .blog-preview-meta b {
+	font-family: var(--u-font-mono);
+	white-space: nowrap;
+}
+
+.urbizen-guides .guides-vide {
+	margin-top: 26px;
+	padding: 26px;
+	border: 1px dashed var(--u-line-strong);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	color: var(--u-ink-soft);
+}
+
+/* ===========================================================================
+   2 · Pagination
+   ======================================================================== */
+
+.urbizen-guides .guides-pagination {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+	margin-top: 34px;
+}
+.urbizen-guides .guides-pagination .page-numbers {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	/* 44 px : la même cible tactile que les contrôles de l'en-tête. */
+	min-width: 44px;
+	min-height: 44px;
+	padding: 0 12px;
+	border: 1px solid var(--u-line);
+	border-radius: 10px;
+	background: var(--u-surface);
+	color: var(--u-ink);
+	font-size: 14px;
+	font-weight: 600;
+	transition: border-color .15s, color .15s, background-color .15s;
+}
+.urbizen-guides .guides-pagination a.page-numbers:hover {
+	border-color: var(--u-brand);
+	color: var(--u-brand-dk);
+	background: var(--u-brand-sf);
+}
+.urbizen-guides .guides-pagination .page-numbers.current {
+	border-color: var(--u-brand);
+	background: var(--u-brand);
+	color: #fff;
+}
+.urbizen-guides .guides-pagination .page-numbers.dots {
+	border-color: transparent;
+	background: none;
+	color: var(--u-ink-faint);
+}
+.urbizen-guides .guides-pagination a.page-numbers:focus-visible {
+	outline: 2px solid var(--u-brand);
+	outline-offset: 3px;
+}
+
+/* ===========================================================================
+   3 · Article — en-tête et corps
+   ======================================================================== */
+
+.urbizen-guides .guide-hero-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 10px 16px;
+	margin-bottom: 12px;
+	font-family: var(--u-font-mono);
+	font-size: 11px;
+	letter-spacing: .09em;
+	text-transform: uppercase;
+}
+.urbizen-guides .guide-hero-cat {
+	color: var(--u-brand);
+	font-weight: 600;
+}
+.urbizen-guides .guide-hero-date { color: var(--u-ink-faint); }
+
+.urbizen-guides .guide-visuel {
+	margin: 0 0 clamp(24px, 3vw, 36px);
+	overflow: hidden;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+}
+/* Le visuel est cadré, pas laissé à sa hauteur naturelle : une image 3/2 sur
+   1140 px de large fait 760 px de haut et remplit l'écran à elle seule, en
+   repoussant la première ligne du guide sous la ligne de flottaison. Le rapport
+   large la ramène à une bande d'ouverture. */
+.urbizen-guides .guide-visuel img {
+	display: block;
+	width: 100%;
+	height: auto;
+	max-height: 420px;
+	object-fit: cover;
+}
+@media (max-width: 700px) {
+	.urbizen-guides .guide-visuel img { max-height: 260px; }
+}
+
+/* Le corps d'un guide se lit sur une surface unie. La trame technique
+   `u-grid-bg` fait l'identité de l'accueil et des pages courtes ; derrière deux
+   mille mots, elle fatigue. Les pages internes emploient déjà `.sec-blanc` pour
+   la même raison. */
+.urbizen-guides .guide-contenu {
+	background: var(--u-surface);
+	border-top: 1px solid var(--u-line);
+	border-bottom: 1px solid var(--u-line);
+}
+
+/* La colonne de lecture. 72ch tient la ligne autour de 70 caractères à la
+   taille du corps : au-delà, l'œil perd le début de la ligne suivante — et un
+   guide d'urbanisme se lit en entier, pas en diagonale. */
+.urbizen-guides .guide-corps {
+	max-width: 72ch;
+	margin: 0 auto;
+	color: var(--u-ink);
+	font-size: 17px;
+	line-height: 1.72;
+}
+.urbizen-guides .guide-corps > * + * { margin-top: 1.15em; }
+.urbizen-guides .guide-corps h2 {
+	margin-top: 1.9em;
+	font-size: clamp(23px, 2.4vw, 28px);
+	font-weight: 600;
+	line-height: 1.25;
+}
+.urbizen-guides .guide-corps h3 {
+	margin-top: 1.7em;
+	font-size: clamp(18px, 1.8vw, 21px);
+	font-weight: 600;
+	line-height: 1.3;
+}
+.urbizen-guides .guide-corps h2 + p,
+.urbizen-guides .guide-corps h3 + p { margin-top: .5em; }
+
+.urbizen-guides .guide-corps a {
+	color: var(--u-brand-dk);
+	text-decoration: underline;
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 3px;
+}
+.urbizen-guides .guide-corps a:hover { color: var(--u-brand); }
+
+.urbizen-guides .guide-corps ul,
+.urbizen-guides .guide-corps ol { padding-left: 1.35em; }
+.urbizen-guides .guide-corps li + li { margin-top: .45em; }
+.urbizen-guides .guide-corps ul { list-style: disc; }
+.urbizen-guides .guide-corps ol { list-style: decimal; }
+.urbizen-guides .guide-corps li::marker { color: var(--u-brand); }
+
+.urbizen-guides .guide-corps strong { font-weight: 600; }
+
+/* Les tableaux d'un guide portent des seuils et des surfaces : ils doivent
+   pouvoir défiler seuls plutôt que d'élargir la page. */
+.urbizen-guides .guide-corps .wp-block-table { overflow-x: auto; }
+.urbizen-guides .guide-corps table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 15px;
+}
+.urbizen-guides .guide-corps th,
+.urbizen-guides .guide-corps td {
+	padding: 11px 13px;
+	border: 1px solid var(--u-line);
+	text-align: left;
+	vertical-align: top;
+}
+.urbizen-guides .guide-corps th {
+	background: var(--u-surface-2);
+	font-weight: 600;
+}
+.urbizen-guides .guide-corps td { font-variant-numeric: tabular-nums; }
+
+.urbizen-guides .guide-corps blockquote {
+	margin-left: 0;
+	padding: 16px 20px;
+	border-left: 3px solid var(--u-brand);
+	border-radius: 0 10px 10px 0;
+	background: var(--u-brand-sf);
+	color: var(--u-ink);
+}
+.urbizen-guides .guide-corps blockquote p { margin: 0; }
+.urbizen-guides .guide-corps blockquote > * + * { margin-top: .6em; }
+
+.urbizen-guides .guide-corps :is(img, .wp-block-image img) {
+	border-radius: 10px;
+}
+.urbizen-guides .guide-corps figcaption {
+	margin-top: 8px;
+	color: var(--u-ink-faint);
+	font-size: 13.5px;
+}
+
+.urbizen-guides .guide-corps hr {
+	margin-top: 2em;
+	border: 0;
+	border-top: 1px solid var(--u-line);
+}
+
+/* ===========================================================================
+   4 · Pied d'article — appel à l'action et guides voisins
+   ======================================================================== */
+
+.urbizen-guides .guide-cta {
+	max-width: 72ch;
+	margin: clamp(34px, 4vw, 48px) auto 0;
+	padding: clamp(24px, 3vw, 32px);
+	border: 1px solid var(--u-line);
+	border-top: 3px solid var(--u-brand);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	box-shadow: var(--u-shadow-card);
+}
+.urbizen-guides .guide-cta h2 {
+	font-size: clamp(20px, 2vw, 24px);
+	font-weight: 600;
+	line-height: 1.25;
+}
+.urbizen-guides .guide-cta p {
+	margin-top: 10px;
+	color: var(--u-ink-soft);
+	font-size: 16px;
+}
+.urbizen-guides .guide-cta-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 20px;
+}
+.urbizen-guides .guide-cta-actions .btn { min-height: 44px; }
+
+.urbizen-guides .guide-voisins { margin-top: clamp(40px, 5vw, 60px); }
+.urbizen-guides .guide-voisins h2 {
+	margin-bottom: 16px;
+	font-size: clamp(19px, 1.9vw, 22px);
+	font-weight: 600;
+}
+
+.urbizen-guides .guide-retour {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin-top: 30px;
+	min-height: 44px;
+	color: var(--u-ink-soft);
+	font-size: 14.5px;
+	font-weight: 600;
+}
+.urbizen-guides .guide-retour:hover { color: var(--u-brand-dk); }
+.urbizen-guides .guide-retour:focus-visible {
+	outline: 2px solid var(--u-brand);
+	outline-offset: 3px;
+	border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.urbizen-guides .blog-preview-card { transition: none; }
+	.urbizen-guides .blog-preview-card:hover { transform: none; }
+}

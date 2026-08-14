@@ -787,6 +787,32 @@ function urbizen_child_configuration_formulaire() {
 }
 
 /**
+ * La page affichée est-elle un guide, l'index des guides ou une de leurs archives ?
+ *
+ * Ces trois contextes ne sont PAS des pages : `get_page_template_slug()` n'y
+ * renvoie rien, et le test des gabarits internes les rejetait donc tous les
+ * trois. Résultat mesuré avant correction : ni polices, ni charte, ni feuille
+ * — les guides seraient sortis avec l'apparence du thème parent.
+ *
+ * `is_home()` désigne la liste des articles, quelle que soit la page assignée à
+ * `page_for_posts` ; il vaut vrai avant même que cette page existe. Les
+ * archives de date et d'étiquette sont incluses par prudence : elles ne sont
+ * pas prévues, mais si une URL en produit une, elle doit ressembler à Urbizen.
+ *
+ * L'archive d'auteur est volontairement ABSENTE : elle répond 404 depuis le
+ * lot A, et lui donner une apparence reviendrait à la faire exister.
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_guides() {
+	if ( is_admin() ) {
+		return false;
+	}
+
+	return is_home() || is_singular( 'post' ) || is_category() || is_tag() || is_date();
+}
+
+/**
  * La page affichée utilise-t-elle un gabarit Urbizen — accueil ou page interne ?
  *
  * Étend `urbizen_child_est_accueil_urbizen()` aux pages internes qui empruntent
@@ -796,6 +822,10 @@ function urbizen_child_configuration_formulaire() {
  */
 function urbizen_child_est_page_urbizen() {
 	if ( urbizen_child_est_accueil_urbizen() ) {
+		return true;
+	}
+
+	if ( urbizen_child_est_page_guides() ) {
 		return true;
 	}
 
@@ -1063,6 +1093,17 @@ function urbizen_child_enqueue_accueil() {
 		}
 	}
 
+	// Guides : feuille des gabarits d'articles, scopée `.urbizen-guides`.
+	// Chargée après `urbizen-pages`, dont elle réutilise le hero et le fil
+	// d'ariane sans les redéfinir.
+	if ( urbizen_child_est_page_guides() ) {
+		$guides_css = '/assets/css/urbizen-guides.css';
+
+		if ( file_exists( $dir . $guides_css ) ) {
+			wp_enqueue_style( 'urbizen-guides', $uri . $guides_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $guides_css ) );
+		}
+	}
+
 	// Page commerciale « Conception » : feuille dédiée (galerie de rendus,
 	// hero illustré) et script de protection des visuels. Chargés uniquement
 	// sur cette page ; scopés `.urbizen-page-conception`.
@@ -1130,6 +1171,116 @@ function urbizen_child_enqueue_accueil() {
 	}
 }
 add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_accueil', 30 );
+
+/* -------------------------------------------------------------------------
+ * GUIDES — HELPERS PARTAGÉS PAR LES PATTERNS
+ *
+ * Ces deux fonctions vivaient d'abord dans `patterns/guides-grille.php`, qui
+ * les utilise. Elles sont ici pour deux raisons, l'une et l'autre fatales :
+ *
+ *   1. `patterns/guide-pied.php` s'en sert aussi, et il est rendu sur un
+ *      ARTICLE, où la grille n'est jamais chargée — l'appel aurait levé une
+ *      erreur fatale « fonction indéfinie » sur chaque guide ;
+ *   2. un fichier de pattern est inclus à CHAQUE rendu. Deux rendus dans la
+ *      même page — la grille puis les guides voisins — auraient redéclaré les
+ *      fonctions, ce que PHP refuse.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Vignette d'un guide, ou un substitut si l'article n'en a pas.
+ *
+ * Un article sans image mise en avant ne doit pas produire une carte trouée :
+ * la figure garde son rapport 3/2 et son fond, la grille reste régulière.
+ *
+ * @param int $id Identifiant de l'article.
+ * @return string
+ */
+function urbizen_child_vignette_guide( $id ) {
+	if ( ! has_post_thumbnail( $id ) ) {
+		return '<figure class="blog-preview-media" aria-hidden="true"></figure>';
+	}
+
+	/*
+	 * `medium_large` (768 px) plutôt que `full` : la carte fait au plus 335 px
+	 * de large sur la grille à trois colonnes. WordPress calcule `srcset` et
+	 * `sizes` seul à partir des tailles enregistrées ; `sizes` est corrigé
+	 * ci-dessous pour décrire la grille réelle et non la largeur du contenu,
+	 * que WordPress suppose pleine.
+	 */
+	$image = get_the_post_thumbnail(
+		$id,
+		'medium_large',
+		array(
+			'loading'  => 'lazy',
+			'decoding' => 'async',
+			'sizes'    => '(max-width: 560px) 90vw, (max-width: 900px) 44vw, 335px',
+		)
+	);
+
+	return '<figure class="blog-preview-media">' . $image . '</figure>';
+}
+
+/**
+ * Première catégorie d'un article, hors « Non classé ».
+ *
+ * @param int $id Identifiant de l'article.
+ * @return string Nom échappé, ou chaîne vide.
+ */
+function urbizen_child_categorie_guide( $id ) {
+	$categories = get_the_category( $id );
+
+	foreach ( $categories as $categorie ) {
+		if ( 'non-classe' !== $categorie->slug ) {
+			return esc_html( $categorie->name );
+		}
+	}
+
+	return '';
+}
+
+/**
+ * Destination de l'appel à l'action, selon la catégorie du guide.
+ *
+ * @param int $id Identifiant de l'article.
+ * @return array{titre:string,texte:string,url:string,libelle:string}
+ */
+function urbizen_child_cta_guide( $id ) {
+	$repli = array(
+		'titre'   => 'Un projet en tête ?',
+		'texte'   => 'Urbizen prépare votre dossier d’urbanisme à distance, pièce par pièce, et vous le remet prêt à déposer en mairie.',
+		'url'     => home_url( '/tarifs/' ),
+		'libelle' => 'Voir les tarifs',
+	);
+
+	$par_categorie = array(
+		'autorisations-projets' => array(
+			'titre'   => 'Votre projet relève-t-il d’une déclaration préalable ?',
+			'texte'   => 'Piscine, extension, abri, clôture, panneaux solaires : Urbizen prépare le dossier complet et vous le remet prêt à déposer.',
+			'url'     => home_url( '/declarations-prealables/' ),
+			'libelle' => 'La déclaration préalable',
+		),
+		'regles-urbanisme'      => array(
+			'titre'   => 'Un doute sur ce que votre terrain autorise ?',
+			'texte'   => 'PLU, emprise au sol, surface de plancher, secteur protégé : Urbizen vérifie les règles applicables avant de dessiner quoi que ce soit.',
+			'url'     => home_url( '/conception/' ),
+			'libelle' => 'La conception de plans',
+		),
+		'conseils-demarches'    => array(
+			'titre'   => 'Faites préparer votre dossier',
+			'texte'   => 'Un dossier complet du premier coup, c’est un mois gagné. Urbizen le monte pour vous, du plan de masse à l’insertion.',
+			'url'     => home_url( '/tarifs/' ),
+			'libelle' => 'Voir les tarifs',
+		),
+	);
+
+	foreach ( (array) get_the_category( $id ) as $terme ) {
+		if ( isset( $par_categorie[ $terme->slug ] ) ) {
+			return $par_categorie[ $terme->slug ];
+		}
+	}
+
+	return $repli;
+}
 
 /**
  * Ajoute une classe au corps de page sur le gabarit de l'accueil.
@@ -1420,6 +1571,57 @@ function urbizen_child_noindex_archives_vides( $attributs ) {
 	return $attributs;
 }
 add_filter( 'aioseo_robots_meta', 'urbizen_child_noindex_archives_vides', 20 );
+
+/**
+ * Catégories de guides tenues hors de l'index tant qu'elles sont maigres.
+ *
+ * La règle ci-dessus s'efface d'elle-même au premier article publié — c'est ce
+ * qui la rend juste pour une rubrique en attente. Mais la propriétaire a
+ * demandé que les trois catégories du lot G restent `noindex` **même une fois
+ * remplies**, le temps de juger si elles apportent quelque chose. Trois pages
+ * d'archive à deux articles n'ont rien à dire qu'un moteur veuille classer, et
+ * elles se placeraient en travers des guides eux-mêmes.
+ *
+ * D'où une seconde règle, nominative et volontairement temporaire. Elle porte
+ * les slugs plutôt que les identifiants : ceux-ci n'existent pas encore, les
+ * catégories n'étant pas créées. Le jour où l'indexation sera rouverte, il
+ * suffira de vider `URBIZEN_CHILD_CATEGORIES_GUIDES` — et le filtre précédent
+ * reprendra la main, qui ne désindexe que ce qui est vide.
+ *
+ * `follow` reste acquis : les guides listés doivent continuer d'être suivis.
+ */
+const URBIZEN_CHILD_CATEGORIES_GUIDES = array(
+	'autorisations-projets',
+	'regles-urbanisme',
+	'conseils-demarches',
+);
+
+/**
+ * Ajoute `noindex` aux archives des catégories de guides.
+ *
+ * @param array<string, string> $attributs Directives calculées par AIOSEO.
+ * @return array<string, string>
+ */
+function urbizen_child_noindex_categories_guides( $attributs ) {
+	if ( is_admin() || ! is_category() ) {
+		return $attributs;
+	}
+
+	$terme = get_queried_object();
+
+	if ( ! ( $terme instanceof WP_Term ) ) {
+		return $attributs;
+	}
+
+	if ( ! in_array( $terme->slug, URBIZEN_CHILD_CATEGORIES_GUIDES, true ) ) {
+		return $attributs;
+	}
+
+	$attributs['noindex'] = 'noindex';
+
+	return $attributs;
+}
+add_filter( 'aioseo_robots_meta', 'urbizen_child_noindex_categories_guides', 21 );
 
 /* -------------------------------------------------------------------------
  * DONNÉES STRUCTURÉES — CORRECTIONS DU GRAPHE AIOSEO

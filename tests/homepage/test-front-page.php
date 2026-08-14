@@ -160,7 +160,25 @@ function get_stylesheet_uri() { return get_stylesheet_directory_uri() . '/style.
 function load_child_theme_textdomain( $domain, $path ) { return true; }
 function wp_json_file_decode( $fichier, $args = array() ) { return json_decode( file_get_contents( $fichier ), true ); }
 function is_front_page() { return $GLOBALS['urbizen_front']; }
-function is_singular( $t = '' ) { return $GLOBALS['urbizen_singular']; }
+
+/*
+ * Marqueurs de contexte ajoutés le 14 août 2026 avec les gabarits de guides :
+ * `urbizen_child_est_page_guides()` les interroge, et un banc qui ne les
+ * double pas s'arrête sur une erreur fatale. Tous à faux : ce banc ne mesure
+ * que l'accueil et les pages internes.
+ */
+function is_admin() { return false; }
+function is_home() { return $GLOBALS['urbizen_home'] ?? false; }
+function is_category() { return $GLOBALS['urbizen_category'] ?? false; }
+function is_tag() { return false; }
+function is_date() { return false; }
+// Le type demandé compte : `is_singular( 'post' )` ne doit pas répondre vrai
+// sur une PAGE interne, sans quoi le contexte « guides » serait reconnu
+// partout et la feuille des guides chargée sur les pages commerciales.
+function is_singular( $t = '' ) {
+	if ( 'post' === $t ) { return $GLOBALS['urbizen_post'] ?? false; }
+	return $GLOBALS['urbizen_singular'];
+}
 function get_queried_object_id() { return $GLOBALS['urbizen_singular'] ? 4 : 0; }
 function get_page_template_slug( $id = 0 ) { return $GLOBALS['urbizen_slug']; }
 function wp_enqueue_style( $handle, $src = '', $deps = array(), $ver = false ) { $GLOBALS['urbizen_styles'][] = $handle; }
