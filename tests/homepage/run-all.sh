@@ -85,6 +85,10 @@ titre "9/12 — Explorateur de dossier et parcours en quatre étapes"
 "$PHP_BIN" test-explorateur-dossier.php
 verdict $? "test-explorateur-dossier.php"
 
+titre "Accompagnement humain — image d'ambiance non trompeuse"
+"$PHP_BIN" test-accompagnement-humain.php
+verdict $? "test-accompagnement-humain.php"
+
 titre "10/12 — Contrat du parcours « Écrire à Urbizen »"
 "$PHP_BIN" test-contrat-renseignements.php
 verdict $? "test-contrat-renseignements.php"
@@ -143,7 +147,7 @@ if [ "${prerequis_absents:-0}" -eq 1 ] && [ "$echecs" -eq 0 ]; then
 	exit 2
 fi
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 14 bancs passent.\033[0m\n'
+	printf '\033[32mLes 15 bancs passent.\033[0m\n'
 	exit 0
 fi
 
