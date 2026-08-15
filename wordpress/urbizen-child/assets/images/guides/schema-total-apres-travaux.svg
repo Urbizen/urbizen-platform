@@ -32,7 +32,9 @@
   <text x="276" y="158" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">existant 118 m²</text>
   <rect x="512" y="132" width="88" height="42" rx="3" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
   <text x="556" y="158" text-anchor="middle" fill="#0E6E48" font-size="13" font-weight="600">+22</text>
-  <text x="612" y="158" fill="#14233B" font-size="14" font-weight="600">= 140 m²</text>
+  <!-- Aligné sur les deux autres totaux, à 712 : posé à 612, il était traversé
+       par le trait du seuil, qui passe à 640. -->
+  <text x="712" y="158" fill="#14233B" font-size="14" font-weight="600">= 140 m²</text>
   <text x="40" y="194" fill="#0E6E48" font-size="13">Sous le seuil — déclaration préalable, sans architecte obligatoire.</text>
 
   <!-- ============ CAS 2 ============ -->
