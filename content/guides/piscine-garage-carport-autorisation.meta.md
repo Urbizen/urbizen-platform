@@ -57,13 +57,55 @@ besoin.
 
 ## Liens restant à poser
 
-- **Vers le guide 2** — prévu depuis « Le garage qui fait basculer la maison
-  au-delà de 150 m² ». Retiré à la rédaction : l'article n'existe pas encore, et
-  un lien mort dans un guide sur la rigueur documentaire serait mal venu. À
-  ajouter le jour de la publication du guide 2.
 - **Depuis les pages DP et PC vers ce guide** — deux ancres prévues, sur la
   phrase de la dalle sous auvent et sur la ligne « Piscine » du tableau. À poser
   après publication, dans le lot commercial dédié.
+
+## Mise à jour du 15 août 2026 — lot `feat/guides-urbizen-complets`
+
+Deux modifications, et deux seulement. Le reste de l'article est inchangé.
+
+### 1 · Le lien réciproque vers le guide Extension est posé
+
+Il était prévu au plan depuis « Le garage qui fait basculer la maison au-delà de
+150 m² », et avait été retiré à la rédaction parce que l'article cible n'existait
+pas encore. `/guides/extension-maison-verifications-avant-plans/` est publié dans
+ce lot : le lien est en place, en fin de section, et le guide 4 renvoie ici
+depuis sa section sur le métré. Les deux liens se répondent sans se dupliquer.
+
+Un second lien a été ajouté dans « Les pièces à réunir », vers
+`/guides/erreurs-dossier-urbanisme/` : c'est là que le lecteur qui vient de lire
+la liste des pièces cherche à savoir ce qui fait revenir la mairie.
+
+### 2 · La liste des pièces de la déclaration préalable est corrigée
+
+**Erreur réglementaire objectivement constatée.** L'article écrivait :
+
+> « Une déclaration préalable s'appuie sur un plan de situation, un plan de masse
+> coté dans les trois dimensions, un plan de coupe du terrain, et selon le projet
+> un plan des façades, un document graphique d'insertion et deux
+> photographies. »
+
+Le **plan en coupe** y figurait parmi les pièces systématiques. Il ne l'est pas :
+la liste de base de l'article R.431-36 comporte a) le plan de situation, b) le
+plan de masse coté dans les trois dimensions, c) la représentation de l'aspect
+extérieur, d) le justificatif aviation civile le cas échéant. Le plan en coupe
+relève de R.431-10 b), auquel R.431-36 renvoie « s'il y a lieu ».
+
+Deux éléments s'ajoutent, découverts à la vérification du 15 août 2026 :
+
+- R.431-36 est **en vigueur dans une nouvelle version depuis le 1er juillet
+  2026**, issue du décret n° 2026-291 du 17 avril 2026. L'article n'en tenait pas
+  compte, ayant été rédigé le 14 août sans que ce point ait été contrôlé ;
+- cette version exige le **document d'insertion et les photographies** pour les
+  projets **visibles depuis l'espace public**, en plus des secteurs protégés — et
+  se clôt sur « aucune autre information ou pièce ne peut être exigée par
+  l'autorité compétente », garantie utile au lecteur et absente de l'article.
+
+Le paragraphe a été réécrit sur cette base, et R.431-36 ajouté aux sources avec
+la mention de la date de mise à jour.
+
+Détail complet dans `docs/VERIFICATION_REGLEMENTAIRE_GUIDES_03-07.md`, § 0.
 
 ## Schémas
 
