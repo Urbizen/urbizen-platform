@@ -88,7 +88,16 @@ foreach ( $sources as $nom => $chemin ) {
 		1 === substr_count( $h, 'class="hero hero-v7"' )
 		&& str_contains( $h, 'id="accueil"' )
 		&& str_contains( $h, 'aria-labelledby="hero-title"' )
-		&& str_contains( $h, 'id="hero-title"' ) );
+		&& str_contains( $h, '<h1 id="hero-title">Déclaration de travaux&nbsp;: <em>du projet au dossier prêt à déposer.</em></h1>' ) );
+
+	// L'accroche validée ne réduit pas l'offre aux quatre exemples visibles
+	// dans le formulaire : elle couvre aussi la construction neuve et les
+	// aménagements extérieurs. Le titre reste propre à Urbizen.
+	check( "[$nom] l'accroche couvre l'ensemble des déclarations de travaux",
+		str_contains( $h, 'Construction neuve, extension, modification de l’existant ou aménagement extérieur' )
+		&& str_contains( $h, 'devis estimatif' )
+		&& str_contains( $h, 'règles d’urbanisme' )
+		&& ! str_contains( $h, 'sans complication' ) );
 
 	// Le texte d'abord, l'illustration ensuite : empilés sur mobile, on lit le
 	// titre avant de voir la planche.
@@ -119,9 +128,9 @@ foreach ( $sources as $nom => $chemin ) {
 	// un lecteur d'écran, et l'illustration porte du sens.
 	check( "[$nom] la planche est décrite pour les lecteurs d'écran",
 		str_contains( $p, 'role="img"' )
-		&& str_contains( $p, 'aria-label="Exemples animés de quatre pièces' )
+		&& str_contains( $p, 'aria-label="Exemples de plans et de pièces graphiques préparés par Urbizen"' )
 		&& str_contains( $p, 'class="board-tag"' )
-		&& str_contains( $p, '>Illustration des pièces<' ) );
+		&& str_contains( $p, '>Ce que nous préparons<' ) );
 
 	check( "[$nom] le SVG intérieur est masqué aux lecteurs d'écran",
 		str_contains( $p, 'aria-hidden="true"' ) );

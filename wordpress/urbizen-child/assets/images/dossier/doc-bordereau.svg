@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 560" width="760" height="560"
+     role="img" aria-labelledby="t-bordereau d-bordereau" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="t-bordereau">Bordereau des pièces</title>
+  <desc id="d-bordereau">Extrait schématique d'un bordereau : une ligne par pièce, avec sa référence, son intitulé et une coche verte. La dernière ligne porte la mention « selon projet ». Aucune donnée réelle.</desc>
+  <rect width="760" height="560" fill="#EAEEF2"/>
+  <rect x="70" y="26" width="620" height="508" fill="#FBFCFD" stroke="#C9D3DD" stroke-width="1"
+        rx="2"/>
+  <text x="104" y="76" fill="#14233B" font-size="15" font-weight="600">Bordereau des pièces jointes</text>
+  <text x="104" y="98" fill="#55617A" font-size="11.5">Récapitulatif de ce que contient le dossier remis</text>
+  <rect x="104" y="120" width="552" height="32" fill="#fff" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="140" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP1</text>
+  <text x="176" y="140" fill="#14233B" font-size="12">Plan de situation</text>
+  <path d="M624 134 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="160" width="552" height="32" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="180" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP2</text>
+  <text x="176" y="180" fill="#14233B" font-size="12">Plan de masse</text>
+  <path d="M624 174 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="200" width="552" height="32" fill="#fff" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="220" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP3</text>
+  <text x="176" y="220" fill="#14233B" font-size="12">Plan en coupe</text>
+  <path d="M624 214 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="240" width="552" height="32" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="260" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP4</text>
+  <text x="176" y="260" fill="#14233B" font-size="12">Plan des façades et toitures</text>
+  <path d="M624 254 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="280" width="552" height="32" fill="#fff" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="300" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP6</text>
+  <text x="176" y="300" fill="#14233B" font-size="12">Insertion graphique</text>
+  <path d="M624 294 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="320" width="552" height="32" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="340" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP7</text>
+  <text x="176" y="340" fill="#14233B" font-size="12">Photographie — environnement proche</text>
+  <path d="M624 334 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="360" width="552" height="32" fill="#fff" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="380" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5">DP8</text>
+  <text x="176" y="380" fill="#14233B" font-size="12">Photographie — paysage lointain</text>
+  <path d="M624 374 l5 6 l10 -12" stroke="#128A5A" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="104" y="400" width="552" height="32" fill="#EAEEF2" stroke="#C9D3DD" stroke-width=".7"/>
+  <text x="118" y="420" fill="#8791A6" font-family="IBM Plex Mono, monospace" font-size="10.5">DP11</text>
+  <text x="176" y="420" fill="#8791A6" font-size="12">Pièce complémentaire éventuelle</text>
+  <text x="632" y="420" fill="#8791A6" font-size="11">selon projet</text>
+  <text x="104" y="500" fill="#55617A" font-size="11">Le contenu exact dépend de la nature du projet et des règles applicables.</text>
+  <g transform="translate(70,516)">
+    <text x="0" y="12" fill="#128A5A" font-family="IBM Plex Mono, monospace" font-size="10.5" letter-spacing="1.2">BORDEREAU</text>
+    <text x="620" y="12" text-anchor="end" fill="#8791A6" font-family="IBM Plex Mono, monospace" font-size="9.5">EXEMPLE URBIZEN</text><text x="620" y="26" text-anchor="end" fill="#8791A6" font-size="10.5">Illustration — projet fictif</text>
+  </g>
+</svg>

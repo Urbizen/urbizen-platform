@@ -49,39 +49,47 @@ command -v "$PY_BIN" >/dev/null 2>&1 || {
 # L'ordre va du plus structurel au plus fin : la fidélité du portage d'abord,
 # puis chaque section. Un échec de fidélité explique souvent les suivants.
 
-titre "1/11 — Fidélité du portage WordPress"
+titre "1/12 — Fidélité du portage WordPress"
 "$PHP_BIN" test-fidelite.php
 verdict $? "test-fidelite.php"
 
-titre "2/11 — En-tête et centre de contact"
+titre "2/12 — En-tête et centre de contact"
 "$PHP_BIN" test-entete.php
 verdict $? "test-entete.php"
 
-titre "3/11 — Menu principal : composition, page courante, lisibilité"
+titre "3/12 — Menu principal : composition, page courante, lisibilité"
 "$PHP_BIN" test-navigation.php
 verdict $? "test-navigation.php"
 
-titre "4/11 — Cibles tactiles de l'en-tête mobile (cascade CSS)"
+titre "4/12 — Cibles tactiles de l'en-tête mobile (cascade CSS)"
 "$PHP_BIN" test-cibles-tactiles.php
 verdict $? "test-cibles-tactiles.php"
 
-titre "5/11 — Planche du hero et sa séquence d'animation"
+titre "5/12 — Planche du hero et sa séquence d'animation"
 "$PHP_BIN" test-hero.php
 verdict $? "test-hero.php"
 
-titre "6/11 — Section « Nos services » : prestations et contenu du dossier"
+titre "6/12 — Section « Nos services » : prestations et contenu du dossier"
 "$PHP_BIN" test-services.php
 verdict $? "test-services.php"
 
-titre "7/11 — Icônes et cartes de type de projet"
+titre "7/12 — Icônes et cartes de type de projet"
 "$PHP_BIN" test-icones-projet.php
 verdict $? "test-icones-projet.php"
 
-titre "8/11 — Gabarit front-page et sa parité"
+titre "8/12 — Gabarit front-page et sa parité"
 "$PHP_BIN" test-front-page.php
 verdict $? "test-front-page.php"
 
-titre "9/11 — Contrat du parcours « Écrire à Urbizen »"
+titre "9/12 — Explorateur de dossier et parcours en quatre étapes"
+"$PHP_BIN" test-explorateur-dossier.php
+verdict $? "test-explorateur-dossier.php"
+
+titre "Accompagnement humain — image d'ambiance non trompeuse"
+"$PHP_BIN" test-accompagnement-humain.php
+verdict $? "test-accompagnement-humain.php"
+
+titre "10/12 — Contrat du parcours « Écrire à Urbizen »"
 "$PHP_BIN" test-contrat-renseignements.php
 verdict $? "test-contrat-renseignements.php"
 
@@ -139,7 +147,7 @@ if [ "${prerequis_absents:-0}" -eq 1 ] && [ "$echecs" -eq 0 ]; then
 	exit 2
 fi
 if [ "$echecs" -eq 0 ]; then
-	printf '\033[32mLes 13 bancs passent.\033[0m\n'
+	printf '\033[32mLes 15 bancs passent.\033[0m\n'
 	exit 0
 fi
 

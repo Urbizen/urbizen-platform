@@ -43,7 +43,7 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--u-mint); display: inline-block; }
 .urbizen-accueil .eyebrow-highlight { gap: 10px; font-size: 13px; font-weight: 400; letter-spacing: .14em; }
 .urbizen-accueil .eyebrow-highlight::before { width: 28px; background: var(--u-brand); }
-.urbizen-accueil .eyebrow-highlight-text { padding: 2px 6px; background: var(--u-mint-pale); white-space: nowrap; }
+.urbizen-accueil .eyebrow-highlight-text { padding: 2px 6px; background: var(--u-mint-pale, #EAF8F1); white-space: nowrap; }
 @media (max-width: 560px) {
   .urbizen-accueil .eyebrow-highlight { font-size: 11px; letter-spacing: .1em; }
   .urbizen-accueil .eyebrow-highlight::before { width: 18px; }
@@ -560,12 +560,12 @@ html { scroll-behavior: smooth; }
 
 /* ===========================================================================
    SÉQUENCE DÉFINITIVE DES FONDS (recalage validé)
-   Quadrillage = jeton commun `--u-grid-bg` (var(--u-grid) #DCE3EA sur
-   var(--u-paper) #EAEEF2, 28×28 px, 1 px) — INCHANGÉ ; jamais #C2D0DE ; aucun
+   Quadrillage = jeton commun `--u-grid-bg` (var(--u-grid) #E9EDF1 sur
+   var(--u-paper) #FBFCFD, 28×28 px, 1 px) ; aucun
    fond quadrillé imposé au wrapper global `.urbizen-accueil`.
-   Ordre haut→bas : hero GRID · réassurance BLEU NUIT · méthode UNI ·
-   localisation UNI · projets GRID · dossier GRID · services UNI ·
-   pourquoi GRID · exemples UNI · FAQ GRID · CTA UNI. */
+   Ordre haut→bas : hero GRID · réassurance BLEU NUIT · méthode GRID ·
+   accompagnement UNI · localisation GRID · projets UNI · services GRID ·
+   dossier UNI · pourquoi GRID · blog UNI · CTA GRID. */
 /* Sections QUADRILLÉES (trame claire de la charte). */
 .urbizen-accueil .hero { background: var(--u-grid-bg); }
 .urbizen-accueil .projet { background: var(--u-surface-2); }
@@ -576,7 +576,7 @@ html { scroll-behavior: smooth; }
    sur ces sections — c'est le contraste carreaux (grille) ↔ aplat (surface-2)
    qui marque la rupture, exactement comme dans la version d'origine. On évite
    ainsi les traits surnuméraires qui alourdissaient la page. */
-.urbizen-accueil .methode { background: var(--u-surface-2); }
+.urbizen-accueil .methode { background: var(--u-grid-bg); }
 .urbizen-accueil .prestations { background: var(--u-surface-2); }
 .urbizen-accueil .exemples { background: var(--u-surface-2); }
 .urbizen-accueil .cta-final { background: var(--u-grid-bg); }
@@ -764,11 +764,11 @@ html { scroll-behavior: smooth; }
 /* --- Alternance des fonds : PLUS de grandes zones blanches ------------------
    Fond principal = quadrillage clair (identité Urbizen), cartes blanches.
    hero GRID · trust NAVY · services GRID · lieu NAVY · projet GRID ·
-   méthode GRIS uni · dossier GRID · exemples GRIS uni · tarifs GRID ·
+   méthode GRID · dossier GRID · exemples GRIS uni · tarifs GRID ·
    pourquoi GRIS uni · FAQ GRID · CTA GRIS. Jamais deux grilles claires de suite. */
 .urbizen-accueil .prestations { background: var(--u-grid-bg); }
 .urbizen-accueil .projet { background: var(--u-surface-2); }
-.urbizen-accueil .methode { background: var(--u-surface-2); }
+.urbizen-accueil .methode { background: var(--u-grid-bg); }
 .urbizen-accueil .dossier { background: var(--u-grid-bg); }
 .urbizen-accueil .exemples { background: var(--u-surface-2); }
 .urbizen-accueil .tarifs-wrap { background: var(--u-grid-bg); }
@@ -1168,6 +1168,7 @@ html { scroll-behavior: smooth; }
     padding-bottom: 14px;
   }
 }
+
 @media (max-width: 560px) {
   .urbizen-accueil .hero-v7 .hero-main { padding-top: 40px; padding-bottom: 36px; gap: 36px; }
   .urbizen-accueil .hero-v7 h1 { font-size: clamp(37px, 11vw, 48px); }
@@ -1599,4 +1600,748 @@ html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) {
   .urbizen-accueil .blog-preview-card:has(.guide-lien) { transition: none; }
   .urbizen-accueil .blog-preview-card:has(.guide-lien):hover { transform: none; }
+}
+
+/* ===========================================================================
+   EXPLORATEUR DE DOSSIER — « Contenu de votre dossier »
+   ----------------------------------------------------------------------------
+   Deux niveaux d'onglets imbriqués : la famille de pièces en haut (horizontal),
+   la pièce elle-même à droite (vertical). Les deux sont de vrais `tablist`
+   ARIA, pas des boutons déguisés : le clavier y circule aux flèches, et un
+   lecteur d'écran annonce « onglet 2 sur 3 » comme il le doit.
+   ======================================================================== */
+.urbizen-accueil .dossier-explorer { background: var(--u-surface-2); }
+.urbizen-accueil .dossier-explorer .sec-head { max-width: 720px; }
+
+.urbizen-accueil .dx { margin-top: clamp(26px, 3.4vw, 40px); }
+
+/* --- niveau 1 : les familles ------------------------------------------- */
+.urbizen-accueil .dx-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.urbizen-accueil .dx-tab {
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1px solid var(--u-line);
+  border-radius: 999px;
+  background: var(--u-surface);
+  color: var(--u-ink-soft);
+  font: inherit; font-size: 14.5px; font-weight: 600;
+  cursor: pointer;
+  transition: color .15s, background-color .15s, border-color .15s;
+}
+.urbizen-accueil .dx-tab:hover { color: var(--u-ink); border-color: var(--u-line-strong); }
+.urbizen-accueil .dx-tab[aria-selected="true"] {
+  background: var(--u-ink);
+  border-color: var(--u-ink);
+  color: #fff;
+}
+.urbizen-accueil .dx-tab:focus-visible { outline: 2px solid var(--u-brand); outline-offset: 3px; }
+
+/* --- le panneau principal ---------------------------------------------- */
+.urbizen-accueil .dx-panel {
+  margin-top: 14px;
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  background: var(--u-surface);
+  box-shadow: var(--u-shadow-card);
+}
+.urbizen-accueil .dx-panel[hidden] { display: none; }
+.urbizen-accueil .dx-panel:focus-visible { outline: 2px solid var(--u-brand); outline-offset: 3px; }
+
+/* Trois colonnes : l'explication, le document, la navigation. La vue occupe
+   les deux premières ; la navigation tient la troisième sur toute la hauteur. */
+.urbizen-accueil .dx-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 300px) minmax(0, 1fr) minmax(0, 268px);
+  align-items: stretch;
+}
+.urbizen-accueil .dx-vue { display: contents; }
+.urbizen-accueil .dx-vue[hidden] { display: none; }
+
+/* --- colonne 1 : l'explication ----------------------------------------- */
+.urbizen-accueil .dx-info {
+  grid-column: 1;
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 12px;
+  padding: clamp(22px, 2.4vw, 30px);
+  border-right: 1px solid var(--u-line);
+}
+.urbizen-accueil .dx-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--u-brand-sf);
+  color: var(--u-brand-dk);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px; letter-spacing: .09em;
+}
+.urbizen-accueil .dx-info h3 { font-size: clamp(19px, 1.9vw, 23px); font-weight: 600; line-height: 1.24; color: var(--u-ink); }
+.urbizen-accueil .dx-info > p { color: var(--u-ink-soft); font-size: 14.8px; line-height: 1.6; }
+.urbizen-accueil .dx-points { display: grid; gap: 9px; margin-top: 2px; }
+.urbizen-accueil .dx-points li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--u-ink);
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.urbizen-accueil .dx-points li::before {
+  content: "";
+  position: absolute; left: 0; top: 3px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: var(--u-brand-sf);
+}
+.urbizen-accueil .dx-points li::after {
+  content: "";
+  position: absolute; left: 4.5px; top: 8px;
+  width: 7px; height: 3.5px;
+  border-left: 2px solid var(--u-brand-dk);
+  border-bottom: 2px solid var(--u-brand-dk);
+  transform: rotate(-45deg);
+}
+.urbizen-accueil .dx-encart {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-left: 3px solid var(--u-line-strong);
+  border-radius: 0 8px 8px 0;
+  background: var(--u-surface-2);
+  color: var(--u-ink-soft);
+  font-size: 13.5px; line-height: 1.55;
+}
+
+/* --- colonne 2 : le document ------------------------------------------- */
+.urbizen-accueil .dx-doc {
+  grid-column: 2;
+  margin: 0;
+  display: flex; flex-direction: column;
+  padding: clamp(18px, 2vw, 26px);
+  background: var(--u-paper);
+}
+.urbizen-accueil .dx-zoom {
+  display: block; position: relative;
+  padding: 0; border: 1px solid var(--u-line); border-radius: 10px;
+  background: var(--u-surface);
+  cursor: zoom-in;
+  /* le badge d'agrandissement se pose sous la planche : ne pas le rogner.
+     Le rayon passe donc sur l'image elle-même. */
+  overflow: visible;
+  transition: border-color .15s, box-shadow .15s;
+}
+.urbizen-accueil .dx-zoom:hover { border-color: var(--u-line-strong); box-shadow: 0 18px 36px -28px rgba(20,35,59,.5); }
+.urbizen-accueil .dx-zoom:focus-visible { outline: 2px solid var(--u-brand); outline-offset: 3px; }
+/* Le document garde ses proportions : c'est une pièce de dossier, pas une
+   image d'ambiance qu'on recadre. */
+.urbizen-accueil .dx-zoom img { display: block; width: 100%; height: auto; border-radius: 9px; }
+.urbizen-accueil .dx-zoom-ico {
+  position: absolute; right: 0; top: 100%; margin-top: 12px;
+  display: inline-grid; grid-auto-flow: column; align-items: center; gap: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: var(--u-ink);
+  color: #fff;
+  font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+}
+.urbizen-accueil .dx-zoom-ico svg { width: 14px; height: 14px; }
+.urbizen-accueil .dx-doc figcaption {
+  margin-top: 12px;
+  /* la légende laisse sa droite au bouton d'agrandissement */
+  padding-right: 108px;
+  color: var(--u-ink-faint);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* --- colonne 3 : la navigation des pièces ------------------------------- */
+.urbizen-accueil .dx-nav {
+  grid-column: 3; grid-row: 1;
+  display: flex; flex-direction: column;
+  border-left: 1px solid var(--u-line);
+}
+.urbizen-accueil .dx-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "n t" "n c";
+  align-items: center;
+  gap: 2px 12px;
+  padding: 16px 18px;
+  border: 0; border-bottom: 1px solid var(--u-line);
+  border-left: 3px solid transparent;
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.urbizen-accueil .dx-item:last-child { border-bottom: 0; }
+.urbizen-accueil .dx-item:hover { background: var(--u-surface-2); }
+.urbizen-accueil .dx-item[aria-selected="true"] {
+  background: var(--u-brand-sf);
+  border-left-color: var(--u-brand);
+}
+.urbizen-accueil .dx-item:focus-visible { outline: 2px solid var(--u-brand); outline-offset: -3px; }
+.urbizen-accueil .dx-item-n {
+  grid-area: n;
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono);
+  font-size: 13px;
+}
+.urbizen-accueil .dx-item[aria-selected="true"] .dx-item-n { color: var(--u-brand-dk); }
+.urbizen-accueil .dx-item-t { grid-area: t; color: var(--u-ink); font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+.urbizen-accueil .dx-item-c { grid-area: c; color: var(--u-ink-faint); font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: .07em; }
+.urbizen-accueil .dx-item[aria-selected="true"] .dx-item-c { color: var(--u-brand-dk); }
+
+.urbizen-accueil .dx-note {
+  margin-top: 16px;
+  color: var(--u-ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+/* --- la loupe ------------------------------------------------------------ */
+.urbizen-accueil .dx-lightbox {
+  position: fixed; inset: 0; z-index: 1200;
+  display: grid; place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: rgba(20, 35, 59, .88);
+}
+.urbizen-accueil .dx-lightbox[hidden] { display: none; }
+.urbizen-accueil .dx-lightbox img {
+  max-width: 100%; max-height: 86vh;
+  border-radius: 10px;
+  background: var(--u-surface);
+  box-shadow: 0 40px 90px -40px rgba(0, 0, 0, .8);
+}
+.urbizen-accueil .dx-lightbox-fermer {
+  position: absolute; top: 18px; right: 18px;
+  display: grid; place-items: center;
+  width: 44px; height: 44px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .1);
+  color: #fff;
+  cursor: pointer;
+}
+.urbizen-accueil .dx-lightbox-fermer:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.urbizen-accueil .dx-lightbox-fermer svg { width: 20px; height: 20px; }
+
+@media (max-width: 1080px) {
+  /* Le document passe au-dessus, la navigation devient une barre horizontale :
+     à cette largeur, trois colonnes rendraient chacune illisible. */
+.urbizen-accueil .dx-grid { grid-template-columns: 1fr; }
+  .urbizen-accueil .dx-info { grid-column: 1; border-right: 0; border-bottom: 1px solid var(--u-line); order: 2; }
+  .urbizen-accueil .dx-doc { grid-column: 1; order: 3; }
+  .urbizen-accueil .dx-nav {
+    grid-column: 1; grid-row: auto; order: 1;
+    flex-direction: row; overflow-x: auto;
+    border-left: 0; border-bottom: 1px solid var(--u-line);
+  }
+  .urbizen-accueil .dx-item {
+    flex: 0 0 auto;
+    grid-template-areas: "n t" "n c";
+    min-width: 190px;
+    border-bottom: 0; border-left: 0; border-top: 3px solid transparent;
+  }
+  .urbizen-accueil .dx-item[aria-selected="true"] { border-left-color: transparent; border-top-color: var(--u-brand); }
+  .urbizen-accueil .dx-vue { display: contents; }
+}
+@media (max-width: 560px) {
+  .urbizen-accueil .dx-tabs { gap: 6px; }
+  .urbizen-accueil .dx-tab { min-height: 44px; padding: 0 14px; font-size: 13.5px; }
+  .urbizen-accueil .dx-item { min-width: 168px; padding: 13px 14px; }
+}
+
+/* ===========================================================================
+   LES QUATRE ÉTAPES — « Comment ça marche »
+   ----------------------------------------------------------------------------
+   Même mécanique ARIA que l'explorateur : un `tablist` vertical à gauche, un
+   panneau par étape. Sur mobile, la colonne de navigation passe au-dessus en
+   bande défilante plutôt que de rétrécir jusqu'à l'illisible.
+   ======================================================================== */
+.urbizen-accueil .methode .sec-head { max-width: none; }
+
+.urbizen-accueil .etapes {
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  gap: 0;
+  margin-top: clamp(26px, 3.4vw, 40px);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  background: var(--u-surface);
+  box-shadow: var(--u-shadow-card);
+  overflow: hidden;
+}
+.urbizen-accueil .etapes-nav {
+  grid-column: 1; grid-row: 1 / span 2;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--u-line);
+  background: var(--u-surface-2);
+}
+.urbizen-accueil .etape-lien {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px;
+  border: 0; border-bottom: 1px solid var(--u-line);
+  border-left: 3px solid transparent;
+  background: none; text-align: left; font: inherit;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.urbizen-accueil .etape-lien:hover { background: var(--u-surface); }
+.urbizen-accueil .etape-lien[aria-selected="true"] {
+  background: var(--u-surface);
+  border-left-color: var(--u-brand);
+}
+.urbizen-accueil .etape-lien:focus-visible { outline: 2px solid var(--u-brand); outline-offset: -3px; }
+.urbizen-accueil .etape-n {
+  display: grid; place-items: center;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--u-paper);
+  color: var(--u-ink-faint);
+  font-family: var(--u-font-mono); font-size: 13px;
+  transition: background-color .15s, color .15s;
+}
+.urbizen-accueil .etape-lien[aria-selected="true"] .etape-n { background: var(--u-ink); color: #fff; }
+.urbizen-accueil .etape-court { color: var(--u-ink); font-size: 15px; font-weight: 600; line-height: 1.3; }
+
+.urbizen-accueil .etape-panel {
+  grid-column: 2; grid-row: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
+}
+.urbizen-accueil .etape-panel-sans-visuel { grid-template-columns: minmax(0, 1fr); }
+.urbizen-accueil .etape-panel[hidden] { display: none; }
+.urbizen-accueil .etape-panel:focus-visible { outline: 2px solid var(--u-brand); outline-offset: -3px; }
+.urbizen-accueil .etape-corps { padding: clamp(24px, 2.8vw, 36px); }
+.urbizen-accueil .etape-rang {
+  display: inline-block;
+  color: var(--u-brand-dk);
+  font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.urbizen-accueil .etape-corps h3 {
+  margin-top: 10px;
+  color: var(--u-ink);
+  font-size: clamp(21px, 2.2vw, 26px); font-weight: 600; line-height: 1.24;
+}
+.urbizen-accueil .etape-corps > p { margin-top: 12px; color: var(--u-ink-soft); font-size: 15.5px; line-height: 1.62; }
+
+/* Le bloc de délai. Fort, mais pas promotionnel : fond encre, chiffre en
+   grand, et une note qui empêche de le confondre avec le délai d'instruction —
+   c'est le seul endroit du site où cette confusion serait coûteuse. */
+.urbizen-accueil .etape-delai {
+  display: flex; align-items: center; gap: clamp(16px, 2vw, 26px);
+  margin-top: 22px;
+  padding: clamp(18px, 2vw, 24px);
+  border-radius: 12px;
+  background: var(--u-ink);
+  color: #fff;
+}
+.urbizen-accueil .etape-delai-chiffre {
+  flex: none;
+  display: flex; align-items: baseline; gap: 6px;
+  color: #fff;
+  font-family: var(--u-font-title);
+  font-size: 15px; font-weight: 600; letter-spacing: .02em;
+  text-transform: uppercase;
+}
+.urbizen-accueil .etape-delai-chiffre span {
+  font-size: clamp(46px, 5vw, 60px);
+  line-height: 1;
+  letter-spacing: -.02em;
+}
+.urbizen-accueil .etape-delai-txt { min-width: 0; }
+.urbizen-accueil .etape-delai-t {
+  color: var(--u-mint, #6BD6A6);
+  font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.urbizen-accueil .etape-delai-txt p + p, .urbizen-accueil .etape-delai-txt p:last-child { margin-top: 6px; }
+.urbizen-accueil .etape-delai-txt p:last-child { color: rgba(255, 255, 255, .86); font-size: 14.5px; line-height: 1.55; }
+.urbizen-accueil .etape-delai-note {
+  margin-top: 10px;
+  color: var(--u-ink-faint);
+  font-size: 13px; line-height: 1.55;
+}
+
+.urbizen-accueil .etape-retenir {
+  display: grid; gap: 4px;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--u-brand);
+  border-radius: 0 10px 10px 0;
+  background: var(--u-brand-sf);
+  color: var(--u-ink);
+  font-size: 14.5px; line-height: 1.55;
+}
+.urbizen-accueil .etape-retenir span {
+  color: var(--u-brand-dk);
+  font-family: var(--u-font-mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.urbizen-accueil .etape-visuel {
+  margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: clamp(18px, 2vw, 26px);
+  border-left: 1px solid var(--u-line);
+  background: var(--u-paper);
+}
+.urbizen-accueil .etape-visuel img {
+  width: 100%; height: auto;
+  border: 1px solid var(--u-line);
+  border-radius: 10px;
+  background: var(--u-surface);
+}
+
+.urbizen-accueil .etapes-pied {
+  grid-column: 2; grid-row: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px clamp(24px, 2.8vw, 36px);
+  border-top: 1px solid var(--u-line);
+  background: var(--u-surface-2);
+}
+.urbizen-accueil .etapes-compteur { color: var(--u-ink-soft); font-size: 13.5px; }
+.urbizen-accueil .etapes-compteur b { color: var(--u-ink); font-weight: 600; }
+.urbizen-accueil .etapes-points { display: flex; gap: 7px; }
+.urbizen-accueil .etapes-point {
+  width: 22px; height: 4px;
+  border-radius: 2px;
+  background: var(--u-line);
+  transition: background-color .15s;
+}
+.urbizen-accueil .etapes-point.is-actif { background: var(--u-brand); }
+
+@media (max-width: 1000px) {
+  /* La navigation passe au-dessus, en bande. Le visuel repasse sous le texte :
+     à cette largeur, une colonne de 320 px l'écraserait. */
+.urbizen-accueil .etapes { grid-template-columns: 1fr; }
+  .urbizen-accueil .etapes-nav {
+    grid-column: 1; grid-row: 1;
+    flex-direction: row; overflow-x: auto;
+    border-right: 0; border-bottom: 1px solid var(--u-line);
+  }
+  .urbizen-accueil .etape-lien {
+    flex: 0 0 auto; min-width: 200px;
+    border-bottom: 0; border-left: 0; border-top: 3px solid transparent;
+  }
+  .urbizen-accueil .etape-lien[aria-selected="true"] { border-left-color: transparent; border-top-color: var(--u-brand); }
+  .urbizen-accueil .etape-panel { grid-column: 1; grid-row: 2; grid-template-columns: 1fr; }
+  .urbizen-accueil .etape-visuel { border-left: 0; border-top: 1px solid var(--u-line); }
+  .urbizen-accueil .etapes-pied { grid-column: 1; grid-row: 3; }
+}
+@media (max-width: 560px) {
+  .urbizen-accueil .etape-lien { min-width: 172px; padding: 16px 14px; }
+  .urbizen-accueil .etape-delai { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .urbizen-accueil .etapes-pied { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+
+/* ===========================================================================
+   ACCOMPAGNEMENT HUMAIN
+   ----------------------------------------------------------------------------
+   Une image d'ambiance apporte de la chaleur sans être présentée comme une
+   photographie de l'équipe. Son texte alternatif décrit uniquement la scène,
+   sans attribuer d'identité aux personnes représentées.
+   ======================================================================== */
+.urbizen-accueil .accompagnement-humain {
+  position: relative;
+  overflow: hidden;
+  background: var(--u-surface);
+  border-top: 1px solid var(--u-line);
+  border-bottom: 1px solid var(--u-line);
+}
+.urbizen-accueil .accompagnement-humain::before {
+  content: "";
+  position: absolute;
+  width: 240px; height: 240px;
+  left: max(-110px, calc((100vw - var(--u-maxw)) / 2 - 180px));
+  bottom: -150px;
+  border: 42px solid var(--u-mint-pale);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.urbizen-accueil .accompagnement-grille {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, .86fr) minmax(0, 1.14fr);
+  gap: clamp(34px, 6vw, 76px);
+  align-items: center;
+}
+.urbizen-accueil .accompagnement-contenu { max-width: 540px; }
+.urbizen-accueil .accompagnement-contenu h2 {
+  margin: 14px 0 18px;
+  color: var(--u-ink);
+  font-size: clamp(28px, 3.6vw, 42px);
+  font-weight: 600;
+}
+.urbizen-accueil .accompagnement-contenu > p {
+  color: var(--u-ink-soft);
+  font-size: 16.5px;
+  line-height: 1.7;
+}
+.urbizen-accueil .accompagnement-atouts {
+  display: grid;
+  gap: 10px;
+  margin-top: 26px;
+  list-style: none;
+}
+.urbizen-accueil .accompagnement-atouts li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 50px;
+  padding: 8px 14px 8px 8px;
+  border: 1px solid var(--u-line);
+  border-radius: 11px;
+  background: var(--u-paper);
+  color: var(--u-ink);
+  font-size: 14.5px;
+}
+.urbizen-accueil .accompagnement-puce {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px; height: 34px;
+  border-radius: 9px;
+  background: var(--u-brand-sf);
+  color: var(--u-brand-dk);
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+}
+.urbizen-accueil .accompagnement-visuel {
+  position: relative;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius);
+  background: var(--u-paper);
+  box-shadow: var(--u-shadow-card);
+}
+.urbizen-accueil .accompagnement-visuel::before {
+  content: "";
+  position: absolute;
+  top: -10px; right: 34px;
+  width: 70px; height: 20px;
+  border-radius: 3px;
+  background: var(--u-mint);
+  opacity: .72;
+  transform: rotate(2deg);
+}
+.urbizen-accueil .accompagnement-visuel picture { display: block; }
+.urbizen-accueil .accompagnement-visuel img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  object-position: center;
+  border-radius: calc(var(--u-radius) - 5px);
+}
+@media (max-width: 820px) {
+  .urbizen-accueil .accompagnement-grille { grid-template-columns: 1fr; gap: 30px; }
+  .urbizen-accueil .accompagnement-contenu { max-width: 680px; }
+  .urbizen-accueil .accompagnement-atouts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .urbizen-accueil .accompagnement-atouts li { align-items: flex-start; flex-direction: column; }
+}
+@media (max-width: 560px) {
+  .urbizen-accueil .accompagnement-humain::before { display: none; }
+  .urbizen-accueil .accompagnement-contenu h2 { font-size: clamp(27px, 9vw, 34px); }
+  .urbizen-accueil .accompagnement-contenu > p { font-size: 15.5px; }
+  .urbizen-accueil .accompagnement-atouts { grid-template-columns: 1fr; margin-top: 22px; }
+  .urbizen-accueil .accompagnement-atouts li { min-height: 48px; flex-direction: row; align-items: center; }
+  .urbizen-accueil .accompagnement-visuel { padding: 7px; }
+}
+
+/* ==========================================================================
+   HARMONISATION DES INTRODUCTIONS ET ALTERNANCE FINALE
+   Toutes les introductions de section utilisent la largeur disponible, la
+   même typographie et le même rythme. Les fonds unis reçoivent chacun un arc
+   menthe discret, alterné de gauche à droite.
+   ======================================================================= */
+.urbizen-accueil .sec-head, .urbizen-accueil .methode .sec-head, .urbizen-accueil .locate .sec-head, .urbizen-accueil .dossier-services .sec-head, .urbizen-accueil .dossier-explorer .sec-head, .urbizen-accueil .blog-preview .sec-head, .urbizen-accueil .tarifs-head {
+  max-width: none;
+}
+
+.urbizen-accueil .sec-head > p, .urbizen-accueil .tarifs-head > p, .urbizen-accueil .cta-band > p, .urbizen-accueil .accompagnement-contenu > p {
+  max-width: none;
+  font-family: var(--u-font-body);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-wrap: pretty;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+/* Alternance stricte dans le nouvel ordre de lecture :
+   hero quadrillé · localisation unie · projet quadrillé · méthode unie ·
+   accompagnement quadrillé · tarifs unis · contenu quadrillé · pourquoi uni ·
+   conseils quadrillés · appel à l'action uni. */
+.urbizen-accueil .hero, .urbizen-accueil .projet, .urbizen-accueil .accompagnement-humain, .urbizen-accueil .dossier-explorer, .urbizen-accueil .blog-preview {
+  background: var(--u-grid-bg);
+}
+.urbizen-accueil .locate, .urbizen-accueil .methode, .urbizen-accueil .dossier-services, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .cta-final {
+  background: var(--u-surface-2);
+}
+
+/* L'arc d'origine de l'accompagnement disparaît sur son fond quadrillé. */
+.urbizen-accueil .accompagnement-humain::before { display: none; }
+
+/* Les cinq sections unies reçoivent chacune un grand arc et une petite forme
+   menthe. Leur position alterne afin d'éviter un motif répétitif. */
+.urbizen-accueil .locate, .urbizen-accueil .methode, .urbizen-accueil .dossier-services, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .cta-final {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.urbizen-accueil .locate > .wrap, .urbizen-accueil .methode > .wrap, .urbizen-accueil .dossier-services > .wrap, .urbizen-accueil .pourquoi-wrap > .wrap, .urbizen-accueil .cta-final > .wrap {
+  position: relative;
+  z-index: 1;
+}
+.urbizen-accueil .locate::before, .urbizen-accueil .methode::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .pourquoi-wrap::before, .urbizen-accueil .cta-final::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 220px;
+  height: 220px;
+  border: 38px solid var(--u-mint-pale);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.urbizen-accueil .locate::after, .urbizen-accueil .methode::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .pourquoi-wrap::after, .urbizen-accueil .cta-final::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  background: var(--u-mint-pale);
+  transform: rotate(18deg);
+  opacity: .78;
+  pointer-events: none;
+}
+.urbizen-accueil .locate::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .cta-final::before {
+  top: -132px;
+  right: max(-96px, calc((100vw - var(--u-maxw)) / 2 - 150px));
+}
+.urbizen-accueil .locate::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .cta-final::after {
+  bottom: 34px;
+  left: max(20px, calc((100vw - var(--u-maxw)) / 2 - 52px));
+}
+.urbizen-accueil .methode::before, .urbizen-accueil .pourquoi-wrap::before {
+  bottom: -138px;
+  left: max(-100px, calc((100vw - var(--u-maxw)) / 2 - 158px));
+}
+.urbizen-accueil .methode::after, .urbizen-accueil .pourquoi-wrap::after {
+  top: 42px;
+  right: max(22px, calc((100vw - var(--u-maxw)) / 2 - 48px));
+  transform: rotate(-16deg);
+}
+
+@media (max-width: 560px) {
+  .urbizen-accueil .sec-head > p, .urbizen-accueil .tarifs-head > p, .urbizen-accueil .cta-band > p, .urbizen-accueil .accompagnement-contenu > p {
+    font-size: 16.5px;
+    line-height: 1.55;
+  }
+  .urbizen-accueil .locate::before, .urbizen-accueil .methode::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .pourquoi-wrap::before, .urbizen-accueil .cta-final::before {
+    width: 150px;
+    height: 150px;
+    border-width: 28px;
+    opacity: .8;
+  }
+  .urbizen-accueil .locate::after, .urbizen-accueil .methode::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .pourquoi-wrap::after, .urbizen-accueil .cta-final::after {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    opacity: .62;
+  }
+}
+
+/* Séparations de sections : un seul trait, fin et identique partout. Les
+   anciennes bordures hautes/basses pouvaient se cumuler et former une barre. */
+.urbizen-accueil .locate, .urbizen-accueil .projet, .urbizen-accueil .methode, .urbizen-accueil .accompagnement-humain, .urbizen-accueil .dossier-services, .urbizen-accueil .dossier-explorer, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .blog-preview, .urbizen-accueil .cta-final {
+  border-top: 1px solid var(--u-grid);
+  border-bottom: 0;
+}
+
+/* ==========================================================================
+   PREMIER ÉCRAN — SIGNATURE URBIZEN
+   Une promesse éditoriale et une planche de livrables réels : aucun faux
+   formulaire ni composition calquée sur un service tiers.
+   ======================================================================= */
+.urbizen-accueil .hero-v7 .hero-main {
+  min-height: 660px;
+  grid-template-columns: minmax(0, .95fr) minmax(500px, 1.05fr);
+  gap: clamp(42px, 5vw, 72px);
+}
+.urbizen-accueil .hero-v7 h1 {
+  max-width: 640px;
+  font-size: clamp(44px, 4.5vw, 62px);
+  line-height: 1.02;
+}
+.urbizen-accueil .hero-v7 .lead {
+  max-width: 59ch;
+  font-size: clamp(17px, 1.5vw, 19px);
+  line-height: 1.58;
+}
+.urbizen-accueil .hero-v7 .hero-actions { max-width: 540px; }
+.urbizen-accueil .hero-v7 .hero-service-cards { display: grid; }
+.urbizen-accueil .hero-cta-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--u-ink-soft);
+  font-size: 13.5px;
+}
+.urbizen-accueil .hero-cta-note span {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--u-brand);
+  border-radius: 50%;
+  background: var(--u-brand-sf);
+  font-weight: 700;
+}
+.urbizen-accueil .hero-v7 .hero-board {
+  padding: clamp(16px, 2vw, 22px);
+  border-color: var(--u-line-strong);
+  background: var(--u-mint-surface);
+  box-shadow: 0 26px 55px -42px rgba(20,35,59,.9);
+}
+.urbizen-accueil .hero-v7 .hero-board > svg { display: block; }
+.urbizen-accueil .hero-v7 .hero-board .board-tag {
+  top: -13px;
+  left: 22px;
+  padding: 6px 11px;
+  border-radius: 3px;
+  background: var(--u-ink);
+  font-size: 10.5px;
+}
+
+/* Deux familles de pièces seulement : la navigation est plus rapide et les
+   onglets occupent naturellement toute la largeur disponible. */
+.urbizen-accueil .dx-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+}
+.urbizen-accueil .dx-panel .dx-item { min-height: 68px; padding: 10px 14px; }
+
+/* La grille tarifaire reste dans la section, sans bande grise intermédiaire. */
+.urbizen-accueil .dossier-services .tarifs-zone { margin-top: 32px; padding: 0 0 62px; }
+.urbizen-accueil .dossier-services .tarifs-zone::before { display: none; }
+
+@media (max-width: 1100px) {
+  .urbizen-accueil .hero-v7 .hero-main { min-height: 0; grid-template-columns: 1fr; gap: 48px; }
+  .urbizen-accueil .hero-v7 .hero-copy { max-width: 820px; }
+  .urbizen-accueil .hero-v7 .hero-board { width: min(100%, 720px); margin-inline: auto; }
+}
+@media (max-width: 560px) {
+  .urbizen-accueil .hero-v7 h1 { font-size: clamp(37px, 10.8vw, 48px); }
+  .urbizen-accueil .hero-v7 .lead { font-size: 16.5px; }
+  .urbizen-accueil .dx-tabs { grid-template-columns: 1fr; }
+  .urbizen-accueil .dx-tab { width: 100%; }
 }

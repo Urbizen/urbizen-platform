@@ -1,13 +1,13 @@
 <?php
 /**
- * Banc d'essai de la section « Nos services » — prestations et contenu du dossier.
+ * Banc d'essai de la section « Nos tarifs » et du contenu du dossier.
  *
  * Cette section porte deux promesses commerciales, et c'est ce qui la rend
  * sensible :
  *
- * 1. **trois parcours de prestation**, chacun menant à sa page dédiée. Une
- *    destination fausse envoie un demandeur de permis vers la déclaration
- *    préalable — il remplirait le mauvais dossier sans le savoir ;
+ * 1. **sept forfaits de départ**, répartis entre déclaration préalable,
+ *    permis de construire et conception sur mesure. Le formulaire reste la
+ *    source du devis estimatif personnalisé ;
  * 2. **dix planches** décrivant ce que le dossier peut comprendre. Chacune
  *    porte un code réglementaire (`DP1 · PCMI1`…) et son intitulé. Un code
  *    déplacé associerait un plan à la mauvaise pièce du CERFA.
@@ -37,9 +37,19 @@ function section( $html, $id ) {
 	}
 
 	$i = $m[0][1];
-	$j = strpos( $html, '</section>', $i );
+	$fragment = substr( $html, $i );
+	preg_match_all( '#</?section\b[^>]*>#', $fragment, $balises, PREG_OFFSET_CAPTURE );
+	$profondeur = 0;
 
-	return false === $j ? '' : substr( $html, $i, $j - $i + 10 );
+	foreach ( $balises[0] as $balise ) {
+		$profondeur += str_starts_with( $balise[0], '</' ) ? -1 : 1;
+
+		if ( 0 === $profondeur ) {
+			return substr( $fragment, 0, $balise[1] + strlen( $balise[0] ) );
+		}
+	}
+
+	return '';
 }
 
 $sources = array(
@@ -62,96 +72,107 @@ $planches = array(
 	'BORDEREAU'   => 'Bordereau des pièces',
 );
 
-/** Les trois prestations et la page qui les sert. */
-$prestations = array(
-	'Déclaration préalable' => 'https://urbizen.fr/declarations-prealables/',
-	'Permis de construire'  => 'https://urbizen.fr/permis-de-construire/',
-	'Conception de plans sur mesure' => 'https://urbizen.fr/conception/',
-);
-
 foreach ( $sources as $nom => $chemin ) {
 	$h = file_get_contents( $chemin );
 	$s = section( $h, 'services' );
 
 	check( "[$nom] la section #services est présente", '' !== $s );
 	check( "[$nom] son titre est celui de la charte",
-		str_contains( $s, 'Une prestation adaptée, un dossier complet' )
-		&& str_contains( $s, '>Nos services<' ) );
+		str_contains( $s, 'Des tarifs clairs, une estimation personnalisée' )
+		&& str_contains( $s, '>Nos tarifs<' ) );
 
-	/* ------------------------------------------- trois parcours de prestation */
+	/* ---------------------------------------------- sept forfaits de départ */
 
-	check( "[$nom] exactement trois parcours de prestation",
-		3 === substr_count( $s, 'class="service-route"' )
-		&& 3 === substr_count( $s, 'class="service-route-kicker"' )
-		&& 3 === substr_count( $s, 'class="service-route-copy"' )
-		&& 3 === substr_count( $s, 'class="service-route-arrow"' ) );
+	check( "[$nom] exactement trois familles tarifaires et sept forfaits",
+		3 === substr_count( $s, 'class="tarif-group ' )
+		&& 7 === preg_match_all( '#class="tarif(?: featured)?"#', $s )
+		&& 7 === substr_count( $s, 'class="tarif-price"' ) );
 
-	$mauvaises = array();
+	check( "[$nom] les trois familles sont dans l'ordre attendu",
+		strpos( $s, 'tarif-group-dp' ) < strpos( $s, 'tarif-group-pc' )
+		&& strpos( $s, 'tarif-group-pc' ) < strpos( $s, 'tarif-group-plans' )
+		&& str_contains( $s, '>Déclaration préalable<' )
+		&& str_contains( $s, '>Permis de construire<' )
+		&& str_contains( $s, '>Conception de plans sur mesure<' ) );
 
-	foreach ( $prestations as $libelle => $url ) {
-		if ( ! str_contains( $s, '>' . $libelle . '<' ) ) { $mauvaises[] = "libellé $libelle"; }
-		if ( ! str_contains( $s, 'href="' . $url . '"' ) ) { $mauvaises[] = "destination $libelle"; }
+	// Chaque forfait annonce un prix d'appel, jamais un prix ferme.
+	check( "[$nom] chaque forfait annonce « À partir de »",
+		7 === substr_count( $s, 'class="tarif-from"' )
+		&& str_contains( $s, '189&nbsp;€' )
+		&& str_contains( $s, '849&nbsp;€' ) );
+
+	check( "[$nom] le formulaire reste la source du devis personnalisé",
+		str_contains( $s, 'Le formulaire calcule ensuite un devis estimatif' )
+		&& str_contains( $s, 'href="https://urbizen.fr/conception/"' ) );
+
+	check( "[$nom] le supplément ABF reste explicite et transversal",
+		str_contains( $s, 'Secteur Bâtiments de France' )
+		&& str_contains( $s, '+80&nbsp;€' ) );
+
+	check( "[$nom] l'ancienne section « Nos services » n'est pas dupliquée",
+		! str_contains( $s, 'class="service-route"' )
+		&& ! str_contains( $s, '>Nos services<' ) );
+
+	// L'explorateur est une SECTION à part depuis le 14 août 2026 : il ne fallait
+	// pas le loger dans « Nos services », qui porte les parcours et les tarifs.
+	$d = section( $h, 'dossier' );
+	check( "[$nom] la section de l'explorateur est repérée", '' !== $d );
+
+	/* ------------------------------------ l'explorateur de pièces du dossier ---
+
+	   Les dix « planches » — dix vignettes SVG et leur libellé — ont été
+	   remplacées le 14 août 2026 par un explorateur à deux niveaux d'onglets.
+	   Ce que les anciens contrôles protégeaient reste protégé : les dix pièces
+	   sont toujours nommées, avec leurs codes réglementaires, et rien n'y est
+	   présenté comme systématiquement fourni. Ce sont les moyens qui changent.  */
+
+	check( "[$nom] trois familles de pièces, en onglets",
+		3 === substr_count( $d, 'class="dx-tab"' )
+		&& 3 === preg_match_all( '#class="dx-tab" role="tab"#', $d ) );
+
+	check( "[$nom] dix pièces réparties dans les trois familles",
+		10 === substr_count( $d, 'class="dx-item"' )
+		&& 10 === substr_count( $d, 'class="dx-vue"' ) );
+
+	// Les mêmes codes qu'avant, aux mêmes intitulés : c'est la donnée métier,
+	// elle ne dépend pas du composant qui l'affiche.
+	$pieces = array(
+		'DP1 · PCMI1' => 'Plan de situation',
+		'DP2 · PCMI2' => 'Plan de masse',
+		'DP3 · PCMI3' => 'Plan en coupe',
+		'DP4 · PCMI5' => 'Façades et toitures',
+		'DP6 · PCMI6' => 'Insertion graphique',
+		'DP7 · PCMI7' => 'Environnement proche',
+		'DP8 · PCMI8' => 'Paysage lointain',
+		'PCMI4'       => 'Notice descriptive',
+		'CERFA'       => 'Formulaire administratif',
+		'BORDEREAU'   => 'Bordereau des pièces',
+	);
+	$manquants = array();
+	foreach ( $pieces as $code => $intitule ) {
+		if ( ! str_contains( $d, $code ) || ! str_contains( $d, $intitule ) ) {
+			$manquants[] = $code;
+		}
 	}
+	check( "[$nom] les dix codes réglementaires et leurs intitulés", array() === $manquants,
+		'absents : ' . implode( ', ', $manquants ) );
 
-	check( "[$nom] chaque prestation porte son libellé et sa destination", array() === $mauvaises );
+	// Le contrat ARIA : sans lui, l'explorateur n'est qu'une pile de boutons.
+	check( "[$nom] les onglets déclarent leur état et leur panneau",
+		13 === preg_match_all( '#role="tab"[^>]*aria-controls="#', $d )
+		&& 13 === preg_match_all( '#role="tab"[^>]*aria-selected="#', $d ) );
 
-	if ( array() !== $mauvaises ) { echo '    écart : ' . implode( ' | ', $mauvaises ) . "\n"; }
+	// Aucune pièce ne doit être présentée comme systématiquement fournie.
+	check( "[$nom] le contenu du dossier reste annoncé comme variable",
+		str_contains( $d, "dépend de la nature du projet" ) );
 
-	// L'ordre commercial : la déclaration préalable, puis le permis, puis la
-	// conception. L'inverser mettrait la prestation la plus lourde en tête.
-	check( "[$nom] les trois prestations dans l'ordre attendu",
-		strpos( $s, 'declarations-prealables' ) < strpos( $s, 'permis-de-construire' )
-		&& strpos( $s, 'permis-de-construire' ) < strpos( $s, 'conception' ) );
+	check( "[$nom] les documents montrés sont annoncés comme des exemples",
+		str_contains( $d, 'projet fictif' ) );
 
-	// Chaque parcours annonce un prix d'appel, jamais un prix ferme.
-	check( "[$nom] chaque parcours annonce « À partir de »",
-		3 === substr_count( $s, 'class="tarif-from"' )
-		&& 3 === substr_count( $s, 'class="tarif-price"' )
-		&& 3 === substr_count( $s, 'class="tarif-detail"' ) );
-
-	// Les icônes des parcours sont décoratives : le libellé porte le sens.
-	check( "[$nom] les icônes de parcours sont décoratives",
-		3 === substr_count( $s, 'class="service-route-icon"' )
-		&& 3 === preg_match_all( '#class="service-route-icon"[^>]*aria-hidden="true"#', $s ) );
-
-	/* --------------------------------------------- les dix planches du dossier */
-
-	check( "[$nom] exactement dix planches",
-		10 === substr_count( $s, 'class="planche-item"' )
-		&& 10 === substr_count( $s, 'class="planche-fig"' )
-		&& 10 === substr_count( $s, 'class="planche-t"' ) );
-
-	check( "[$nom] l'intitulé de la liste est conservé",
-		str_contains( $s, 'Votre dossier peut comprendre' )
-		&& str_contains( $s, '>CONTENU DU DOSSIER<' ) );
-
-	$ecarts = array();
-
-	foreach ( $planches as $code => $intitule ) {
-		if ( ! str_contains( $s, '>' . $code . '</span>' ) ) { $ecarts[] = "code $code"; }
-		if ( ! str_contains( $s, '>' . $intitule . '</span>' ) ) { $ecarts[] = "intitulé $code"; }
-	}
-
-	check( "[$nom] les dix codes réglementaires et leurs intitulés", array() === $ecarts );
-
-	if ( array() !== $ecarts ) { echo '    écart : ' . implode( ' | ', $ecarts ) . "\n"; }
-
-	// Les codes se suivent dans l'ordre du dossier déposé en mairie.
-	$positions = array_map( static fn( $c ) => strpos( $s, '>' . $c . '</span>' ), array_keys( $planches ) );
-	$triees    = $positions;
-	sort( $triees );
-
-	check( "[$nom] les dix planches se suivent dans l'ordre du dossier", $positions === $triees );
-
-	// Chaque figure est une illustration décorative : aucun texte alternatif à
-	// lire, aucun gestionnaire en ligne.
-	check( "[$nom] les figures sont décoratives et inertes",
-		10 === preg_match_all( '#class="planche-fig" aria-hidden="true"><svg#', $s )
-		&& ! preg_match( '#\son(click|load|mouse\w+)=#', $s ) );
-
-	// Le dépôt dématérialisé est une option annoncée, pas une promesse ferme.
-	check( "[$nom] le dépôt dématérialisé reste annoncé comme option",
-		str_contains( $s, 'Dépôt dématérialisé en option' ) );
+	// La mention d'option a été retirée : elle refroidissait le parcours et ne
+	// remplaçait pas le devis détaillé produit par le formulaire.
+	check( "[$nom] aucun encart « dépôt dématérialisé en option »",
+		! str_contains( $s, 'Dépôt dématérialisé en option' ) );
 
 	/* ------------------------------ les blocs de ee1415c ne reviennent pas ---- */
 
