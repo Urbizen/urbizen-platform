@@ -72,6 +72,31 @@ function is_front_page() { return false; }
 function is_singular() { return true; }
 function get_queried_object_id() { return 10; }
 function get_page_template_slug( $id = 0 ) { return 'page-tarifs'; }
+
+/*
+ * DOUBLONS AJOUTÉS LE 15 AOÛT 2026 — L'EN-TÊTE INTERROGE LA PAGE D'ARTICLES
+ *
+ * `header-accueil.php` a gagné l'entrée « Guides » le 14 août 2026 : il appelle
+ * `get_option( 'page_for_posts' )`, puis `get_permalink()`, et distingue
+ * `is_home()` des autres contextes. `tests/homepage/test-fidelite.php` a reçu
+ * ces doublons le même jour ; cet aperçu-ci ne les a pas eus, et rendait la
+ * page Tarifs sur une erreur fatale « Call to undefined function get_option() ».
+ * Le banc `test-geometrie-tarifs.py`, qui mesure un rendu réel, échouait donc
+ * sans que le défaut soit visible dans les bancs statiques.
+ *
+ * Les valeurs décrivent un site où /guides/ existe et où l'on est sur /tarifs/.
+ */
+function get_option( $nom, $defaut = false ) {
+	return 'page_for_posts' === $nom ? 1204 : $defaut;
+}
+function get_permalink( $id = 0 ) {
+	return 1204 === (int) $id ? '/guides/' : 'https://urbizen.fr/tarifs/';
+}
+function is_home() { return false; }
+function is_category() { return false; }
+function is_tag() { return false; }
+function is_date() { return false; }
+function untrailingslashit( $chaine ) { return rtrim( (string) $chaine, '/\\' ); }
 function wp_kses_post( $t ) { return (string) $t; }
 
 /**

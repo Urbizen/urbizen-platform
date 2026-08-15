@@ -147,8 +147,15 @@ check( 'CTA de renseignements vers le parcours existant',
 	substr_count( $tpl, 'href="/#demander-des-renseignements"' ) >= 2 );
 
 // --- Navigation : « Tarifs » ouvre la page, plus l'ancre de l'accueil -------
+// Le lien ne s'écrit plus d'une seule pièce depuis le 14 août 2026 : l'entrée
+// courante reçoit un `aria-current="page"` interpolé entre l'URL et le chevron
+// fermant. Une comparaison littérale sur `…/tarifs/">Tarifs</a>` ne trouvait
+// donc plus rien, alors que les deux entrées étaient intactes. On vise
+// désormais la forme réelle — URL, appel éventuel au marqueur d'état, libellé —
+// ce qui conserve l'intention du contrôle sans le rendre sensible au prochain
+// attribut ajouté.
 check( 'En-tête : « Tarifs » ouvre /tarifs/',
-	2 === substr_count( $header, '<a href="https://urbizen.fr/tarifs/">Tarifs</a>' )
+	2 === preg_match_all( '#<a href="https://urbizen\.fr/tarifs/"(?:<\?php[^>]*\?>)?>Tarifs</a>#', $header )
 	&& ! preg_match( '/#tarifs">Tarifs/', $header ) );
 check( 'Pied de page : « Tarifs » ouvre /tarifs/',
 	str_contains( $footer, '<a href="https://urbizen.fr/tarifs/">Tarifs</a>' )
