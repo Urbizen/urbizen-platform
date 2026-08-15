@@ -19,6 +19,49 @@
      séparément, et un focus qui saute annulerait le mouvement en cours. */
   var focusSafe = function (el) { if (!el) return; try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); } };
 
+  /* Le visiteur doit pouvoir commencer sa demande sans traverser toute la
+     page. Les deux interactions principales sont donc placées juste après le
+     bandeau de réassurance, avant le détail de la méthode. Le déplacement est
+     fait avant le branchement des interactions : l'ordre visuel, l'ordre du
+     DOM et l'ordre de navigation au clavier restent identiques. */
+  var contenuPrincipal = document.querySelector("main");
+  var methodeSection = document.getElementById("methode");
+  var localisationSection = document.getElementById("localisation");
+  var projetSection = document.getElementById("projet");
+  if (contenuPrincipal && methodeSection && localisationSection && projetSection) {
+    contenuPrincipal.insertBefore(localisationSection, methodeSection);
+    contenuPrincipal.insertBefore(projetSection, methodeSection);
+  }
+
+  /* « Plans techniques » et « Visuels du projet » forment désormais une seule
+     famille. Les vues et leurs onglets sont réunis avant l'initialisation ARIA,
+     afin de conserver un seul parcours clavier continu de DP1 à DP8. */
+  var plansPanel = document.getElementById("dx-p-plans");
+  var visuelsPanel = document.getElementById("dx-p-visuels");
+  var visuelsTab = document.getElementById("dx-t-visuels");
+  if (plansPanel && visuelsPanel) {
+    var plansGrid = plansPanel.querySelector(".dx-grid");
+    var visuelsGrid = visuelsPanel.querySelector(".dx-grid");
+    var plansNav = plansGrid && plansGrid.querySelector(".dx-nav");
+    var visuelsNav = visuelsGrid && visuelsGrid.querySelector(".dx-nav");
+    if (plansGrid && visuelsGrid && plansNav && visuelsNav) {
+      [].slice.call(visuelsGrid.querySelectorAll(".dx-vue")).forEach(function (vue) {
+        vue.hidden = true;
+        plansGrid.insertBefore(vue, plansNav);
+      });
+      [].slice.call(visuelsNav.querySelectorAll(".dx-item")).forEach(function (onglet, i) {
+        onglet.setAttribute("aria-selected", "false");
+        onglet.setAttribute("tabindex", "-1");
+        var numero = onglet.querySelector(".dx-item-n");
+        if (numero) { numero.textContent = String(i + 5).padStart(2, "0"); }
+        plansNav.appendChild(onglet);
+      });
+      plansNav.setAttribute("aria-label", "Pièces — Plans et visuels");
+      visuelsPanel.remove();
+      if (visuelsTab) { visuelsTab.remove(); }
+    }
+  }
+
   /* ----- Menu mobile -----
      `closeMobileMenu` est extraite parce que deux chemins la demandent : un lien
      ordinaire du menu, et « Écrire à Urbizen » qui doit refermer le menu avant
@@ -859,6 +902,13 @@
       }
     });
   }
+
+  /* ----- Composant cadastre -----
+     Aucun montage manuel ici : sous WordPress, le bloc `urbizen/cadastre`
+     rend son propre conteneur et urbizen-cadastre.js le monte via
+     autoMount(). Un mount() supplémentaire provoquerait un double montage.
+     Les libellés et la clé de stockage « accueil » sont portés par les
+     attributs du bloc, dans le gabarit. */
 
   /* ----- Réaction à la confirmation de parcelle -----
      Pour cette première version : on conserve les données (déjà persistées en

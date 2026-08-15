@@ -43,7 +43,7 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .eyebrow::before { content: ""; width: 22px; height: 2px; background: var(--u-mint); display: inline-block; }
 .urbizen-accueil .eyebrow-highlight { gap: 10px; font-size: 13px; font-weight: 400; letter-spacing: .14em; }
 .urbizen-accueil .eyebrow-highlight::before { width: 28px; background: var(--u-brand); }
-.urbizen-accueil .eyebrow-highlight-text { padding: 2px 6px; background: var(--u-mint-pale); white-space: nowrap; }
+.urbizen-accueil .eyebrow-highlight-text { padding: 2px 6px; background: var(--u-mint-pale, #EAF8F1); white-space: nowrap; }
 @media (max-width: 560px) {
   .urbizen-accueil .eyebrow-highlight { font-size: 11px; letter-spacing: .1em; }
   .urbizen-accueil .eyebrow-highlight::before { width: 18px; }
@@ -560,12 +560,12 @@ html { scroll-behavior: smooth; }
 
 /* ===========================================================================
    SÉQUENCE DÉFINITIVE DES FONDS (recalage validé)
-   Quadrillage = jeton commun `--u-grid-bg` (var(--u-grid) #DCE3EA sur
-   var(--u-paper) #EAEEF2, 28×28 px, 1 px) — INCHANGÉ ; jamais #C2D0DE ; aucun
+   Quadrillage = jeton commun `--u-grid-bg` (var(--u-grid) #E9EDF1 sur
+   var(--u-paper) #FBFCFD, 28×28 px, 1 px) ; aucun
    fond quadrillé imposé au wrapper global `.urbizen-accueil`.
-   Ordre haut→bas : hero GRID · réassurance BLEU NUIT · méthode UNI ·
-   localisation UNI · projets GRID · dossier GRID · services UNI ·
-   pourquoi GRID · exemples UNI · FAQ GRID · CTA UNI. */
+   Ordre haut→bas : hero GRID · réassurance BLEU NUIT · méthode GRID ·
+   accompagnement UNI · localisation GRID · projets UNI · services GRID ·
+   dossier UNI · pourquoi GRID · blog UNI · CTA GRID. */
 /* Sections QUADRILLÉES (trame claire de la charte). */
 .urbizen-accueil .hero { background: var(--u-grid-bg); }
 .urbizen-accueil .projet { background: var(--u-surface-2); }
@@ -576,7 +576,7 @@ html { scroll-behavior: smooth; }
    sur ces sections — c'est le contraste carreaux (grille) ↔ aplat (surface-2)
    qui marque la rupture, exactement comme dans la version d'origine. On évite
    ainsi les traits surnuméraires qui alourdissaient la page. */
-.urbizen-accueil .methode { background: var(--u-surface-2); }
+.urbizen-accueil .methode { background: var(--u-grid-bg); }
 .urbizen-accueil .prestations { background: var(--u-surface-2); }
 .urbizen-accueil .exemples { background: var(--u-surface-2); }
 .urbizen-accueil .cta-final { background: var(--u-grid-bg); }
@@ -764,11 +764,11 @@ html { scroll-behavior: smooth; }
 /* --- Alternance des fonds : PLUS de grandes zones blanches ------------------
    Fond principal = quadrillage clair (identité Urbizen), cartes blanches.
    hero GRID · trust NAVY · services GRID · lieu NAVY · projet GRID ·
-   méthode GRIS uni · dossier GRID · exemples GRIS uni · tarifs GRID ·
+   méthode GRID · dossier GRID · exemples GRIS uni · tarifs GRID ·
    pourquoi GRIS uni · FAQ GRID · CTA GRIS. Jamais deux grilles claires de suite. */
 .urbizen-accueil .prestations { background: var(--u-grid-bg); }
 .urbizen-accueil .projet { background: var(--u-surface-2); }
-.urbizen-accueil .methode { background: var(--u-surface-2); }
+.urbizen-accueil .methode { background: var(--u-grid-bg); }
 .urbizen-accueil .dossier { background: var(--u-grid-bg); }
 .urbizen-accueil .exemples { background: var(--u-surface-2); }
 .urbizen-accueil .tarifs-wrap { background: var(--u-grid-bg); }
@@ -1168,6 +1168,7 @@ html { scroll-behavior: smooth; }
     padding-bottom: 14px;
   }
 }
+
 @media (max-width: 560px) {
   .urbizen-accueil .hero-v7 .hero-main { padding-top: 40px; padding-bottom: 36px; gap: 36px; }
   .urbizen-accueil .hero-v7 h1 { font-size: clamp(37px, 11vw, 48px); }
@@ -1855,7 +1856,7 @@ html { scroll-behavior: smooth; }
    panneau par étape. Sur mobile, la colonne de navigation passe au-dessus en
    bande défilante plutôt que de rétrécir jusqu'à l'illisible.
    ======================================================================== */
-.urbizen-accueil .methode .sec-head { max-width: 720px; }
+.urbizen-accueil .methode .sec-head { max-width: none; }
 
 .urbizen-accueil .etapes {
   display: grid;
@@ -1909,6 +1910,7 @@ html { scroll-behavior: smooth; }
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 320px);
 }
+.urbizen-accueil .etape-panel-sans-visuel { grid-template-columns: minmax(0, 1fr); }
 .urbizen-accueil .etape-panel[hidden] { display: none; }
 .urbizen-accueil .etape-panel:focus-visible { outline: 2px solid var(--u-brand); outline-offset: -3px; }
 .urbizen-accueil .etape-corps { padding: clamp(24px, 2.8vw, 36px); }
@@ -2149,4 +2151,197 @@ html { scroll-behavior: smooth; }
   .urbizen-accueil .accompagnement-atouts { grid-template-columns: 1fr; margin-top: 22px; }
   .urbizen-accueil .accompagnement-atouts li { min-height: 48px; flex-direction: row; align-items: center; }
   .urbizen-accueil .accompagnement-visuel { padding: 7px; }
+}
+
+/* ==========================================================================
+   HARMONISATION DES INTRODUCTIONS ET ALTERNANCE FINALE
+   Toutes les introductions de section utilisent la largeur disponible, la
+   même typographie et le même rythme. Les fonds unis reçoivent chacun un arc
+   menthe discret, alterné de gauche à droite.
+   ======================================================================= */
+.urbizen-accueil .sec-head, .urbizen-accueil .methode .sec-head, .urbizen-accueil .locate .sec-head, .urbizen-accueil .dossier-services .sec-head, .urbizen-accueil .dossier-explorer .sec-head, .urbizen-accueil .blog-preview .sec-head, .urbizen-accueil .tarifs-head {
+  max-width: none;
+}
+
+.urbizen-accueil .sec-head > p, .urbizen-accueil .tarifs-head > p, .urbizen-accueil .cta-band > p, .urbizen-accueil .accompagnement-contenu > p {
+  max-width: none;
+  font-family: var(--u-font-body);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.55;
+  text-wrap: pretty;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+/* Alternance stricte dans le nouvel ordre de lecture :
+   hero quadrillé · localisation unie · projet quadrillé · méthode unie ·
+   accompagnement quadrillé · tarifs unis · contenu quadrillé · pourquoi uni ·
+   conseils quadrillés · appel à l'action uni. */
+.urbizen-accueil .hero, .urbizen-accueil .projet, .urbizen-accueil .accompagnement-humain, .urbizen-accueil .dossier-explorer, .urbizen-accueil .blog-preview {
+  background: var(--u-grid-bg);
+}
+.urbizen-accueil .locate, .urbizen-accueil .methode, .urbizen-accueil .dossier-services, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .cta-final {
+  background: var(--u-surface-2);
+}
+
+/* L'arc d'origine de l'accompagnement disparaît sur son fond quadrillé. */
+.urbizen-accueil .accompagnement-humain::before { display: none; }
+
+/* Les cinq sections unies reçoivent chacune un grand arc et une petite forme
+   menthe. Leur position alterne afin d'éviter un motif répétitif. */
+.urbizen-accueil .locate, .urbizen-accueil .methode, .urbizen-accueil .dossier-services, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .cta-final {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.urbizen-accueil .locate > .wrap, .urbizen-accueil .methode > .wrap, .urbizen-accueil .dossier-services > .wrap, .urbizen-accueil .pourquoi-wrap > .wrap, .urbizen-accueil .cta-final > .wrap {
+  position: relative;
+  z-index: 1;
+}
+.urbizen-accueil .locate::before, .urbizen-accueil .methode::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .pourquoi-wrap::before, .urbizen-accueil .cta-final::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 220px;
+  height: 220px;
+  border: 38px solid var(--u-mint-pale);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.urbizen-accueil .locate::after, .urbizen-accueil .methode::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .pourquoi-wrap::after, .urbizen-accueil .cta-final::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  width: 62px;
+  height: 62px;
+  border-radius: 18px;
+  background: var(--u-mint-pale);
+  transform: rotate(18deg);
+  opacity: .78;
+  pointer-events: none;
+}
+.urbizen-accueil .locate::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .cta-final::before {
+  top: -132px;
+  right: max(-96px, calc((100vw - var(--u-maxw)) / 2 - 150px));
+}
+.urbizen-accueil .locate::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .cta-final::after {
+  bottom: 34px;
+  left: max(20px, calc((100vw - var(--u-maxw)) / 2 - 52px));
+}
+.urbizen-accueil .methode::before, .urbizen-accueil .pourquoi-wrap::before {
+  bottom: -138px;
+  left: max(-100px, calc((100vw - var(--u-maxw)) / 2 - 158px));
+}
+.urbizen-accueil .methode::after, .urbizen-accueil .pourquoi-wrap::after {
+  top: 42px;
+  right: max(22px, calc((100vw - var(--u-maxw)) / 2 - 48px));
+  transform: rotate(-16deg);
+}
+
+@media (max-width: 560px) {
+  .urbizen-accueil .sec-head > p, .urbizen-accueil .tarifs-head > p, .urbizen-accueil .cta-band > p, .urbizen-accueil .accompagnement-contenu > p {
+    font-size: 16.5px;
+    line-height: 1.55;
+  }
+  .urbizen-accueil .locate::before, .urbizen-accueil .methode::before, .urbizen-accueil .dossier-services::before, .urbizen-accueil .pourquoi-wrap::before, .urbizen-accueil .cta-final::before {
+    width: 150px;
+    height: 150px;
+    border-width: 28px;
+    opacity: .8;
+  }
+  .urbizen-accueil .locate::after, .urbizen-accueil .methode::after, .urbizen-accueil .dossier-services::after, .urbizen-accueil .pourquoi-wrap::after, .urbizen-accueil .cta-final::after {
+    width: 42px;
+    height: 42px;
+    border-radius: 13px;
+    opacity: .62;
+  }
+}
+
+/* Séparations de sections : un seul trait, fin et identique partout. Les
+   anciennes bordures hautes/basses pouvaient se cumuler et former une barre. */
+.urbizen-accueil .locate, .urbizen-accueil .projet, .urbizen-accueil .methode, .urbizen-accueil .accompagnement-humain, .urbizen-accueil .dossier-services, .urbizen-accueil .dossier-explorer, .urbizen-accueil .pourquoi-wrap, .urbizen-accueil .blog-preview, .urbizen-accueil .cta-final {
+  border-top: 1px solid var(--u-grid);
+  border-bottom: 0;
+}
+
+/* ==========================================================================
+   PREMIER ÉCRAN — SIGNATURE URBIZEN
+   Une promesse éditoriale et une planche de livrables réels : aucun faux
+   formulaire ni composition calquée sur un service tiers.
+   ======================================================================= */
+.urbizen-accueil .hero-v7 .hero-main {
+  min-height: 660px;
+  grid-template-columns: minmax(0, .95fr) minmax(500px, 1.05fr);
+  gap: clamp(42px, 5vw, 72px);
+}
+.urbizen-accueil .hero-v7 h1 {
+  max-width: 640px;
+  font-size: clamp(44px, 4.5vw, 62px);
+  line-height: 1.02;
+}
+.urbizen-accueil .hero-v7 .lead {
+  max-width: 59ch;
+  font-size: clamp(17px, 1.5vw, 19px);
+  line-height: 1.58;
+}
+.urbizen-accueil .hero-v7 .hero-actions { max-width: 540px; }
+.urbizen-accueil .hero-v7 .hero-service-cards { display: grid; }
+.urbizen-accueil .hero-cta-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--u-ink-soft);
+  font-size: 13.5px;
+}
+.urbizen-accueil .hero-cta-note span {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--u-brand);
+  border-radius: 50%;
+  background: var(--u-brand-sf);
+  font-weight: 700;
+}
+.urbizen-accueil .hero-v7 .hero-board {
+  padding: clamp(16px, 2vw, 22px);
+  border-color: var(--u-line-strong);
+  background: var(--u-mint-surface);
+  box-shadow: 0 26px 55px -42px rgba(20,35,59,.9);
+}
+.urbizen-accueil .hero-v7 .hero-board > svg { display: block; }
+.urbizen-accueil .hero-v7 .hero-board .board-tag {
+  top: -13px;
+  left: 22px;
+  padding: 6px 11px;
+  border-radius: 3px;
+  background: var(--u-ink);
+  font-size: 10.5px;
+}
+
+/* Deux familles de pièces seulement : la navigation est plus rapide et les
+   onglets occupent naturellement toute la largeur disponible. */
+.urbizen-accueil .dx-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, max-content));
+}
+.urbizen-accueil .dx-panel .dx-item { min-height: 68px; padding: 10px 14px; }
+
+/* La grille tarifaire reste dans la section, sans bande grise intermédiaire. */
+.urbizen-accueil .dossier-services .tarifs-zone { margin-top: 32px; padding: 0 0 62px; }
+.urbizen-accueil .dossier-services .tarifs-zone::before { display: none; }
+
+@media (max-width: 1100px) {
+  .urbizen-accueil .hero-v7 .hero-main { min-height: 0; grid-template-columns: 1fr; gap: 48px; }
+  .urbizen-accueil .hero-v7 .hero-copy { max-width: 820px; }
+  .urbizen-accueil .hero-v7 .hero-board { width: min(100%, 720px); margin-inline: auto; }
+}
+@media (max-width: 560px) {
+  .urbizen-accueil .hero-v7 h1 { font-size: clamp(37px, 10.8vw, 48px); }
+  .urbizen-accueil .hero-v7 .lead { font-size: 16.5px; }
+  .urbizen-accueil .dx-tabs { grid-template-columns: 1fr; }
+  .urbizen-accueil .dx-tab { width: 100%; }
 }

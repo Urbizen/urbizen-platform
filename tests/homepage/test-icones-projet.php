@@ -218,13 +218,15 @@ foreach ( $sources as $nom => $chemin ) {
 	// est vérifié par `test-services.php` sur le nouveau composant.
 	check( "[$nom] l'explorateur porte les dix pièces",
 		10 === substr_count( $h, 'class="dx-item"' ) );
-	// Trois parcours tarifaires, un par prestation, chacun vers sa page.
-	check( "[$nom] les trois parcours de prestation sont intacts",
-		3 === substr_count( $h, 'class="service-route"' )
+	// La grille tarifaire validée remplace l'ancienne répétition « Nos
+	// services » : trois familles, sept prix d'appel, et le formulaire reste le
+	// chemin vers l'estimation personnalisée.
+	check( "[$nom] les trois familles et les sept tarifs sont intacts",
+		3 === substr_count( $h, 'class="tarif-group ' )
 		&& 7 === substr_count( $h, 'class="tarif-price"' )
-		&& str_contains( $h, 'href="https://urbizen.fr/declarations-prealables/"' )
-		&& str_contains( $h, 'href="https://urbizen.fr/permis-de-construire/"' )
-		&& str_contains( $h, 'href="https://urbizen.fr/conception/"' ) );
+		&& 7 === substr_count( $h, 'class="tarif-from"' )
+		&& str_contains( $h, 'Des tarifs clairs, une estimation personnalisée' )
+		&& ! str_contains( $h, 'class="service-route"' ) );
 	// Et les blocs abandonnés de ee1415c ne reviennent pas.
 	check( "[$nom] ni section #exemples ni planche .hero-plan",
 		! str_contains( $h, 'id="exemples"' ) && ! str_contains( $h, 'class="hero-plan"' )

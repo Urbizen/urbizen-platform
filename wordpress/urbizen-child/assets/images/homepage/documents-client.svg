@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="560" viewBox="0 0 760 560" role="img" aria-labelledby="title desc">
+  <title id="title">Documents disponibles pour démarrer un projet</title>
+  <desc id="desc">Une interface présente une photo du terrain, un croquis du projet et un plan existant, avec la possibilité de compléter les documents plus tard.</desc>
+  <rect width="760" height="560" rx="24" fill="#f7f9fb"/>
+  <rect x="24" y="24" width="712" height="512" rx="18" fill="#fff" stroke="#c8d3df" stroke-width="2"/>
+  <rect x="24" y="24" width="712" height="74" rx="18" fill="#14233b"/>
+  <path d="M24 80h712v18H24z" fill="#14233b"/>
+  <text x="58" y="59" fill="#fff" font-family="Arial, sans-serif" font-size="19" font-weight="700">Mes documents disponibles</text>
+  <text x="58" y="82" fill="#cbd5e1" font-family="Arial, sans-serif" font-size="11">Ajoutez simplement les éléments que vous avez déjà</text>
+
+  <g transform="translate(58 128)">
+    <rect width="192" height="218" rx="13" fill="#fbfcfd" stroke="#c8d3df" stroke-width="2"/>
+    <rect x="14" y="14" width="164" height="125" rx="8" fill="#e5f5ee"/>
+    <circle cx="145" cy="43" r="13" fill="#7bdcb5"/>
+    <path d="M27 119 72 75l33 29 25-22 48 37v20H14z" fill="#86bba5"/>
+    <path d="m27 119 45-44 33 29 25-22 48 37" fill="none" stroke="#128a5a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="31" cy="165" r="11" fill="#e1f5ec"/>
+    <path d="m26 165 4 4 7-9" fill="none" stroke="#128a5a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="51" y="162" fill="#14233b" font-family="Arial, sans-serif" font-size="14" font-weight="700">Photos du terrain</text>
+    <text x="51" y="182" fill="#667085" font-family="Arial, sans-serif" font-size="11">Façades et environnement</text>
+  </g>
+
+  <g transform="translate(284 128)">
+    <rect width="192" height="218" rx="13" fill="#fbfcfd" stroke="#c8d3df" stroke-width="2"/>
+    <rect x="32" y="14" width="128" height="125" rx="5" fill="#fff" stroke="#d7dfe7"/>
+    <path d="M48 111V72l46-31 50 31v39M61 111V79h70v32M104 111V87h17v24" fill="none" stroke="#14233b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m46 122 99-92" stroke="#128a5a" stroke-width="2" stroke-dasharray="5 5"/>
+    <circle cx="31" cy="165" r="11" fill="#e1f5ec"/>
+    <path d="m26 165 4 4 7-9" fill="none" stroke="#128a5a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="51" y="162" fill="#14233b" font-family="Arial, sans-serif" font-size="14" font-weight="700">Croquis du projet</text>
+    <text x="51" y="182" fill="#667085" font-family="Arial, sans-serif" font-size="11">Même dessiné à la main</text>
+  </g>
+
+  <g transform="translate(510 128)">
+    <rect width="192" height="218" rx="13" fill="#fbfcfd" stroke="#c8d3df" stroke-width="2"/>
+    <path d="M53 18h72l24 25v96H53z" fill="#fff" stroke="#9cabb9" stroke-width="1.5"/>
+    <path d="M125 18v25h24" fill="#e5f5ee" stroke="#9cabb9" stroke-width="1.5"/>
+    <path d="M69 62h64M69 79h48M69 96h64M69 113h38" stroke="#7a8998" stroke-width="2" stroke-linecap="round"/>
+    <path d="M69 130h52" stroke="#128a5a" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="31" cy="165" r="11" fill="#e1f5ec"/>
+    <path d="m26 165 4 4 7-9" fill="none" stroke="#128a5a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="51" y="162" fill="#14233b" font-family="Arial, sans-serif" font-size="14" font-weight="700">Plan existant</text>
+    <text x="51" y="182" fill="#667085" font-family="Arial, sans-serif" font-size="11">Si vous en possédez un</text>
+  </g>
+
+  <rect x="58" y="374" width="644" height="112" rx="14" fill="#f1faf6" stroke="#128a5a" stroke-width="2" stroke-dasharray="8 7"/>
+  <circle cx="111" cy="430" r="25" fill="#dff5eb"/>
+  <path d="M111 443v-28m-10 10 10-10 10 10M98 446h26" fill="none" stroke="#128a5a" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="151" y="421" fill="#14233b" font-family="Arial, sans-serif" font-size="16" font-weight="700">Photos, croquis et documents utiles</text>
+  <text x="151" y="447" fill="#667085" font-family="Arial, sans-serif" font-size="13">Vous pourrez ajouter les éléments manquants plus tard.</text>
+</svg>

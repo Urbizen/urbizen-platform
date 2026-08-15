@@ -1,13 +1,13 @@
 <?php
 /**
- * Banc d'essai de la section « Nos services » — prestations et contenu du dossier.
+ * Banc d'essai de la section « Nos tarifs » et du contenu du dossier.
  *
  * Cette section porte deux promesses commerciales, et c'est ce qui la rend
  * sensible :
  *
- * 1. **trois parcours de prestation**, chacun menant à sa page dédiée. Une
- *    destination fausse envoie un demandeur de permis vers la déclaration
- *    préalable — il remplirait le mauvais dossier sans le savoir ;
+ * 1. **sept forfaits de départ**, répartis entre déclaration préalable,
+ *    permis de construire et conception sur mesure. Le formulaire reste la
+ *    source du devis estimatif personnalisé ;
  * 2. **dix planches** décrivant ce que le dossier peut comprendre. Chacune
  *    porte un code réglementaire (`DP1 · PCMI1`…) et son intitulé. Un code
  *    déplacé associerait un plan à la mauvaise pièce du CERFA.
@@ -37,9 +37,19 @@ function section( $html, $id ) {
 	}
 
 	$i = $m[0][1];
-	$j = strpos( $html, '</section>', $i );
+	$fragment = substr( $html, $i );
+	preg_match_all( '#</?section\b[^>]*>#', $fragment, $balises, PREG_OFFSET_CAPTURE );
+	$profondeur = 0;
 
-	return false === $j ? '' : substr( $html, $i, $j - $i + 10 );
+	foreach ( $balises[0] as $balise ) {
+		$profondeur += str_starts_with( $balise[0], '</' ) ? -1 : 1;
+
+		if ( 0 === $profondeur ) {
+			return substr( $fragment, 0, $balise[1] + strlen( $balise[0] ) );
+		}
+	}
+
+	return '';
 }
 
 $sources = array(
@@ -62,57 +72,46 @@ $planches = array(
 	'BORDEREAU'   => 'Bordereau des pièces',
 );
 
-/** Les trois prestations et la page qui les sert. */
-$prestations = array(
-	'Déclaration préalable' => 'https://urbizen.fr/declarations-prealables/',
-	'Permis de construire'  => 'https://urbizen.fr/permis-de-construire/',
-	'Conception de plans sur mesure' => 'https://urbizen.fr/conception/',
-);
-
 foreach ( $sources as $nom => $chemin ) {
 	$h = file_get_contents( $chemin );
 	$s = section( $h, 'services' );
 
 	check( "[$nom] la section #services est présente", '' !== $s );
 	check( "[$nom] son titre est celui de la charte",
-		str_contains( $s, 'Une prestation adaptée, un dossier complet' )
-		&& str_contains( $s, '>Nos services<' ) );
+		str_contains( $s, 'Des tarifs clairs, une estimation personnalisée' )
+		&& str_contains( $s, '>Nos tarifs<' ) );
 
-	/* ------------------------------------------- trois parcours de prestation */
+	/* ---------------------------------------------- sept forfaits de départ */
 
-	check( "[$nom] exactement trois parcours de prestation",
-		3 === substr_count( $s, 'class="service-route"' )
-		&& 3 === substr_count( $s, 'class="service-route-kicker"' )
-		&& 3 === substr_count( $s, 'class="service-route-copy"' )
-		&& 3 === substr_count( $s, 'class="service-route-arrow"' ) );
+	check( "[$nom] exactement trois familles tarifaires et sept forfaits",
+		3 === substr_count( $s, 'class="tarif-group ' )
+		&& 7 === preg_match_all( '#class="tarif(?: featured)?"#', $s )
+		&& 7 === substr_count( $s, 'class="tarif-price"' ) );
 
-	$mauvaises = array();
+	check( "[$nom] les trois familles sont dans l'ordre attendu",
+		strpos( $s, 'tarif-group-dp' ) < strpos( $s, 'tarif-group-pc' )
+		&& strpos( $s, 'tarif-group-pc' ) < strpos( $s, 'tarif-group-plans' )
+		&& str_contains( $s, '>Déclaration préalable<' )
+		&& str_contains( $s, '>Permis de construire<' )
+		&& str_contains( $s, '>Conception de plans sur mesure<' ) );
 
-	foreach ( $prestations as $libelle => $url ) {
-		if ( ! str_contains( $s, '>' . $libelle . '<' ) ) { $mauvaises[] = "libellé $libelle"; }
-		if ( ! str_contains( $s, 'href="' . $url . '"' ) ) { $mauvaises[] = "destination $libelle"; }
-	}
+	// Chaque forfait annonce un prix d'appel, jamais un prix ferme.
+	check( "[$nom] chaque forfait annonce « À partir de »",
+		7 === substr_count( $s, 'class="tarif-from"' )
+		&& str_contains( $s, '189&nbsp;€' )
+		&& str_contains( $s, '849&nbsp;€' ) );
 
-	check( "[$nom] chaque prestation porte son libellé et sa destination", array() === $mauvaises );
+	check( "[$nom] le formulaire reste la source du devis personnalisé",
+		str_contains( $s, 'Le formulaire calcule ensuite un devis estimatif' )
+		&& str_contains( $s, 'href="https://urbizen.fr/conception/"' ) );
 
-	if ( array() !== $mauvaises ) { echo '    écart : ' . implode( ' | ', $mauvaises ) . "\n"; }
+	check( "[$nom] le supplément ABF reste explicite et transversal",
+		str_contains( $s, 'Secteur Bâtiments de France' )
+		&& str_contains( $s, '+80&nbsp;€' ) );
 
-	// L'ordre commercial : la déclaration préalable, puis le permis, puis la
-	// conception. L'inverser mettrait la prestation la plus lourde en tête.
-	check( "[$nom] les trois prestations dans l'ordre attendu",
-		strpos( $s, 'declarations-prealables' ) < strpos( $s, 'permis-de-construire' )
-		&& strpos( $s, 'permis-de-construire' ) < strpos( $s, 'conception' ) );
-
-	// Chaque parcours annonce un prix d'appel, jamais un prix ferme.
-	check( "[$nom] chaque parcours annonce « À partir de »",
-		3 === substr_count( $s, 'class="tarif-from"' )
-		&& 3 === substr_count( $s, 'class="tarif-price"' )
-		&& 3 === substr_count( $s, 'class="tarif-detail"' ) );
-
-	// Les icônes des parcours sont décoratives : le libellé porte le sens.
-	check( "[$nom] les icônes de parcours sont décoratives",
-		3 === substr_count( $s, 'class="service-route-icon"' )
-		&& 3 === preg_match_all( '#class="service-route-icon"[^>]*aria-hidden="true"#', $s ) );
+	check( "[$nom] l'ancienne section « Nos services » n'est pas dupliquée",
+		! str_contains( $s, 'class="service-route"' )
+		&& ! str_contains( $s, '>Nos services<' ) );
 
 	// L'explorateur est une SECTION à part depuis le 14 août 2026 : il ne fallait
 	// pas le loger dans « Nos services », qui porte les parcours et les tarifs.
@@ -170,9 +169,10 @@ foreach ( $sources as $nom => $chemin ) {
 	check( "[$nom] les documents montrés sont annoncés comme des exemples",
 		str_contains( $d, 'projet fictif' ) );
 
-	// Le dépôt dématérialisé est une option annoncée, pas une promesse ferme.
-	check( "[$nom] le dépôt dématérialisé reste annoncé comme option",
-		str_contains( $s, 'Dépôt dématérialisé en option' ) );
+	// La mention d'option a été retirée : elle refroidissait le parcours et ne
+	// remplaçait pas le devis détaillé produit par le formulaire.
+	check( "[$nom] aucun encart « dépôt dématérialisé en option »",
+		! str_contains( $s, 'Dépôt dématérialisé en option' ) );
 
 	/* ------------------------------ les blocs de ee1415c ne reviennent pas ---- */
 

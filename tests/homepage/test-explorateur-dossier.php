@@ -14,12 +14,11 @@
  *      disait ;
  *   2. trois vues sur dix n'avaient pas d'encart, la référence en demandant un
  *      par pièce ;
- *   3. les trois « visuels » — dont un vrai rendu 3D Urbizen — étaient légendés
- *      « projet fictif », et la note de section affirmait que **tout** était
- *      fictif.
+ *   3. les visuels ne portaient pas le cartouche métier validé et l'insertion
+ *      reprenait une maison sans rapport avec le projet montré.
  *
- * Le point 3 n'est pas cosmétique : il fait dire au site l'inverse de la
- * vérité sur la provenance de ses propres images.
+ * Le point 3 n'est pas cosmétique : les pièces montrées doivent ressembler à
+ * de vraies pièces Urbizen, tout en restant clairement fictives.
  *
  * Ce banc lit les sources. Il ne remplace pas un contrôle rendu — le
  * chevauchement du bouton « Agrandir » relève de la géométrie — mais il fige
@@ -110,19 +109,18 @@ foreach ( $vues as $vue ) {
 check( 'Deux à trois points par pièce', array() === $hors, implode( ' | ', $hors ) );
 
 // ------------------------------------------ 3 · la provenance des images ----
-// C'est le contrôle qui manquait. Trois provenances cohabitent :
-//   · les planches dessinées pour l'occasion — projet fictif ;
-//   · un rendu 3D réellement produit par Urbizen ;
-//   · deux photographies d'illustration, pour des pièces que le demandeur
-//     fournit lui-même.
-// Les confondre fait dire au site le contraire de la vérité.
-check( 'Le rendu 3D réel n\'est pas présenté comme un projet fictif',
-	str_contains( $dossier, 'rendu 3D réalisé par Urbizen' )
-	&& ! preg_match( '#conception/[^"]+\.webp".*?<figcaption>[^<]*projet fictif#s', $dossier ) );
+// Les dix fiches sont des exemples sur un projet entièrement fictif. DP6 est
+// une insertion originale préparée pour cette démonstration — jamais la villa
+// « Bali » ni un visuel du catalogue Conception.
+check( 'L\'insertion DP6 est originale et ne reprend aucune maison du catalogue',
+	str_contains( $dossier, 'Insertion graphique originale — exemple Urbizen sur un projet fictif' )
+	&& str_contains( $dossier, 'dp6-insertion-cartouche.webp' )
+	&& ! str_contains( $dossier, 'conception-maison-plain-pied-terrasse' )
+	&& ! str_contains( $dossier, 'Bali' ) );
 check( 'Les pièces photographiques disent qu\'elles sont prises par le demandeur',
 	2 === substr_count( $dossier, 'cette pièce est prise par vos soins' ) );
-check( 'Les planches dessinées restent annoncées comme fictives',
-	7 === substr_count( $dossier, 'exemple Urbizen sur un projet fictif' ) );
+check( 'Les huit planches préparées restent annoncées comme fictives',
+	8 === substr_count( $dossier, 'exemple Urbizen sur un projet fictif' ) );
 check( 'La note de section ne dit plus que tout le contenu est fictif',
 	! str_contains( $dossier, 'Les documents montrés sont des exemples réalisés sur un projet fictif' )
 	&& str_contains( $dossier, "aucune pièce n'est systématiquement exigée" ) );
@@ -133,22 +131,30 @@ check( 'La note de section ne dit plus que tout le contenu est fictif',
 check( 'Aucune pièce n\'est annoncée comme systématiquement fournie',
 	! preg_match( '#(?<!aucune pièce n.est )(toujours|systématiquement) (fourni|joint|exigé|inclus)#iu', $dossier ) );
 
-// Le dépôt ne doit contenir aucun document client. Les planches sont dessinées,
-// et leur cartouche le dit — c'est ce qui distingue une illustration d'une
-// pièce réelle anonymisée.
-$planches = glob( $racine . '/wordpress/urbizen-child/assets/images/dossier/*' );
-check( 'Sept planches, toutes en SVG dessiné', 7 === count( $planches )
-	&& 7 === count( preg_grep( '#\.svg$#', $planches ) ),
-	implode( ', ', array_map( 'basename', $planches ) ) );
-$sans_cartouche = array();
-foreach ( $planches as $f ) {
-	$svg = file_get_contents( $f );
-	if ( ! str_contains( $svg, 'EXEMPLE URBIZEN' ) || ! str_contains( $svg, 'projet fictif' ) ) {
-		$sans_cartouche[] = basename( $f );
+// Le dépôt ne doit contenir aucun document client. Les sept pièces graphiques
+// DP1 à DP8 sont des planches WebP exportées avec le même cartouche UrbiZen ;
+// les trois SVG restants sont les documents administratifs schématiques.
+$dossier_assets = $racine . '/wordpress/urbizen-child/assets/images/dossier/';
+$cartouches      = glob( $dossier_assets . '*-cartouche.webp' );
+$administratifs = glob( $dossier_assets . 'doc-*.svg' );
+check( 'Sept planches au cartouche UrbiZen et trois documents administratifs',
+	7 === count( $cartouches ) && 3 === count( $administratifs ),
+	implode( ', ', array_map( 'basename', array_merge( $cartouches, $administratifs ) ) ) );
+
+$planches_incompletes = array();
+foreach ( $cartouches as $f ) {
+	$dimensions = @getimagesize( $f );
+	if ( false === $dimensions || 1600 !== $dimensions[0] || 1131 !== $dimensions[1] || filesize( $f ) < 50000 ) {
+		$planches_incompletes[] = basename( $f );
 	}
 }
-check( 'Chaque planche porte son cartouche « EXEMPLE URBIZEN / projet fictif »',
-	array() === $sans_cartouche, implode( ', ', $sans_cartouche ) );
+check( 'Les sept planches sont des exports lisibles 1600 × 1131',
+	array() === $planches_incompletes, implode( ', ', $planches_incompletes ) );
+check( 'Chaque fiche DP1 à DP8 nomme explicitement le cartouche UrbiZen',
+	7 === preg_match_all( '#alt="[^"]*cartouche (vertical )?UrbiZen[^"]*"#iu', $dossier ) );
+check( 'DP1 décrit une parcelle entièrement délimitée',
+	str_contains( $dossier, 'dp1-plan-situation-cartouche.webp' )
+	&& str_contains( $dossier, 'la parcelle entièrement délimitée' ) );
 
 // ------------------------------------------ 4 · le bouton d'agrandissement --
 // Aucun coin de la planche n'est libre : en bas à droite se trouve le cartouche
@@ -167,7 +173,7 @@ check( 'Chaque déclencheur nomme la pièce qu\'il agrandit',
 	10 === preg_match_all( '#aria-label="Agrandir&nbsp;: [^"]+"|aria-label="Agrandir : [^"]+"#', $dossier ) );
 
 // ------------------------------------------ 5 · le câblage ARIA -------------
-check( 'Trois familles, trois panneaux',
+check( 'Trois familles de repli sont présentes dans le HTML',
 	3 === substr_count( $dossier, 'class="dx-tab"' )
 	&& 3 === substr_count( $dossier, 'class="dx-panel"' ) );
 check( 'Une seule famille sélectionnée au chargement',
@@ -184,12 +190,22 @@ check( 'Chaque vue est reliée à sa pièce par aria-labelledby',
 check( 'Chaque pièce pointe sa vue par aria-controls',
 	10 === preg_match_all( '#aria-controls="dx-v-[a-z0-9]+"#', $dossier ) );
 
+// Avec JavaScript, « Plans techniques » et « Visuels du projet » deviennent
+// le groupe unique demandé « Plans et visuels ». Le panneau de repli reste
+// dans le HTML pour que les dix fiches existent avant l'initialisation.
+check( 'Les plans et les visuels sont réunis dans une seule famille visible',
+	str_contains( $dossier, '>Plans et visuels</button>' )
+	&& str_contains( $dossier, 'id="dx-t-visuels" aria-controls="dx-p-visuels" aria-selected="false" tabindex="-1" hidden' )
+	&& str_contains( $js_wp, 'plansNav.appendChild(onglet)' )
+	&& str_contains( $js_wp, 'visuelsPanel.remove()' )
+	&& str_contains( $js_wp, 'visuelsTab.remove()' ) );
+
 // ------------------------------------------ 6 · les quatre étapes -----------
 check( 'Quatre étapes, quatre panneaux',
 	4 === substr_count( $methode, 'class="etape-lien"' )
-	&& 4 === substr_count( $methode, 'class="etape-panel"' ) );
+	&& 4 === preg_match_all( '#class="etape-panel(?: [^"]+)?"#', $methode ) );
 check( 'Trois panneaux sur quatre sont masqués au chargement',
-	3 === preg_match_all( '#class="etape-panel"[^>]*hidden#', $methode ) );
+	3 === preg_match_all( '#class="etape-panel(?: [^"]+)?"[^>]*hidden#', $methode ) );
 check( 'Le compteur annonce « Étape 1 sur 4 » au chargement',
 	str_contains( $methode, 'Étape 1 sur 4' ) );
 // « etapes-point » sans délimiteur attrape aussi le conteneur « etapes-points ».
@@ -209,7 +225,7 @@ check( 'Le délai est qualifié de délai de préparation',
 check( 'Le point de départ du délai est dit',
 	str_contains( $methode, 'après réception de l' ) );
 check( 'La distinction avec le délai d\'instruction est écrite, dans le même bloc',
-	(bool) preg_match( '#ne se confond pas avec le délai d.{0,3}instruction de la mairie#u', $methode ) );
+	(bool) preg_match( '#ne (se confond|correspond) pas (avec le|au) délai d.{0,3}instruction de la mairie#u', $methode ) );
 check( 'Les sept jours ne sont jamais présentés comme un délai de mairie',
 	! preg_match( '#7\s*jours[^<]{0,80}(mairie|instruction)#iu', $methode ) );
 // On ne promet pas une décision favorable : Urbizen prépare un dossier, la
@@ -228,12 +244,17 @@ foreach ( array( 'dossier-explorer' => 'dossier', 'methode' => 'methode' ) as $c
 }
 
 // ------------------------------------------ 9 · le hors-périmètre ----------
-// Une première tentative avait supprimé les trois parcours de prestation et la
-// grille de sept tarifs de l'accueil, qui n'étaient pas dans le périmètre.
-check( 'Les trois parcours de prestation sont intacts',
-	3 === substr_count( $gabarit, 'class="service-route"' ) );
+// La section redondante « Nos services » a été retirée, mais la grille de sept
+// tarifs reste bien visible et le formulaire produit le devis estimatif.
+check( 'Aucune section « Nos services » redondante',
+	! str_contains( $gabarit, 'class="service-route"' )
+	&& ! str_contains( $gabarit, '>Nos services<' ) );
 check( 'Les sept tarifs de l\'accueil sont intacts',
-	7 === substr_count( $gabarit, 'À partir de' ) );
+	7 === substr_count( $gabarit, 'class="tarif-price"' )
+	&& 7 === substr_count( $gabarit, 'class="tarif-from"' ) );
+check( 'Localisation et type de projet sont remontés avant la méthode',
+	str_contains( $js_wp, 'contenuPrincipal.insertBefore(localisationSection, methodeSection)' )
+	&& str_contains( $js_wp, 'contenuPrincipal.insertBefore(projetSection, methodeSection)' ) );
 
 echo "\n";
 if ( $fail ) {
