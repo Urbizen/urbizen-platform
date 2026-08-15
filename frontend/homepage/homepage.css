@@ -2025,9 +2025,8 @@ main .hero-v7 {
    ACCOMPAGNEMENT HUMAIN
    ----------------------------------------------------------------------------
    Une image d'ambiance apporte de la chaleur sans être présentée comme une
-   photographie de l'équipe. La légende visible « Image d'illustration » rend
-   cette distinction explicite, jusque dans un contexte où le texte serait
-   partagé séparément de la page.
+   photographie de l'équipe. Son texte alternatif décrit uniquement la scène,
+   sans attribuer d'identité aux personnes représentées.
    ======================================================================== */
 .accompagnement-humain {
   position: relative;
@@ -2117,22 +2116,11 @@ main .hero-v7 {
 .accompagnement-visuel img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   border-radius: calc(var(--u-radius) - 5px);
-}
-.accompagnement-visuel figcaption {
-  position: absolute;
-  right: 20px; bottom: 18px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: rgba(20, 35, 59, .78);
-  color: #fff;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
 }
 @media (max-width: 820px) {
   .accompagnement-grille { grid-template-columns: 1fr; gap: 30px; }
@@ -2147,5 +2135,4 @@ main .hero-v7 {
   .accompagnement-atouts { grid-template-columns: 1fr; margin-top: 22px; }
   .accompagnement-atouts li { min-height: 48px; flex-direction: row; align-items: center; }
   .accompagnement-visuel { padding: 7px; }
-  .accompagnement-visuel figcaption { right: 14px; bottom: 13px; }
 }

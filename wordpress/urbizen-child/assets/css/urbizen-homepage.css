@@ -2039,9 +2039,8 @@ html { scroll-behavior: smooth; }
    ACCOMPAGNEMENT HUMAIN
    ----------------------------------------------------------------------------
    Une image d'ambiance apporte de la chaleur sans être présentée comme une
-   photographie de l'équipe. La légende visible « Image d'illustration » rend
-   cette distinction explicite, jusque dans un contexte où le texte serait
-   partagé séparément de la page.
+   photographie de l'équipe. Son texte alternatif décrit uniquement la scène,
+   sans attribuer d'identité aux personnes représentées.
    ======================================================================== */
 .urbizen-accueil .accompagnement-humain {
   position: relative;
@@ -2131,22 +2130,11 @@ html { scroll-behavior: smooth; }
 .urbizen-accueil .accompagnement-visuel img {
   display: block;
   width: 100%;
+  height: auto;
   aspect-ratio: 16 / 9;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
   border-radius: calc(var(--u-radius) - 5px);
-}
-.urbizen-accueil .accompagnement-visuel figcaption {
-  position: absolute;
-  right: 20px; bottom: 18px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: rgba(20, 35, 59, .78);
-  color: #fff;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: .08em;
-  text-transform: uppercase;
 }
 @media (max-width: 820px) {
   .urbizen-accueil .accompagnement-grille { grid-template-columns: 1fr; gap: 30px; }
@@ -2161,5 +2149,4 @@ html { scroll-behavior: smooth; }
   .urbizen-accueil .accompagnement-atouts { grid-template-columns: 1fr; margin-top: 22px; }
   .urbizen-accueil .accompagnement-atouts li { min-height: 48px; flex-direction: row; align-items: center; }
   .urbizen-accueil .accompagnement-visuel { padding: 7px; }
-  .urbizen-accueil .accompagnement-visuel figcaption { right: 14px; bottom: 13px; }
 }

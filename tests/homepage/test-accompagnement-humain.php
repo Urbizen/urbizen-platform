@@ -50,13 +50,15 @@ check( 'La section suit « Comment ça marche » et précède l’explorateur',
 check( 'Le titre et le texte d’accompagnement validés sont présents',
 	str_contains( $section_gabarit, 'Un interlocuteur pour suivre votre projet' )
 	&& str_contains( $section_gabarit, "votre dossier n'est pas traité de façon impersonnelle" ) );
-check( 'Les trois bénéfices validés sont présents',
+check( 'Les quatre bénéfices validés sont présents',
 	str_contains( $section_gabarit, 'Échanges directs' )
 	&& str_contains( $section_gabarit, 'Suivi du dossier' )
-	&& str_contains( $section_gabarit, 'Conseils adaptés au projet' ) );
+	&& str_contains( $section_gabarit, 'Conseils adaptés au projet' )
+	&& str_contains( $section_gabarit, 'Interprétation des règles d’urbanisme' ) );
 
-check( 'L’image est explicitement identifiée comme une illustration',
-	str_contains( $section_gabarit, "<figcaption>Image d'illustration</figcaption>" ) );
+check( 'Aucune légende ne masque l’image',
+	! str_contains( $section_gabarit, '<figcaption>' )
+	&& ! str_contains( $section_gabarit, "Image d'illustration" ) );
 check( 'Aucune formule ne présente les personnes comme l’équipe Urbizen',
 	! preg_match( '#(équipe Urbizen|notre équipe|nos collaborateurs)#iu', $section_gabarit ) );
 check( 'Le texte alternatif décrit la scène sans inventer une identité',
@@ -75,8 +77,8 @@ check( 'Les deux images restent légères',
 	is_file( $petite ) && filesize( $petite ) < 100000
 	&& is_file( $grande ) && filesize( $grande ) < 150000 );
 
-check( 'Le recadrage est centré et conserve un ratio horizontal',
-	(bool) preg_match( '#\.accompagnement-visuel img \{.*?aspect-ratio:\s*16\s*/\s*9;.*?object-fit:\s*cover;.*?object-position:\s*center;#s', $css ) );
+check( 'L’image conserve son ratio horizontal sans être coupée',
+	(bool) preg_match( '#\.accompagnement-visuel img \{.*?height:\s*auto;.*?aspect-ratio:\s*16\s*/\s*9;.*?object-fit:\s*contain;.*?object-position:\s*center;#s', $css ) );
 check( 'Le mobile empile le texte et le visuel',
 	(bool) preg_match( '#@media \(max-width: 820px\).*?\.accompagnement-grille \{ grid-template-columns: 1fr;#s', $css ) );
 
