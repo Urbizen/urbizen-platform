@@ -33,9 +33,16 @@
 /* Le visuel d'en-tête, cadré comme celui des guides : une image 3:2 sur
    1140 px ferait 760 px de haut et repousserait la première ligne sous la
    ligne de flottaison. */
+/* LE DÉBORD EST PLUS FAIBLE QUE SUR LES GUIDES, ET C'EST VOULU
+   Le hero d'un guide se termine par son chapô ; celui d'une page projet porte
+   deux boutons. Le débord de `clamp(-96px, -6vw, -48px)` repris des guides
+   remontait donc le visuel de 86 px à 1440 px et lui faisait recouvrir le bas
+   des boutons de 7 px — mesuré sur la production, invisible à la lecture de la
+   feuille. La valeur retenue laisse 16 px sous les boutons à cette largeur,
+   tout en gardant l'effet de liaison entre le bandeau et le contenu. */
 .urbizen-projets .projet-visuel {
 	width: 100%;
-	margin: clamp(-96px, -6vw, -48px) 0 clamp(24px, 3vw, 38px);
+	margin: clamp(-64px, -4.5vw, -32px) 0 clamp(24px, 3vw, 38px);
 	position: relative;
 	z-index: 1;
 	border: 1px solid var(--u-line);

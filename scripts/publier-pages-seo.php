@@ -34,8 +34,15 @@ foreach ( array( 'pages', 'guides' ) as $sous ) {
 	}
 }
 
-/** Répertoire des visuels du kit, livrés avec le thème. */
-$dossier_images = get_stylesheet_directory() . '/assets/images/seo-projects';
+/**
+ * Racine des visuels du thème.
+ *
+ * Le manifeste porte un chemin RELATIF — `seo-projects/…` ou `dossier/…` —
+ * parce que le kit sert deux familles : les photographies de projets fictifs,
+ * et les planches métier au cartouche. Le handoff visuel désigne les unes ou
+ * les autres selon l'URL, et un chemin en dur ici interdirait la moitié.
+ */
+$dossier_images = get_stylesheet_directory() . '/assets/images';
 
 /*
  * LE MANIFESTE
@@ -55,7 +62,7 @@ $contenus = array(
 		'extrait'   => 'Extension, véranda, surélévation : comment savoir si votre projet relève d’une déclaration préalable ou d’un permis, et ce qu’Urbizen prépare pour la mairie.',
 		'seo_titre' => 'Extension de maison : votre dossier de déclaration | Urbizen',
 		'seo_desc'  => 'Extension de 5 à 40 m² : Urbizen détermine la démarche, dessine les plans et prépare le dossier complet à déposer en mairie. Devis avant commande.',
-		'image'     => 'extension-maison-photo.webp',
+		'image'     => 'seo-projects/extension-maison-photo.webp',
 		'image_alt' => 'Extension contemporaine sobre accolée à l’arrière d’une maison en brique, illustration d’un projet fictif.',
 	),
 	array(
@@ -65,7 +72,7 @@ $contenus = array(
 		'extrait'   => 'Bassin, plage, local technique, abri : ce qui compte dans le calcul, ce que la mairie attend, et le dossier qu’Urbizen prépare pour vous.',
 		'seo_titre' => 'Dossier de déclaration pour une piscine | Urbizen',
 		'seo_desc'  => 'Bassin, plage, local technique, abri : ce qui compte pour votre déclaration, et le dossier qu’Urbizen prépare pour la mairie. À partir de 249 €.',
-		'image'     => 'piscine-photo.webp',
+		'image'     => 'seo-projects/piscine-photo.webp',
 		'image_alt' => 'Piscine rectangulaire implantée dans le jardin d’une maison individuelle, illustration d’un projet fictif.',
 	),
 	array(
@@ -75,7 +82,7 @@ $contenus = array(
 		'extrait'   => 'Au-delà de 5 m², un abri de jardin se déclare. Les seuils, la taxe d’aménagement et le dossier prêt à déposer, expliqués sans jargon.',
 		'seo_titre' => 'Abri de jardin : déclaration de travaux clé en main | Urbizen',
 		'seo_desc'  => 'Au-delà de 5 m², un abri de jardin se déclare. Les seuils, la taxe d’aménagement et le dossier qu’Urbizen prépare pour vous. À partir de 189 €.',
-		'image'     => 'abri-jardin-photo.webp',
+		'image'     => 'seo-projects/abri-jardin-photo.webp',
 		'image_alt' => 'Abri de jardin en bois installé dans une parcelle résidentielle, illustration d’un projet fictif.',
 	),
 	array(
@@ -85,7 +92,7 @@ $contenus = array(
 		'extrait'   => 'Pergola ouverte, pergola couverte, carport, annexe fermée : quatre objets que le code ne traite pas de la même façon. Urbizen qualifie le vôtre.',
 		'seo_titre' => 'Pergola ou carport : quelle déclaration, quel dossier | Urbizen',
 		'seo_desc'  => 'Pergola ouverte, pergola couverte, carport, annexe fermée : quatre cas, quatre régimes. Urbizen qualifie le vôtre et prépare le dossier.',
-		'image'     => 'pergola-photo.webp',
+		'image'     => 'seo-projects/pergola-photo.webp',
 		'image_alt' => 'Pergola en aluminium adossée à la façade arrière d’une maison, illustration d’un projet fictif.',
 	),
 	array(
@@ -95,7 +102,7 @@ $contenus = array(
 		'extrait'   => 'Façade modifiée, surface de plancher créée, stationnement du PLU : trois notions distinctes que ce projet met en jeu d’un coup.',
 		'seo_titre' => 'Transformer un garage : le dossier à déposer | Urbizen',
 		'seo_desc'  => 'Façade modifiée, surface de plancher créée, stationnement du PLU : ce que la transformation d’un garage déclenche vraiment, et le dossier associé.',
-		'image'     => 'transformation-garage-photo.webp',
+		'image'     => 'seo-projects/transformation-garage-photo.webp',
 		'image_alt' => 'Ancienne ouverture de garage remplacée par une large baie vitrée, illustration d’un projet fictif.',
 	),
 	array(
@@ -105,7 +112,7 @@ $contenus = array(
 		'extrait'   => 'Toiture, sol ou ombrière : la formalité n’est pas la même. Urbizen qualifie votre installation et prépare le dossier pour la mairie.',
 		'seo_titre' => 'Panneaux solaires : déclaration préalable et dossier | Urbizen',
 		'seo_desc'  => 'Toiture, sol ou ombrière : la formalité n’est pas la même. Urbizen qualifie votre installation et prépare les pièces attendues par la mairie.',
-		'image'     => 'panneaux-solaires-photo.webp',
+		'image'     => 'seo-projects/panneaux-solaires-photo.webp',
 		'image_alt' => 'Panneaux photovoltaïques alignés sur un pan de toiture en tuiles, illustration d’un projet fictif.',
 	),
 	array(
@@ -115,7 +122,7 @@ $contenus = array(
 		'extrait'   => 'Créer une fenêtre de toit modifie l’aspect extérieur. Où passe la ligne avec l’entretien, et ce que le dossier doit montrer.',
 		'seo_titre' => 'Fenêtre de toit : déclarer la création en mairie | Urbizen',
 		'seo_desc'  => 'Créer ou agrandir une fenêtre de toit modifie l’aspect extérieur. Ce que la mairie attend, et le dossier qu’Urbizen prépare. À partir de 189 €.',
-		'image'     => 'fenetre-toit-photo.webp',
+		'image'     => 'seo-projects/fenetre-toit-photo.webp',
 		'image_alt' => 'Deux fenêtres de toit intégrées à une toiture en tuiles, illustration d’un projet fictif.',
 	),
 	array(
@@ -125,7 +132,7 @@ $contenus = array(
 		'extrait'   => 'Ouverture nouvelle, menuiseries, enduit, ravalement : ce qui relève d’une déclaration, ce qui n’en relève pas, et pourquoi.',
 		'seo_titre' => 'Modifier une façade : déclaration et pièces à fournir | Urbizen',
 		'seo_desc'  => 'Ouverture nouvelle, menuiseries, enduit, ravalement : ce qui relève d’une déclaration et ce qui n’en relève pas, puis le dossier prêt à déposer.',
-		'image'     => 'modification-facade-photo.webp',
+		'image'     => 'seo-projects/modification-facade-photo.webp',
 		'image_alt' => 'Façade de maison avec une grande ouverture et des menuiseries anthracite, illustration d’un projet fictif.',
 	),
 	array(
@@ -135,7 +142,7 @@ $contenus = array(
 		'extrait'   => 'C’est le seul sujet où la règle nationale ne tranche pas : tout dépend de ce que votre commune a décidé. Comment le vérifier, et quoi déposer.',
 		'seo_titre' => 'Clôture et portail : faut-il déclarer ? | Urbizen',
 		'seo_desc'  => 'La clôture est le cas où la commune décide. Comment savoir si la vôtre est soumise à déclaration, et le dossier qu’Urbizen prépare si elle l’est.',
-		'image'     => 'cloture-portail-photo.webp',
+		'image'     => 'seo-projects/cloture-portail-photo.webp',
 		'image_alt' => 'Clôture et portails anthracite sur un soubassement maçonné en bord de rue, illustration d’un projet fictif.',
 	),
 
@@ -149,7 +156,7 @@ $contenus = array(
 		'extrait'   => 'Une seule pièce est obligatoire dans tous les cas. Les sept autres dépendent de ce que fait votre projet, et de l’endroit où il le fait.',
 		'seo_titre' => 'Les pièces d’une déclaration préalable, une par une | Urbizen',
 		'seo_desc'  => 'DP1 à DP8 : ce que chaque pièce montre, quand elle est demandée, ce qu’elle doit faire apparaître, et l’erreur qui la fait revenir.',
-		'image'     => 'pieces-declaration-prealable.webp',
+		'image'     => 'seo-projects/pieces-declaration-prealable.webp',
 		'image_alt' => 'Ensemble des planches d’un dossier de déclaration préalable Urbizen présentées côte à côte avec leur cartouche, sur un projet fictif.',
 	),
 	array(
@@ -160,8 +167,8 @@ $contenus = array(
 		'extrait'   => 'La pièce sur laquelle l’instruction vérifie l’implantation, les distances et les hauteurs. Une planche réelle, décomposée.',
 		'seo_titre' => 'Le plan de masse DP2, lu ligne à ligne | Urbizen',
 		'seo_desc'  => 'Échelle, orientation, cotes en trois dimensions, distances aux limites : ce que le plan de masse doit porter, et les cinq questions à lui poser.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp2-plan-masse-cartouche.webp',
+		'image_alt' => 'Plan de masse coté d’une extension à l’arrière d’une maison, avec les distances aux limites et le récapitulatif des surfaces, sous cartouche Urbizen — projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -171,8 +178,8 @@ $contenus = array(
 		'extrait'   => 'Ce n’est pas une belle image du projet. C’est une démonstration : voilà ce qu’on verra, depuis là où on le verra.',
 		'seo_titre' => 'L’insertion graphique DP6 : ce qu’elle montre | Urbizen',
 		'seo_desc'  => 'La différence entre un rendu et une insertion, les trois erreurs qui vident la pièce de son sens, et ce que l’architecte des Bâtiments de France y cherche.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp6-insertion-cartouche.webp',
+		'image_alt' => 'Document graphique d’insertion montrant une extension intégrée à la photographie du site réel, sous cartouche Urbizen — projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -182,8 +189,8 @@ $contenus = array(
 		'extrait'   => 'La pièce que l’instruction compare. Une planche qui ne montre qu’un seul état ne permet aucune comparaison.',
 		'seo_titre' => 'Plan des façades et toitures DP4 : comment le lire | Urbizen',
 		'seo_desc'  => 'Quand cette pièce est exigée, pourquoi toutes les façades concernées doivent y figurer, et à quoi sert la légende des matériaux et des teintes.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp4-facades-cartouche.webp',
+		'image_alt' => 'Planche des façades et toitures présentant quatre élévations avec la légende des matériaux et des teintes, sous cartouche Urbizen — projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -193,8 +200,8 @@ $contenus = array(
 		'extrait'   => 'Sa fonction est précise : montrer ce que le projet fait au terrain. Pas au bâtiment, pas à la distribution intérieure.',
 		'seo_titre' => 'Le plan en coupe DP3 et le profil du terrain | Urbizen',
 		'seo_desc'  => 'Deux lignes de terrain, avant et après, les cotes qui comptent, où passe le trait de coupe, et les trois erreurs qui font revenir la pièce.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp3-plan-coupe-cartouche.webp',
+		'image_alt' => 'Plan en coupe montrant le profil du terrain avant et après travaux et l’implantation de la construction, sous cartouche Urbizen — projet fictif.',
 	),
 
 	// ------------------------------------ 7 guides de qualification ----------
@@ -218,8 +225,8 @@ $contenus = array(
 		'extrait'   => 'Deux grandeurs qui décident de presque tout, qui ne se calculent pas de la même façon, et qui ne s’additionnent jamais.',
 		'seo_titre' => 'Emprise au sol et surface de plancher : deux compteurs | Urbizen',
 		'seo_desc'  => 'Les deux définitions, la règle du « et » et celle du « ou », et quatre calculs chiffrés qui isolent chacun un mécanisme.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp2-plan-masse-cartouche.webp',
+		'image_alt' => 'Plan de masse coté montrant l’emprise au sol d’une maison et de son extension sur la parcelle, sous cartouche Urbizen — projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -229,8 +236,8 @@ $contenus = array(
 		'extrait'   => 'Le code de l’urbanisme ne fixe aucune distance générale. Elle est locale par construction — voici où la lire.',
 		'seo_titre' => 'À quelle distance de la limite peut-on construire ? | Urbizen',
 		'seo_desc'  => 'Pourquoi il n’existe pas de réponse nationale, les trois formes que prend la règle, et depuis quel point la distance se mesure réellement.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'dossier/dp2-plan-masse-cartouche.webp',
+		'image_alt' => 'Plan de masse portant les distances d’implantation aux limites séparatives, sous cartouche Urbizen — projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -251,8 +258,8 @@ $contenus = array(
 		'extrait'   => 'Ce n’est ni un refus ni un mauvais signe. Ce qui coûte cher, c’est le temps qu’on met à y répondre.',
 		'seo_titre' => 'Répondre à une demande de pièces complémentaires | Urbizen',
 		'seo_desc'  => 'Le délai qui recommence au lieu de reprendre, les deux protections que le code vous donne, et les cinq gestes pour répondre vite et bien.',
-		'image'     => '',
-		'image_alt' => '',
+		'image'     => 'seo-projects/pieces-declaration-prealable.webp',
+		'image_alt' => 'Ensemble des planches d’un dossier de déclaration préalable Urbizen présentées côte à côte avec leur cartouche, sur un projet fictif.',
 	),
 	array(
 		'type'      => 'post',
@@ -365,7 +372,7 @@ foreach ( $contenus as $c ) {
 					'numberposts' => 1,
 					'fields'      => 'ids',
 					'meta_key'    => '_urbizen_seo_image',   // phpcs:ignore WordPress.DB.SlowDBQuery
-					'meta_value'  => $c['image'],            // phpcs:ignore WordPress.DB.SlowDBQuery
+					'meta_value'  => basename( $c['image'] ), // phpcs:ignore WordPress.DB.SlowDBQuery
 				)
 			);
 
@@ -378,12 +385,12 @@ foreach ( $contenus as $c ) {
 
 				// Copie obligatoire : `media_handle_sideload` DÉPLACE le fichier
 				// qu'on lui donne, et viderait le thème de ses visuels.
-				$tmp = wp_tempnam( $c['image'] );
+				$tmp = wp_tempnam( basename( $c['image'] ) );
 				if ( ! copy( $chemin, $tmp ) ) {
 					WP_CLI::error( "Copie impossible : $chemin" );
 				}
 				$att = media_handle_sideload(
-					array( 'name' => $c['image'], 'tmp_name' => $tmp ),
+					array( 'name' => basename( $c['image'] ), 'tmp_name' => $tmp ),
 					0,
 					$c['image_alt']
 				);
@@ -392,7 +399,7 @@ foreach ( $contenus as $c ) {
 					WP_CLI::error( "Import du visuel en échec ($slug) : " . $att->get_error_message() );
 				}
 				$att = (int) $att;
-				update_post_meta( $att, '_urbizen_seo_image', $c['image'] );
+				update_post_meta( $att, '_urbizen_seo_image', basename( $c['image'] ) );
 				update_post_meta( $att, '_wp_attachment_image_alt', $c['image_alt'] );
 			}
 

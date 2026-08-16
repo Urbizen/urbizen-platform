@@ -54,6 +54,38 @@ const NON_REGRESSION = [
 
 const TOUTES = [...PAGES, ...GUIDES];
 
+/*
+ * LES QUATRE GUIDES QUI N'ONT DÉLIBÉRÉMENT PAS D'IMAGE
+ *
+ * `docs/SEO_VISUALS_HANDOFF.md` l'écrit noir sur blanc, et c'est un choix de
+ * fond, pas un oubli : « ces guides n'ont pas besoin d'une image artificielle
+ * différente à tout prix ; la preuve métier est plus crédible qu'un visuel
+ * décoratif ». Il détaille ensuite, pour chacun :
+ *
+ *   secteur protégé  → une capture officielle correctement créditée, ou rien.
+ *                      Ne pas inventer un périmètre ABF.
+ *   architecte 150 m² → pas de schéma de seuil figé dans une image ; un tableau
+ *                      HTML maintenable vaut mieux.
+ *   refus            → pas de faux arrêté municipal.
+ *   CERFA            → pas de fausse reproduction de formulaire.
+ *
+ * Le contrôle est donc bilatéral : ces quatre-là doivent rester SANS image mise
+ * en avant, et tous les autres doivent en avoir une. Écrit dans l'autre sens,
+ * il laisserait passer l'ajout d'un visuel décoratif — exactement ce que le
+ * handoff refuse.
+ *
+ * Conséquence assumée : ces quatre pages n'émettent pas d'`og:image`. Y
+ * remédier suppose une image OG par défaut au niveau du site, qui toucherait
+ * toutes les pages sans vignette — une décision de configuration globale, hors
+ * du périmètre de ce lot.
+ */
+const SANS_IMAGE_VOULU = [
+  '/guides/secteur-protege-abf-declaration-travaux/',
+  '/guides/recours-architecte-150-m2/',
+  '/guides/refus-declaration-prealable/',
+  '/guides/cerfa-declaration-travaux/',
+];
+
 let echecs = 0;
 const check = (nom, ok, detail = '') => {
   console.log(`   ${ok ? 'OK   ' : 'ECHEC'}  ${nom}`);
@@ -96,6 +128,7 @@ for (const chemin of TOUTES) {
       h1: document.querySelector('h1')?.textContent.replace(/\s+/g, ' ').trim() ?? '',
       ogTitle: og('title'),
       ogImage: og('image'),
+      ogDescription: og('description'),
       types: [...new Set(types)].map((t) => t.split('"')[3]),
       fil: !!document.querySelector('.fil-ariane'),
       liensInternes: [...document.querySelectorAll('main a[href^="/"]')].map((a) => a.getAttribute('href')),
@@ -113,7 +146,14 @@ for (const chemin of TOUTES) {
   check(`${nom} · canonical autonome`, m.canonical === `${BASE}${chemin}`, `${m.canonical}`);
   check(`${nom} · un seul H1`, m.h1n === 1, `${m.h1n}`);
   check(`${nom} · title et description présents`, !!m.titre && !!m.description);
-  check(`${nom} · Open Graph`, !!m.ogTitle && !!m.ogImage);
+  const sansImageVoulu = SANS_IMAGE_VOULU.includes(chemin);
+  check(`${nom} · Open Graph title et description`, !!m.ogTitle && !!m.ogDescription);
+  if (sansImageVoulu) {
+    // Contrôle inversé : le handoff veut ces quatre guides SANS image.
+    check(`${nom} · sans image mise en avant, conformément au handoff`, !m.ogImage, `og:image = ${m.ogImage}`);
+  } else {
+    check(`${nom} · image mise en avant et og:image`, !!m.ogImage);
+  }
   check(`${nom} · fil d'ariane`, m.fil);
   check(`${nom} · BreadcrumbList`, m.types.includes('BreadcrumbList'), m.types.join(', '));
   check(`${nom} · aucune erreur JavaScript`, m.erreursJs === 0);
