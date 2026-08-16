@@ -214,7 +214,19 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-mentions-legales',
 	'page-cgv',
 	'page-confidentialite',
+	/*
+	 * Gabarit UNIQUE des neuf pages projets du cocon « déclaration préalable ».
+	 * Un seul nom ici, pas neuf : le contenu vit dans l'éditeur, sourcé depuis
+	 * `content/pages/` au dépôt. Ajouter une dixième page projet ne demandera
+	 * aucune ligne de PHP — c'est le modèle des guides, qui a fait ses preuves.
+	 */
+	'page-projet-seo',
 );
+
+/**
+ * Identifiant du gabarit des pages projets.
+ */
+const URBIZEN_CHILD_TEMPLATE_PROJET = 'page-projet-seo';
 
 /**
  * Identifiant du gabarit de la page Tarifs.
@@ -865,6 +877,33 @@ function urbizen_child_est_page_conception() {
 }
 
 /**
+ * La page affichée est-elle une page projet, ou le hub qui les liste ?
+ *
+ * La feuille `urbizen-projets.css` sert deux contextes : les neuf pages
+ * projets, et la grille de liens ajoutée sur `/declarations-prealables/`. Le
+ * hub porte `.urbizen-page-dp` et non `.urbizen-projets` ; la portée de la
+ * grille est écrite en conséquence dans la feuille.
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_projet() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	$gabarit = get_page_template_slug( $id );
+
+	return URBIZEN_CHILD_TEMPLATE_PROJET === $gabarit
+		|| 'page-declaration-prealable' === $gabarit;
+}
+
+/**
  * La page affichée utilise-t-elle le gabarit « Tarifs » ?
  *
  * @return bool
@@ -1101,6 +1140,18 @@ function urbizen_child_enqueue_accueil() {
 
 		if ( file_exists( $dir . $guides_css ) ) {
 			wp_enqueue_style( 'urbizen-guides', $uri . $guides_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $guides_css ) );
+		}
+	}
+
+	// Pages projets : feuille des neuf pages du cocon, scopée
+	// `.urbizen-projets`. Chargée aussi sur `/declarations-prealables/`, qui
+	// porte la grille de liens vers ces pages — la règle correspondante y est
+	// scopée `.urbizen-page-dp`, et n'a donc aucun effet ailleurs.
+	if ( urbizen_child_est_page_projet() ) {
+		$projets_css = '/assets/css/urbizen-projets.css';
+
+		if ( file_exists( $dir . $projets_css ) ) {
+			wp_enqueue_style( 'urbizen-projets', $uri . $projets_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $projets_css ) );
 		}
 	}
 
