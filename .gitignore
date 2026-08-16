@@ -61,3 +61,6 @@ tests/cadastre/fixture-conception.html
 # Aperçu de la page Tarifs — artefact régénérable (tests/tarifs/apercu-tarifs.php)
 tests/tarifs/apercu-tarifs.html
 tests/legal/apercu-*.html
+
+# Kit visuel SEO — archive de livraison, décompressée dans le thème
+urbizen-visuels-seo-professionnels.zip
