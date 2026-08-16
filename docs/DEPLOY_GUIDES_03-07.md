@@ -182,6 +182,69 @@ Relevés par la recette, vérifiés un par un, et laissés tels quels :
 
 ---
 
+## 6 bis · Second passage du 16 août 2026 — clôture du lot
+
+Trois écarts SEO restaient ouverts au premier rapport. Ils sont fermés, et
+`main` a été fusionné en **`b8a4443`**.
+
+### Le H1 n'était pas sur la page annoncée
+
+Le premier rapport situait l'écart sur `/declarations-prealables/`. En relisant
+la sortie complète du banc, c'est faux : cette page passe son contrôle. La page
+en écart était **l'accueil**, dont le H1 annonçait « Déclaration de travaux »
+quand son title promet « Dossiers d'urbanisme à distance ». Corrigé là, et
+seulement là — toucher la page Déclaration préalable n'aurait rien réparé.
+
+### Un lien contextuel vers `/tarifs/`
+
+Sous les forfaits de l'accueil et leurs conditions, à l'endroit où la question
+se pose. Même forme que « Voir tous les guides » sous les cartes du blog.
+
+### Les visuels, et la 7e illustration
+
+L'illustration de l'étape 1 n'avait aucun `srcset` : elle téléchargeait le
+fichier de 960 px à toutes les largeurs, y compris à 360 px où elle s'affiche
+sur 286. Elle reçoit la même échelle que les cartes, avec un `sizes` calibré sur
+des largeurs rendues mesurées.
+
+Les trois visuels lourds — `extension-maison`, `plu-terrain`,
+`piscine-garage-carport` — sont réencodés en `cwebp -q 70 -m 6 -sharp_yuv`,
+variantes régénérées depuis la même source. PSNR de 33,7 à 34,8 dB.
+
+| Cas | Avant | Après |
+|---|---:|---:|
+| Bureau, DPR 1 | 238,3 Ko | **70,7 Ko** |
+| 768 px, DPR 1 | 238,3 Ko | **123,0 Ko** |
+| 768 px, DPR 2 | 421,9 Ko | **315,0 Ko** |
+| Mobile, DPR 2 | 421,9 Ko | **213,0 Ko** |
+
+### Les mêmes photos, en médiathèque
+
+Ordre de déploiement malheureux au premier passage : les vignettes avaient été
+importées **avant** le réencodage. Les guides servaient donc encore des héros de
+153 et 151 Ko quand le thème expédiait les mêmes photos à 104 et 94.
+
+Les trois fichiers d'`uploads/2026/08/` ont été remplacés **à identifiant et
+chemin inchangés** — aucun nouvel attachement, aucun doublon —, puis
+`wp media regenerate 1206 1213 1215 --yes` a refait les tailles intermédiaires.
+Héros des guides : 153 → 102 Ko, 151 → 93 Ko.
+
+### Le lanceur global, qui n'existait pas
+
+Le tour complet se faisait par une boucle shell dont le code de sortie était
+celui de la boucle : une suite rouge pouvait rendre 0. `tests/run-all.sh` le
+remplace — une suite rouge rend le tour rouge, un prérequis absent sort en 2 et
+n'est jamais compté comme un succès, et la liste des suites est découverte sur
+le disque.
+
+`tests/seo/run-all.sh` teste désormais l'import de `playwright` avant les lots D
+et F. Sans lui, ils n'étaient pas exécutés mais comptaient comme des échecs :
+deux bancs ont pu paraître rouges sans avoir jamais tourné.
+
+**Résultat : 16/16 suites vertes, code de sortie 0, en 24 min 20 s.**
+
+---
+
 ## 7 · Ce qui reste à surveiller
 
 - **Indexation.** Les cinq URL sont neuves ; leur prise en compte demandera
