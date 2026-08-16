@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 520" width="840" height="520" role="img"
+     aria-labelledby="tcoh dcoh" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="tcoh">Quelle valeur doit se retrouver dans quelle pièce du dossier</title>
+  <desc id="dcoh">Tableau de contrôle croisant quatre valeurs et cinq pièces du dossier. Les cinq
+  pièces sont le formulaire Cerfa, le plan de masse, le plan en coupe, le plan des façades et le
+  document graphique d'insertion. La surface de plancher créée doit figurer, identique, sur le
+  formulaire Cerfa et sur le plan de masse. L'emprise au sol doit figurer sur le formulaire Cerfa,
+  sur le plan de masse et sur le document d'insertion. Les distances aux limites séparatives
+  doivent figurer sur le plan de masse et sur le document d'insertion. La hauteur doit figurer sur
+  le plan de masse, sur le plan en coupe, sur le plan des façades et sur le document d'insertion.
+  La règle de contrôle est indiquée en bas : lorsqu'une de ces valeurs change, il faut rouvrir
+  toutes les pièces marquées sur sa ligne, car une même valeur écrite deux fois différemment est
+  une contradiction que l'instruction relève.</desc>
+
+  <rect width="840" height="520" fill="#FBFCFD"/>
+  <g stroke="#C9D3DD" stroke-width=".5" opacity=".55">
+    <path d="M40 0V520M120 0V520M200 0V520M280 0V520M360 0V520M440 0V520M520 0V520M600 0V520M680 0V520M760 0V520"/>
+    <path d="M0 40H840M0 120H840M0 200H840M0 280H840M0 360H840M0 440H840"/>
+  </g>
+
+  <text x="40" y="42" fill="#14233B" font-size="19" font-weight="600">Une valeur, plusieurs pièces</text>
+  <text x="40" y="65" fill="#55617A" font-size="13.5">Chaque valeur doit apparaître à l'identique dans toutes les pièces de sa ligne</text>
+
+  <!-- en-tête des colonnes -->
+  <g text-anchor="middle" font-size="12.5" fill="#14233B">
+    <rect x="290" y="90" width="100" height="52" rx="6" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.2"/>
+    <text x="340" y="112" font-weight="600">Formulaire</text><text x="340" y="129" font-weight="600">Cerfa</text>
+    <rect x="392" y="90" width="100" height="52" rx="6" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.2"/>
+    <text x="442" y="112" font-weight="600">Plan</text><text x="442" y="129" font-weight="600">de masse</text>
+    <rect x="494" y="90" width="100" height="52" rx="6" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.2"/>
+    <text x="544" y="112" font-weight="600">Plan</text><text x="544" y="129" font-weight="600">en coupe</text>
+    <rect x="596" y="90" width="100" height="52" rx="6" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.2"/>
+    <text x="646" y="112" font-weight="600">Plan des</text><text x="646" y="129" font-weight="600">façades</text>
+    <rect x="698" y="90" width="100" height="52" rx="6" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.2"/>
+    <text x="748" y="112" font-weight="600">Document</text><text x="748" y="129" font-weight="600">d'insertion</text>
+  </g>
+
+  <!-- ligne 1 · surface de plancher -->
+  <rect x="40" y="152" width="758" height="60" rx="6" fill="#F2F5F8"/>
+  <text x="58" y="180" fill="#14233B" font-size="13.5" font-weight="600">Surface de plancher créée</text>
+  <text x="58" y="198" fill="#55617A" font-size="11.5">art. R.111-22</text>
+  <g fill="#128A5A">
+    <circle cx="340" cy="182" r="13"/><circle cx="442" cy="182" r="13"/>
+  </g>
+  <g stroke="#FBFCFD" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M334 182l4.5 4.5 7.5-8"/><path d="M436 182l4.5 4.5 7.5-8"/>
+  </g>
+  <g stroke="#C9D3DD" stroke-width="2">
+    <line x1="537" y1="182" x2="551" y2="182"/><line x1="639" y1="182" x2="653" y2="182"/><line x1="741" y1="182" x2="755" y2="182"/>
+  </g>
+
+  <!-- ligne 2 · emprise au sol -->
+  <rect x="40" y="220" width="758" height="60" rx="6" fill="#FBFCFD"/>
+  <text x="58" y="248" fill="#14233B" font-size="13.5" font-weight="600">Emprise au sol</text>
+  <text x="58" y="266" fill="#55617A" font-size="11.5">art. R.420-1 — débords et surplombs compris</text>
+  <g fill="#128A5A">
+    <circle cx="340" cy="250" r="13"/><circle cx="442" cy="250" r="13"/><circle cx="748" cy="250" r="13"/>
+  </g>
+  <g stroke="#FBFCFD" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M334 250l4.5 4.5 7.5-8"/><path d="M436 250l4.5 4.5 7.5-8"/><path d="M742 250l4.5 4.5 7.5-8"/>
+  </g>
+  <g stroke="#C9D3DD" stroke-width="2">
+    <line x1="537" y1="250" x2="551" y2="250"/><line x1="639" y1="250" x2="653" y2="250"/>
+  </g>
+
+  <!-- ligne 3 · distances aux limites -->
+  <rect x="40" y="288" width="758" height="60" rx="6" fill="#F2F5F8"/>
+  <text x="58" y="316" fill="#14233B" font-size="13.5" font-weight="600">Distances aux limites séparatives</text>
+  <text x="58" y="334" fill="#55617A" font-size="11.5">depuis le point le plus avancé, avant-toit soutenu compris</text>
+  <g fill="#128A5A">
+    <circle cx="442" cy="318" r="13"/><circle cx="748" cy="318" r="13"/>
+  </g>
+  <g stroke="#FBFCFD" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M436 318l4.5 4.5 7.5-8"/><path d="M742 318l4.5 4.5 7.5-8"/>
+  </g>
+  <g stroke="#C9D3DD" stroke-width="2">
+    <line x1="333" y1="318" x2="347" y2="318"/><line x1="537" y1="318" x2="551" y2="318"/><line x1="639" y1="318" x2="653" y2="318"/>
+  </g>
+
+  <!-- ligne 4 · hauteur -->
+  <rect x="40" y="356" width="758" height="60" rx="6" fill="#FBFCFD"/>
+  <text x="58" y="384" fill="#14233B" font-size="13.5" font-weight="600">Hauteur</text>
+  <text x="58" y="402" fill="#55617A" font-size="11.5">depuis le point de référence défini par le règlement</text>
+  <g fill="#128A5A">
+    <circle cx="442" cy="386" r="13"/><circle cx="544" cy="386" r="13"/><circle cx="646" cy="386" r="13"/><circle cx="748" cy="386" r="13"/>
+  </g>
+  <g stroke="#FBFCFD" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M436 386l4.5 4.5 7.5-8"/><path d="M538 386l4.5 4.5 7.5-8"/><path d="M640 386l4.5 4.5 7.5-8"/><path d="M742 386l4.5 4.5 7.5-8"/>
+  </g>
+  <g stroke="#C9D3DD" stroke-width="2">
+    <line x1="333" y1="386" x2="347" y2="386"/>
+  </g>
+
+  <!-- règle de contrôle -->
+  <rect x="40" y="434" width="758" height="56" rx="8" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
+  <text x="60" y="457" fill="#0E6E48" font-size="13" font-weight="600">La règle : quand une valeur change, rouvrir toutes les pièces de sa ligne.</text>
+  <text x="60" y="476" fill="#14233B" font-size="12.5">Une même valeur écrite deux fois différemment est une contradiction — et c'est la première chose que l'instruction relève.</text>
+
+  <!-- légende -->
+  <g transform="translate(560,510)" font-size="12">
+    <circle cx="0" cy="-4" r="8" fill="#128A5A"/>
+    <text x="14" y="0" fill="#55617A">doit y figurer</text>
+    <line x1="120" y1="-4" x2="134" y2="-4" stroke="#C9D3DD" stroke-width="2"/>
+    <text x="142" y="0" fill="#55617A">sans objet</text>
+  </g>
+</svg>

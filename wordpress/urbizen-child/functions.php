@@ -1657,6 +1657,97 @@ function urbizen_child_noindex_categories_guides( $attributs ) {
 }
 add_filter( 'aioseo_robots_meta', 'urbizen_child_noindex_categories_guides', 21 );
 
+/*
+ * CE QUI EST `noindex` NE DOIT PAS FIGURER AU PLAN DE SITE
+ *
+ * La règle ci-dessus tient les archives de catégories hors de l'index. Elle ne
+ * dit rien du plan de site, et AIOSEO continuait d'y annoncer
+ * `/guides/category/<slug>/` — mesuré le 15 août 2026, aussitôt après la
+ * publication des cinq guides : les trois rubriques y figuraient toutes les
+ * trois, chacune servie avec `noindex`.
+ *
+ * Annoncer à un moteur une adresse qu'on lui demande par ailleurs de ne pas
+ * indexer est contradictoire : le plan de site est une invitation à explorer.
+ * Le banc SEO du lot B le signalait déjà, sur la seule catégorie alors
+ * remplie ; la publication en aurait fait trois.
+ *
+ * UN SEUL FILTRE, ET SURTOUT PAS `aioseo_sitemap_exclude_terms`
+ *
+ * La première version passait par ce filtre-là. Erreur, mesurée en production
+ * le 15 août 2026 : `app/Common/Sitemap/Query.php` s'en sert aussi pour écarter
+ * les ARTICLES rattachés aux termes exclus. Les six guides ont disparu du
+ * `post-sitemap.xml`, qui est tombé à une seule entrée — l'index `/guides/`.
+ * Exclure la rubrique revenait à exclure ce qu'elle contient.
+ *
+ * On agit donc uniquement sur l'index du plan de site : `sitemap.xml`
+ * n'annonce plus `category-sitemap.xml`. Le fichier reste servi si on le
+ * demande à la main, mais plus rien n'y conduit — et c'est bien ce qu'on veut
+ * dire à un moteur : ces archives existent, elles ne sont pas à explorer.
+ * Les articles, eux, restent intégralement au plan de site.
+ *
+ * La règle se lit sur la MÊME liste que le `noindex`. Le jour où l'indexation
+ * des rubriques sera rouverte, vider `URBIZEN_CHILD_CATEGORIES_GUIDES`
+ * rétablit les deux comportements d'un coup, sans qu'aucun ne soit oublié.
+ */
+
+/**
+ * Identifiants des catégories tenues hors de l'index.
+ *
+ * Volontairement NON accrochée à un filtre AIOSEO : voir ci-dessus.
+ *
+ * @return array<int, int>
+ */
+function urbizen_child_categories_guides_ids() {
+	$ids = array();
+
+	foreach ( URBIZEN_CHILD_CATEGORIES_GUIDES as $slug ) {
+		$terme = get_term_by( 'slug', $slug, 'category' );
+		if ( $terme instanceof WP_Term ) {
+			$ids[] = (int) $terme->term_id;
+		}
+	}
+
+	return $ids;
+}
+
+/**
+ * Retire l'entrée « category » de l'index du plan de site s'il ne reste rien à
+ * y annoncer.
+ *
+ * Le test porte sur ce qui subsiste après exclusion, et non sur une liste
+ * écrite en dur : une rubrique future, hors de la liste des guides,
+ * réapparaîtrait donc d'elle-même au plan de site. C'est la même logique
+ * d'effacement automatique que celle du `noindex`.
+ *
+ * @param array<int, array<string, mixed>> $indexes Entrées de l'index.
+ * @return array<int, array<string, mixed>>
+ */
+function urbizen_child_sitemap_index_sans_categories( $indexes ) {
+	$restantes = get_terms(
+		array(
+			'taxonomy'   => 'category',
+			'hide_empty' => true,
+			'fields'     => 'slugs',
+			'exclude'    => urbizen_child_categories_guides_ids(),
+		)
+	);
+
+	if ( is_wp_error( $restantes ) || array() !== (array) $restantes ) {
+		return $indexes;
+	}
+
+	return array_values(
+		array_filter(
+			(array) $indexes,
+			static function ( $entree ) {
+				$loc = is_array( $entree ) ? ( $entree['loc'] ?? '' ) : '';
+				return ! str_contains( (string) $loc, 'category-sitemap' );
+			}
+		)
+	);
+}
+add_filter( 'aioseo_sitemap_indexes', 'urbizen_child_sitemap_index_sans_categories', 10, 1 );
+
 /* -------------------------------------------------------------------------
  * DONNÉES STRUCTURÉES — CORRECTIONS DU GRAPHE AIOSEO
  *

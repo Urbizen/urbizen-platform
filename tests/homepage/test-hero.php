@@ -88,7 +88,14 @@ foreach ( $sources as $nom => $chemin ) {
 		1 === substr_count( $h, 'class="hero hero-v7"' )
 		&& str_contains( $h, 'id="accueil"' )
 		&& str_contains( $h, 'aria-labelledby="hero-title"' )
-		&& str_contains( $h, '<h1 id="hero-title">Déclaration de travaux&nbsp;: <em>du projet au dossier prêt à déposer.</em></h1>' ) );
+		// Libellé harmonisé le 16 août 2026. Le H1 annonçait « Déclaration de
+		// travaux » quand le title de la page promet « Dossiers d'urbanisme à
+		// distance » : deux signaux différents sur la même page, et le banc SEO
+		// du lot C le relevait. Le H1 dit désormais ce que le title promet — et
+		// ce que le site fait réellement, déclaration préalable comme permis de
+		// construire comme conception de plans. La seconde moitié, portée par
+		// l'<em>, ne bouge pas : c'est elle qui porte l'accroche validée.
+		&& str_contains( $h, '<h1 id="hero-title">Dossiers d\'urbanisme&nbsp;: <em>du projet au dossier prêt à déposer.</em></h1>' ) );
 
 	// L'accroche validée ne réduit pas l'offre aux quatre exemples visibles
 	// dans le formulaire : elle couvre aussi la construction neuve et les

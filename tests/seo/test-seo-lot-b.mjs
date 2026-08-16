@@ -96,9 +96,21 @@ console.log(`\n════ LOT B — ${BASE} ════`);
   // La catégorie par défaut, vide. AIOSEO annonce un réglage `noIndexEmptyCat`
   // qui ne fait rien dans la version 5.0.0.1 — l'option n'est lue nulle part.
   // C'est le filtre `aioseo_robots_meta` du thème qui tient cette règle.
-  {
-    const r = await lire('/category/non-classe/');
-    check('la catégorie par défaut vide est en noindex', r.code === 200 && !r.indexable,
+  //
+  // CORRIGÉ LE 15 AOÛT 2026 — le contrôle contredisait son propre commentaire.
+  //
+  // Il exigeait `r.code === 200`, alors que les quatre lignes ci-dessus disent
+  // exactement l'inverse : 200 comme 404 conviennent, seule l'indexabilité
+  // compte. Il interrogeait de surcroît `/category/…`, une base que la bascule
+  // des permaliens a déplacée sous `/guides/category/…`. Mesuré : l'ancienne
+  // adresse répond 404 (donc non indexable, ce qui est bien), la nouvelle
+  // répond 200 avec `noindex` — et le contrôle échouait sur la première sans
+  // jamais regarder la seconde.
+  //
+  // On vérifie donc les deux adresses, sur le seul critère qui vaut.
+  for (const chemin of ['/category/non-classe/', '/guides/category/non-classe/']) {
+    const r = await lire(chemin);
+    check(`la catégorie par défaut n'est pas indexable — ${chemin}`, !r.indexable,
       `code ${r.code}, robots ${r.robots ?? '(absent)'}`);
   }
 

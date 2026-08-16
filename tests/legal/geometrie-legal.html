@@ -25,6 +25,21 @@ const VUES = [1440, 1280, 1024, 900, 768, 620, 480, 390, 360, 320];
 /** Ce qui peut recevoir un doigt ou le focus. */
 const INTERACTIFS = 'a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])';
 
+/*
+ * PORTER UNE LISTE DE SÉLECTEURS, C'EST LA PORTER TERME À TERME.
+ *
+ * `'main ' + INTERACTIFS` ne scope que le PREMIER terme : il produit
+ * « main a[href], button, input, … », donc tout `button` du document, en-tête
+ * compris. Le défaut est resté invisible tant que l'aperçu échouait à se
+ * générer ; dès qu'il a rendu, le bouton « Nos prestations » de l'en-tête est
+ * remonté dans les cibles tactiles de la zone principale, à 119,9 × 22,4 px.
+ *
+ * L'en-tête a ses propres bancs (`tests/homepage/test-cibles-tactiles.php` et
+ * `test-geometrie-entete.py`) : ce banc-ci mesure la zone principale, et c'est
+ * ce que sa fonction annonce.
+ */
+const dans = ( portee ) => INTERACTIFS.split( ', ' ).map( ( s ) => portee + ' ' + s ).join( ', ' );
+
 const rect = ( el ) => {
 	const r = el.getBoundingClientRect();
 	return {
@@ -93,7 +108,7 @@ async function mesurer() {
 
 		// --- cibles tactiles de la zone principale ---
 		const petites = [];
-		for ( const el of doc.querySelectorAll( 'main ' + INTERACTIFS ) ) {
+		for ( const el of doc.querySelectorAll( dans( 'main' ) ) ) {
 			if ( ! visible( el, vue ) ) { continue; }
 			const r = rect( el );
 			// Un lien en pleine phrase n'est pas une cible tactile : on ne

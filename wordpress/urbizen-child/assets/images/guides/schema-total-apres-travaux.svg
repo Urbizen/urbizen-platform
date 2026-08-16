@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 545" width="840" height="545" role="img"
+     aria-labelledby="ttat dtat" font-family="IBM Plex Sans, system-ui, sans-serif">
+  <title id="ttat">Le seuil de 150 m² se lit sur le total après travaux, pas sur l'extension seule</title>
+  <desc id="dtat">Trois projets d'extension fictifs sont comparés sur une même échelle de surface de
+  plancher, graduée de 0 à 180 mètres carrés, avec le seuil de 150 mètres carrés marqué par une
+  ligne verticale. Premier cas : maison existante de 118 mètres carrés et véranda de 22 mètres
+  carrés, total 140 mètres carrés, sous le seuil — déclaration préalable, sans architecte
+  obligatoire. Deuxième cas : maison existante de 135 mètres carrés et extension de 30 mètres
+  carrés, total 165 mètres carrés, au-dessus du seuil — permis de construire et architecte
+  obligatoire, bien que l'extension reste sous 40 mètres carrés. Troisième cas : la même maison de
+  135 mètres carrés et un garage de 30 mètres carrés aménagé pour le stationnement, dont la surface
+  est déduite du calcul, total 135 mètres carrés, sous le seuil. La comparaison des deuxième et
+  troisième cas montre que l'usage des mètres carrés créés compte autant que leur nombre.</desc>
+
+  <rect width="840" height="545" fill="#FBFCFD"/>
+  <g stroke="#C9D3DD" stroke-width=".5" opacity=".55">
+    <path d="M40 0V545M120 0V545M200 0V545M280 0V545M360 0V545M440 0V545M520 0V545M600 0V545M680 0V545M760 0V545"/>
+    <path d="M0 40H840M0 120H840M0 200H840M0 280H840M0 360H840M0 440H840M0 520H840"/>
+  </g>
+
+  <text x="40" y="42" fill="#14233B" font-size="19" font-weight="600">Le seuil de 150 m² regarde le total, pas l'extension</text>
+  <text x="40" y="65" fill="#55617A" font-size="13.5">Trois projets fictifs, sur la même échelle de surface de plancher</text>
+
+  <!-- seuil 150 m² -->
+  <line x1="640" y1="90" x2="640" y2="452" stroke="#C0392B" stroke-width="2" stroke-dasharray="7 5"/>
+  <rect x="586" y="76" width="108" height="22" rx="5" fill="#C0392B"/>
+  <text x="640" y="91" text-anchor="middle" fill="#FBFCFD" font-size="12" font-weight="600">seuil 150 m²</text>
+
+  <!-- ============ CAS 1 ============ -->
+  <text x="40" y="122" fill="#14233B" font-size="13.5" font-weight="600">Cas 1 — maison de 118 m² + véranda close de 22 m²</text>
+  <rect x="40" y="132" width="472" height="42" rx="3" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.5"/>
+  <text x="276" y="158" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">existant 118 m²</text>
+  <rect x="512" y="132" width="88" height="42" rx="3" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
+  <text x="556" y="158" text-anchor="middle" fill="#0E6E48" font-size="13" font-weight="600">+22</text>
+  <!-- Aligné sur les deux autres totaux, à 712 : posé à 612, il était traversé
+       par le trait du seuil, qui passe à 640. -->
+  <text x="712" y="158" fill="#14233B" font-size="14" font-weight="600">= 140 m²</text>
+  <text x="40" y="194" fill="#0E6E48" font-size="13">Sous le seuil — déclaration préalable, sans architecte obligatoire.</text>
+
+  <!-- ============ CAS 2 ============ -->
+  <text x="40" y="242" fill="#14233B" font-size="13.5" font-weight="600">Cas 2 — maison de 135 m² + extension close de 30 m²</text>
+  <rect x="40" y="252" width="540" height="42" rx="3" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.5"/>
+  <text x="310" y="278" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">existant 135 m²</text>
+  <rect x="580" y="252" width="120" height="42" rx="3" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
+  <text x="640" y="278" text-anchor="middle" fill="#0E6E48" font-size="13" font-weight="600">+30</text>
+  <text x="712" y="278" fill="#C0392B" font-size="14" font-weight="600">= 165 m²</text>
+  <text x="40" y="314" fill="#C0392B" font-size="13">Au-dessus du seuil — permis de construire <tspan font-weight="600">et</tspan> architecte, alors que l'extension reste sous 40 m².</text>
+
+  <!-- ============ CAS 3 ============ -->
+  <text x="40" y="362" fill="#14233B" font-size="13.5" font-weight="600">Cas 3 — la même maison + garage de 30 m² aménagé pour stationner</text>
+  <rect x="40" y="372" width="540" height="42" rx="3" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.5"/>
+  <text x="310" y="398" text-anchor="middle" fill="#14233B" font-size="14" font-weight="600">existant 135 m²</text>
+  <rect x="580" y="372" width="120" height="42" rx="3" fill="none" stroke="#9FADBC" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="640" y="392" text-anchor="middle" fill="#55617A" font-size="12">30 m² bâtis</text>
+  <text x="640" y="408" text-anchor="middle" fill="#55617A" font-size="12" font-style="italic">déduits</text>
+  <text x="712" y="398" fill="#14233B" font-size="14" font-weight="600">= 135 m²</text>
+  <text x="40" y="434" fill="#0E6E48" font-size="13">Sous le seuil — la surface aménagée pour le stationnement est déduite (art. R.111-22).</text>
+
+  <!-- échelle -->
+  <line x1="40" y1="464" x2="760" y2="464" stroke="#9FADBC" stroke-width="1.5"/>
+  <g fill="#55617A" font-size="12" text-anchor="middle">
+    <line x1="40" y1="464" x2="40" y2="471" stroke="#9FADBC" stroke-width="1.5"/><text x="40" y="486">0</text>
+    <line x1="240" y1="464" x2="240" y2="471" stroke="#9FADBC" stroke-width="1.5"/><text x="240" y="486">50 m²</text>
+    <line x1="440" y1="464" x2="440" y2="471" stroke="#9FADBC" stroke-width="1.5"/><text x="440" y="486">100 m²</text>
+    <line x1="640" y1="464" x2="640" y2="471" stroke="#C0392B" stroke-width="2"/><text x="640" y="486" fill="#C0392B" font-weight="600">150 m²</text>
+    <line x1="760" y1="464" x2="760" y2="471" stroke="#9FADBC" stroke-width="1.5"/><text x="757" y="486">180 m²</text>
+  </g>
+
+  <!-- légende -->
+  <g transform="translate(40,520)" font-size="12.5">
+    <rect x="0" y="-11" width="18" height="14" rx="2" fill="#EAEEF2" stroke="#9FADBC" stroke-width="1.5"/>
+    <text x="26" y="0" fill="#55617A">Surface de plancher existante</text>
+    <rect x="238" y="-11" width="18" height="14" rx="2" fill="#E4F5EC" stroke="#128A5A" stroke-width="2"/>
+    <text x="264" y="0" fill="#14233B">Surface créée, comptée</text>
+    <rect x="452" y="-11" width="18" height="14" rx="2" fill="none" stroke="#9FADBC" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <text x="478" y="0" fill="#55617A">Surface créée, déduite du calcul</text>
+  </g>
+</svg>

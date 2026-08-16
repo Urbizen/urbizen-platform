@@ -19,14 +19,22 @@ command -v "$PHP_BIN" >/dev/null 2>&1 || {
 	exit 2
 }
 
-printf '\n\033[1m── 1/1 — Gabarits, patterns, feuille et contexte\033[0m\n'
-"$PHP_BIN" test-guides.php
-code=$?
+echecs=0
+
+printf '\n\033[1m── 1/2 — Gabarits, patterns, feuille et contexte\033[0m\n'
+"$PHP_BIN" test-guides.php || echecs=$((echecs + 1))
+
+# Le contenant est figé par le banc ci-dessus ; celui-ci fige le CONTENU
+# versionné dans content/guides/, qui est la source de vérité des articles
+# publiés. Sans lui, un lien vers un guide inexistant ou une promesse
+# d'obtention d'autorisation passeraient sans être vus.
+printf '\n\033[1m── 2/2 — Contenu des guides, maillage et règles éditoriales\033[0m\n'
+"$PHP_BIN" test-contenu-guides.php || echecs=$((echecs + 1))
 
 printf '\n'
-if [ "$code" -eq 0 ]; then
-	printf '\033[32mLe banc passe.\033[0m\n'
+if [ "$echecs" -eq 0 ]; then
+	printf '\033[32mLes deux bancs passent.\033[0m\n'
 	exit 0
 fi
-printf '\033[31mBanc en échec.\033[0m\n'
+printf '\033[31m%s banc(s) en échec.\033[0m\n' "$echecs"
 exit 1
