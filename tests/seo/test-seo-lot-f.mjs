@@ -13,22 +13,48 @@ import { chromium } from 'playwright';
 
 const BASE = (process.argv[2] || 'https://urbizen.fr').replace(/\/$/, '');
 
-// Largeur de fenêtre, DPR, variante attendue, plafond de poids en Ko.
+// Largeur de fenêtre, DPR, variante attendue pour les CARTES, variante attendue
+// pour l'ILLUSTRATION DE L'ÉTAPE 1, plafond de poids en Ko.
 //
 // L'attendu vient de la largeur RENDUE mesurée, multipliée par le DPR — pas
-// d'une intuition sur la taille de l'écran. À 768 px en DPR 1, l'image occupe
+// d'une intuition sur la taille de l'écran. À 768 px en DPR 1, une carte occupe
 // 337 px CSS, donc 337 pixels réels : la variante 352 est la bonne, et attendre
-// 704 était une erreur du banc, corrigée ici. Le même 768 px en DPR 2 demande
-// 674 pixels réels, et bascule bien sur 704.
+// 704 était une erreur du banc, corrigée en son temps. Le même 768 px en DPR 2
+// demande 674 pixels réels, et bascule bien sur 704.
+//
+// DEUX FAMILLES DEPUIS LE 16 AOÛT 2026
+//
+// L'illustration de l'étape 1 n'a pas la largeur d'une carte. Mesurée sur la
+// production : 267 px à 1400, 271 à 1200, 278 à 1024, 316 à 390, 286 à 360 —
+// et 653 px à 768, parce que la grille du parcours se replie sous 1000 px et
+// que le visuel y passe pleine largeur. Un attendu unique pour les sept images
+// était donc faux par construction : il exigeait d'un visuel de 653 px la même
+// variante que d'une carte de 337.
+//
+// LES DEUX PLAFONDS DE 768 px
+//
+// Ils sont plus hauts que leurs voisins, et c'est ce même repli qui l'explique :
+// à cette largeur seule, l'étape 1 demande une variante PLUS GRANDE que les
+// cartes, donc un fichier de plus. Ailleurs elle partage le leur, et ne coûte
+// rien. Valeurs mesurées après optimisation des visuels :
+//
+//   768 / DPR 1 — cartes en 352 (68,9 Ko) + étape en 704 (52,0 Ko) = 120,9 Ko
+//   768 / DPR 2 — cartes en 704 (211,3 Ko) + étape en 960 (101,7 Ko) = 313,0 Ko
+//
+// Les plafonds sont posés juste au-dessus, à 135 et 330 Ko : assez pour ne pas
+// casser sur une variation de compression, trop peu pour laisser passer une
+// image non optimisée. Pour mémoire, ces deux cas pesaient 421,9 Ko avant ce
+// lot, l'étape 1 n'ayant alors aucun `srcset` et téléchargeant toujours le
+// fichier de 960 px.
 const CAS = [
-  [1400, 1, '352', 110],
-  [1200, 1, '352', 110],
-  [1024, 1, '352', 110],
-  [768, 1, '352', 110],
-  [768, 2, '704', 290],
-  [390, 2, '704', 290],
-  [360, 2, '704', 290],
-  [360, 1, '352', 110],
+  [1400, 1, '352', '352', 110],
+  [1200, 1, '352', '352', 110],
+  [1024, 1, '352', '352', 110],
+  [768, 1, '352', '704', 135],
+  [768, 2, '704', '960', 330],
+  [390, 2, '704', '704', 290],
+  [360, 2, '704', '704', 290],
+  [360, 1, '352', '352', 110],
 ];
 
 let echecs = 0;
@@ -43,7 +69,7 @@ const nav = await chromium.launch({ headless: true });
 
 console.log(`\n════ LOT F — IMAGES DE L'ACCUEIL — ${BASE} ════`);
 
-for (const [largeur, dpr, attendue, plafond] of CAS) {
+for (const [largeur, dpr, attendue, etapeAttendue, plafond] of CAS) {
   const ctx = await nav.newContext({ viewport: { width: largeur, height: 900 }, deviceScaleFactor: dpr });
   const page = await ctx.newPage();
 
@@ -66,9 +92,29 @@ for (const [largeur, dpr, attendue, plafond] of CAS) {
         .filter((r) => r.name.includes('/images/blog/'))
         .map((r) => [r.name, r.transferSize])
     );
+    /*
+     * DEUX FAMILLES, DEUX ATTENDUS.
+     *
+     * `/images/blog/` sert deux usages : les six cartes de la section Guides,
+     * toutes de la même largeur, et l'illustration de l'étape 1 du parcours,
+     * qui est plus étroite en bureau et pleine largeur dès que la grille se
+     * replie. Leur imposer la même variante était une erreur de conception du
+     * banc : elles n'occupent pas la même place.
+     *
+     * On les sépare donc par leur conteneur, et chaque famille porte son propre
+     * attendu, dérivé d'une largeur RENDUE mesurée.
+     */
+    const dans = (sel) => im.filter((i) => i.closest(sel));
+    const nom = (i) => i.currentSrc.split('/').pop();
+    const largeur = (i) => Math.round(i.getBoundingClientRect().width);
     return {
       n: im.length,
-      choisies: im.map((i) => i.currentSrc.split('/').pop()),
+      cartes: dans('.blog-preview-media').map(nom),
+      cartesLargeur: dans('.blog-preview-media').map(largeur)[0] ?? null,
+      etape: dans('.etape-visuel').map(nom),
+      etapeLargeur: dans('.etape-visuel').map(largeur)[0] ?? null,
+      horsFamille: im.filter((i) => !i.closest('.blog-preview-media') && !i.closest('.etape-visuel')).map(nom),
+      choisies: im.map(nom),
       sansDim: im.filter((i) => !i.getAttribute('width') || !i.getAttribute('height')).length,
       sansSrcset: im.filter((i) => !i.getAttribute('srcset')).length,
       cassees: im.filter((i) => i.naturalWidth === 0).length,
@@ -94,13 +140,22 @@ for (const [largeur, dpr, attendue, plafond] of CAS) {
   console.log(`           variantes choisies : ${[...new Set(mesure.choisies.map((c) => (c.match(/-(\d+)\.webp$/) || [null, '960'])[1]))].join(', ')} px`);
   console.log(`           ${mesure.n} image(s) · ${ko} Ko · CLS ${cls}`);
 
-  check(`les six illustrations sont présentes`, mesure.n === 6, `${mesure.n} trouvée(s)`);
+  check(`les six cartes de guides sont présentes`, mesure.cartes.length === 6, `${mesure.cartes.length} trouvée(s)`);
+  check(`l'illustration de l'étape 1 est présente`, mesure.etape.length === 1, `${mesure.etape.length} trouvée(s)`);
+  // Toute image de `/images/blog/` doit appartenir à l'une des deux familles :
+  // une troisième apparaîtrait sans attendu, et passerait sans être mesurée.
+  check(`aucune image hors des deux familles`, mesure.horsFamille.length === 0, mesure.horsFamille.join(', '));
   check(`aucune image cassée`, mesure.cassees === 0, `${mesure.cassees} sans pixels`);
   check(`toutes portent width et height`, mesure.sansDim === 0, `${mesure.sansDim} sans dimensions`);
   check(`toutes portent un srcset`, mesure.sansSrcset === 0, `${mesure.sansSrcset} sans srcset`);
-  check(`variante ${attendue} px sélectionnée`,
-    mesure.choisies.every((c) => c.includes(`-${attendue}.webp`)),
-    mesure.choisies.join(', '));
+  check(`cartes — variante ${attendue} px`,
+    mesure.cartes.length > 0 && mesure.cartes.every((c) => c.includes(`-${attendue}.webp`)),
+    `rendues à ${mesure.cartesLargeur} px : ${mesure.cartes.join(', ')}`);
+  // `960` est le fichier de base, sans suffixe : c'est la plus grande variante.
+  check(`étape 1 — variante ${etapeAttendue} px`,
+    mesure.etape.length > 0 && mesure.etape.every((c) =>
+      '960' === etapeAttendue ? /^extension-maison\.webp$/.test(c) : c.includes(`-${etapeAttendue}.webp`)),
+    `rendue à ${mesure.etapeLargeur} px : ${mesure.etape.join(', ')}`);
   check(`poids sous ${plafond} Ko`, mesure.octets / 1024 < plafond, `${ko} Ko`);
   check('CLS négligeable', cls < 0.05, `${cls}`);
   check('le logo d\'en-tête n\'est pas différé', mesure.logoLoading !== 'lazy', `loading=${mesure.logoLoading}`);
