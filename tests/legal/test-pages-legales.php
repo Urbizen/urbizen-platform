@@ -345,7 +345,21 @@ check( '5 · aucune image ajoutée sur les pages légales',
 preg_match( '/^Version:\s*(.+)$/m', $style, $v );
 $version = isset( $v[1] ) ? trim( $v[1] ) : '';
 
-check( '6 · version du thème = 0.3.0 (cinq nouveaux patterns déployés)', '0.3.0' === $version, 'lue : ' . $version );
+/*
+ * 0.4.0 depuis le 16 août 2026 — et ce contrôle a rempli exactement son office.
+ *
+ * Le lot du cocon SEO a ajouté `projet-entete.php` et `projet-pied.php`, sans
+ * toucher à la version. Résultat en production : les deux patterns n'étaient
+ * pas enregistrés, et les neuf pages projets sortaient sans H1 ni fil d'ariane.
+ * Un bloc `wp:pattern` dont le pattern manque ne rend rien, en silence.
+ *
+ * C'est le mécanisme que ce contrôle protège : WordPress met en cache la liste
+ * des patterns d'un thème, et la clé de ce cache comprend sa version. Ajouter
+ * un pattern sans bump est un non-événement pour WordPress.
+ *
+ * Le thème compte désormais 14 patterns et 16 gabarits.
+ */
+check( '6 · version du thème = 0.4.0 (deux patterns ajoutés au lot du cocon SEO)', '0.4.0' === $version, 'lue : ' . $version );
 check( '6 · une seule source de vérité pour la version', 1 === preg_match_all( '/^Version:/m', $style ) );
 
 // ======================================================================

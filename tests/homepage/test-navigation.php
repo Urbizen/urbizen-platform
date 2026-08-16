@@ -110,10 +110,15 @@ function bloc_nav( $html ) {
  * Le décompte est volontairement figé : tout gabarit ajouté doit passer sous
  * les yeux de quelqu'un, parce qu'un gabarit qui n'appelle pas `header-urbizen`
  * sert le menu du thème parent. 12 pages + les 3 gabarits de guides ajoutés le
- * 14 août 2026 (home, single, archive).
+ * 14 août 2026 (home, single, archive) + `page-projet-seo`, ajouté le 16 août
+ * 2026 pour les neuf pages du cocon SEO.
+ *
+ * Un seul gabarit pour ces neuf pages, et non neuf : le contenu vit dans
+ * l'éditeur, sourcé depuis `content/pages/`. C'est ce qui fait qu'une dixième
+ * page projet ne fera pas remonter ce compteur.
  */
 $gabarits = glob( $theme . '/templates/*.html' );
-check( 'Les 15 gabarits sont trouvés', 15 === count( $gabarits ), count( $gabarits ) . ' trouvé(s)' );
+check( 'Les 16 gabarits sont trouvés', 16 === count( $gabarits ), count( $gabarits ) . ' trouvé(s)' );
 
 $hors = array();
 foreach ( $gabarits as $g ) {
