@@ -14,6 +14,7 @@
 
 require __DIR__ . '/bootstrap.php';
 
+use Urbizen\Platform\Forms\ValidationMessages;
 use Urbizen\Platform\Http\AcceptNegotiation;
 use Urbizen\Platform\Http\SubmissionFeedback;
 use Urbizen\Platform\Http\SubmissionJsonResponse;
@@ -123,6 +124,58 @@ check_json(
 	'aucun code interne de contrôle ne ressort',
 	! str_contains( wp_json_encode( $echec ), 'email_invalide' ) && ! str_contains( wp_json_encode( $echec ), 'projet_inconnu' )
 );
+
+/* ------------------------------------------------------------------ *
+ *  4 bis. Le détail par champ — ce qui manquait
+ *
+ *  `fields` seul ne dit QUE le nom du champ. L'interface ne pouvait donc
+ *  afficher qu'un message global, et la personne devait deviner ce qui n'allait
+ *  pas. Ces contrôles exigent désormais le message public par champ, sans
+ *  jamais laisser passer le code interne qui l'a produit.
+ * ------------------------------------------------------------------ */
+
+echo "\n── 4 bis. Chaque champ en erreur porte son message\n";
+
+check_json( 'la réponse porte un détail par champ', isset( $echec['errors'] ) && is_array( $echec['errors'] ) );
+check_json( 'un détail par champ en erreur', 2 === count( $echec['errors'] ) );
+check_json( 'chaque détail nomme son champ', array( 'email', 'nature' ) === array_column( $echec['errors'], 'field' ) );
+
+$messages = array_column( $echec['errors'], 'message' );
+
+check_json( 'le message d’email est celui du présentateur', ValidationMessages::message( 'email_invalide' ) === $messages[0] );
+check_json( 'le message de nature est celui du présentateur', ValidationMessages::message( 'projet_inconnu' ) === $messages[1] );
+check_json( 'aucun message vide', '' !== trim( $messages[0] ) && '' !== trim( $messages[1] ) );
+check_json( 'les deux messages diffèrent — le générique ne les a pas écrasés', $messages[0] !== $messages[1] );
+
+// Compatibilité : un client déjà déployé ne lit que `fields`. Il doit continuer
+// de fonctionner à l'identique, sans quoi la correction casserait la production
+// le temps que le nouveau script soit servi.
+check_json( '`fields` est conservé pour la compatibilité', array( 'email', 'nature' ) === $echec['fields'] );
+check_json( '`fields` et `errors` désignent les mêmes champs', $echec['fields'] === array_column( $echec['errors'], 'field' ) );
+
+// Un code inconnu ne doit jamais ressortir tel quel : il retombe sur le message
+// générique sûr, et surtout pas sur la chaîne brute.
+$inconnu = SubmissionJsonResponse::echec( 'validation', array( 'mystere' => 'code_jamais_vu' ) );
+
+check_json( 'un code inconnu reçoit le message générique', ValidationMessages::message( 'code_jamais_vu' ) === $inconnu['errors'][0]['message'] );
+check_json( 'le code inconnu ne fuit pas', ! str_contains( (string) wp_json_encode( $inconnu ), 'code_jamais_vu' ) );
+
+// Aucun détail sur les catégories qui ne sont pas de la validation : un incident
+// technique ne nomme aucun champ, donc n'a aucun message par champ à porter.
+check_json( 'un incident ne porte aucun détail par champ', ! isset( SubmissionJsonResponse::echec( 'technical' )['errors'] ) );
+check_json( 'une limitation de débit non plus', ! isset( SubmissionJsonResponse::echec( 'rate_limited' )['errors'] ) );
+
+/* Le doublon `hors_bornes` rendait un second `case` inatteignable. Le message
+   canonique est celui qui était effectivement servi ; ce contrôle empêche qu'un
+   futur doublon réintroduise deux textes pour un même code. */
+check_json(
+	'`hors_bornes` rend le message canonique',
+	'Cette valeur est en dehors des limites autorisées.' === ValidationMessages::message( 'hors_bornes' )
+);
+
+$source_messages = (string) file_get_contents( dirname( __DIR__, 2 ) . '/wordpress/urbizen-platform/src/Forms/ValidationMessages.php' );
+preg_match_all( "/case '([a-z_]+)':/", $source_messages, $cases );
+check_json( 'aucun code n’est déclaré deux fois dans le présentateur', count( $cases[1] ) === count( array_unique( $cases[1] ) ), implode( ', ', array_diff_assoc( $cases[1], array_unique( $cases[1] ) ) ) );
 
 $technique = SubmissionJsonResponse::echec( 'technical' );
 

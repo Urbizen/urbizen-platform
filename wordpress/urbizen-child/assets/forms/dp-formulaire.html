@@ -445,8 +445,8 @@
   #dp-app .dp-parcel.confirmed .dp-parcel-ok { background: var(--ink); pointer-events:none; }
   #dp-app .leaflet-container { font: inherit; }
 </style>
-<link rel="stylesheet" href="../css/urbizen-form-tarifs.css?v=0.2.8" />
-<link rel="stylesheet" href="../css/urbizen-form-pieces.css?v=0.2.8" />
+<link rel="stylesheet" href="../css/urbizen-form-tarifs.css?v=0.2.9" />
+<link rel="stylesheet" href="../css/urbizen-form-pieces.css?v=0.2.9" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
@@ -578,6 +578,10 @@
                   <p class="dp-report-adresse" data-adresse-report-adresse></p>
                   <p class="dp-report-note" data-adresse-report-note></p>
                 </div>
+                <!-- Le composant Adresse ne rend qu'un booléen « prêt ». C'est
+                     ici que l'échec devient une phrase : sans ce réceptacle, le
+                     bouton « Continuer » restait sans effet et sans explication. -->
+                <p class="dp-err" data-erreur-pour="__adresse" role="alert" hidden></p>
               </div>
               <div class="dp-field col-2 dp-adresse" data-adresse="terrain">
                 <div data-adresse-groupe-auto>
@@ -792,6 +796,11 @@
             <div class="dp-err" id="dp-final-err" role="alert"></div>
           </section>
 
+          <!-- Résumé des informations à corriger. Placé HORS des étapes : il
+               doit rester lisible quelle que soit celle qui est ouverte, y
+               compris après un retour automatique déclenché par le serveur. -->
+          <p class="dp-err dp-resume" id="dp-resume-err" role="status" aria-live="polite" hidden></p>
+
           <footer class="dp-foot">
             <span class="dp-count" id="dp-count">Rubrique 1 / 8</span>
             <div class="dp-btns">
@@ -821,12 +830,12 @@
   </div>
 </div>
 
-<script src="../js/urbizen-form-tarifs.js?v=0.2.8"></script>
-<script src="../js/urbizen-form-pieces.js?v=0.2.8"></script>
-<script src="../js/urbizen-form-nombres.js?v=0.2.8"></script>
-<script src="../js/urbizen-form-adresse.js?v=0.2.8"></script>
-<script src="../js/urbizen-form-champs.js?v=0.2.8"></script>
-<script src="../js/urbizen-form-bridge.js?v=0.2.8"></script>
+<script src="../js/urbizen-form-tarifs.js?v=0.2.9"></script>
+<script src="../js/urbizen-form-pieces.js?v=0.2.9"></script>
+<script src="../js/urbizen-form-nombres.js?v=0.2.9"></script>
+<script src="../js/urbizen-form-adresse.js?v=0.2.9"></script>
+<script src="../js/urbizen-form-champs.js?v=0.2.9"></script>
+<script src="../js/urbizen-form-bridge.js?v=0.2.9"></script>
 <script>
 (function () {
   "use strict";
@@ -1118,46 +1127,158 @@
     app.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  /* validation minimale du pas courant : champs requis visibles */
+  /* Moteur d'erreurs partagé avec le pont : une seule instance, sinon les deux
+     marqueraient les mêmes champs sans se voir et l'une effacerait l'autre. */
+  var erreurs = window.UrbizenErreurs
+    ? UrbizenErreurs.creer(form, {
+        activerEtape: activerEtape,
+        resume: document.getElementById("dp-resume-err")
+      })
+    : null;
+
+  /* Ouvre l'étape demandée par le moteur. Le moteur ignore tout de la
+     numérotation : il désigne un élément, le document sait quoi en faire. */
+  function activerEtape(element) {
+    var index = steps.indexOf(element);
+    if (index < 0 || index === current) return;
+    current = index;
+    render();
+  }
+
+  /* Un contrôle est-il réellement rendu ? Un champ masqué par la matrice ou par
+     « même adresse » ne doit jamais bloquer : il n'est pas soumis, et le serveur
+     ne l'exige pas non plus sur une branche inactive. */
+  function estVisible(el) {
+    return el.offsetParent !== null && !el.disabled;
+  }
+
+  /* Le groupe obligatoire auquel appartient un contrôle, s'il l'est. */
+  function estObligatoire(el) {
+    var groupe = el.closest(".dp-field");
+    return !!(groupe && groupe.querySelector(".req"));
+  }
+
+  /**
+   * Validation du pas courant.
+   *
+   * CE QUI A CHANGÉ, ET POURQUOI
+   *
+   * La version précédente signalait un champ vide par une bordure rouge et
+   * rien d'autre : aucun message, aucun `aria-invalid`, donc rien du tout pour
+   * qui ne voit pas la couleur. Pire, deux règles — la nature du projet et
+   * l'adresse — se contentaient de `ok = false`, sans la moindre trace : le
+   * bouton « Continuer » restait sans effet et rien n'expliquait pourquoi.
+   *
+   * Les groupes de boutons radio et les cases à cocher échappaient au contrôle :
+   * `el.value` vaut « on » par défaut sur une case, donc le test « valeur non
+   * vide » était toujours satisfait, cochée ou non.
+   *
+   * Les règles ne sont plus attachées à un NUMÉRO d'étape mais à la présence
+   * du champ concerné dans l'étape ouverte : insérer une rubrique ne déplace
+   * plus silencieusement une règle de validation.
+   */
   function validateStep() {
     var step = steps[current];
-    var ok = true, firstBad = null;
+    var vus = {};
+
+    if (erreurs) {
+      // On n'efface que les erreurs de l'étape courante : celles des autres
+      // étapes, posées par le serveur, doivent survivre jusqu'à leur correction.
+      Object.keys(erreurs.messages).forEach(function (nom) {
+        var champ = form.querySelector('[name="' + nom + '"]');
+        if (champ && step.contains(champ)) erreurs.effacer(nom);
+      });
+    }
+
     step.querySelectorAll("input, select, textarea").forEach(function (el) {
-      if (el.offsetParent === null) return; // caché
-      var labelReq = el.closest(".dp-field") && el.closest(".dp-field").querySelector(".req");
-      var group = el.closest(".dp-field");
-      var needed = labelReq && (el.tagName === "SELECT" || el.type === "text" || el.type === "email" || el.type === "tel" || el.type === "number" || el.tagName === "TEXTAREA");
-      if (needed && !String(el.value).trim()) {
-        ok = false; el.style.borderColor = "var(--error)";
-        if (!firstBad) firstBad = el;
-      } else if (needed) {
-        el.style.borderColor = "";
+      var nom = el.getAttribute("name");
+      if (!nom || vus[nom] || !estVisible(el) || !estObligatoire(el)) return;
+
+      var manquant;
+
+      if ("radio" === el.type) {
+        // Un groupe radio est satisfait dès qu'une option est cochée. On ne
+        // teste jamais `value` : elle est renseignée même sans sélection.
+        manquant = !step.querySelector('input[name="' + nom + '"]:checked');
+      } else if ("checkbox" === el.type) {
+        manquant = !step.querySelector('input[name="' + nom + '"]:checked');
+      } else {
+        manquant = "" === String(el.value).trim();
+      }
+
+      if (manquant) {
+        vus[nom] = true;
+        if (erreurs) erreurs.poser(nom, messageManquant(el, nom));
       }
     });
-    // nature : le projet principal est requis au pas 3
-    if (current === 2) {
-      var anyNature = form.querySelector('input[name="nature"]:checked');
-      if (!anyNature) { ok = false; }
+
+    /* La nature du projet : un groupe radio hors `.dp-field`, donc invisible à
+       la boucle ci-dessus. La règle suit le CHAMP, pas le numéro d'étape. */
+    var nature = step.querySelector('input[name="nature"]');
+    if (nature && !form.querySelector('input[name="nature"]:checked')) {
+      vus.nature = true;
+      if (erreurs) erreurs.poser("nature", "Choisissez la nature de votre projet pour continuer.");
     }
-    // projets supplémentaires : aucune ligne laissée sans nature choisie
-    if (current === 6) {
-      var errTravaux = document.getElementById("dp-travaux-err");
+
+    /* Projets supplémentaires : la règle s'applique là où le module est monté,
+       et non au pas 7 comme auparavant. */
+    var errTravaux = document.getElementById("dp-travaux-err");
+    if (errTravaux && step.contains(errTravaux)) {
       if (!tarifs.estValide()) {
-        ok = false;
+        vus["projets_supplementaires"] = true;
         errTravaux.textContent = "Choisissez la nature de chaque projet ajouté, ou supprimez la ligne inutile.";
+        errTravaux.hidden = false;
       } else {
         errTravaux.textContent = "";
       }
     }
-    // Le bloc terrain retiré par « même adresse » échappe à la boucle ci-dessus :
-    // masqué, il n'a plus de champ visible à exiger. C'est alors la validité de
-    // l'adresse du déclarant qui conditionne la progression — sans quoi une
-    // demande partirait sans adresse de terrain du tout.
-    if (window.UrbizenAdresse && UrbizenAdresse.reportPret && !UrbizenAdresse.reportPret(form)) {
-      ok = false;
+
+    /* Le bloc terrain retiré par « même adresse » échappe à la boucle : masqué,
+       il n'a plus de champ visible à exiger. C'est alors la validité de
+       l'adresse du déclarant qui conditionne la progression — sans quoi une
+       demande partirait sans adresse de terrain du tout.
+
+       Le composant Adresse ne connaît pas les étapes : il rend un booléen, et
+       c'est ici qu'on le traduit en erreur visible. */
+    var blocAdresse = step.querySelector("[data-adresse-report]");
+    if (blocAdresse && window.UrbizenAdresse && UrbizenAdresse.reportPret && !UrbizenAdresse.reportPret(form)) {
+      vus["__adresse"] = true;
+      var zoneAdresse = step.querySelector('[data-erreur-pour="__adresse"]');
+      if (zoneAdresse) {
+        zoneAdresse.textContent = "Complétez l’adresse du terrain : recherchez-la, ou saisissez-la manuellement.";
+        zoneAdresse.hidden = false;
+      }
+    } else {
+      var zoneOk = step.querySelector('[data-erreur-pour="__adresse"]');
+      if (zoneOk) { zoneOk.textContent = ""; zoneOk.hidden = true; }
     }
-    if (firstBad) firstBad.focus();
-    return ok;
+
+    var total = Object.keys(vus).length;
+
+    if (0 === total) {
+      if (erreurs) erreurs.resumer("");
+      return true;
+    }
+
+    if (erreurs) {
+      erreurs.resumer(
+        1 === total
+          ? "1 information doit être corrigée pour continuer."
+          : total + " informations doivent être corrigées pour continuer."
+      );
+      erreurs.conduireAuPremier();
+    }
+
+    return false;
+  }
+
+  /* Le message d'un champ vide, adapté à ce qu'on lui demande. */
+  function messageManquant(el, nom) {
+    if ("radio" === el.type || "checkbox" === el.type) return "Choisissez une option pour continuer.";
+    if ("SELECT" === el.tagName) return "Sélectionnez une valeur dans la liste.";
+    if ("email" === el.type) return "Indiquez une adresse électronique.";
+    if (el.hasAttribute("data-mesure")) return "Indiquez une mesure.";
+    return "Ce champ est obligatoire.";
   }
 
   nextBtn.addEventListener("click", function () {
@@ -1196,6 +1317,12 @@
     },
     bouton: sendBtn,
     erreur: document.getElementById("dp-final-err"),
+    // Le pont partage l'instance de la validation locale : deux moteurs
+    // marqueraient les mêmes champs sans se voir, et le second effacerait les
+    // marques du premier.
+    moteur: erreurs,
+    activerEtape: activerEtape,
+    resume: document.getElementById("dp-resume-err"),
     serialiser: function (fd) {
       // « nature » est un choix unique : FormData porte déjà la bonne valeur.
       // Les modules y ajoutent les projets répétés, leurs descriptions, les
@@ -1218,8 +1345,55 @@
       return;
     }
 
+    /* Toutes les étapes sont revalidées avant l'appel réseau.
+       Ce n'est PAS un allègement du contrôle serveur : celui-ci reste la source
+       de vérité et rejouera l'intégralité de ses règles. C'est un aller-retour
+       qu'on évite quand on sait déjà que la donnée est invalide — et surtout un
+       retour immédiat à la bonne rubrique, au lieu d'un refus après l'envoi. */
+    if (!validerToutesLesEtapes()) return;
+
     pont.envoyer();
   });
+
+  /**
+   * Revalide chaque étape et ramène à la première fautive.
+   *
+   * On parcourt les étapes dans l'ordre en activant chacune : un contrôle
+   * masqué ne se laisse ni mesurer ni marquer, et `estVisible()` refuserait
+   * tout champ d'une rubrique fermée. L'étape ouverte au départ est restaurée
+   * si tout est valide.
+   */
+  function validerToutesLesEtapes() {
+    var depart = current;
+    var premiereFautive = -1;
+
+    for (var i = 0; i < steps.length; i++) {
+      current = i;
+      render();
+      if (!validateStep() && premiereFautive < 0) premiereFautive = i;
+    }
+
+    if (premiereFautive < 0) {
+      current = depart;
+      render();
+      return true;
+    }
+
+    current = premiereFautive;
+    render();
+
+    var total = erreurs ? erreurs.nombre() : 0;
+    if (erreurs && total) {
+      erreurs.resumer(
+        1 === total
+          ? "1 information doit être corrigée avant l’envoi."
+          : total + " informations doivent être corrigées avant l’envoi."
+      );
+      erreurs.conduireAuPremier();
+    }
+
+    return false;
+  }
 
   /**
    * Écran final, bâti exclusivement à partir de la réponse du serveur.

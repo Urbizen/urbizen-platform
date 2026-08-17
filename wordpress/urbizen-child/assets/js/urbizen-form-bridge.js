@@ -29,6 +29,338 @@
 
   var DELAI_INITIALISATION = 10000;
 
+  /* ======================================================================
+     MOTEUR D'ERREURS PAR CHAMP — une seule implémentation pour DP et PC
+     ======================================================================
+
+     POURQUOI ICI
+
+     DP et PC sont deux documents statiques distincts, mais ils chargent le
+     même pont. Y placer le moteur donne une implémentation unique sans
+     nouveau fichier à enfiler : deux copies auraient divergé à la première
+     retouche, et c'est exactement ce qui distingue déjà leurs `validateStep()`.
+
+     CE QU'IL RÉPARE
+
+     Le pont se contentait de `form.querySelector('[name=…]').focus()`. Le champ
+     fautif d'une étape antérieure EXISTE dans le document — la sélection
+     réussissait donc — mais son étape est en `display:none`, où `focus()` est
+     sans effet et sans erreur. Le repli qui aurait mis le focus sur le message
+     ne s'exécutait jamais, puisqu'il était conditionné à l'absence du champ.
+     Résultat : message générique, focus nulle part, étape inchangée.
+
+     L'ORDRE COMPTE
+
+     Activer l'étape AVANT de donner le focus. Un `focus()` sur un élément non
+     rendu est ignoré silencieusement par le navigateur ; l'inverser ne produit
+     aucune erreur, seulement un formulaire qui semble ne rien faire.
+
+     CE QU'IL NE DÉCIDE PAS
+
+     Il ne sait pas ce qu'est une étape DP ou PC. Le document lui fournit
+     `activerEtape` ; à défaut, il se contente de marquer les champs. C'est ce
+     qui lui permet de servir aussi la validation locale, qui n'a pas d'étape à
+     changer puisqu'elle valide celle qui est déjà ouverte.
+     ====================================================================== */
+
+  /* `.dp-step` et NON `[data-step]` : l'attribut est surchargé. Les sections
+     l'emploient comme numéro de rubrique, mais les champs de mesure l'emploient
+     comme pas numérique (`data-step="0.01"`). Un `closest("[data-step]")` depuis
+     un champ de bassin renvoyait donc le champ lui-même, jamais sa rubrique —
+     et l'étape n'était jamais ouverte. La classe, elle, ne désigne qu'une
+     rubrique. */
+  var SELECTEUR_ETAPE = ".dp-step";
+  var SELECTEUR_CONTROLE = "input, select, textarea";
+
+  /**
+   * @param {HTMLFormElement} form
+   * @param {Object}          [options]
+   * @param {Function}        [options.activerEtape] Reçoit l'élément d'étape à ouvrir.
+   * @param {HTMLElement}     [options.resume]       Zone de résumé, si le document en a une.
+   */
+  function Moteur(form, options) {
+    this.form = form;
+    this.options = options || {};
+    // Toutes les erreurs connues, y compris celles des étapes non ouvertes :
+    // elles doivent survivre au changement d'étape pour apparaître quand la
+    // personne y arrive.
+    this.messages = {};
+    this._brancherCorrection();
+  }
+
+  /** Les contrôles portant ce nom, groupes radio compris. */
+  Moteur.prototype._controles = function (nom) {
+    try {
+      return this.form.querySelectorAll('[name="' + nom + '"]');
+    } catch (e) {
+      return [];
+    }
+  };
+
+  /**
+   * Le réceptacle de message d'un champ — créé s'il manque.
+   *
+   * Les documents n'en portent que sur une poignée de champs : la rubrique des
+   * mesures de bassin, et rien d'autre. Se contenter de ceux qui existent
+   * reviendrait à poser `aria-invalid` sans avoir où écrire la phrase — un
+   * champ signalé comme invalide, sans dire pourquoi, pour la grande majorité
+   * des cas. On le fabrique donc à la demande, dans le groupe du champ, avec
+   * les mêmes attributs que ceux du document.
+   */
+  Moteur.prototype._zone = function (nom) {
+    var existante;
+
+    try {
+      existante = this.form.querySelector('[data-erreur-pour="' + nom + '"]');
+    } catch (e) {
+      return null;
+    }
+
+    if (existante) return existante;
+
+    var controles = this._controles(nom);
+    if (!controles.length) return null;
+
+    // Le groupe du champ, ou à défaut son parent direct : le message doit
+    // rester à côté de ce qu'il commente, jamais en fin de formulaire.
+    var hote =
+      (controles[0].closest && controles[0].closest(".dp-field")) ||
+      controles[0].parentNode;
+
+    if (!hote || !hote.appendChild) return null;
+
+    var zone = this.form.ownerDocument.createElement("p");
+    zone.className = "dp-err";
+    zone.setAttribute("data-erreur-pour", nom);
+    zone.setAttribute("role", "alert");
+    zone.hidden = true;
+    hote.appendChild(zone);
+
+    return zone;
+  };
+
+  /** Un contrôle est-il réellement rendu ? `offsetParent` suffit ici : aucun
+      champ de ces formulaires n'est en `position: fixed`. */
+  function visible(el) {
+    return !!(el && el.offsetParent !== null && !el.disabled);
+  }
+
+  Moteur.prototype.etapeDe = function (el) {
+    return el && el.closest ? el.closest(SELECTEUR_ETAPE) : null;
+  };
+
+  /**
+   * Enregistre une erreur et la rend visible si son étape est ouverte.
+   */
+  Moteur.prototype.poser = function (nom, message) {
+    if (!nom || !message) return;
+
+    this.messages[nom] = message;
+
+    var zone = this._zone(nom);
+    var controles = this._controles(nom);
+    var i;
+
+    if (zone) {
+      if (!zone.id) zone.id = "err-" + String(nom).replace(/[^a-zA-Z0-9_-]/g, "-");
+      zone.textContent = message;
+      zone.hidden = false;
+      zone.setAttribute("role", "alert");
+    }
+
+    for (i = 0; i < controles.length; i++) {
+      controles[i].setAttribute("aria-invalid", "true");
+
+      if (zone && zone.id) {
+        // `aria-describedby` peut déjà désigner une aide : on complète, on ne
+        // remplace pas — sinon l'aide disparaîtrait au premier échec.
+        var decrit = (controles[i].getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean);
+        if (decrit.indexOf(zone.id) === -1) decrit.push(zone.id);
+        controles[i].setAttribute("aria-describedby", decrit.join(" "));
+      }
+    }
+  };
+
+  /** Retire l'erreur d'un champ — appelé dès que la personne le corrige. */
+  Moteur.prototype.effacer = function (nom) {
+    if (!Object.prototype.hasOwnProperty.call(this.messages, nom)) return;
+
+    delete this.messages[nom];
+
+    var zone = this._zone(nom);
+    var controles = this._controles(nom);
+    var i;
+
+    if (zone) {
+      zone.textContent = "";
+      zone.hidden = true;
+    }
+
+    for (i = 0; i < controles.length; i++) {
+      controles[i].removeAttribute("aria-invalid");
+      controles[i].style.borderColor = "";
+
+      if (zone && zone.id) {
+        var reste = (controles[i].getAttribute("aria-describedby") || "")
+          .split(/\s+/)
+          .filter(function (id) { return id && id !== zone.id; });
+        if (reste.length) controles[i].setAttribute("aria-describedby", reste.join(" "));
+        else controles[i].removeAttribute("aria-describedby");
+      }
+    }
+  };
+
+  Moteur.prototype.effacerTout = function () {
+    var noms = Object.keys(this.messages);
+    for (var i = 0; i < noms.length; i++) this.effacer(noms[i]);
+    this.resumer("");
+  };
+
+  Moteur.prototype.nombre = function () {
+    return Object.keys(this.messages).length;
+  };
+
+  /** Le premier contrôle fautif du document, dans l'ordre du document. */
+  Moteur.prototype.premierFautif = function () {
+    var champs = this.form.querySelectorAll(SELECTEUR_CONTROLE);
+
+    for (var i = 0; i < champs.length; i++) {
+      var nom = champs[i].getAttribute("name");
+      if (nom && Object.prototype.hasOwnProperty.call(this.messages, nom)) return champs[i];
+    }
+
+    return null;
+  };
+
+  /** Écrit le résumé, s'il y a une zone pour l'accueillir. */
+  Moteur.prototype.resumer = function (texte) {
+    var zone = this.options.resume;
+    if (!zone) return;
+
+    zone.textContent = texte;
+    zone.hidden = "" === texte;
+  };
+
+  /** Le libellé public d'un champ : il vit dans le document, pas en PHP. */
+  Moteur.prototype.libelle = function (nom) {
+    var controles = this._controles(nom);
+    if (!controles.length) return nom;
+
+    var groupe = controles[0].closest ? controles[0].closest(".dp-field") : null;
+    var etiquette = groupe ? groupe.querySelector("label, legend") : null;
+
+    return etiquette ? etiquette.textContent.replace(/\s+/g, " ").trim() : nom;
+  };
+
+  /**
+   * Applique une liste d'erreurs venue du serveur, puis conduit la personne
+   * jusqu'à la première.
+   *
+   * @param {Array} liste  Entrées `{ field, message }`.
+   * @returns {number} Nombre d'erreurs retenues.
+   */
+  Moteur.prototype.appliquer = function (liste) {
+    var moteur = this;
+
+    this.effacerTout();
+
+    if (!Array.isArray(liste)) return 0;
+
+    liste.forEach(function (entree) {
+      if (!entree || "string" !== typeof entree.field) return;
+      var message = "string" === typeof entree.message && "" !== entree.message ? entree.message : null;
+      if (message) moteur.poser(entree.field, message);
+    });
+
+    var total = this.nombre();
+
+    if (0 === total) return 0;
+
+    this.resumer(
+      1 === total
+        ? "1 information doit être corrigée avant l’envoi."
+        : total + " informations doivent être corrigées avant l’envoi."
+    );
+
+    this.conduireAuPremier();
+
+    return total;
+  };
+
+  /**
+   * Ouvre l'étape de la première erreur, puis y met le focus.
+   *
+   * L'ordre des cinq gestes n'est pas indifférent : activer, laisser le
+   * document se rendre, vérifier que le contrôle est bien visible, faire
+   * défiler, puis seulement donner le focus.
+   */
+  Moteur.prototype.conduireAuPremier = function () {
+    var cible = this.premierFautif();
+    if (!cible) return;
+
+    var etape = this.etapeDe(cible);
+
+    if (etape && "function" === typeof this.options.activerEtape) {
+      this.options.activerEtape(etape);
+    }
+
+    // Après activation seulement : un contrôle encore masqué ne prend pas le
+    // focus, et l'appel échouerait sans rien dire.
+    if (!visible(cible)) {
+      var zone = this._zone(cible.getAttribute("name")) || this.options.resume;
+      if (zone && zone.focus) {
+        zone.setAttribute("tabindex", "-1");
+        zone.focus();
+      }
+      return;
+    }
+
+    if (cible.scrollIntoView) {
+      cible.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+
+    cible.focus();
+  };
+
+  /**
+   * Une erreur disparaît dès que la personne touche au champ. Sans cela, le
+   * message resterait après correction et invaliderait le résumé.
+   */
+  Moteur.prototype._brancherCorrection = function () {
+    var moteur = this;
+
+    ["input", "change"].forEach(function (type) {
+      moteur.form.addEventListener(
+        type,
+        function (evenement) {
+          var nom = evenement.target && evenement.target.getAttribute
+            ? evenement.target.getAttribute("name")
+            : null;
+
+          if (!nom || !Object.prototype.hasOwnProperty.call(moteur.messages, nom)) return;
+
+          moteur.effacer(nom);
+
+          var reste = moteur.nombre();
+          moteur.resumer(
+            0 === reste
+              ? ""
+              : 1 === reste
+                ? "1 information doit être corrigée avant l’envoi."
+                : reste + " informations doivent être corrigées avant l’envoi."
+          );
+        },
+        true
+      );
+    });
+  };
+
+  global.UrbizenErreurs = {
+    creer: function (form, options) {
+      return new Moteur(form, options);
+    }
+  };
+
   /**
    * Temporisation des demandes de configuration, en millisecondes.
    *
@@ -111,6 +443,19 @@
     this.verrouille = false;
     this.envoiEnCours = false;
     this.minuteurs = [];
+
+    // Le moteur d'erreurs est partagé avec la validation locale du document :
+    // celui-ci le fournit s'il en tient déjà un, sinon le pont en crée un. Deux
+    // instances marqueraient les mêmes champs sans se voir, et l'une effacerait
+    // les marques de l'autre.
+    this.moteur =
+      config.moteur ||
+      (global.UrbizenErreurs
+        ? global.UrbizenErreurs.creer(config.form, {
+            activerEtape: config.activerEtape || null,
+            resume: config.resume || null
+          })
+        : null);
 
     this._preparerBouton();
     this._ecouter();
@@ -308,7 +653,8 @@
           "string" === typeof issue.donnees.message && "" !== issue.donnees.message
             ? issue.donnees.message
             : MESSAGE_RESEAU,
-          issue.donnees.fields
+          issue.donnees.fields,
+          issue.donnees.errors
         );
       })
       .catch(function () {
@@ -318,8 +664,21 @@
 
   /**
    * Refus corrigeable : le formulaire reste tel quel, le bouton revient.
+   *
+   * Trois sources d'information, par ordre de précision décroissante :
+   *
+   *   1. `errors` — un message public par champ. C'est le seul cas où l'on peut
+   *      dire ce qui ne va pas, et où la personne peut corriger sans deviner.
+   *   2. `fields` — les noms seuls, conservés pour un serveur non encore à jour.
+   *      On nomme alors les champs par leur libellé lu dans le document, faute
+   *      de mieux : c'est moins bon qu'un message, c'est mieux que rien.
+   *   3. Ni l'un ni l'autre — message global seul, focus sur ce message.
+   *
+   * @param {string} message Message global public.
+   * @param {Array}  champs  Noms des champs en erreur (compatibilité).
+   * @param {Array}  erreurs Entrées `{ field, message }`, quand le serveur les donne.
    */
-  Pont.prototype._echec = function (message, champs) {
+  Pont.prototype._echec = function (message, champs, erreurs) {
     this.envoiEnCours = false;
     this.bouton.disabled = false;
     this.bouton.removeAttribute("aria-busy");
@@ -328,19 +687,23 @@
     this.erreur.textContent = message;
     this.erreur.setAttribute("tabindex", "-1");
 
-    // Le focus va au premier champ nommé par le serveur quand il en nomme un,
-    // au message sinon : dans les deux cas, la personne sait où regarder.
-    var cible = null;
+    var moteur = this.moteur;
 
-    if (Array.isArray(champs) && champs.length) {
-      cible = this.form.querySelector('[name="' + champs[0] + '"]');
+    if (moteur && Array.isArray(erreurs) && erreurs.length) {
+      if (moteur.appliquer(erreurs) > 0) return;
     }
 
-    if (cible && cible.focus) {
-      cible.focus();
-    } else {
-      this.erreur.focus();
+    // Repli : le serveur n'a nommé que les champs. On fabrique un message par
+    // champ à partir de son libellé, pour au moins conduire au bon endroit.
+    if (moteur && Array.isArray(champs) && champs.length) {
+      var liste = champs.map(function (nom) {
+        return { field: nom, message: "« " + moteur.libelle(nom) + " » doit être vérifié." };
+      });
+
+      if (moteur.appliquer(liste) > 0) return;
     }
+
+    this.erreur.focus();
   };
 
   /**
