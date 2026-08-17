@@ -10,6 +10,7 @@
  * Codes de sortie : 0 conforme · 1 au moins un écart.
  */
 import { chromium } from 'playwright';
+import { readFileSync } from 'node:fs';
 
 const BASE = (process.argv[2] || 'https://urbizen.fr').replace(/\/$/, '');
 
@@ -55,36 +56,55 @@ const NON_REGRESSION = [
 const TOUTES = [...PAGES, ...GUIDES];
 
 /*
- * LES QUATRE GUIDES QUI N'ONT DÉLIBÉRÉMENT PAS D'IMAGE
+ * TOUS LES GUIDES ONT UNE IMAGE — CE QUI N'A PAS TOUJOURS ÉTÉ VRAI
  *
- * `docs/SEO_VISUALS_HANDOFF.md` l'écrit noir sur blanc, et c'est un choix de
- * fond, pas un oubli : « ces guides n'ont pas besoin d'une image artificielle
- * différente à tout prix ; la preuve métier est plus crédible qu'un visuel
- * décoratif ». Il détaille ensuite, pour chacun :
+ * Ce banc portait jusqu'ici une liste de quatre guides devant rester SANS image
+ * mise en avant : secteur protégé, architecte 150 m², refus, CERFA. Ce n'était
+ * pas un oubli mais une position de `docs/SEO_VISUALS_HANDOFF.md` (kit v1) :
+ * faute de visuel honnête disponible, mieux valait pas d'image qu'un visuel
+ * décoratif — et surtout pas de faux périmètre ABF, de faux arrêté municipal ni
+ * de fausse reproduction de formulaire.
  *
- *   secteur protégé  → une capture officielle correctement créditée, ou rien.
- *                      Ne pas inventer un périmètre ABF.
- *   architecte 150 m² → pas de schéma de seuil figé dans une image ; un tableau
- *                      HTML maintenable vaut mieux.
- *   refus            → pas de faux arrêté municipal.
- *   CERFA            → pas de fausse reproduction de formulaire.
+ * Le kit v2 lève la cause, pas la règle. `docs/SEO_VISUALS_V2_HANDOFF.md`
+ * fournit un visuel propre à chacun de ces quatre guides, et pose en principe
+ * que « les visuels éditoriaux n'imitent pas des documents administratifs
+ * officiels ». Le visuel CERFA est une composition de bureau sans texte
+ * lisible ni logo ; celui du secteur protégé, une rue de centre ancien
+ * explicitement fictive. L'exigence de fond est donc tenue par le kit lui-même.
  *
- * Le contrôle est donc bilatéral : ces quatre-là doivent rester SANS image mise
- * en avant, et tous les autres doivent en avoir une. Écrit dans l'autre sens,
- * il laisserait passer l'ajout d'un visuel décoratif — exactement ce que le
- * handoff refuse.
- *
- * Conséquence assumée : ces quatre pages n'émettent pas d'`og:image`. Y
- * remédier suppose une image OG par défaut au niveau du site, qui toucherait
- * toutes les pages sans vignette — une décision de configuration globale, hors
- * du périmètre de ce lot.
+ * La liste disparaît, mais le contrôle reste bilatéral dans son esprit : les
+ * dix-huit guides doivent avoir une image, ET cette image doit être celle que
+ * le manifeste leur attribue — vérifié ci-dessous sur le nom de fichier. Un
+ * visuel décoratif quelconque échouerait encore, ce qui était tout l'objet de
+ * la règle d'origine.
  */
-const SANS_IMAGE_VOULU = [
-  '/guides/secteur-protege-abf-declaration-travaux/',
-  '/guides/recours-architecte-150-m2/',
-  '/guides/refus-declaration-prealable/',
-  '/guides/cerfa-declaration-travaux/',
-];
+const VISUEL_ATTENDU = Object.fromEntries(
+  JSON.parse(readFileSync(new URL('../../docs/SEO_VISUALS_V2_MANIFEST.json', import.meta.url), 'utf8'))
+    .assets.map((a) => [a.order, a.file]),
+);
+
+// Ordre du manifeste → chemin du guide. La correspondance est explicite : le
+// manifeste identifie ses entrées par un titre rédactionnel, pas par un slug.
+const ORDRE_GUIDE = {
+  '/guides/cerfa-declaration-travaux/': 1,
+  '/guides/refus-declaration-prealable/': 2,
+  '/guides/demande-pieces-complementaires-urbanisme/': 3,
+  '/guides/recours-architecte-150-m2/': 4,
+  '/guides/distance-limite-separative-construction/': 5,
+  '/guides/emprise-au-sol-surface-de-plancher/': 6,
+  '/guides/secteur-protege-abf-declaration-travaux/': 7,
+  '/guides/plan-coupe-dp3/': 8,
+  '/guides/plan-facades-toitures-dp4/': 9,
+  '/guides/insertion-graphique-dp6/': 10,
+  '/guides/plan-masse-dp2/': 11,
+  '/guides/pieces-declaration-prealable/': 12,
+  '/guides/delais-urbanisme-debut-des-travaux/': 13,
+  '/guides/erreurs-dossier-urbanisme/': 14,
+  '/guides/lire-le-plu-de-son-terrain/': 15,
+  '/guides/extension-maison-verifications-avant-plans/': 16,
+  '/guides/dp-ou-permis-de-construire/': 17,
+  '/guides/piscine-garage-carport-autorisation/': 18,
+};
 
 let echecs = 0;
 const check = (nom, ok, detail = '') => {
@@ -146,13 +166,18 @@ for (const chemin of TOUTES) {
   check(`${nom} · canonical autonome`, m.canonical === `${BASE}${chemin}`, `${m.canonical}`);
   check(`${nom} · un seul H1`, m.h1n === 1, `${m.h1n}`);
   check(`${nom} · title et description présents`, !!m.titre && !!m.description);
-  const sansImageVoulu = SANS_IMAGE_VOULU.includes(chemin);
   check(`${nom} · Open Graph title et description`, !!m.ogTitle && !!m.ogDescription);
-  if (sansImageVoulu) {
-    // Contrôle inversé : le handoff veut ces quatre guides SANS image.
-    check(`${nom} · sans image mise en avant, conformément au handoff`, !m.ogImage, `og:image = ${m.ogImage}`);
-  } else {
-    check(`${nom} · image mise en avant et og:image`, !!m.ogImage);
+  check(`${nom} · image mise en avant et og:image`, !!m.ogImage);
+
+  // Pour un guide, l'image doit être celle que le manifeste lui attribue. Le
+  // nom de fichier suffit à le dire : WordPress le conserve dans l'URL de la
+  // médiathèque, à un suffixe `-1`, `-2`… près en cas de collision.
+  const ordre = ORDRE_GUIDE[chemin];
+  if (ordre) {
+    const radical = VISUEL_ATTENDU[ordre].replace(/\.webp$/, '');
+    const attendu = new RegExp(`/${radical}(-\\d+)?(-\\d+x\\d+)?\\.webp$`);
+    check(`${nom} · le visuel est celui du manifeste (${radical})`,
+      attendu.test(m.ogImage ?? ''), `og:image = ${m.ogImage}`);
   }
   check(`${nom} · fil d'ariane`, m.fil);
   check(`${nom} · BreadcrumbList`, m.types.includes('BreadcrumbList'), m.types.join(', '));

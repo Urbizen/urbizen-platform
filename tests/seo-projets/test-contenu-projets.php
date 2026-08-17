@@ -187,11 +187,58 @@ check( 'hub : la section projets est ajoutée sans rien retirer',
  */
 $kit_photos   = glob( $theme . '/assets/images/seo-projects/*.webp' );
 $kit_planches = glob( $theme . '/assets/images/dossier/dp*-cartouche.webp' );
+$kit_guides   = glob( $theme . '/assets/images/seo-guides-v2/*.webp' );
 check( 'Le kit photographique est installé (44 fichiers)', 44 === count( $kit_photos ), count( $kit_photos ) . ' trouvé(s)' );
 check( 'Les sept planches au cartouche sont présentes', 7 === count( $kit_planches ), count( $kit_planches ) . ' trouvée(s)' );
+check( 'Le kit visuel des guides v2 est installé (72 fichiers)', 72 === count( $kit_guides ), count( $kit_guides ) . ' trouvé(s)' );
 
 $autorises = array();
-foreach ( array_merge( $kit_photos, $kit_planches ) as $f ) { $autorises[] = basename( $f ); }
+foreach ( array_merge( $kit_photos, $kit_planches, $kit_guides ) as $f ) { $autorises[] = basename( $f ); }
+
+/*
+ * LA COPIE DU MANIFESTE DANS LE THÈME EST SURVEILLÉE
+ *
+ * `URBIZEN_CHILD_VISUELS_ENTIERS` recopie dans `functions.php` la liste des
+ * visuels que le manifeste marque `display: contain` — un plan coté, qu'un
+ * recadrage viderait de sa démonstration. Une copie non surveillée dérive : le
+ * jour où le manifeste changerait, le thème recadrerait une planche sans que
+ * rien ne le dise. Les deux listes sont donc comparées ici, dans les deux sens.
+ */
+$manifeste = $racine . '/docs/SEO_VISUALS_V2_MANIFEST.json';
+check( 'Le manifeste du kit visuel v2 est versionné', is_file( $manifeste ) );
+
+if ( is_file( $manifeste ) ) {
+	$m = json_decode( (string) file_get_contents( $manifeste ), true );
+	check( 'Le manifeste décrit bien dix-huit visuels', 18 === count( $m['assets'] ?? array() ) );
+
+	$attendus_entiers = array();
+	foreach ( (array) ( $m['assets'] ?? array() ) as $a ) {
+		if ( 'contain' === ( $a['display'] ?? '' ) ) { $attendus_entiers[] = $a['file']; }
+	}
+	sort( $attendus_entiers );
+
+	preg_match( '/URBIZEN_CHILD_VISUELS_ENTIERS = array\((.*?)\);/s', (string) file_get_contents( $theme . '/functions.php' ), $bloc );
+	preg_match_all( "/'([^']+\.webp)'/", $bloc[1] ?? '', $decl );
+	$declares = $decl[1];
+	sort( $declares );
+
+	check( 'Le thème et le manifeste désignent les mêmes planches à afficher entières',
+		$attendus_entiers === $declares,
+		'manifeste : ' . implode( ', ', array_diff( $attendus_entiers, $declares ) )
+		. ' | thème : ' . implode( ', ', array_diff( $declares, $attendus_entiers ) ) );
+
+	// Chaque visuel du manifeste doit être livré avec ses trois variantes.
+	$manquants = array();
+	foreach ( (array) ( $m['assets'] ?? array() ) as $a ) {
+		$base = substr( $a['file'], 0, -5 );
+		foreach ( array( '', '-352', '-704', '-960' ) as $suffixe ) {
+			if ( ! is_file( $theme . '/assets/images/seo-guides-v2/' . $base . $suffixe . '.webp' ) ) {
+				$manquants[] = $base . $suffixe . '.webp';
+			}
+		}
+	}
+	check( 'Chaque visuel du manifeste est livré avec ses trois variantes', array() === $manquants, implode( ', ', $manquants ) );
+}
 
 foreach ( $src as $url => $corps ) {
 	if ( '' === $corps ) { continue; }
@@ -204,7 +251,10 @@ foreach ( $src as $url => $corps ) {
 	$sans_lazy = 0;
 
 	foreach ( $imgs[0] as $img ) {
-		preg_match_all( '#assets/images/[a-z-]+/([a-z0-9.-]+\.webp)#', $img, $f );
+		// `[a-z0-9-]+` et non `[a-z-]+` pour le répertoire : `seo-guides-v2`
+		// porte un chiffre, et la classe d'origine ne l'aurait pas reconnu —
+		// les visuels du kit v2 seraient passés au travers du contrôle.
+		preg_match_all( '#assets/images/[a-z0-9-]+/([a-z0-9.-]+\.webp)#', $img, $f );
 		foreach ( array_unique( $f[1] ) as $fichier ) {
 			if ( ! in_array( $fichier, $autorises, true ) ) { $hors_kit[] = $fichier; }
 		}
@@ -220,16 +270,19 @@ foreach ( $src as $url => $corps ) {
 	check( "$nom : chaque image porte width et height", 0 === $sans_dim, "$sans_dim image(s)" );
 	check( "$nom : chaque image du corps est différée", 0 === $sans_lazy, "$sans_lazy image(s)" );
 
-	// Les photographies doivent porter leurs quatre variantes ; les planches au
-	// cartouche n'en ont pas, et n'ont donc pas de srcset.
+	// Les photographies du kit d'origine et TOUS les visuels du kit v2 sont
+	// livrés en quatre déclinaisons : ils doivent être servis avec leur srcset.
+	// Seules les planches `dossier/` en sont dépourvues.
 	foreach ( $imgs[0] as $img ) {
-		if ( ! str_contains( $img, 'seo-projects/' ) ) { continue; }
-		check( "$nom : photographie servie avec un srcset à quatre variantes",
+		if ( ! str_contains( $img, 'seo-projects/' ) && ! str_contains( $img, 'seo-guides-v2/' ) ) { continue; }
+		check( "$nom : visuel servi avec un srcset à quatre variantes",
 			4 === preg_match_all( '/\d+w/', $img ) && str_contains( $img, 'sizes=' ) );
 	}
 
-	// Toute planche au cartouche doit être légendée comme un exemple fictif.
-	if ( str_contains( $corps, 'images/dossier/' ) ) {
+	// Toute planche au cartouche doit être légendée comme un exemple fictif —
+	// celles du kit d'origine comme les trois pièces inédites du kit v2.
+	if ( str_contains( $corps, 'images/dossier/' ) || str_contains( $corps, 'images/seo-guides-v2/guide-distance-limites' )
+		|| str_contains( $corps, 'images/seo-guides-v2/guide-emprise-surface' ) ) {
 		check( "$nom : les planches sont légendées « Exemple Urbizen — projet fictif »",
 			(bool) preg_match( '/Exemple Urbizen\s*—\s*projet fictif/u', $corps ) );
 	}
@@ -239,6 +292,122 @@ foreach ( $src as $url => $corps ) {
 foreach ( $src as $url => $corps ) {
 	check( trim( $url, '/' ) . ' : aucun schéma vectoriel', ! str_contains( $corps, '.svg' ) );
 }
+
+// ------------------------------------- 4 bis · mots-clés principaux ----------
+
+/*
+ * LE MOT-CLÉ PRINCIPAL EST CELUI DE LA CARTE DE CONTENU, ET IL EST DANS LE TEXTE
+ *
+ * `publier-pages-seo.php` pose le mot-clé principal d'AIOSEO pour les vingt et
+ * un contenus. Deux dérives sont possibles, et toutes les deux silencieuses :
+ * un mot-clé recopié de travers depuis `docs/SEO_CONTENT_MAP.md`, ou un
+ * mot-clé juste mais absent du contenu qu'il est censé décrire. Les deux sont
+ * vérifiées ici.
+ *
+ * Le test d'occurrence porte sur les termes SIGNIFIANTS, pas sur la chaîne
+ * entière : « déclaration préalable abri de jardin » est une requête, pas une
+ * phrase française, et exiger la chaîne exacte pousserait à l'écrire telle
+ * quelle dans le texte — c'est-à-dire à mal écrire pour satisfaire un banc.
+ *
+ * Le contrôle de densité est là pour la raison inverse : il échoue si un terme
+ * revient au point de trahir un bourrage. Les deux bornes tiennent le texte
+ * entre l'oubli et l'excès.
+ */
+$carte = (string) file_get_contents( $racine . '/docs/SEO_CONTENT_MAP.md' );
+$pub   = (string) file_get_contents( $racine . '/scripts/publier-pages-seo.php' );
+
+// Mots-clés déclarés par le script, dans l'ordre des slugs.
+preg_match_all( "/'slug'\s*=> '([a-z0-9-]+)'.*?'mot_cle'\s*=> '((?:[^'\\\\]|\\\\.)*)'/s", $pub, $md );
+$mots_script = array();
+foreach ( $md[1] as $i => $slug ) { $mots_script[ $slug ] = str_replace( "\\'", "'", $md[2][ $i ] ); }
+
+check( 'Les vingt et un contenus portent un mot-clé principal', 21 === count( $mots_script ), count( $mots_script ) . ' trouvé(s)' );
+
+// Mots-clés de la carte de contenu : fiches détaillées, puis tableaux de guides.
+$mots_carte = array();
+if ( preg_match_all( '/###[^\n]*`\/([a-z0-9-]+)\/`(.*?)(?=\n###|\n---|\z)/s', $carte, $fiches, PREG_SET_ORDER ) ) {
+	foreach ( $fiches as $f ) {
+		if ( preg_match( '/\*\*Mot-clé principal\*\*\s*\|\s*([^|\n]+)/u', $f[2], $k ) ) {
+			$mots_carte[ $f[1] ] = trim( $k[1] );
+		}
+	}
+}
+if ( preg_match_all( '/\|\s*`\/guides\/([a-z0-9-]+)\/`\s*\|\s*([^|]+)\|/u', $carte, $lignes, PREG_SET_ORDER ) ) {
+	foreach ( $lignes as $l ) {
+		$slug = $l[1];
+		$kw   = trim( $l[2] );
+		if ( ! isset( $mots_carte[ $slug ] ) && ! str_starts_with( $kw, 'les ' ) ) { $mots_carte[ $slug ] = $kw; }
+	}
+}
+
+foreach ( $mots_script as $slug => $mot ) {
+	check( "$slug : le mot-clé est celui de la carte de contenu",
+		isset( $mots_carte[ $slug ] ) && $mots_carte[ $slug ] === $mot,
+		'carte : ' . ( $mots_carte[ $slug ] ?? '—' ) . ' | script : ' . $mot );
+}
+
+/** Réduit une chaîne à une forme comparable : minuscules, sans accent. */
+$aplatir = static function ( $s ) {
+	$s = mb_strtolower( $s, 'UTF-8' );
+	$s = strtr( $s, array( 'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e', 'à' => 'a', 'â' => 'a', 'î' => 'i', 'ï' => 'i', 'ô' => 'o', 'ö' => 'o', 'û' => 'u', 'ù' => 'u', 'ü' => 'u', 'ç' => 'c', '’' => "'" ) );
+	return preg_replace( '/\s+/', ' ', $s );
+};
+
+// Mots outils : ils ne portent pas l'intention et leur absence ne dit rien.
+$outils = array( 'de', 'du', 'des', 'la', 'le', 'les', 'en', 'au', 'aux', 'un', 'une', 'et', 'ou', 'a', 'sur', 'pour', 'dans' );
+
+foreach ( $mots_script as $slug => $mot ) {
+	$fichier = is_file( "$pages/$slug.html" ) ? "$pages/$slug.html" : "$guides/$slug.html";
+	if ( ! is_file( $fichier ) ) { continue; }
+
+	/*
+	 * Le corps versionné ne contient NI le H1 NI la meta description : le
+	 * gabarit rend le premier depuis `titre`, AIOSEO sert la seconde depuis
+	 * `seo_desc`. Chercher le mot-clé dans le seul fichier de contenu déclarait
+	 * donc absents des termes bel et bien servis au visiteur. Le texte examiné
+	 * est reconstitué à l'identique de ce que la page publie.
+	 */
+	preg_match( "/'slug'\s*=> '" . preg_quote( $slug, '/' ) . "'(.*?)\n\s*\),/s", $pub, $bloc_c );
+	$entete = '';
+	foreach ( array( 'titre', 'extrait', 'seo_titre', 'seo_desc' ) as $champ ) {
+		if ( preg_match( "/'$champ'\s*=> '((?:[^'\\\\]|\\\\.)*)'/", $bloc_c[1] ?? '', $v ) ) {
+			$entete .= ' ' . str_replace( "\\'", "'", $v[1] );
+		}
+	}
+
+	$texte  = $aplatir( $entete . ' ' . strip_tags( (string) file_get_contents( $fichier ) ) );
+	$termes = array_values( array_diff( explode( ' ', $aplatir( $mot ) ), $outils ) );
+
+	$absents = array();
+	foreach ( $termes as $t ) {
+		if ( '' === $t ) { continue; }
+		// Racine sur cinq caractères : « déclaration » couvre « déclarations »,
+		// « pièce » couvre « pièces », sans réimplémenter un lemmatiseur.
+		$racine_t = mb_substr( $t, 0, 5, 'UTF-8' );
+		if ( ! str_contains( $texte, $racine_t ) ) { $absents[] = $t; }
+	}
+	check( "$slug : chaque terme du mot-clé figure dans le contenu", array() === $absents, implode( ', ', $absents ) );
+
+	// Bourrage : aucun terme signifiant ne doit dépasser 3 % des mots du texte.
+	$total = max( 1, str_word_count( $texte, 0, 'àâçéèêëîïôöùûü' ) );
+	$excessifs = array();
+	foreach ( $termes as $t ) {
+		if ( mb_strlen( $t, 'UTF-8' ) < 5 ) { continue; }
+		$n = substr_count( $texte, mb_substr( $t, 0, 5, 'UTF-8' ) );
+		if ( $n / $total > 0.03 ) { $excessifs[] = "$t ($n/$total)"; }
+	}
+	check( "$slug : aucun terme du mot-clé n'est répété jusqu'au bourrage", array() === $excessifs, implode( ', ', $excessifs ) );
+}
+
+// Aucune balise `meta keywords` : elle n'est plus lue et signale un site
+// sur-optimisé. Le contrôle porte sur le thème comme sur les contenus.
+$keywords = array();
+foreach ( array_merge( glob( "$pages/*.html" ), glob( "$guides/*.html" ), glob( $theme . '/templates/*.html' ), array( $theme . '/functions.php' ) ) as $f ) {
+	if ( preg_match( '/<meta[^>]+name=["\']keywords["\']/i', (string) file_get_contents( $f ) ) ) {
+		$keywords[] = basename( $f );
+	}
+}
+check( 'Aucune balise meta keywords nulle part', array() === $keywords, implode( ', ', $keywords ) );
 
 // ------------------------------------------------- 5 · règles éditoriales ----
 

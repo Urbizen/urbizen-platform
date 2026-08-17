@@ -73,9 +73,18 @@ for (const [largeur, dpr, attendue, etapeAttendue, plafond] of CAS) {
   const ctx = await nav.newContext({ viewport: { width: largeur, height: 900 }, deviceScaleFactor: dpr });
   const page = await ctx.newPage();
 
+  /*
+   * Les deux répertoires que la section Guides et l'étape 1 peuvent servir.
+   * `blog/` était le seul jusqu'au kit visuel v2, qui a déplacé les six cartes
+   * vers `seo-guides-v2/` sans toucher à l'illustration de l'étape 1. Filtrer
+   * sur le seul `blog/` ne trouvait plus aucune carte — et le banc l'aurait
+   * annoncé comme « 0 trouvée » au lieu de mesurer les nouvelles.
+   */
+  const REPERTOIRES = ['/images/blog/', '/images/seo-guides-v2/'];
+
   const telecharges = new Map();
   page.on('response', (r) => {
-    if (r.url().includes('/images/blog/')) telecharges.set(r.url(), r.status());
+    if (REPERTOIRES.some((d) => r.url().includes(d))) telecharges.set(r.url(), r.status());
   });
 
   await page.goto(`${BASE}/?nc=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -85,24 +94,25 @@ for (const [largeur, dpr, attendue, etapeAttendue, plafond] of CAS) {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(1000);
 
-  const mesure = await page.evaluate(() => {
-    const im = [...document.images].filter((i) => i.src.includes('/images/blog/'));
+  const mesure = await page.evaluate((repertoires) => {
+    const im = [...document.images].filter((i) => repertoires.some((d) => i.src.includes(d)));
     const poids = Object.fromEntries(
       performance.getEntriesByType('resource')
-        .filter((r) => r.name.includes('/images/blog/'))
+        .filter((r) => repertoires.some((d) => r.name.includes(d)))
         .map((r) => [r.name, r.transferSize])
     );
     /*
      * DEUX FAMILLES, DEUX ATTENDUS.
      *
-     * `/images/blog/` sert deux usages : les six cartes de la section Guides,
-     * toutes de la même largeur, et l'illustration de l'étape 1 du parcours,
-     * qui est plus étroite en bureau et pleine largeur dès que la grille se
-     * replie. Leur imposer la même variante était une erreur de conception du
-     * banc : elles n'occupent pas la même place.
+     * Deux usages cohabitent : les six cartes de la section Guides, toutes de
+     * la même largeur, et l'illustration de l'étape 1 du parcours, qui est plus
+     * étroite en bureau et pleine largeur dès que la grille se replie. Leur
+     * imposer la même variante était une erreur de conception du banc : elles
+     * n'occupent pas la même place.
      *
-     * On les sépare donc par leur conteneur, et chaque famille porte son propre
-     * attendu, dérivé d'une largeur RENDUE mesurée.
+     * On les sépare par leur CONTENEUR et non par leur répertoire. C'est ce qui
+     * a permis au kit v2 de déplacer les cartes sans rien casser ici : le
+     * conteneur, lui, ne bouge pas.
      */
     const dans = (sel) => im.filter((i) => i.closest(sel));
     const nom = (i) => i.currentSrc.split('/').pop();
@@ -124,7 +134,7 @@ for (const [largeur, dpr, attendue, etapeAttendue, plafond] of CAS) {
         return l ? l.getAttribute('loading') : null;
       })(),
     };
-  });
+  }, REPERTOIRES);
 
   /*
    * LE CLS SE MESURE TROIS FOIS, ET ON RETIENT LA MÉDIANE.

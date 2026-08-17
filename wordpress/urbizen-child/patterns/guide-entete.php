@@ -76,7 +76,7 @@ foreach ( (array) get_the_category( $id_guide ) as $terme ) {
 </section>
 <?php if ( has_post_thumbnail( $id_guide ) ) : ?>
 <div class="wrap">
-  <figure class="guide-visuel">
+  <figure class="guide-visuel<?php echo urbizen_child_visuel_entier( $id_guide ) ? ' guide-visuel--planche' : ''; ?>">
 	<?php
 	/*
 	 * Le visuel d'article occupe la colonne de contenu, au plus 1200 px. Il

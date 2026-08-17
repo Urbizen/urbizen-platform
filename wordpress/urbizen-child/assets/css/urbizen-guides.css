@@ -185,6 +185,34 @@
 	.urbizen-guides .guide-visuel img { aspect-ratio: 3 / 2; }
 }
 
+/* UNE PIÈCE GRAPHIQUE N'EST PAS UNE PHOTOGRAPHIE
+   Le cadrage ci-dessus vaut pour une image d'illustration : on perd du ciel,
+   on ne perd rien. Sur une planche 1600 × 1131, `cover` en 21/9 mange 40 % de
+   la hauteur — c'est-à-dire le cartouche Urbizen, la ligne d'échelle et les
+   cotes basses, soit précisément ce que le guide demande au lecteur de
+   regarder. Sept des dix-huit visuels sont dans ce cas ; ils sont posés
+   entiers, sur le fond de la figure, qui leur sert de carton de montage.
+   La bande reste calée en 16/9 plutôt que laissée au rapport naturel : à
+   1140 px de large, une planche non contrainte ferait 806 px de haut et
+   repousserait la première ligne du texte sous la ligne de flottaison — le
+   défaut que le cadrage évitait au départ. */
+.urbizen-guides .guide-visuel--planche img {
+	aspect-ratio: 16 / 9;
+	object-fit: contain;
+}
+/* Sur mobile la largeur disponible est déjà l'exacte contrainte : la planche
+   prend son rapport naturel, sans bandes perdues de part et d'autre. */
+@media (max-width: 700px) {
+	.urbizen-guides .guide-visuel--planche img {
+		aspect-ratio: auto;
+		height: auto;
+	}
+}
+
+/* Même règle dans les cartes de l'index. La figure garde son rapport 3/2 —
+   la grille doit rester régulière — mais la planche y est posée entière. */
+.urbizen-guides .blog-preview-media--planche img { object-fit: contain; }
+
 /* LA TRAME TECHNIQUE NE DESCEND PAS DANS L'ARTICLE
    `u-grid-bg` est posé sur le <body> par le thème : elle traverse donc toute la
    page. Sur l'accueil c'est l'identité ; derrière deux mille mots, c'est du
