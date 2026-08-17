@@ -93,6 +93,13 @@ titre "10/12 — Contrat du parcours « Écrire à Urbizen »"
 "$PHP_BIN" test-contrat-renseignements.php
 verdict $? "test-contrat-renseignements.php"
 
+# L'ancien parcours de commande : la page reste en base, mais plus aucun lien
+# actif n'y mène et une 301 conduit au tunnel. Sans ce banc, le CTA d'en-tête
+# pourrait y revenir sans que rien ne le signale.
+titre "Ancien parcours de commande — redirection et liens"
+"$PHP_BIN" test-parcours-legacy.php
+verdict $? "test-parcours-legacy.php"
+
 # Le portage CSS a son propre banc unitaire : c'est lui qui garantit que
 # `:root` et `body` ne sont jamais préfixés, faute de quoi les variables du
 # document seraient perdues en silence.

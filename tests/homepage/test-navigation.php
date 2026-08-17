@@ -210,7 +210,7 @@ check( 'Le tiroir mobile porte le même menu, groupe compris',
 check( 'L\'intitulé du groupe mobile n\'est pas un lien',
 	! preg_match( '#<a[^>]*class="[^"]*mmenu-groupe#', $accueil ) );
 check( 'Les deux appels à l\'action du tiroir sont conservés',
-	str_contains( $accueil, 'js-open-inquiry' ) && str_contains( $accueil, '>Démarrer mon projet</a>' ) );
+	str_contains( $accueil, 'js-open-inquiry' ) && str_contains( $accueil, '>Étudier mon projet</a>' ) );
 
 // ------------------------------------------- 5 · page courante ---------------
 
@@ -314,9 +314,9 @@ check( 'Le focus clavier reste visible, et seulement au clavier',
 check( 'Le logo est inchangé : aucune dimension, chargement immédiat',
 	! preg_match( '/<img[^>]*logo-urbizen\.png[^>]*(width|height)=/', $accueil )
 	&& str_contains( $accueil, 'loading="eager"' ) );
-check( 'Le CTA « Démarrer mon projet » est inchangé',
+check( 'Le CTA « Étudier mon projet » est inchangé',
 	str_contains( $accueil, 'class="btn btn-primary btn-sm js-start"' )
-	&& str_contains( $accueil, 'class="nav-cta-long">Démarrer mon projet</span>' )
+	&& str_contains( $accueil, 'class="nav-cta-long">Étudier mon projet</span>' )
 	&& str_contains( $accueil, 'class="nav-cta-short"' ) );
 check( 'Les icônes téléphone et compte, et le burger, sont inchangés',
 	str_contains( $accueil, 'class="icon-btn link-tel"' )

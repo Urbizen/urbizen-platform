@@ -316,8 +316,14 @@
          jamais les questions des autres branches. -->
     <div class="qualif" id="js-qualification" aria-live="polite" aria-atomic="true" hidden></div>
     <div class="projet-continue">
-      <button type="button" class="btn btn-primary" id="js-continue" disabled>Continuer vers ma demande</button>
-      <span class="projet-continue-hint" id="js-continue-hint" role="status" aria-live="polite">Sélectionnez un type de projet pour continuer.</span>
+      <button type="button" class="btn btn-primary" id="js-continue" disabled>Étudier mon projet</button>
+      <!-- Titre et explication vivent dans UNE SEULE région vivante, annoncée
+           d'un bloc : deux régions distinctes se seraient interrompues l'une
+           l'autre, et le titre seul ne veut rien dire sans sa réserve. -->
+      <div class="projet-continue-verdict" role="status" aria-live="polite" aria-atomic="true">
+        <p class="projet-continue-titre" id="js-continue-titre" hidden></p>
+        <span class="projet-continue-hint" id="js-continue-hint">Sélectionnez un type de projet pour continuer.</span>
+      </div>
     </div>
   </div>
 </section>
@@ -895,7 +901,7 @@
       <h2>Prêt à faire avancer votre projet&nbsp;?</h2>
       <p>Présentez-nous votre projet et recevez une réponse adaptée à votre démarche.</p>
       <div class="cta-actions">
-        <a class="btn btn-primary js-start" href="#localisation">Démarrer mon projet</a>
+        <a class="btn btn-primary js-start" href="#localisation">Étudier mon projet</a>
         <button class="btn btn-contact js-toggle-inquiry" type="button" aria-expanded="false" aria-controls="cta-inquiry-form">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5.5h16v13H4z"/><path d="m4 7 8 6 8-6"/></svg>
           <span>Demander des renseignements</span>

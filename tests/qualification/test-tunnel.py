@@ -197,7 +197,13 @@ def main():
 
     scenarios = {s["nom"]: s for s in donnees["scenarios"]}
 
-    check("Les 24 scénarios ont été rejoués", len(scenarios) == 24, str(sorted(scenarios)))
+    # 25 depuis l'ajout de « piscine à vérifier » : un bassin sous le seuil de
+    # dispense mais en secteur protégé inconnu. C'était le seul verdict que la
+    # piscine pouvait rendre sans qu'aucun scénario ne le joue, et c'est
+    # précisément celui que ce lot devait apprendre à distinguer de « aucune
+    # formalité ». Le compteur reste épinglé : un scénario qui disparaîtrait
+    # sans qu'on le veuille doit continuer de faire échouer ce banc.
+    check("Les 25 scénarios ont été rejoués", len(scenarios) == 25, str(sorted(scenarios)))
     check(
         "La carte « Transformer un espace existant » existe dans le tunnel",
         "transformation" in donnees["cartes"],
@@ -305,6 +311,88 @@ def main():
         not fautes,
         " | ".join(fautes),
     )
+
+    # ------------------------- chaque verdict dit où il mène, avant le clic ---
+
+    # `none` et `confirm` menaient au MÊME endroit sous le MÊME libellé
+    # (« Continuer vers ma demande »), alors qu'ils ne veulent pas dire la même
+    # chose : l'un annonce qu'aucune formalité nationale n'a été identifiée,
+    # l'autre qu'il manque une information pour conclure. Rien ne les
+    # distinguait au moment de cliquer.
+    attendus = {
+        "dp": "Continuer vers ma déclaration préalable",
+        "pcmi": "Continuer vers mon permis de construire",
+        "none": "Vérifier les règles locales",
+        "confirm": "Demander une vérification",
+    }
+
+    ecarts = [
+        "%s (%s) : « %s »" % (s["nom"], s["statut"], s["bouton"])
+        for s in scenarios.values()
+        if s["statut"] in attendus and s["bouton"] != attendus[s["statut"]]
+    ]
+    check("Chaque verdict porte le bouton attendu", not ecarts, " | ".join(ecarts))
+
+    boutons_par_statut = {}
+    for s in scenarios.values():
+        boutons_par_statut.setdefault(s["statut"], set()).add(s["bouton"])
+
+    check(
+        "« aucune formalité » et « à vérifier » n'ont PAS le même bouton",
+        boutons_par_statut.get("none", set()) != boutons_par_statut.get("confirm", set())
+        and boutons_par_statut.get("none") and boutons_par_statut.get("confirm"),
+        "none=%s confirm=%s" % (boutons_par_statut.get("none"), boutons_par_statut.get("confirm")),
+    )
+
+    check(
+        "Plus aucun bouton ne dit « Continuer vers ma demande »",
+        not [s["nom"] for s in scenarios.values() if "continuer vers ma demande" in s["bouton"].lower()],
+    )
+
+    # Le titre annonce le résultat. Sans lui, le message seul portait toute la
+    # nuance, et il n'était lu qu'après coup.
+    titres = {
+        "none": "Aucune formalité nationale identifiée",
+        "confirm": "Votre projet nécessite une vérification",
+    }
+    ecarts_t = [
+        "%s (%s) : « %s »" % (s["nom"], s["statut"], s.get("titre", ""))
+        for s in scenarios.values()
+        if s["statut"] in titres and s.get("titre", "") != titres[s["statut"]]
+    ]
+    check("Le titre du verdict annonce le résultat", not ecarts_t, " | ".join(ecarts_t))
+
+    check(
+        "Les titres de « aucune formalité » et « à vérifier » diffèrent",
+        titres["none"] != titres["confirm"],
+    )
+
+    # Une dispense n'est jamais présentée comme une certitude juridique : le
+    # moteur applique le code de l'urbanisme, pas le PLU de la commune.
+    sans_reserve = [
+        s["nom"] for s in scenarios.values()
+        if s["statut"] == "none"
+        and ("ne semble pas" not in s["message"].lower() or "locales" not in s["message"].lower())
+    ]
+    check(
+        "« aucune formalité » garde sa réserve sur les règles locales",
+        not sans_reserve,
+        " | ".join(sans_reserve),
+    )
+
+    # Les cas piscine, un par verdict : c'est le projet qui en produit le plus.
+    piscines = {s["nom"]: s for s in scenarios.values() if s["nom"].startswith("piscine")}
+    for nom, statut in (
+        ("piscine sans formalité", "none"),
+        ("piscine DP", "dp"),
+        ("piscine PC", "pcmi"),
+        ("piscine à vérifier", "confirm"),
+    ):
+        check(
+            "%s → %s" % (nom, statut),
+            piscines.get(nom, {}).get("statut") == statut,
+            str(piscines.get(nom, {}).get("statut")),
+        )
 
     anciens_libelles = [
         "%s : %s" % (s["nom"], s["bouton"])

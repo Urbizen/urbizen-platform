@@ -48,6 +48,10 @@ function etat(f) {
 		bouton: btn.textContent.trim(),
 		desactive: btn.disabled,
 		message: (d.getElementById("js-continue-hint") || {}).textContent || "",
+		/* Le titre annonce le RÉSULTAT ; sans lui, un banc ne peut pas vérifier
+		   que « aucune formalité » et « à vérifier » se distinguent avant le
+		   clic — ce qu'un bouton et un message identiques ne permettaient pas. */
+		titre: (d.getElementById("js-continue-titre") || {}).textContent || "",
 		question: q ? q.textContent.trim() : null,
 		questionVisible: !!(zone && !zone.hidden),
 		/* Après un retour arrière la page est rechargée : les collecteurs posés
@@ -115,6 +119,10 @@ async function jouer(f, projet, reponses) {
 		{ nom: "piscine sans formalité", projet: "piscine", reponses: ["8", "Non", "Non"] },
 		{ nom: "piscine DP", projet: "piscine", reponses: ["40", "Non"] },
 		{ nom: "piscine PC", projet: "piscine", reponses: ["120"] },
+		/* Bassin sous le seuil de dispense, mais secteur protégé inconnu : le moteur
+		   ne peut pas conclure, et c'est précisément le cas que « à vérifier » doit
+		   savoir annoncer sans se confondre avec « aucune formalité ». */
+		{ nom: "piscine à vérifier", projet: "piscine", reponses: ["8", "Non", "Je ne sais pas"] },
 		{ nom: "pergola autonome", projet: "pergola", reponses: ["Indépendante", "12", "Non", "2.4"] },
 		{ nom: "pergola adossée DP", projet: "pergola", reponses: ["Accolée", "12"] },
 		{ nom: "pergola adossée PC prudent", projet: "pergola", reponses: ["Accolée", "30", "Je ne sais pas"] },

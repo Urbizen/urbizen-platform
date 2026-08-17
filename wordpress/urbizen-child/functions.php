@@ -701,6 +701,53 @@ function urbizen_child_interdire_cache_formulaire() {
 add_action( 'template_redirect', 'urbizen_child_interdire_cache_formulaire' );
 
 /**
+ * L'ancien parcours de commande renvoie vers le tunnel actuel.
+ *
+ * POURQUOI CETTE PAGE DEVAIT PARTIR
+ *
+ * `/commander-un-dossier/` sert un formulaire Fluent Forms antérieur au tunnel
+ * de qualification. Elle est déjà en `noindex` et hors du plan de site, mais le
+ * bouton principal de l'en-tête — présent sur CHAQUE page, guides compris — y
+ * menait encore. C'était donc le chemin le plus court du site vers un dossier
+ * non qualifié, et il annulait l'intérêt du tunnel.
+ *
+ * POURQUOI UNE 301 ET NON UNE DÉPUBLICATION
+ *
+ * Dépublier rendrait un 404 à quiconque a gardé le lien — un courriel, un
+ * favori, un devis. La 301 conserve le peu de signal restant et conduit la
+ * personne là où le parcours commence vraiment. La page n'est pas supprimée :
+ * son contenu reste en base, et retirer ce hook la remet en ligne telle quelle.
+ *
+ * CE QU'ELLE NE TOUCHE PAS
+ *
+ * Une seule page, reconnue par son slug ET son type. Aucune autre URL n'est
+ * concernée, et la cible étant l'accueil, aucune boucle n'est possible. Les
+ * requêtes non-GET ne sont pas redirigées : une soumission POST encore en vol
+ * doit aboutir ou échouer franchement, pas être détournée en chemin.
+ *
+ * @return void
+ */
+function urbizen_child_rediriger_ancien_parcours() {
+	if ( is_admin() || ! is_singular( 'page' ) ) {
+		return;
+	}
+
+	if ( 'GET' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+		return;
+	}
+
+	$page = get_queried_object();
+
+	if ( ! $page instanceof WP_Post || 'commander-un-dossier' !== $page->post_name ) {
+		return;
+	}
+
+	wp_safe_redirect( home_url( '/#localisation' ), 301 );
+	exit;
+}
+add_action( 'template_redirect', 'urbizen_child_rediriger_ancien_parcours' );
+
+/**
  * Configuration de soumission du formulaire affiché.
  *
  * Le nonce est émis ici, dans la page parente, et non dans le document servi en
