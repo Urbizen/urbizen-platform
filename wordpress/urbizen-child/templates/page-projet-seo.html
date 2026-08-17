@@ -1,0 +1,42 @@
+<!-- wp:html -->
+<div class="urbizen-accueil urbizen-page urbizen-projets">
+<a class="u-skip" href="#contenu">Aller au contenu principal</a>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"header-urbizen","tagName":"div","className":"urbizen-entete"} /-->
+
+<!-- wp:html -->
+<main id="contenu">
+<!-- /wp:html -->
+
+<!-- Fil d'ariane, titre, chapô et visuel d'en-tête. -->
+<!-- wp:pattern {"slug":"urbizen-child/projet-entete"} /-->
+
+<!-- wp:html -->
+<section class="projet-contenu">
+  <div class="wrap">
+    <div class="projet-corps">
+<!-- /wp:html -->
+
+<!-- Le contenu de l'éditeur, sourcé depuis content/pages/ au dépôt. C'est le
+     seul bloc dynamique du cœur indispensable ici : rien d'autre ne rend le
+     corps de la page. Sa mise en forme vient de `.projet-corps`. -->
+<!-- wp:post-content {"layout":{"type":"default"}} /-->
+
+<!-- wp:html -->
+    </div>
+<!-- /wp:html -->
+
+<!-- wp:pattern {"slug":"urbizen-child/projet-pied"} /-->
+
+<!-- wp:html -->
+  </div>
+</section>
+</main>
+<!-- /wp:html -->
+
+<!-- wp:template-part {"slug":"footer-urbizen","tagName":"div"} /-->
+
+<!-- wp:html -->
+</div>
+<!-- /wp:html -->

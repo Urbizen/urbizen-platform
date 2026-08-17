@@ -214,7 +214,19 @@ const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-mentions-legales',
 	'page-cgv',
 	'page-confidentialite',
+	/*
+	 * Gabarit UNIQUE des neuf pages projets du cocon « déclaration préalable ».
+	 * Un seul nom ici, pas neuf : le contenu vit dans l'éditeur, sourcé depuis
+	 * `content/pages/` au dépôt. Ajouter une dixième page projet ne demandera
+	 * aucune ligne de PHP — c'est le modèle des guides, qui a fait ses preuves.
+	 */
+	'page-projet-seo',
 );
+
+/**
+ * Identifiant du gabarit des pages projets.
+ */
+const URBIZEN_CHILD_TEMPLATE_PROJET = 'page-projet-seo';
 
 /**
  * Identifiant du gabarit de la page Tarifs.
@@ -865,6 +877,33 @@ function urbizen_child_est_page_conception() {
 }
 
 /**
+ * La page affichée est-elle une page projet, ou le hub qui les liste ?
+ *
+ * La feuille `urbizen-projets.css` sert deux contextes : les neuf pages
+ * projets, et la grille de liens ajoutée sur `/declarations-prealables/`. Le
+ * hub porte `.urbizen-page-dp` et non `.urbizen-projets` ; la portée de la
+ * grille est écrite en conséquence dans la feuille.
+ *
+ * @return bool
+ */
+function urbizen_child_est_page_projet() {
+	if ( ! is_singular() ) {
+		return false;
+	}
+
+	$id = get_queried_object_id();
+
+	if ( ! $id ) {
+		return false;
+	}
+
+	$gabarit = get_page_template_slug( $id );
+
+	return URBIZEN_CHILD_TEMPLATE_PROJET === $gabarit
+		|| 'page-declaration-prealable' === $gabarit;
+}
+
+/**
  * La page affichée utilise-t-elle le gabarit « Tarifs » ?
  *
  * @return bool
@@ -1104,6 +1143,18 @@ function urbizen_child_enqueue_accueil() {
 		}
 	}
 
+	// Pages projets : feuille des neuf pages du cocon, scopée
+	// `.urbizen-projets`. Chargée aussi sur `/declarations-prealables/`, qui
+	// porte la grille de liens vers ces pages — la règle correspondante y est
+	// scopée `.urbizen-page-dp`, et n'a donc aucun effet ailleurs.
+	if ( urbizen_child_est_page_projet() ) {
+		$projets_css = '/assets/css/urbizen-projets.css';
+
+		if ( file_exists( $dir . $projets_css ) ) {
+			wp_enqueue_style( 'urbizen-projets', $uri . $projets_css, array( 'urbizen-pages' ), (string) filemtime( $dir . $projets_css ) );
+		}
+	}
+
 	// Page commerciale « Conception » : feuille dédiée (galerie de rendus,
 	// hero illustré) et script de protection des visuels. Chargés uniquement
 	// sur cette page ; scopés `.urbizen-page-conception`.
@@ -1187,6 +1238,69 @@ add_action( 'wp_enqueue_scripts', 'urbizen_child_enqueue_accueil', 30 );
  * ---------------------------------------------------------------------- */
 
 /**
+ * Les visuels du kit v2 qui sont des pièces graphiques, à afficher entières.
+ *
+ * POURQUOI UNE LISTE, ET POURQUOI CELLE-CI
+ *
+ * Une photographie supporte d'être recadrée : on perd du ciel. Un plan coté ne
+ * le supporte pas — `object-fit: cover` sur un rapport 21/9 mange près de la
+ * moitié de la hauteur d'une planche 1600 × 1131, c'est-à-dire le cartouche
+ * Urbizen, la ligne d'échelle et les cotes basses. Le document reste beau et ne
+ * démontre plus rien. `docs/SEO_VISUALS_V2_HANDOFF.md` l'interdit expressément.
+ *
+ * Le champ `display` du manifeste porte cette distinction. Elle est recopiée
+ * ici plutôt que lue à chaud : le manifeste est une pièce de documentation, pas
+ * un fichier déployé avec le thème, et le rendu d'une page ne doit pas dépendre
+ * d'un `json_decode` sur un chemin qui peut ne pas exister en production. La
+ * suite `seo-projets` compare les deux listes et échoue si elles divergent —
+ * la copie est donc surveillée, pas laissée à la bonne volonté.
+ */
+const URBIZEN_CHILD_VISUELS_ENTIERS = array(
+	'guide-distance-limites.webp',
+	'guide-emprise-surface.webp',
+	'guide-plan-coupe-dp3.webp',
+	'guide-facades-toitures-dp4.webp',
+	'guide-insertion-dp6.webp',
+	'guide-plan-masse-dp2.webp',
+	'guide-pieces-declaration-prealable.webp',
+);
+
+/**
+ * Indique si le visuel mis en avant d'un guide est une pièce graphique.
+ *
+ * Le test porte sur le fichier source de l'attachement, et non sur une méta
+ * posée à la publication : un article republié par un script antérieur n'aurait
+ * pas la méta, et sa planche serait recadrée sans que rien ne le signale.
+ *
+ * `_wp_attached_file` porte le chemin relatif dans `uploads`, suffixé par
+ * WordPress en cas de collision de nom (`-1`, `-2`…). La comparaison se fait
+ * donc sur le radical du fichier, pas sur son nom exact.
+ *
+ * @param int $id Identifiant de l'article.
+ * @return bool
+ */
+function urbizen_child_visuel_entier( $id ) {
+	$att = (int) get_post_thumbnail_id( $id );
+	if ( ! $att ) {
+		return false;
+	}
+
+	$fichier = basename( (string) get_post_meta( $att, '_wp_attached_file', true ) );
+	if ( '' === $fichier ) {
+		return false;
+	}
+
+	foreach ( URBIZEN_CHILD_VISUELS_ENTIERS as $attendu ) {
+		$radical = substr( $attendu, 0, -strlen( '.webp' ) );
+		if ( (bool) preg_match( '~^' . preg_quote( $radical, '~' ) . '(-\d+)?\.webp$~', $fichier ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+/**
  * Vignette d'un guide, ou un substitut si l'article n'en a pas.
  *
  * Un article sans image mise en avant ne doit pas produire une carte trouée :
@@ -1199,6 +1313,12 @@ function urbizen_child_vignette_guide( $id ) {
 	if ( ! has_post_thumbnail( $id ) ) {
 		return '<figure class="blog-preview-media" aria-hidden="true"></figure>';
 	}
+
+	// Une planche est posée entière dans la carte, sur le fond de la figure ;
+	// une photographie remplit le cadre.
+	$classe = urbizen_child_visuel_entier( $id )
+		? 'blog-preview-media blog-preview-media--planche'
+		: 'blog-preview-media';
 
 	/*
 	 * `medium_large` (768 px) plutôt que `full` : la carte fait au plus 335 px
@@ -1217,7 +1337,7 @@ function urbizen_child_vignette_guide( $id ) {
 		)
 	);
 
-	return '<figure class="blog-preview-media">' . $image . '</figure>';
+	return '<figure class="' . esc_attr( $classe ) . '">' . $image . '</figure>';
 }
 
 /**

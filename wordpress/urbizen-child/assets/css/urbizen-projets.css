@@ -1,0 +1,538 @@
+/**
+ * Urbizen — pages projets (cocon SEO « déclaration préalable »)
+ *
+ * Feuille des neuf pages projets, chargée après urbizen-homepage.css et
+ * urbizen-pages.css, et scopée `.urbizen-projets` — classe absente partout
+ * ailleurs.
+ *
+ * CE QU'ELLE N'ÉCRIT PAS
+ *
+ * Le hero, le fil d'ariane, les boutons, `.wrap`, l'eyebrow et la typographie
+ * de base viennent de `urbizen-homepage.css` et `urbizen-pages.css`, dont le
+ * gabarit porte les deux classes de portée. Les redéfinir aurait créé un second
+ * jeu de composants, qui aurait dérivé du premier à la première retouche.
+ *
+ * Ce qui reste ici : les blocs éditoriaux propres à une page projet — réponse
+ * courte, cas de figure, étapes, planches, FAQ — et la colonne de lecture.
+ */
+
+/* ===========================================================================
+   1 · Cadre général
+   ======================================================================== */
+
+/* La trame technique fait l'identité du haut de page ; derrière mille cinq
+   cents mots elle fatigue, et elle réapparaissait dans les interstices entre
+   blocs opaques. Le hero garde la sienne, dessinée par `.page-hero::before`. */
+.urbizen-projets main { background: var(--u-surface); }
+
+.urbizen-projets .projet-contenu {
+	background: var(--u-surface);
+	border-top: 1px solid var(--u-line);
+}
+
+/* Le visuel d'en-tête, cadré comme celui des guides : une image 3:2 sur
+   1140 px ferait 760 px de haut et repousserait la première ligne sous la
+   ligne de flottaison. */
+/* LE DÉBORD EST PLUS FAIBLE QUE SUR LES GUIDES, ET C'EST VOULU
+   Le hero d'un guide se termine par son chapô ; celui d'une page projet porte
+   deux boutons. Le débord de `clamp(-96px, -6vw, -48px)` repris des guides
+   remontait donc le visuel de 86 px à 1440 px et lui faisait recouvrir le bas
+   des boutons de 7 px — mesuré sur la production, invisible à la lecture de la
+   feuille. La valeur retenue laisse 16 px sous les boutons à cette largeur,
+   tout en gardant l'effet de liaison entre le bandeau et le contenu. */
+.urbizen-projets .projet-visuel {
+	width: 100%;
+	margin: clamp(-64px, -4.5vw, -32px) 0 clamp(24px, 3vw, 38px);
+	position: relative;
+	z-index: 1;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+	box-shadow: 0 2px 0 rgba(20, 35, 59, .04), 0 28px 56px -34px rgba(20, 35, 59, .45);
+	overflow: hidden;
+}
+.urbizen-projets .projet-visuel img {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 21 / 9;
+	object-fit: cover;
+	object-position: center;
+}
+.urbizen-projets .projet-visuel figcaption {
+	padding: 10px 16px 12px;
+	border-top: 1px solid var(--u-line);
+	color: var(--u-ink-faint);
+	font-size: 12.5px;
+}
+@media (max-width: 700px) {
+	.urbizen-projets .projet-visuel { margin-top: clamp(-56px, -8vw, -32px); }
+	.urbizen-projets .projet-visuel img { aspect-ratio: 3 / 2; }
+}
+
+/* ===========================================================================
+   2 · Colonne de lecture
+   ======================================================================== */
+
+/* 72ch tient la ligne autour de 70 caractères : au-delà, l'œil perd le début
+   de la ligne suivante. Même valeur que les guides, pour que le lecteur qui
+   passe de l'un à l'autre ne change pas de rythme. */
+.urbizen-projets .projet-corps {
+	max-width: 72ch;
+	margin: 0 auto;
+	padding-block: clamp(28px, 3.4vw, 44px);
+	color: var(--u-ink);
+	font-size: 17px;
+	line-height: 1.72;
+}
+/* `wp:post-content` enveloppe tout dans un `.entry-content` : viser le seul
+   enfant direct de `.projet-corps` ne toucherait qu'un nœud. On cible les deux,
+   comme sur les guides. */
+.urbizen-projets .projet-corps > * + *,
+.urbizen-projets .projet-corps .entry-content > * + * { margin-top: 1.15em; }
+
+.urbizen-projets .projet-corps h2,
+.urbizen-projets .projet-corps .entry-content > h2 {
+	position: relative;
+	margin-top: 2.4em;
+	padding-top: 1.4em;
+	border-top: 1px solid var(--u-line);
+	color: var(--u-ink);
+	font-size: clamp(23px, 2.4vw, 29px);
+	font-weight: 600;
+	line-height: 1.22;
+	letter-spacing: -.012em;
+}
+.urbizen-projets .projet-corps h2::before,
+.urbizen-projets .projet-corps .entry-content > h2::before {
+	content: "";
+	position: absolute;
+	top: -2px;
+	left: 0;
+	width: 44px;
+	height: 3px;
+	background: var(--u-brand);
+	border-radius: 2px;
+}
+.urbizen-projets .projet-corps h3,
+.urbizen-projets .projet-corps .entry-content > h3 {
+	margin-top: 1.8em;
+	color: var(--u-ink);
+	font-size: clamp(18px, 1.8vw, 21px);
+	font-weight: 600;
+	line-height: 1.3;
+}
+.urbizen-projets .projet-corps h2 + p,
+.urbizen-projets .projet-corps h3 + p { margin-top: .5em; }
+
+.urbizen-projets .projet-corps a {
+	color: var(--u-brand-dk);
+	text-decoration: underline;
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 3px;
+}
+.urbizen-projets .projet-corps a:hover { color: var(--u-brand); }
+
+.urbizen-projets .projet-corps ul,
+.urbizen-projets .projet-corps ol { padding-left: 1.35em; }
+.urbizen-projets .projet-corps li + li { margin-top: .45em; }
+.urbizen-projets .projet-corps ul { list-style: disc; }
+.urbizen-projets .projet-corps ol { list-style: decimal; }
+.urbizen-projets .projet-corps li::marker { color: var(--u-brand); }
+.urbizen-projets .projet-corps strong { font-weight: 600; }
+
+/* Les tableaux portent des seuils et des surfaces : ils défilent seuls plutôt
+   que d'élargir la page. */
+.urbizen-projets .projet-corps .wp-block-table { overflow-x: auto; }
+.urbizen-projets .projet-corps table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 15px;
+}
+.urbizen-projets .projet-corps th,
+.urbizen-projets .projet-corps td {
+	padding: 11px 13px;
+	border: 1px solid var(--u-line);
+	text-align: left;
+	vertical-align: top;
+}
+.urbizen-projets .projet-corps th {
+	background: var(--u-surface-2);
+	font-weight: 600;
+}
+.urbizen-projets .projet-corps td { font-variant-numeric: tabular-nums; }
+
+/* ===========================================================================
+   3 · Blocs éditoriaux propres aux pages projets
+   ======================================================================== */
+
+/* LA RÉPONSE COURTE
+   Le lecteur arrive avec une question fermée. Elle est répondue avant tout le
+   reste, dans un bloc qu'on ne peut pas manquer — filet vert, fond très pâle. */
+.urbizen-projets .projet-corps .projet-reponse {
+	margin-top: 1.4em;
+	padding: 18px 22px;
+	border: 1px solid var(--u-brand);
+	border-left-width: 4px;
+	border-radius: 0 12px 12px 0;
+	background: var(--u-brand-sf);
+	color: var(--u-ink);
+	font-size: 17.5px;
+	line-height: 1.6;
+}
+.urbizen-projets .projet-corps .projet-reponse strong { color: var(--u-brand-dk); }
+
+/* CE QUI CONDITIONNE — les cas de figure, la localisation, les réserves. */
+.urbizen-projets .projet-corps .projet-note {
+	margin-top: 1.4em;
+	padding: 16px 20px;
+	border-left: 3px solid var(--u-line-strong);
+	border-radius: 0 10px 10px 0;
+	background: var(--u-surface-2);
+	color: var(--u-ink-soft);
+	font-size: 15.5px;
+	line-height: 1.6;
+}
+.urbizen-projets .projet-corps .projet-note strong { color: var(--u-ink); }
+
+/* LA RÉSERVE QUI REVIENT PARTOUT — les pièces ne sont pas toutes exigées.
+   Forme distincte de la note : c'est une mise en garde, pas un complément. */
+.urbizen-projets .projet-corps .projet-reserve {
+	margin-top: 1.2em;
+	padding-left: 20px;
+	border-left: 2px dashed var(--u-line-strong);
+	color: var(--u-ink-soft);
+	font-size: 15.5px;
+}
+
+/* LES PLANCHES AU CARTOUCHE
+   Ratio 1600 × 1131 imposé par le handoff. Une vraie planche, pas une image
+   posée dans le texte : encadrée, sur surface propre, avec sa légende. */
+.urbizen-projets .projet-corps .projet-planche,
+.urbizen-projets .projet-corps .wp-block-image {
+	margin-top: 1.9em;
+	padding: 14px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	box-shadow: var(--u-shadow-card);
+}
+.urbizen-projets .projet-corps :is(img, .wp-block-image img) {
+	max-width: 100%;
+	height: auto;
+	border-radius: 8px;
+}
+.urbizen-projets .projet-corps figcaption {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--u-line);
+	color: var(--u-ink-soft);
+	font-size: 13.5px;
+	line-height: 1.5;
+}
+
+/* Sur mobile, une planche A3 ramenée à 354 px rend ses cotes illisibles. On lui
+   donne la même liberté qu'aux tableaux : une largeur minimale lisible, et un
+   défilement contenu dans sa propre boîte — jamais dans la page. */
+@media (max-width: 720px) {
+	.urbizen-projets .projet-corps .wp-block-image { overflow-x: auto; padding-bottom: 6px; }
+	.urbizen-projets .projet-corps .wp-block-image img { min-width: 620px; max-width: none; }
+	.urbizen-projets .projet-corps .wp-block-image figcaption { min-width: 0; }
+}
+
+/* LES QUATRE ÉTAPES */
+.urbizen-projets .projet-corps .projet-etapes { counter-reset: etape; }
+.urbizen-projets .projet-corps .projet-etapes ol {
+	list-style: none;
+	padding-left: 0;
+	display: grid;
+	gap: 12px;
+}
+.urbizen-projets .projet-corps .projet-etapes li {
+	counter-increment: etape;
+	position: relative;
+	margin: 0;
+	padding: 15px 18px 15px 58px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	font-size: 16px;
+}
+.urbizen-projets .projet-corps .projet-etapes li::before {
+	content: counter(etape, decimal-leading-zero);
+	position: absolute;
+	left: 16px;
+	top: 15px;
+	width: 28px;
+	height: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 8px;
+	background: var(--u-brand-sf);
+	color: var(--u-brand-dk);
+	font-family: var(--u-font-mono);
+	font-size: 12px;
+	font-weight: 600;
+}
+
+/* LE TARIF — un seul forfait par page, et le renvoi à la page complète. */
+.urbizen-projets .projet-corps .projet-tarif {
+	margin-top: 1.6em;
+	padding: 20px 22px;
+	border: 1px solid var(--u-line);
+	border-top: 3px solid var(--u-brand);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	box-shadow: var(--u-shadow-card);
+}
+.urbizen-projets .projet-corps .projet-tarif-montant {
+	display: block;
+	color: var(--u-ink);
+	font-family: var(--u-font-title);
+	font-size: clamp(26px, 3vw, 34px);
+	font-weight: 600;
+	line-height: 1.1;
+}
+.urbizen-projets .projet-corps .projet-tarif-montant span {
+	display: block;
+	color: var(--u-ink-soft);
+	font-family: var(--u-font-body);
+	font-size: 13.5px;
+	font-weight: 400;
+}
+
+/* LA FAQ — visible, dépliable, et réellement présente dans le DOM : c'est la
+   condition pour que le balisage FAQPage ne soit pas trompeur. */
+.urbizen-projets .projet-corps .projet-faq details {
+	margin-top: 10px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+}
+.urbizen-projets .projet-corps .projet-faq summary {
+	padding: 14px 18px;
+	min-height: 44px;
+	color: var(--u-ink);
+	font-size: 16px;
+	font-weight: 600;
+	cursor: pointer;
+	list-style: none;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+.urbizen-projets .projet-corps .projet-faq summary::-webkit-details-marker { display: none; }
+.urbizen-projets .projet-corps .projet-faq summary::after {
+	content: "+";
+	color: var(--u-brand);
+	font-size: 20px;
+	font-weight: 400;
+	line-height: 1;
+	flex: none;
+}
+.urbizen-projets .projet-corps .projet-faq details[open] summary::after { content: "−"; }
+.urbizen-projets .projet-corps .projet-faq summary:focus-visible {
+	outline: 2px solid var(--u-brand);
+	outline-offset: -2px;
+	border-radius: var(--u-radius);
+}
+.urbizen-projets .projet-corps .projet-faq details > *:not(summary) {
+	padding: 0 18px 16px;
+	color: var(--u-ink-soft);
+	font-size: 15.5px;
+}
+
+/* LES LIENS VERS LES GUIDES */
+.urbizen-projets .projet-corps .projet-liens ul {
+	list-style: none;
+	padding-left: 0;
+	display: grid;
+	gap: 10px;
+}
+.urbizen-projets .projet-corps .projet-liens li {
+	margin: 0;
+	padding: 13px 16px;
+	border: 1px solid var(--u-line);
+	border-left: 3px solid var(--u-brand);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+	font-size: 15.5px;
+}
+
+/* LES SOURCES */
+.urbizen-projets .projet-corps .projet-sources {
+	margin-top: 2.2em;
+	padding: 18px 22px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+	color: var(--u-ink-soft);
+	font-size: 13.5px;
+	line-height: 1.65;
+}
+.urbizen-projets .projet-corps .projet-sources strong {
+	display: block;
+	margin-bottom: 6px;
+	color: var(--u-ink);
+	font-family: var(--u-font-mono);
+	font-size: 11px;
+	letter-spacing: .09em;
+	text-transform: uppercase;
+}
+.urbizen-projets .projet-corps .projet-sources a {
+	color: var(--u-ink-soft);
+	text-decoration-thickness: 1px;
+}
+.urbizen-projets .projet-corps .projet-sources a:hover { color: var(--u-brand-dk); }
+
+.urbizen-projets .projet-corps hr {
+	margin-top: 2.2em;
+	border: 0;
+	border-top: 1px solid var(--u-line);
+}
+
+/* ===========================================================================
+   4 · Pied de page projet
+   ======================================================================== */
+
+.urbizen-projets .projet-cta {
+	max-width: 72ch;
+	margin: clamp(30px, 4vw, 44px) auto 0;
+	padding: clamp(22px, 3vw, 30px);
+	border: 1px solid var(--u-line);
+	border-top: 3px solid var(--u-brand);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	box-shadow: var(--u-shadow-card);
+}
+.urbizen-projets .projet-cta h2 {
+	color: var(--u-ink);
+	font-size: clamp(20px, 2vw, 24px);
+	font-weight: 600;
+	line-height: 1.25;
+}
+.urbizen-projets .projet-cta p {
+	margin-top: 10px;
+	color: var(--u-ink-soft);
+	font-size: 16px;
+}
+.urbizen-projets .projet-cta-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin-top: 18px;
+}
+.urbizen-projets .projet-cta-actions .btn { min-height: 44px; }
+.urbizen-projets .projet-cta-note {
+	margin-top: 14px;
+	color: var(--u-ink-faint);
+	font-size: 13.5px;
+	line-height: 1.55;
+}
+
+.urbizen-projets .projet-reassurance {
+	max-width: 72ch;
+	margin: clamp(34px, 4vw, 48px) auto 0;
+}
+.urbizen-projets .projet-reassurance-grille {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px;
+}
+.urbizen-projets .projet-reassurance-grille > div {
+	padding: 16px 18px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface-2);
+}
+.urbizen-projets .projet-reassurance h3 {
+	color: var(--u-ink);
+	font-size: 15.5px;
+	font-weight: 600;
+	line-height: 1.3;
+}
+.urbizen-projets .projet-reassurance p {
+	margin-top: 6px;
+	color: var(--u-ink-soft);
+	font-size: 14.5px;
+	line-height: 1.55;
+}
+@media (max-width: 640px) {
+	.urbizen-projets .projet-reassurance-grille { grid-template-columns: minmax(0, 1fr); }
+}
+
+.urbizen-projets .projet-retour {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	max-width: 72ch;
+	margin: 28px auto 0;
+	min-height: 44px;
+	color: var(--u-ink-soft);
+	font-size: 14.5px;
+	font-weight: 600;
+}
+.urbizen-projets .projet-retour:hover { color: var(--u-brand-dk); }
+.urbizen-projets .projet-retour:focus-visible {
+	outline: 2px solid var(--u-brand);
+	outline-offset: 3px;
+	border-radius: 6px;
+}
+
+/* ===========================================================================
+   5 · Grille des projets, sur le hub /declarations-prealables/
+   ----------------------------------------------------------------------------
+   Portée `.urbizen-page-dp`, pas `.urbizen-projets` : c'est la seule règle de
+   cette feuille qui vit sur une autre page, et elle y est chargée parce que
+   `urbizen-pages.css` ne connaît pas ce composant.
+   ======================================================================== */
+
+.urbizen-page-dp .projets-grille {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 14px;
+	margin-top: 26px;
+}
+.urbizen-page-dp .projets-grille a {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-height: 44px;
+	padding: 16px 18px;
+	border: 1px solid var(--u-line);
+	border-radius: var(--u-radius);
+	background: var(--u-surface);
+	color: var(--u-ink);
+	font-weight: 600;
+	text-decoration: none;
+	transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.urbizen-page-dp .projets-grille a span {
+	color: var(--u-ink-soft);
+	font-size: 14px;
+	font-weight: 400;
+	line-height: 1.5;
+}
+.urbizen-page-dp .projets-grille a:hover {
+	border-color: var(--u-brand);
+	box-shadow: 0 1px 0 rgba(20, 35, 59, .04), 0 18px 36px -28px rgba(20, 35, 59, .5);
+	transform: translateY(-2px);
+}
+.urbizen-page-dp .projets-grille a:focus-visible {
+	outline: 2px solid var(--u-brand);
+	outline-offset: 3px;
+}
+@media (max-width: 900px) {
+	.urbizen-page-dp .projets-grille { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+	.urbizen-page-dp .projets-grille { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.urbizen-page-dp .projets-grille a { transition: none; }
+	.urbizen-page-dp .projets-grille a:hover { transform: none; }
+}

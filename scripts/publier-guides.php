@@ -63,9 +63,9 @@ $guides = array(
 		'extrait'     => 'Construction nouvelle ou travaux sur l’existant, emprise ou surface de plancher, zone U ou non, total après travaux : quatre questions qui se répondent dans l’ordre, et trois cas limites tranchés pas à pas.',
 		'seo_titre'   => 'DP ou permis de construire : comment trancher | Urbizen',
 		'seo_desc'    => 'Quatre questions, dans l’ordre, pour savoir si votre projet relève d’une déclaration préalable ou d’un permis — et ce qui fait basculer un cas limite.',
-		'image'       => 'autorisation-dp-permis.webp',
-		'image_titre' => 'Maquette de maison et plans d’architecte',
-		'image_alt'   => 'Maquette de maison et plans d’architecte',
+		'image'       => 'seo-guides-v2/guide-dp-ou-permis.webp',
+		'image_titre' => 'Deux dossiers de plans de tailles différentes illustrant la comparaison entre deux démarches.',
+		'image_alt'   => 'Deux dossiers de plans de tailles différentes illustrant la comparaison entre deux démarches.',
 	),
 	array(
 		'slug'        => 'extension-maison-verifications-avant-plans',
@@ -74,9 +74,9 @@ $guides = array(
 		'extrait'     => 'Ce que le règlement de zone autorise, la surface que vous aurez au total après travaux, le seuil qui fait basculer vers le permis, l’architecte, le contexte du terrain — et une check-list à reprendre avant le premier trait.',
 		'seo_titre'   => 'Extension de maison : 5 vérifications avant les plans | Urbizen',
 		'seo_desc'    => 'Avant de dessiner une extension : ce que le PLU autorise, comment se calcule le total après travaux, et cinq points à vérifier pour ne pas refaire les plans.',
-		'image'       => 'extension-maison.webp',
-		'image_titre' => 'Extension contemporaine reliée à une maison en pierre',
-		'image_alt'   => 'Extension contemporaine reliée à une maison en pierre',
+		'image'       => 'seo-guides-v2/guide-extension-maison.webp',
+		'image_titre' => 'Extension contemporaine en rez-de-chaussée accolée à une maison en brique, projet fictif.',
+		'image_alt'   => 'Extension contemporaine en rez-de-chaussée accolée à une maison en brique, projet fictif.',
 	),
 	array(
 		'slug'        => 'lire-le-plu-de-son-terrain',
@@ -85,9 +85,9 @@ $guides = array(
 		'extrait'     => 'Un PLU tient en cinq pièces, dont deux seulement s’imposent à votre projet. Retrouver sa zone, ouvrir le bon chapitre, lire les six familles de règles, et savoir ce que les annexes cachent de décisif.',
 		'seo_titre'   => 'Lire le PLU de son terrain : le guide pratique | Urbizen',
 		'seo_desc'    => 'Retrouver la zone d’une parcelle, ouvrir le bon chapitre du règlement, lire emprise, hauteur, reculs et servitudes — et distinguer faisabilité et autorisation.',
-		'image'       => 'plu-terrain.webp',
-		'image_titre' => 'Vue aérienne d’un terrain situé dans une zone résidentielle',
-		'image_alt'   => 'Vue aérienne d’un terrain situé dans une zone résidentielle',
+		'image'       => 'seo-guides-v2/guide-plu-terrain.webp',
+		'image_titre' => 'Plan de zonage urbain avec une parcelle mise en évidence, territoire fictif.',
+		'image_alt'   => 'Plan de zonage urbain avec une parcelle mise en évidence, territoire fictif.',
 	),
 	array(
 		'slug'        => 'erreurs-dossier-urbanisme',
@@ -96,9 +96,9 @@ $guides = array(
 		'extrait'     => 'Ces erreurs ne font pas refuser un dossier : elles le font recommencer. Sept points à vérifier avant le dépôt, avec pour chacun le symptôme, la conséquence, la méthode de vérification et la correction.',
 		'seo_titre'   => '7 erreurs qui retardent un dossier d’urbanisme | Urbizen',
 		'seo_desc'    => 'Une pièce oubliée ne coûte pas quelques jours : le délai d’instruction recommence entier. Sept erreurs fréquentes, leur symptôme et comment les corriger.',
-		'image'       => 'erreurs-dossier-urbanisme.webp',
-		'image_titre' => 'Vérification attentive d’un dossier et de plans d’urbanisme',
-		'image_alt'   => 'Vérification attentive d’un dossier et de plans d’urbanisme',
+		'image'       => 'seo-guides-v2/guide-erreurs-dossier.webp',
+		'image_titre' => 'Sept points de contrôle repérés sur les plans d’une maison individuelle fictive.',
+		'image_alt'   => 'Sept points de contrôle repérés sur les plans d’une maison individuelle fictive.',
 	),
 	array(
 		'slug'        => 'delais-urbanisme-debut-des-travaux',
@@ -107,9 +107,9 @@ $guides = array(
 		'extrait'     => '« Deux mois d’instruction » est un chiffre juste qui ne répond pas à la question. Le calendrier réel, étape par étape, en distinguant ce qu’un texte fixe de ce qui dépend de vous.',
 		'seo_titre'   => 'Délais d’urbanisme : quand commencer les travaux | Urbizen',
 		'seo_desc'    => 'Du dépôt au premier coup de pelle : départ du délai, pièces manquantes, décision tacite, affichage, recours des tiers — et ce que vous pouvez raccourcir.',
-		'image'       => 'delais-urbanisme.webp',
-		'image_titre' => 'Calendrier, horloge et dossier de projet architectural',
-		'image_alt'   => 'Calendrier, horloge et dossier de projet architectural',
+		'image'       => 'seo-guides-v2/guide-delais-urbanisme.webp',
+		'image_titre' => 'Calendrier et étapes d’un dossier d’urbanisme présentés sur un bureau, illustration fictive.',
+		'image_alt'   => 'Calendrier et étapes d’un dossier d’urbanisme présentés sur un bureau, illustration fictive.',
 	),
 	/*
 	 * Le guide 1 est déjà publié. Il figure ici parce que son corps a changé le
@@ -125,14 +125,21 @@ $guides = array(
 		'extrait'     => 'Trois seuils, et surtout trois façons de mesurer. Ce qui entre dans la surface d’un bassin, ce qu’une dalle sous auvent change, et pourquoi un carport crée de l’emprise sans créer de surface de plancher.',
 		'seo_titre'   => 'Piscine, garage, carport : quelle autorisation ? | Urbizen',
 		'seo_desc'    => 'Piscine, garage ou carport : ce qui compte vraiment dans le calcul des surfaces, et comment savoir si votre projet relève d’une déclaration ou d’un permis.',
-		'image'       => 'piscine-garage-carport.webp',
-		'image_titre' => 'Piscine et carport d’une maison individuelle',
-		'image_alt'   => 'Piscine et carport d’une maison individuelle',
+		'image'       => 'seo-guides-v2/guide-piscine-garage-carport.webp',
+		'image_titre' => 'Piscine, garage indépendant et carport présentés dans trois projets résidentiels fictifs.',
+		'image_alt'   => 'Piscine, garage indépendant et carport présentés dans trois projets résidentiels fictifs.',
 	),
 );
 
-/** Répertoire des visuels livrés avec le thème. */
-$dossier_images = get_stylesheet_directory() . '/assets/images/blog';
+/*
+ * Répertoire des visuels livrés avec le thème. La racine `assets/images` et non
+ * plus `assets/images/blog` : les visuels du kit v2 vivent dans
+ * `assets/images/seo-guides-v2`, et `image` porte désormais le chemin relatif —
+ * même convention que `publier-pages-seo.php`, qui sert les douze autres
+ * guides. Partout où le nom de fichier seul est attendu (médiathèque, marqueur
+ * d'idempotence), `basename()` le rétablit.
+ */
+$dossier_images = get_stylesheet_directory() . '/assets/images';
 
 WP_CLI::log( $simulation ? "\n=== SIMULATION — aucune écriture ===\n" : "\n=== PUBLICATION ===\n" );
 
@@ -200,12 +207,29 @@ foreach ( $guides as $g ) {
 	wp_set_post_categories( $id, array( (int) $terme->term_id ), false );
 
 	/*
-	 * Image mise en avant. On ne touche à rien si l'article en a déjà une :
-	 * une vignette choisie ou recadrée dans l'admin ne doit pas être écrasée
-	 * par un script de publication.
+	 * Image mise en avant.
+	 *
+	 * La règle d'origine — « ne rien écraser » — protégeait une vignette
+	 * choisie à la main dans l'admin. Elle avait un effet de bord : le
+	 * manifeste ci-dessus, pourtant versionné, ne pouvait plus rien changer une
+	 * fois la première vignette posée. Le kit visuel v2 remplace les six
+	 * visuels d'origine ; sans levée de ce verrou, le changement n'aurait
+	 * jamais atteint le site.
+	 *
+	 * La distinction se fait donc sur l'ORIGINE de la vignette, pas sur sa
+	 * présence. `_urbizen_guide_image` marque les attachements posés par ce
+	 * script : si le marqueur désigne un autre fichier que celui du manifeste,
+	 * la source versionnée gagne et la vignette est remplacée. Si le marqueur
+	 * est absent, quelqu'un a choisi cette image dans l'admin — on n'y touche
+	 * pas, et on le signale plutôt que de le taire.
 	 */
 	$vignette = (int) get_post_thumbnail_id( $id );
-	if ( ! $vignette ) {
+	$attendu  = basename( $g['image'] );
+	$marqueur = $vignette ? (string) get_post_meta( $vignette, '_urbizen_guide_image', true ) : '';
+
+	if ( $vignette && '' === $marqueur ) {
+		WP_CLI::warning( "$slug : vignette posée hors de ce script, conservée — le manifeste demandait $attendu." );
+	} elseif ( basename( $marqueur ) !== $attendu ) {
 		$chemin = "$dossier_images/{$g['image']}";
 		if ( ! is_file( $chemin ) ) {
 			WP_CLI::warning( "Visuel absent du thème : $chemin — article publié sans image." );
@@ -222,7 +246,7 @@ foreach ( $guides as $g ) {
 					'numberposts' => 1,
 					'fields'      => 'ids',
 					'meta_key'    => '_urbizen_guide_image',   // phpcs:ignore WordPress.DB.SlowDBQuery
-					'meta_value'  => $g['image'],              // phpcs:ignore WordPress.DB.SlowDBQuery
+					'meta_value'  => $attendu,                 // phpcs:ignore WordPress.DB.SlowDBQuery
 				)
 			);
 
@@ -235,12 +259,12 @@ foreach ( $guides as $g ) {
 
 				// Copie : `media_handle_sideload` DÉPLACE le fichier qu'on lui donne.
 				// Sans copie, le visuel disparaîtrait du thème déployé.
-				$tmp = wp_tempnam( $g['image'] );
+				$tmp = wp_tempnam( $attendu );
 				if ( ! copy( $chemin, $tmp ) ) {
 					WP_CLI::error( "Copie impossible : $chemin" );
 				}
 				$att = media_handle_sideload(
-					array( 'name' => $g['image'], 'tmp_name' => $tmp ),
+					array( 'name' => $attendu, 'tmp_name' => $tmp ),
 					0,
 					$g['image_titre']
 				);
@@ -249,7 +273,7 @@ foreach ( $guides as $g ) {
 					WP_CLI::error( "Import du visuel en échec ($slug) : " . $att->get_error_message() );
 				}
 				$att = (int) $att;
-				update_post_meta( $att, '_urbizen_guide_image', $g['image'] );
+				update_post_meta( $att, '_urbizen_guide_image', $attendu );
 				update_post_meta( $att, '_wp_attachment_image_alt', $g['image_alt'] );
 			}
 

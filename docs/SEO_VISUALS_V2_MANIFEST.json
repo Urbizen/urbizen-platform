@@ -1,0 +1,171 @@
+{
+  "version": 2,
+  "brand": "Urbizen",
+  "status": "ready_for_integration",
+  "disclaimer": "Tous les projets, plans, adresses et territoires représentés sont fictifs.",
+  "variant_widths": [352, 704, 960],
+  "assets": [
+    {
+      "order": 1,
+      "guide": "Quel CERFA pour une déclaration de travaux en 2026 ?",
+      "file": "guide-cerfa-declaration-travaux.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Formulaire administratif, dossier et plan de maison disposés sur un bureau, projet fictif."
+    },
+    {
+      "order": 2,
+      "guide": "Que faire après un refus de déclaration préalable ?",
+      "file": "guide-refus-declaration-prealable.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Plan de maison avec une zone à corriger mise en évidence, projet fictif."
+    },
+    {
+      "order": 3,
+      "guide": "Demande de pièces complémentaires en urbanisme",
+      "file": "guide-pieces-complementaires.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Dossier réunissant plans, photographies, croquis et liste de pièces, projet fictif."
+    },
+    {
+      "order": 4,
+      "guide": "Quand faut-il recourir à un architecte au-delà de 150 m² ?",
+      "file": "guide-architecte-150m2.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Plan de maison avec surface mise en évidence et maquette architecturale, projet fictif."
+    },
+    {
+      "order": 5,
+      "guide": "Distance aux limites séparatives",
+      "file": "guide-distance-limites.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Plan de masse Urbizen d’un garage indépendant avec cotes aux limites, projet fictif."
+    },
+    {
+      "order": 6,
+      "guide": "Emprise au sol et surface de plancher",
+      "file": "guide-emprise-surface.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Plan de masse Urbizen d’une piscine distinguant emprise au sol et surface de plancher, projet fictif."
+    },
+    {
+      "order": 7,
+      "guide": "Travaux en secteur protégé et avis de l’ABF",
+      "file": "guide-secteur-protege-abf.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Rue d’un centre ancien dominée par un édifice patrimonial, lieu entièrement fictif."
+    },
+    {
+      "order": 8,
+      "guide": "Plan en coupe DP3",
+      "file": "guide-plan-coupe-dp3.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Plan en coupe Urbizen d’une extension implantée sur un terrain en pente, projet fictif."
+    },
+    {
+      "order": 9,
+      "guide": "Plan des façades et toitures DP4",
+      "file": "guide-facades-toitures-dp4.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Planche Urbizen présentant les quatre façades d’une maison avec extension, projet fictif."
+    },
+    {
+      "order": 10,
+      "guide": "Insertion graphique DP6",
+      "file": "guide-insertion-dp6.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Insertion graphique Urbizen d’une extension contemporaine sur une maison en brique, projet fictif."
+    },
+    {
+      "order": 11,
+      "guide": "Plan de masse DP2",
+      "file": "guide-plan-masse-dp2.webp",
+      "width": 1600,
+      "height": 1131,
+      "display": "contain",
+      "alt": "Plan de masse Urbizen d’une extension à l’arrière d’une maison, projet fictif."
+    },
+    {
+      "order": 12,
+      "guide": "Pièces d’une déclaration préalable",
+      "file": "guide-pieces-declaration-prealable.webp",
+      "width": 1500,
+      "height": 1061,
+      "display": "contain",
+      "alt": "Ensemble de pièces Urbizen DP1, DP2, DP4 et DP6 d’un même projet fictif."
+    },
+    {
+      "order": 13,
+      "guide": "Délais d’urbanisme et début des travaux",
+      "file": "guide-delais-urbanisme.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Calendrier et étapes d’un dossier d’urbanisme présentés sur un bureau, illustration fictive."
+    },
+    {
+      "order": 14,
+      "guide": "Les 7 erreurs d’un dossier d’urbanisme",
+      "file": "guide-erreurs-dossier.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Sept points de contrôle repérés sur les plans d’une maison individuelle fictive."
+    },
+    {
+      "order": 15,
+      "guide": "Lire le PLU de son terrain",
+      "file": "guide-plu-terrain.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Plan de zonage urbain avec une parcelle mise en évidence, territoire fictif."
+    },
+    {
+      "order": 16,
+      "guide": "Extension de maison : 5 vérifications",
+      "file": "guide-extension-maison.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Extension contemporaine en rez-de-chaussée accolée à une maison en brique, projet fictif."
+    },
+    {
+      "order": 17,
+      "guide": "Déclaration préalable ou permis de construire ?",
+      "file": "guide-dp-ou-permis.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Deux dossiers de plans de tailles différentes illustrant la comparaison entre deux démarches."
+    },
+    {
+      "order": 18,
+      "guide": "Piscine, garage et carport : quelle autorisation ?",
+      "file": "guide-piscine-garage-carport.webp",
+      "width": 1500,
+      "height": 1000,
+      "display": "cover",
+      "alt": "Piscine, garage indépendant et carport présentés dans trois projets résidentiels fictifs."
+    }
+  ]
+}
