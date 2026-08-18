@@ -85,12 +85,18 @@ l'administration.
 
 | Cible | Emplacement |
 |---|---|
+| `/declarations-prealables/` | introduction, 2ᵉ paragraphe — la seule portion du calendrier qui dépend du dépôt |
 | `/guides/lire-le-plu-de-son-terrain/` | étape 1, sur ce qui rallonge la préparation |
 | `/guides/extension-maison-verifications-avant-plans/` | étape 1 |
 | `/guides/erreurs-dossier-urbanisme/` | étape 4, sur ce qui déclenche une demande de pièces |
 | `/declarations-prealables/` | dernier paragraphe |
 | `/permis-de-construire/` | dernier paragraphe |
 | `/conception/` | dernier paragraphe |
+
+> Les cibles ci-dessus étaient déjà liées ailleurs dans l'article : le décompte
+> « Liens internes », qui porte sur les cibles distinctes, ne change pas. Ce que
+> le lot GUIDES ajoute est un **emplacement** — l'introduction — et non une cible.
+
 
 Le CTA de fin d'article, servi par la catégorie « Conseils & démarches », mène à
 `/tarifs/`.

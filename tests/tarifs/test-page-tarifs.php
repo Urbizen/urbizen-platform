@@ -141,8 +141,36 @@ foreach ( array(
 ) as $parcours ) {
 	check( "Parcours existant réutilisé : $parcours", str_contains( $fns, $parcours ) );
 }
-check( 'CTA « Démarrer mon projet » vers le parcours de qualification',
+/*
+ * LE LIBELLÉ DU BOUTON DE QUALIFICATION
+ *
+ * Ce contrôle ne comptait que les destinations, et son intitulé nommait
+ * « Démarrer mon projet ». Le site est harmonisé : tout appel à l'action dont
+ * la fonction est simplement d'ouvrir le tunnel `/#localisation` porte
+ * « Étudier mon projet ». Deux boutons de cette page gardaient l'ancien libellé
+ * — la destination était juste, le mot ne l'était plus, et compter des `href`
+ * ne pouvait pas le voir.
+ *
+ * La page portait trois boutons vers cette ancre sous TROIS libellés : « Démarrer
+ * mon projet » deux fois, et « Faire étudier mon projet » dans le bloc « Vous
+ * hésitez ». Même destination, même fonction, trois mots différents. Les trois
+ * portent désormais le libellé de référence.
+ *
+ * Le contrôle ne se contente pas de compter le bon libellé : il exige que
+ * CHAQUE ancre vers `/#localisation` le porte. Compter les occurrences aurait
+ * laissé passer un quatrième bouton ajouté demain sous un quatrième nom.
+ */
+check( 'CTA de qualification vers le parcours, au moins deux fois',
 	substr_count( $tpl, 'href="/#localisation"' ) >= 2 );
+preg_match_all( '#<a[^>]*href="/\#localisation"[^>]*>(.*?)</a>#s', $tpl, $ancres );
+$libelles_hors_norme = array_values( array_diff( array_unique( $ancres[1] ), array( 'Étudier mon projet' ) ) );
+check( 'CTA de qualification : toutes les ancres portent « Étudier mon projet »',
+	array() !== $ancres[1] && array() === $libelles_hors_norme,
+	implode( ' | ', $libelles_hors_norme ) );
+foreach ( array( 'Démarrer mon projet', 'Faire étudier mon projet' ) as $abandonne ) {
+	check( "CTA de qualification : plus aucun « $abandonne »",
+		! str_contains( $tpl, $abandonne ) );
+}
 check( 'CTA de renseignements vers le parcours existant',
 	substr_count( $tpl, 'href="/#demander-des-renseignements"' ) >= 2 );
 

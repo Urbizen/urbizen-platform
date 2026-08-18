@@ -101,6 +101,7 @@ Aucune page commerciale ne porte cela.
 
 | Cible | Emplacement |
 |---|---|
+| `/declarations-prealables/` | introduction, 2ᵉ paragraphe — la relecture d’avant remise |
 | `/guides/piscine-garage-carport-autorisation/` | erreur 2, sur la méthode de métré |
 | `/guides/dp-ou-permis-de-construire/` | erreur 6, sur la qualification du projet |
 | `/guides/lire-le-plu-de-son-terrain/` | erreur 7, sur la lecture du règlement |
@@ -108,6 +109,11 @@ Aucune page commerciale ne porte cela.
 | `/declarations-prealables/` | dernier paragraphe |
 | `/permis-de-construire/` | dernier paragraphe |
 | `/conception/` | dernier paragraphe |
+
+> Les cibles ci-dessus étaient déjà liées ailleurs dans l'article : le décompte
+> « Liens internes », qui porte sur les cibles distinctes, ne change pas. Ce que
+> le lot GUIDES ajoute est un **emplacement** — l'introduction — et non une cible.
+
 
 Le CTA de fin d'article, servi par la catégorie « Conseils & démarches », mène à
 `/tarifs/`. C'est le seul chemin vers cette page, et il suffit : le corps n'en

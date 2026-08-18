@@ -19,18 +19,33 @@
  * validées. Si une catégorie inconnue apparaît, le repli s'applique — aucun
  * lien mort, aucune orientation fausse.
  *
- * LES DEUX BOUTONS SONT CEUX DE L'ACCUEIL
+ * TROIS ACTIONS, DEUX BOUTONS, UN SEUL TITRE
  *
- * Ils menaient vers `/contact/` et son ancien formulaire, qui n'a plus sa place
- * dans le parcours. Ils reprennent maintenant les deux actions de l'accueil —
- * « Démarrer mon projet » et « Demander des renseignements » — vers leurs ancres
- * réelles, préfixées par l'URL de l'accueil puisqu'un guide n'est pas l'accueil
- * et que ces sections n'y existent pas.
+ * Le bloc a hésité : d'abord `/contact/`, puis deux ancres d'accueil avec la
+ * prestation reléguée en lien de texte, puis l'inverse. Il se cale ici sur le
+ * tunnel du site, et n'en bouge plus :
  *
- * Le titre et le texte restent orientés par la catégorie : c'est ce qui fait
- * qu'un guide sur la piscine parle de déclaration préalable et non d'un
- * argumentaire générique. Le lien vers la prestation passe sous les boutons,
- * en lien simple : il complète le parcours sans lui faire concurrence.
+ *   bouton principal    « Étudier mon projet »   → /#localisation
+ *   bouton secondaire   « Poser mes questions »  → /#demander-des-renseignements
+ *   lien de texte       « Tarifs et délais »     → /tarifs/
+ *
+ * DEUX BOUTONS, PAS TROIS. Trois appels à l'action de même poids ne
+ * hiérarchisent plus rien. Le troisième chemin existe, en lien.
+ *
+ * « Démarrer mon projet » NE DOIT PAS REVENIR. Le site a été harmonisé sur
+ * « Étudier mon projet » pour cette ancre ; un banc refuse l'ancien libellé
+ * dans ce pattern.
+ *
+ * Le titre est commun aux dix-huit guides. Ce qui varie — le texte et les trois
+ * points — vient de `urbizen_child_cta_guide()`, par catégorie : c'est ce qui
+ * fait qu'un guide sur la piscine parle de métré et de pièces DP, et non d'un
+ * argumentaire générique.
+ *
+ * LA PAGE DE PRESTATION N'EST PLUS ICI
+ *
+ * Elle est liée dans l'introduction et dans le corps de chaque guide, en
+ * contexte, là où elle veut dire quelque chose. Le bloc de fin d'article sert
+ * la qualification, pas le catalogue.
  *
  * PAS DE PROMESSE SUR LE RÉSULTAT
  *
@@ -70,14 +85,23 @@ $id_index  = (int) get_option( 'page_for_posts' );
 $url_index = $id_index ? get_permalink( $id_index ) : '';
 ?>
 <!-- wp:html -->
-<aside class="guide-cta">
-  <h2><?php echo esc_html( $cta['titre'] ); ?></h2>
+<aside class="guide-cta" aria-labelledby="guide-cta-titre">
+  <p class="guide-cta-marque">Le service Urbizen</p>
+  <h2 id="guide-cta-titre">Besoin d’aide pour votre projet&nbsp;?</h2>
   <p><?php echo esc_html( $cta['texte'] ); ?></p>
+	<?php $points = (array) ( $cta['points'] ?? array() ); ?>
+	<?php if ( array() !== $points ) : ?>
+  <ul class="guide-cta-points">
+		<?php foreach ( $points as $point ) : ?>
+    <li><?php echo esc_html( $point ); ?></li>
+		<?php endforeach; ?>
+  </ul>
+	<?php endif; ?>
   <div class="guide-cta-actions">
-    <a class="btn btn-primary" href="<?php echo esc_url( home_url( '/#localisation' ) ); ?>">Démarrer mon projet</a>
-    <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/#demander-des-renseignements' ) ); ?>">Demander des renseignements</a>
+    <a class="btn btn-primary" href="<?php echo esc_url( home_url( '/#localisation' ) ); ?>">Étudier mon projet</a>
+    <a class="btn btn-ghost" href="<?php echo esc_url( home_url( '/#demander-des-renseignements' ) ); ?>">Poser mes questions</a>
   </div>
-  <p class="guide-cta-lien"><a href="<?php echo esc_url( $cta['url'] ); ?>"><?php echo esc_html( $cta['libelle'] ); ?></a></p>
+  <p class="guide-cta-lien"><a href="<?php echo esc_url( home_url( '/tarifs/' ) ); ?>">Tarifs et délais</a></p>
 </aside>
 <?php if ( $voisins->have_posts() ) : ?>
 <section class="guide-voisins">
@@ -112,6 +136,6 @@ $url_index = $id_index ? get_permalink( $id_index ) : '';
 </section>
 <?php endif; ?>
 <?php if ( '' !== $url_index ) : ?>
-<p><a class="guide-retour" href="<?php echo esc_url( $url_index ); ?>">‹ Tous les guides</a></p>
+<p class="guide-retour-ligne"><a class="guide-retour" href="<?php echo esc_url( $url_index ); ?>">‹ Tous les guides</a></p>
 <?php endif; ?>
 <!-- /wp:html -->

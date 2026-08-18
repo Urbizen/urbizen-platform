@@ -83,6 +83,7 @@ réglementaire :
 
 | Cible | Emplacement |
 |---|---|
+| `/conception/` | introduction, 2ᵉ paragraphe — les vérifications faites avant de dessiner |
 | `/guides/lire-le-plu-de-son-terrain/` | vérification 1, pour retrouver la zone et son chapitre de règlement |
 | `/guides/piscine-garage-carport-autorisation/` | vérification 2, sur le métré — **c'est le lien réciproque prévu au plan** |
 | `/guides/dp-ou-permis-de-construire/` | vérification 3, sur l'articulation 40 / 150 m² |
@@ -91,6 +92,11 @@ réglementaire :
 | `/declarations-prealables/` | « Ce que le dossier demandera » |
 | `/permis-de-construire/` | même section |
 | `/conception/` | même section |
+
+> Les cibles ci-dessus étaient déjà liées ailleurs dans l'article : le décompte
+> « Liens internes », qui porte sur les cibles distinctes, ne change pas. Ce que
+> le lot GUIDES ajoute est un **emplacement** — l'introduction — et non une cible.
+
 
 Aucun lien vers `/tarifs/` dans le corps, conformément au lot C.
 

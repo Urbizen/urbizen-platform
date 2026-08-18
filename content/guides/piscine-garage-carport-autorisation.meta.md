@@ -42,14 +42,24 @@ l'emprise sans créer de surface de plancher.
 | H2 | 7 |
 | H3 | 21 |
 | Schémas dédiés | 3 |
-| Liens internes | 3 |
+| Liens internes | 5 |
 | Références au code, liées | 8 |
 
 ## Liens internes posés
 
-- `/declarations-prealables/` — section « Les pièces à réunir »
-- `/permis-de-construire/` — même section, pour les projets au-delà des seuils
+- `/declarations-prealables/` — **introduction, 2ᵉ paragraphe** (le métré comme
+  point de départ du dossier), puis section « Les pièces à réunir »
+- `/permis-de-construire/` — section « Les pièces à réunir », pour les projets
+  au-delà des seuils
 - `/conception/` — section « Ce qui fait revenir la mairie »
+- `/guides/extension-maison-verifications-avant-plans/` — lien réciproque prévu
+  au plan
+- `/guides/erreurs-dossier-urbanisme/` — avant dépôt
+
+> Le décompte ci-dessus disait **3** jusqu'au lot GUIDES, alors que l'article en
+> portait déjà cinq : les deux renvois vers d'autres guides manquaient à la
+> liste. L'écart est antérieur à ce lot ; il est corrigé ici parce qu'il se
+> constate en lisant le fichier. Seul l'emplacement en introduction est nouveau.
 
 Aucun lien vers `/tarifs/` dans le corps : cette page porte l'intention prix,
 isolée au lot C. Le CTA de fin d'article, servi par la catégorie, y mène si
