@@ -86,10 +86,37 @@ check(
 	preg_match( '/function urbizen_child_desactive_archives_auteur.*?nocache_headers\(\)/s', $fns )
 );
 
+/*
+ * LE CONTRÔLE PORTE SUR LE CORPS DE LA FONCTION, PAS SUR LE FICHIER
+ *
+ * Il s'écrivait `…auteur.*?wp_redirect|wp_safe_redirect`. Deux défauts, et le
+ * second survivait à la correction du premier.
+ *
+ * En PCRE, `|` a la précédence la PLUS BASSE : le motif se coupait en deux, et
+ * sa seconde branche valait « `wp_safe_redirect` n'importe où dans le fichier ».
+ * Le contrôle ne mesurait plus la fonction visée mais tout `functions.php`, et
+ * il a échoué le jour où une redirection sans rapport — celle de l'ancien
+ * parcours de commande — y est apparue.
+ *
+ * Grouper l'alternance ne suffisait pas : `.*?` traverse les frontières de
+ * fonction, si bien que le résultat dépendait de l'ORDRE des définitions. Le
+ * contrôle serait repassé au vert par pur effet de rangement, et aurait de
+ * nouveau échoué le jour où une redirection serait déclarée plus bas.
+ *
+ * Le corps est donc isolé d'abord, et la recherche s'y limite. La décision
+ * qu'il protège n'a pas bougé : l'archive d'auteur rend un 404, jamais un 301.
+ */
+preg_match( '/function urbizen_child_desactive_archives_auteur\(.*?\n}/s', $fns, $corps_archives );
+
+check(
+	'1 · le corps de la fonction d\'archive est isolable',
+	isset( $corps_archives[0] ) && '' !== $corps_archives[0]
+);
+
 check(
 	'1 · aucune redirection n\'est créée pour l\'ancienne archive',
 	// Décision explicite de la propriétaire : 404, pas de 301.
-	! preg_match( '/function urbizen_child_desactive_archives_auteur.*?wp_redirect|wp_safe_redirect/s', $fns )
+	! preg_match( '/wp_redirect|wp_safe_redirect/', $corps_archives[0] ?? '' )
 );
 
 // ---- 2 · Le script de correction reste fidèle à la décision ----------------

@@ -3,7 +3,7 @@
  * Banc d'essai des cibles tactiles de l'en-tête mobile.
  *
  * Quatre contrôles interactifs cohabitent dans la barre : téléphone, Espace
- * client, « Démarrer mon projet » et le burger. Sous 400 px, trois d'entre eux
+ * client, « Étudier mon projet » et le burger. Sous 400 px, trois d'entre eux
  * tombaient sous les 44 × 44 px recommandés — le burger à 26 × 34, l'Espace
  * client à 40 × 40, le CTA à 38 de haut. Le doigt visait plus petit que la
  * pastille annoncée.
@@ -401,7 +401,7 @@ check( 'Le script bascule toujours aria-expanded',
 	str_contains( $js, 'burger' ) && str_contains( $js, 'aria-expanded' ) );
 
 check( 'Le CTA conserve son libellé accessible et ses deux intitulés',
-	str_contains( $pattern, 'aria-label="Démarrer mon projet"' )
+	str_contains( $pattern, 'aria-label="Étudier mon projet"' )
 	&& str_contains( $pattern, 'class="nav-cta-long"' )
 	&& str_contains( $pattern, 'class="nav-cta-short"' ) );
 check( 'Le libellé court reste masqué aux lecteurs d\'écran (pas de doublon vocal)',

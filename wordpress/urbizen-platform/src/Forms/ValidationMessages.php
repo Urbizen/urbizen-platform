@@ -88,8 +88,11 @@ final class ValidationMessages {
 			case 'projet_malforme':
 				return __( 'La liste des projets n’a pas pu être lue. Actualisez la page et réessayez.', 'urbizen-platform' );
 
-			case 'hors_bornes':
-				return __( 'La valeur est en dehors des limites autorisées.', 'urbizen-platform' );
+			// `hors_bornes` figurait ici une SECONDE fois, avec un texte légèrement
+			// différent de celui déclaré plus haut. PHP retient le premier `case`
+			// atteint : ce doublon était mort, et il donnait à lire deux messages
+			// pour un même code — dont un que personne n'a jamais vu. Le message
+			// canonique est celui qui était effectivement servi.
 
 			default:
 				// Message générique sûr : jamais le code brut ni une valeur.

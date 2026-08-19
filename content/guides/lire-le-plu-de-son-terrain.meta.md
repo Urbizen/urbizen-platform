@@ -91,12 +91,18 @@ espaces verts qui redessinent le projet. C'est la leçon de la section.
 
 | Cible | Emplacement |
 |---|---|
+| `/conception/` | introduction, 2ᵉ paragraphe — la lecture du PLU comme premier livrable |
 | `/guides/dp-ou-permis-de-construire/` | « Les quatre familles de zones », sur le fait que zone AU ≠ zone U |
 | `/guides/extension-maison-verifications-avant-plans/` | « Une fois le règlement lu » |
 | `/guides/erreurs-dossier-urbanisme/` | même section |
 | `/conception/` | même section |
 | `/declarations-prealables/` | même section |
 | `/permis-de-construire/` | même section |
+
+> Les cibles ci-dessus étaient déjà liées ailleurs dans l'article : le décompte
+> « Liens internes », qui porte sur les cibles distinctes, ne change pas. Ce que
+> le lot GUIDES ajoute est un **emplacement** — l'introduction — et non une cible.
+
 
 Aucun lien vers `/tarifs/` dans le corps. Le CTA de fin d'article, servi par la
 catégorie « Règles d'urbanisme », mène à `/conception/` — ce qui est cohérent :

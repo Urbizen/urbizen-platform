@@ -423,9 +423,14 @@
     autre: "Autre projet"
   };
 
+  /* Ce libellé part dans le message du formulaire de renseignements : c'est ce
+     que lira la personne qui traitera la demande. Il doit donc dire ce qui est
+     attendu, et non l'état interne du moteur — aucun `verdict=confirm` ne
+     traverse jamais ce texte. Les deux cas demandent des choses différentes :
+     l'un un contrôle des règles locales, l'autre une conclusion qui manque. */
   var LIBELLES_VERDICT = {
-    none: "aucune formalité nationale identifiée",
-    confirm: "échange direct avec Urbizen"
+    none: "aucune formalité nationale identifiée — vérification des règles locales demandée",
+    confirm: "vérification demandée : les informations fournies ne permettent pas encore de conclure"
   };
 
   var LIBELLES_REPONSE = {
@@ -675,20 +680,40 @@
     { champ: "description", libelle: "Décrivez votre projet en quelques mots.", texte: true }
   ];
 
+  /* Le titre annonce le RÉSULTAT, le message l'explique, le bouton dit où l'on
+     va. Les trois doivent concorder : « Continuer vers ma demande » servait
+     jusqu'ici à la fois pour « aucune formalité » et pour « à vérifier », deux
+     conclusions que rien ne distinguait alors au moment de cliquer. */
+  var TITRES = {
+    dp:         "Votre projet relève d'une déclaration préalable",
+    pcmi:       "Votre projet relève d'un permis de construire",
+    conception: "Des plans sur mesure pour votre projet",
+    none:       "Aucune formalité nationale identifiée",
+    confirm:    "Votre projet nécessite une vérification"
+  };
+
   var MESSAGES = {
     dp:         "Démarche : déclaration préalable. Après l'envoi, Urbizen vérifie vos informations et vous rappelle sous 24 h ouvrées.",
     pcmi:       "Démarche : permis de construire. Après l'envoi, Urbizen vérifie vos informations et vous rappelle sous 24 h ouvrées.",
     conception: "Vous allez ouvrir le formulaire de conception de plans sur mesure.",
-    none:       "D'après ces éléments, aucune autorisation d'urbanisme nationale n'est nécessaire. Vous pouvez transmettre votre demande à Urbizen pour un contrôle des règles locales sous 24 h ouvrées.",
-    confirm:    "Continuez vers le formulaire de renseignements. Urbizen vérifie les informations transmises et vous répond sous 24 h ouvrées."
+    /* « ne semble pas » et « au titre des règles nationales » : le moteur
+       applique le code de l'urbanisme, il ne connaît ni le PLU de la commune ni
+       les périmètres protégés. Annoncer une dispense comme une certitude
+       juridique serait faux, et le lecteur le paierait en mairie. */
+    none:       "D'après les informations fournies, votre projet ne semble pas nécessiter d'autorisation d'urbanisme au titre des règles nationales. Des règles locales du PLU ou d'un secteur protégé peuvent néanmoins s'appliquer.",
+    confirm:    "Certaines informations ne permettent pas encore de déterminer avec certitude la formalité adaptée. Urbizen vérifie votre projet et les règles applicables avant de vous orienter vers la bonne démarche."
   };
 
+  /* Chaque verdict a son libellé : deux destinations identiques ne justifient
+     pas un libellé identique quand elles ne veulent pas dire la même chose.
+     `none` est une bonne nouvelle assortie d'une réserve locale ; `confirm` est
+     une information manquante. Le bouton doit le dire avant le clic. */
   var BOUTONS = {
     dp:         "Continuer vers ma déclaration préalable",
     pcmi:       "Continuer vers mon permis de construire",
     conception: "Continuer vers mes plans sur mesure",
-    none:       "Continuer vers ma demande",
-    confirm:    "Continuer vers ma demande"
+    none:       "Vérifier les règles locales",
+    confirm:    "Demander une vérification"
   };
 
   var reponses = {};
@@ -696,6 +721,7 @@
   var parcoursId = null;
   var continueBtn = document.getElementById("js-continue");
   var continueHint = document.getElementById("js-continue-hint");
+  var continueTitre = document.getElementById("js-continue-titre");
   var zoneQuestions = document.getElementById("js-qualification");
   var cards = document.querySelectorAll(".pcard");
   var moteur = window.UrbizenQualification;
@@ -829,6 +855,8 @@
         continueBtn.disabled = true;
         continueBtn.textContent = "Répondez pour continuer";
         if (continueHint) { continueHint.textContent = ""; }
+        // Tant qu'une question reste posée, il n'y a pas de verdict à titrer.
+        if (continueTitre) { continueTitre.textContent = ""; continueTitre.hidden = true; }
         return;
       }
     }
@@ -836,6 +864,10 @@
     masquerQuestions();
     continueBtn.disabled = false;
     continueBtn.textContent = BOUTONS[verdict.status];
+    if (continueTitre) {
+      continueTitre.textContent = TITRES[verdict.status] || "";
+      continueTitre.hidden = "" === continueTitre.textContent;
+    }
     if (continueHint) { continueHint.textContent = MESSAGES[verdict.status]; }
     window.setTimeout(function () { continueBtn.focus(); }, 0);
 

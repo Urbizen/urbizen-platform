@@ -23,6 +23,7 @@ namespace Urbizen\Platform\Http;
 
 use Urbizen\Platform\Forms\CatalogueProjets;
 use Urbizen\Platform\Forms\CatalogueRegistry;
+use Urbizen\Platform\Forms\ValidationMessages;
 use Urbizen\Platform\Submissions\SubmissionRepository;
 
 defined( 'ABSPATH' ) || exit;
@@ -82,8 +83,32 @@ final class SubmissionJsonResponse {
 	/**
 	 * Compose la réponse d'un refus corrigeable ou d'un incident.
 	 *
+	 * CE QUI SORT, ET CE QUI NE SORT PAS
+	 *
+	 * `$erreurs` associe un nom de champ à un **code interne** (`requis`,
+	 * `hors_liste`, `nombre_invalide`…). Ce code ne sort pas : il nomme un
+	 * contrôle, pas un problème, et il n'a aucun sens pour la personne qui lit.
+	 * Ce qui sort est le message public que {@see ValidationMessages::message()}
+	 * lui associe — écrit pour être lu, et déjà maintenu côté serveur.
+	 *
+	 * La version précédente ne gardait que `array_keys( $erreurs )` : les codes
+	 * étaient détruits sur place, `ValidationMessages` n'était jamais appelé sur
+	 * ce chemin, et l'interface ne pouvait plus rien dire d'autre que « certaines
+	 * informations n'ont pas pu être validées ». Dix-huit messages précis
+	 * existaient et se perdaient à cette ligne.
+	 *
+	 * PAS DE `label`, PAS DE `step`
+	 *
+	 * Le libellé public d'un champ DP/PC vit dans le `<label>` du document, qui
+	 * en est la source canonique : le recopier ici en créerait une seconde, à
+	 * tenir à jour. L'étape, elle, est une notion d'interface — le serveur ne
+	 * connaît pas le découpage en pas et n'a pas à en décider.
+	 *
+	 * `fields` est conservé tel quel : un client déjà déployé continue de
+	 * fonctionner sans rien changer.
+	 *
 	 * @param string                $categorie Catégorie publique en liste blanche.
-	 * @param array<string, string> $erreurs   Erreurs par champ, déjà publiques.
+	 * @param array<string, string> $erreurs   Codes d'erreur par champ.
 	 * @return array<string, mixed>
 	 */
 	public static function echec( string $categorie, array $erreurs = array() ): array {
@@ -95,11 +120,19 @@ final class SubmissionJsonResponse {
 			'message' => self::MESSAGES[ $categorie ] ?? self::MESSAGES['technical'],
 		);
 
-		// Les champs en erreur ne sont utiles qu'à la validation, et seuls les
-		// noms canoniques sortent — jamais la valeur reçue, jamais le code
-		// interne du contrôle qui a échoué.
 		if ( 'validation' === $categorie && array() !== $erreurs ) {
 			$reponse['fields'] = array_values( array_keys( $erreurs ) );
+
+			$details = array();
+
+			foreach ( $erreurs as $champ => $code ) {
+				$details[] = array(
+					'field'   => (string) $champ,
+					'message' => ValidationMessages::message( is_scalar( $code ) ? (string) $code : '' ),
+				);
+			}
+
+			$reponse['errors'] = $details;
 		}
 
 		return $reponse;

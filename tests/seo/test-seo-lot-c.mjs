@@ -38,6 +38,43 @@ const decoder = (s) => (s || '')
   .replace(/&quot;/g, '"')
   .replace(/&nbsp;/g, ' ');
 
+const texte = (s) => decoder((s || '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
+
+/**
+ * La zone éditoriale d'une page : son H1, son chapô, ses H2.
+ *
+ * L'extraction est bornée à `<main>`. C'est le point qui fait tout : le menu et
+ * le pied de page citent la cible sans rien promettre, et un contrôle sur le
+ * corps entier passerait grâce à eux, quel que soit le contenu réel. Hors
+ * `<main>`, on retombe sur le document entier plutôt que de ne rien contrôler —
+ * un thème sans `<main>` doit faire échouer le banc sur le fond, pas le
+ * neutraliser en silence.
+ */
+function zoneEditoriale(html) {
+  const m = html.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+  const zone = m ? m[1] : html;
+  const tous = (re) => [...zone.matchAll(re)].map((x) => texte(x[1])).filter(Boolean);
+  return {
+    h1: tous(/<h1[^>]*>([\s\S]*?)<\/h1>/gi),
+    lead: tous(/<p[^>]*class="[^"]*\blead\b[^"]*"[^>]*>([\s\S]*?)<\/p>/gi),
+    h2: tous(/<h2[^>]*>([\s\S]*?)<\/h2>/gi),
+  };
+}
+
+/** La cible est-elle portée par le H1, le chapô ou un H2 ? */
+const portePromesse = (zone, motif) =>
+  [...zone.h1, ...zone.lead, ...zone.h2].some((t) => motif.test(t));
+
+/** Où la cible a été trouvée — pour que l'échec se lise sans rouvrir la page. */
+function decrirePortee(zone, motif) {
+  const ou = [];
+  if (zone.h1.some((t) => motif.test(t))) ou.push('H1');
+  if (zone.lead.some((t) => motif.test(t))) ou.push('chapô');
+  if (zone.h2.some((t) => motif.test(t))) ou.push('H2');
+  if (ou.length) return `portée par : ${ou.join(', ')}`;
+  return `absente de H1 (${zone.h1.length}), chapô (${zone.lead.length}), H2 (${zone.h2.length})`;
+}
+
 async function lire(chemin) {
   const r = await fetch(BASE + chemin + anticache(chemin), { redirect: 'manual' });
   const html = await r.text();
@@ -69,7 +106,25 @@ const ATTENDU = {
     nom: 'Accueil',
     title: `Dossiers d${A}urbanisme à distance | Urbizen`,
     description: `Urbizen prépare vos dossiers d${A}urbanisme à distance, partout en France : déclaration préalable, permis de construire, plans et pièces prêts à déposer.`,
-    h1Attendu: /dossiers d.urbanisme/i,
+    // L'ACCUEIL SE CONTRÔLE SUR SON SUJET, PAS SUR UN MOT DANS SON H1
+    //
+    // La règle était : le H1 doit contenir l'expression du title. Elle tenait
+    // tant que le H1 nommait le livrable. Il s'adresse désormais à la personne
+    // qui lit — « Vos travaux commencent par les bonnes démarches. » — et le
+    // mot-clé a migré vers un H2, sans que la page ait changé de sujet.
+    //
+    // Exiger le mot dans le H1 revenait donc à interdire toute accroche qui ne
+    // soit pas un résumé du title. Ce qui se contrôle ici est l'intention : la
+    // cible doit rester portée par la zone ÉDITORIALE — H1, chapô, H2 — et le
+    // title doit continuer de la porter, lui aussi. Si l'expression disparaît
+    // de ces trois endroits, la page a réellement changé de sujet, et le banc
+    // le dit.
+    //
+    // La zone est délibérément restreinte : un contrôle sur tout le corps
+    // passerait grâce au menu ou au pied de page, qui citent la cible sans rien
+    // promettre. Huit occurrences existent dans le document, une seule dans la
+    // zone éditoriale — c'est celle-là qui compte.
+    promesseEditoriale: /dossiers? d.urbanisme/i,
   },
   '/declarations-prealables/': {
     nom: 'Déclaration préalable',
@@ -123,13 +178,53 @@ for (const [chemin, att] of Object.entries(ATTENDU)) {
     (r.description || '').length >= 120 && (r.description || '').length <= 160,
     `${(r.description || '').length} c.`);
 
-  // Cohérence title ↔ H1 : le H1 doit reprendre la promesse du title. C'est ce
-  // qui évite d'envoyer deux signaux différents sur une même page.
+  // Cohérence title ↔ contenu : la page ne doit pas envoyer deux signaux
+  // différents. Selon la page, cela se contrôle sur le H1 seul ou sur la zone
+  // éditoriale entière — voir le commentaire porté par l'entrée « / ».
   const corps = r.html.replace(/<div id="cmplz-cookiebanner-container"[\s\S]*$/i, '');
-  const h1 = [...corps.matchAll(/<h1[^>]*>([\s\S]*?)<\/h1>/gi)]
-    .map((m) => decoder(m[1].replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim());
+  const zone = zoneEditoriale(corps);
+  const h1 = zone.h1;
+
   check('un seul H1', h1.length === 1, `${h1.length} H1`);
-  check('le H1 reprend la promesse du title', h1.length > 0 && att.h1Attendu.test(h1[0]), `H1 : ${h1[0]}`);
+  check('le H1 est non vide', h1.length > 0 && h1[0].length > 0, `H1 : « ${h1[0] ?? ''} »`);
+
+  if (att.h1Attendu) {
+    check('le H1 reprend la promesse du title', h1.length > 0 && att.h1Attendu.test(h1[0]), `H1 : ${h1[0]}`);
+  }
+
+  if (att.promesseEditoriale) {
+    const p = att.promesseEditoriale;
+    check('le title porte toujours la cible', p.test(r.title || ''), `title : ${r.title}`);
+    check('la cible est portée par la zone éditoriale (H1, chapô ou H2)',
+      portePromesse(zone, p), decrirePortee(zone, p));
+  }
+}
+
+// ---- Contre-épreuve de la garde éditoriale --------------------------------
+//
+// Une garde qui ne peut pas échouer ne garde rien. Celle-ci se vérifie donc sur
+// une zone amputée : on retire la cible du H1, du chapô et des H2, et le
+// prédicat doit basculer au rouge. Sans cette contre-épreuve, un jour où
+// `portePromesse` renverrait `true` par construction — regex vidée, zone mal
+// extraite — le banc resterait vert en ne contrôlant plus rien.
+{
+  console.log('\n── Contre-épreuve : la garde éditoriale sait échouer');
+  const p = ATTENDU['/'].promesseEditoriale;
+
+  const pleine = {
+    h1: ['Vos travaux commencent par les bonnes démarches.'],
+    lead: ['Construction neuve, extension, modification de l’existant.'],
+    h2: ['Découvrez les pièces préparées pour votre dossier d’urbanisme'],
+  };
+  const amputee = { h1: pleine.h1, lead: pleine.lead, h2: ['Découvrez les pièces préparées'] };
+
+  check('zone portant la cible en H2 : acceptée', portePromesse(pleine, p));
+  check('zone amputée de la cible : refusée', !portePromesse(amputee, p));
+  check('cible en H1 seul : acceptée',
+    portePromesse({ h1: ['Vos dossiers d’urbanisme'], lead: [], h2: [] }, p));
+  check('cible dans le chapô seul : acceptée',
+    portePromesse({ h1: ['Titre'], lead: ['Un dossier d’urbanisme complet'], h2: [] }, p));
+  check('zone entièrement vide : refusée', !portePromesse({ h1: [], lead: [], h2: [] }, p));
 }
 
 // ---- Unicité : c'est le cœur du lot ---------------------------------------

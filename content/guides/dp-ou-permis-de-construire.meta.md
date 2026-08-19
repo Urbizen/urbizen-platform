@@ -71,6 +71,8 @@ l'ordre, et trois cas limites tranchés pas à pas.
 
 | Cible | Emplacement |
 |---|---|
+| `/declarations-prealables/` | introduction, 2ᵉ paragraphe — la première question tranchée sur chaque dossier |
+| `/permis-de-construire/` | introduction, 2ᵉ paragraphe — l’autre branche de la même question |
 | `/guides/piscine-garage-carport-autorisation/` | « La règle du "et" et la règle du "ou" » — renvoi vers le métré détaillé |
 | `/guides/lire-le-plu-de-son-terrain/` | Question 3, pour retrouver la zone d'une parcelle |
 | `/guides/extension-maison-verifications-avant-plans/` | Question 4, sur le total après travaux |
@@ -78,6 +80,11 @@ l'ordre, et trois cas limites tranchés pas à pas.
 | `/declarations-prealables/` | « Une fois la formalité identifiée » |
 | `/permis-de-construire/` | même section |
 | `/conception/` | même section, si les plans restent à produire |
+
+> Les cibles ci-dessus étaient déjà liées ailleurs dans l'article : le décompte
+> « Liens internes », qui porte sur les cibles distinctes, ne change pas. Ce que
+> le lot GUIDES ajoute est un **emplacement** — l'introduction — et non une cible.
+
 
 Aucun lien vers `/tarifs/` dans le corps : cette page porte l'intention prix,
 isolée au lot C. Le CTA de fin d'article, servi par la catégorie

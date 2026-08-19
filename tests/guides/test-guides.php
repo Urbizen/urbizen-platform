@@ -221,7 +221,105 @@ foreach ( preg_split( '/\}/', preg_replace( '#/\*.*?\*/#s', '', $css ) ) as $blo
 check( 'Chaque règle est scopée .urbizen-guides', array() === $non_scopees,
 	implode( ' | ', array_slice( $non_scopees, 0, 4 ) ) );
 
-check( 'La colonne de lecture est bornée', (bool) preg_match( '/\.guide-corps \{[^}]*max-width: 72ch/s', $css ) );
+/*
+ * DEUX LARGEURS, DEUX JETONS
+ *
+ * La feuille portait `max-width: 72ch` deux fois, sur `.guide-corps` et sur
+ * `.guide-cta`. Deux écritures identiques, deux largeurs différentes : `ch`
+ * vaut l'avance du « 0 » de la police COURANTE, et ces deux blocs n'ont pas la
+ * même taille de texte (17px contre 16px). Mesuré : 734,4 px contre 691,2 px.
+ *
+ * Et une seule largeur ne suffisait pas : un guide fait cohabiter du texte, qui
+ * se lit, et des planches, qui se regardent. D'où A — la colonne de lecture —
+ * et B — la largeur éditoriale. Le banc vérifie que ces deux-là existent, qu'ils
+ * sont dans une unité qui ne dépende pas du contexte de lecture, et que rien ne
+ * réintroduise une troisième largeur en dur.
+ */
+check( 'La colonne de lecture est déclarée une seule fois',
+	1 === preg_match_all( '/--u-guide-col:/', $css ) );
+check( 'La largeur éditoriale est déclarée une seule fois',
+	1 === preg_match_all( '/--u-guide-large:/', $css ) );
+check( 'Les deux jetons sont déclarés sur la portée de la feuille',
+	(bool) preg_match( '/\.urbizen-guides \{[^}]*--u-guide-col:[^}]*--u-guide-large:/s', $css ) );
+/*
+ * `rem` et pas `ch` ni `em` : ces deux dernières se résolvent sur la taille de
+ * texte de l'élément qui les lit, ce qui est exactement le défaut corrigé. Un
+ * retour à `ch` réintroduirait le décalage sans rien changer d'apparent dans la
+ * feuille — d'où ce contrôle sur l'unité elle-même.
+ */
+foreach ( array( '--u-guide-col', '--u-guide-large' ) as $jeton ) {
+	check( "$jeton est exprimé dans une unité indépendante du contexte de lecture",
+		(bool) preg_match( '/' . $jeton . ':\s*[\d.]+rem\s*;/', $css ),
+		'attendu une valeur en rem' );
+}
+/*
+ * La colonne vaut 37,5rem parce qu'une mesure l'a dit : corps de trois guides
+ * rendu avec IBM Plex Sans chargée, signes comptés ligne à ligne, lignes
+ * finales de paragraphe exclues — médiane 77, quartiles 74 à 80. Le banc ne
+ * refait pas la mesure, il fige la borne : au-delà de 40rem la médiane sort des
+ * 80 signes, en deçà de 34rem les planches ne tiennent plus.
+ */
+if ( preg_match( '/--u-guide-col:\s*([\d.]+)rem/', $css, $m ) ) {
+	$rem = (float) $m[1];
+	check( 'La colonne de lecture reste dans la plage mesurée (34 à 40rem)',
+		$rem >= 34 && $rem <= 40, $m[1] . 'rem' );
+}
+check( 'Aucune largeur de colonne n’est réécrite en dur dans la feuille',
+	! preg_match( '/max-width:\s*\d+(\.\d+)?(ch|em)\s*;/', preg_replace( '#/\*.*?\*/#s', '', $css ) ) );
+
+/*
+ * A · CE QUI SE LIT. Ces blocs doivent tomber sur la même verticale, à gauche
+ * comme à droite : c'est le contrat du lot.
+ */
+foreach ( array(
+	'guide-cta'          => 'l’appel à l’action',
+	'guide-retour-ligne' => 'le retour à l’index',
+) as $classe => $quoi ) {
+	check( "La largeur de $quoi vient de la colonne de lecture",
+		(bool) preg_match( '/\.' . $classe . ' \{[^}]*max-width: var\(--u-guide-col\)/s', $css ),
+		".$classe" );
+}
+check( 'Le chapô du hero d’article vient de la colonne lui aussi',
+	(bool) preg_match( '/\.guide-hero \.wrap > :is\([^)]*\) \{[^}]*max-width: var\(--u-guide-col\)/s', $css ) );
+/*
+ * L'ARCHITECTURE CONTRAINTE : tout enfant du contenu prend la colonne par
+ * DÉFAUT — un bloc Gutenberg ajouté demain est lisible sans que personne y
+ * pense — et seuls les objets nommés en sortent.
+ */
+check( 'Tout bloc du contenu prend la colonne par défaut',
+	(bool) preg_match( '/\.guide-corps \.entry-content > \* \{[^}]*max-width: var\(--u-guide-col\)/s', $css ) );
+
+/*
+ * B · CE QUI SE REGARDE. Le corps est le CADRE, pas la colonne : c'est ce qui
+ * permet à une planche de s'étendre sans marge négative, donc sans risque de
+ * débordement à une largeur intermédiaire.
+ */
+foreach ( array(
+	'guide-corps'   => 'le cadre de l’article',
+	'guide-visuel'  => 'le visuel d’en-tête',
+	'guide-voisins' => 'la grille « À lire aussi »',
+) as $classe => $quoi ) {
+	check( "La largeur de $quoi vient de la largeur éditoriale",
+		(bool) preg_match( '/\.' . $classe . ' \{[^}]*max-width: var\(--u-guide-large\)/s', $css ),
+		".$classe" );
+}
+check( 'Les planches et les tableaux ont le droit de sortir de la colonne',
+	(bool) preg_match( '/\.entry-content > :is\(\.wp-block-image, \.wp-block-table\) \{[^}]*max-width: var\(--u-guide-large\)/s', $css ) );
+check( 'Une planche plus étroite que le cadre se centre au lieu de se caler à gauche',
+	(bool) preg_match( '/\.guide-corps :is\(img, \.wp-block-image img\) \{[^}]*margin-inline: auto/s', $css ) );
+/*
+ * `.entry-content` est lui-même un enfant de `.guide-corps` : sans la reprise,
+ * il hériterait de la colonne et emporterait les planches avec lui. Le défaut
+ * serait invisible à la lecture de la règle, et net à l'écran.
+ */
+check( 'Le conteneur du contenu ne rétrécit pas ce qu’il contient',
+	(bool) preg_match( '/\.guide-corps > \.entry-content \{[^}]*max-width: none/s', $css ) );
+
+// Le `sizes` du visuel doit suivre la largeur éditoriale, pas la colonne :
+// sinon le navigateur télécharge une image dimensionnée pour la mauvaise.
+$entete_guide = file_get_contents( $theme . '/patterns/guide-entete.php' );
+check( 'Le `sizes` du visuel annonce la largeur éditoriale',
+	str_contains( $entete_guide, '1040px' ) && ! str_contains( $entete_guide, '1140px' ) );
 check( 'Les tableaux longs défilent seuls plutôt que d’élargir la page',
 	(bool) preg_match( '/wp-block-table \{[^}]*overflow-x: auto/s', $css ) );
 // Le cadrage est passé d'une hauteur maximale à un RAPPORT fixe le 14 août
@@ -266,18 +364,187 @@ check( 'Le mouvement réduit est respecté', str_contains( $css, 'prefers-reduce
 
 // ------------------------------------------------- 9 · ce qui ne bouge pas ----
 
-// Le CTA de fin de guide mène au parcours de l'accueil, pas à l'ancien
-// formulaire de contact — retiré du menu, il n'a plus sa place ici non plus.
+/*
+ * LE CTA DES GUIDES — TROIS ACTIONS, DEUX BOUTONS, UN SEUL TITRE
+ *
+ * Le bloc a changé trois fois : `/contact/`, puis deux ancres d'accueil avec la
+ * prestation en lien de texte, puis l'inverse. Il se cale sur le tunnel du
+ * site, et ce banc l'y tient.
+ *
+ * POURQUOI CONTRÔLER LE PATTERN ET NON LES DIX-HUIT ARTICLES
+ *
+ * Le bloc n'est pas recopié dans les guides : il est rendu une fois, par
+ * `guide-pied.php`, appelé par `single.html`, qui est le gabarit de tout
+ * article. Vérifier le pattern ET son appel prouve les dix-huit d'un coup — et
+ * le prouve encore pour le dix-neuvième. Recopier l'assertion dix-huit fois
+ * n'aurait rien couvert de plus, et aurait manqué le cas où le gabarit cesse
+ * d'appeler le pattern.
+ */
 $pied = file_get_contents( $theme . '/patterns/guide-pied.php' );
-check( 'Le CTA reprend les deux actions de l’accueil',
-	str_contains( $pied, "home_url( '/#localisation' )" )
-	&& str_contains( $pied, "home_url( '/#demander-des-renseignements' )" ) );
+
+check( 'Le gabarit d’article appelle bien le pied de guide',
+	str_contains( $contenus['single'], '"slug":"urbizen-child/guide-pied"' ),
+	'sans cet appel, aucun guide ne sert le CTA' );
+
+$actions = array(
+	'principal' => array( 'btn-primary', 'Étudier mon projet',  '/#localisation' ),
+	'secondaire'=> array( 'btn-ghost',   'Poser mes questions', '/#demander-des-renseignements' ),
+);
+foreach ( $actions as $rang => $attendu ) {
+	list( $classe, $libelle, $ancre ) = $attendu;
+	check( "CTA · le bouton $rang porte « $libelle »",
+		(bool) preg_match( '~' . $classe . '[^\n]*>' . preg_quote( $libelle, '~' ) . '<~u', $pied ) );
+	check( "CTA · le bouton $rang mène à $ancre",
+		(bool) preg_match( '~' . $classe . '[^\n]*' . preg_quote( $ancre, '~' ) . '~', $pied ) );
+}
+check( 'CTA · le lien de texte porte « Tarifs et délais » et mène à /tarifs/',
+	(bool) preg_match( '~guide-cta-lien[^\n]*/tarifs/[^\n]*>Tarifs et délais<~u', $pied ) );
+
+/*
+ * DEUX BOUTONS, PAS TROIS. Trois appels à l'action de même poids ne
+ * hiérarchisent plus rien. On compte les boutons du bloc, pas ceux du fichier :
+ * la grille des guides voisins n'en a pas, mais rien ne dit qu'elle n'en aura
+ * jamais.
+ */
+preg_match( '~<aside class="guide-cta".*?</aside>~s', $pied, $bloc_cta );
+check( 'CTA · le bloc porte deux boutons, pas trois',
+	isset( $bloc_cta[0] ) && 2 === substr_count( $bloc_cta[0], 'class="btn ' ),
+	isset( $bloc_cta[0] ) ? substr_count( $bloc_cta[0], 'class="btn ' ) . ' bouton(s)' : 'bloc introuvable' );
+
+/*
+ * « Démarrer mon projet » NE REVIENT PAS. Le site a été harmonisé sur
+ * « Étudier mon projet » pour l'ancre `/#localisation` ; le libellé abandonné
+ * doit rester hors des guides — pattern, gabarits et contenu compris.
+ */
+/*
+ * Le contrôle porte sur ce qui est RENDU, pas sur le fichier : le docblock
+ * ci-dessus nomme le libellé abandonné pour expliquer pourquoi il l'est, et un
+ * commentaire PHP ne part pas chez le visiteur. Les commentaires sont donc
+ * retirés avant l'examen — sans quoi la seule façon de faire passer le banc
+ * serait d'effacer l'explication, c'est-à-dire la mémoire de la décision.
+ */
+$pied_rendu = preg_replace( array( '#/\*.*?\*/#s', '#^\s*//.*$#m' ), '', $pied );
+check( 'Aucun libellé « Démarrer mon projet » dans ce qui est rendu',
+	! str_contains( $pied_rendu, 'Démarrer mon projet' ) );
+foreach ( GABARITS as $nom ) {
+	check( "$nom.html : aucun libellé « Démarrer mon projet »",
+		! str_contains( $contenus[ $nom ], 'Démarrer mon projet' ) );
+}
+
 check( 'Le CTA ne renvoie plus vers /contact/', ! str_contains( $pied, "home_url( '/contact/' )" ) );
-check( 'Le titre du CTA reste orienté par la catégorie',
-	str_contains( $pied, "urbizen_child_cta_guide" ) && str_contains( $pied, "\$cta['titre']" ) );
-check( 'Le lien de prestation subsiste, en lien simple',
-	str_contains( $pied, 'class="guide-cta-lien"' )
-	&& (bool) preg_match( '/\.guide-cta-lien a \{/', file_get_contents( $theme . '/assets/css/urbizen-guides.css' ) ) );
+check( 'Le titre du CTA est commun aux dix-huit guides',
+	(bool) preg_match( '~<h2 id="guide-cta-titre">Besoin d’aide pour votre projet~u', $pied )
+	&& ! str_contains( $pied, "\$cta['titre']" ) );
+check( 'Ce qui varie par catégorie reste l’éditorial, pas les URL',
+	str_contains( $pied, "\$cta['texte']" ) && str_contains( $pied, "\$cta['points']" )
+	&& ! str_contains( $pied, "\$cta['url']" ) );
+
+// Le bloc NOMME le service : sans ce cartouche, il s'ouvrait sur une question
+// dont le lecteur ne savait pas qui la pose.
+check( 'Le CTA nomme le service Urbizen',
+	str_contains( $pied, 'class="guide-cta-marque"' )
+	&& str_contains( $pied, 'Le service Urbizen' )
+	&& str_contains( $css, '.guide-cta-marque' ) );
+check( 'Le CTA énumère ce que le service produit',
+	str_contains( $pied, 'class="guide-cta-points"' )
+	&& str_contains( $css, '.guide-cta-points li::before' ) );
+check( 'Le lien de texte est bien dessiné comme tel dans la feuille',
+	(bool) preg_match( '/\.guide-cta-lien a \{/', $css ) );
+// Relevé à la recette : 20 px de haut de 834 à 1440 px, contre 44 pour les deux
+// boutons du même bloc. Troisième action, même cible.
+check( 'Le lien de texte garde une cible de 44 px, comme les boutons',
+	(bool) preg_match( '/\.guide-cta-lien a \{[^}]*min-height: 44px/s', $css ) );
+check( 'Le retour à l’index partage l’axe de la colonne',
+	str_contains( $pied, 'class="guide-retour-ligne"' ) );
+
+/*
+ * LA TABLE ÉDITORIALE NE PORTE PLUS D'URL. Une table qui en porte finit par en
+ * porter une de travers ; les trois destinations sont écrites une seule fois,
+ * dans le pattern.
+ */
+$fn_cta = file_get_contents( $theme . '/functions.php' );
+preg_match( '/function urbizen_child_cta_guide\(.*?\n\}/s', $fn_cta, $corps_cta );
+check( 'urbizen_child_cta_guide() ne porte aucune URL',
+	isset( $corps_cta[0] ) && ! str_contains( $corps_cta[0], 'home_url(' ) );
+check( 'urbizen_child_cta_guide() donne trois points à chaque catégorie',
+	isset( $corps_cta[0] ) && 4 === preg_match_all( '/.points.\s*=>\s*array\(/', $corps_cta[0] )
+	&& 4 === preg_match_all( '/.texte.\s*=>/', $corps_cta[0] ) );
+/*
+ * Aucun montant, aucune promesse d'obtention : la règle du lot C ne s'arrête
+ * pas au corps des guides. Ce bloc-ci argumente, il est donc plus exposé.
+ */
+check( 'Aucun montant de prestation dans les textes du CTA',
+	isset( $corps_cta[0] ) && ! preg_match( '/\d+\s*(&nbsp;)?€/u', $corps_cta[0] ) );
+check( 'Aucune promesse d’obtention dans les textes du CTA',
+	isset( $corps_cta[0] )
+	&& ! preg_match( '/(garanti|nous obtenons|obtention assurée|accord assuré)/iu', $corps_cta[0] ) );
+
+/*
+ * L'INSERTION N'EST PAS SYSTÉMATIQUE
+ *
+ * « Le dossier monté de bout en bout, du plan de masse à l'insertion » laissait
+ * entendre que tout dossier en contient une. C'est faux : la composition dépend
+ * du projet, et la notice officielle l'écrit dès sa première ligne — c'est même
+ * le sujet du guide `pieces-declaration-prealable`. Un argumentaire qui
+ * contredit le guide sur lequel il est posé est pire qu'un argumentaire absent.
+ *
+ * La mention reste permise comme EXEMPLE ; elle doit être conditionnée. Le banc
+ * exige donc qu'un marqueur de condition accompagne chaque phrase où le mot
+ * apparaît — pas qu'il disparaisse.
+ */
+$phrases_insertion = array();
+if ( isset( $corps_cta[0] ) ) {
+	foreach ( preg_split( "/\n/", $corps_cta[0] ) as $ligne ) {
+		if ( ! preg_match( '/insertion/iu', $ligne ) ) { continue; }
+		if ( ! preg_match( '/(lorsque|si |selon|requis|exigé|le cas échéant|quand)/iu', $ligne ) ) {
+			$phrases_insertion[] = trim( $ligne );
+		}
+	}
+}
+check( 'Le mot « insertion » n’apparaît dans le CTA que sous condition',
+	array() === $phrases_insertion, implode( ' | ', $phrases_insertion ) );
+
+/*
+ * Pas de promesse d'ORGANISATION non plus. « Un interlocuteur unique » engageait
+ * qu'une seule personne physique traite toutes les étapes — invérifiable, et
+ * sans rapport avec la valeur rendue, qui est la continuité de
+ * l'accompagnement.
+ */
+check( 'Aucune promesse sur l’organisation dans les textes du CTA',
+	isset( $corps_cta[0] )
+	&& ! preg_match( '/(interlocuteur unique|une seule personne|toujours la même personne)/iu', $corps_cta[0] ) );
+
+/*
+ * NI CHIFFRE, NI ABSOLU
+ *
+ * « Un dossier complet du premier coup, c'est un mois gagné » cumulait les deux
+ * : un dossier réputé complet d'emblée, et un gain de temps quantifié. Ni l'un
+ * ni l'autre ne dépend d'Urbizen seul — une demande de pièces peut venir d'une
+ * exigence locale, et le délai d'instruction appartient à l'administration.
+ *
+ * Le contrôle ne vise QUE les textes du CTA, jamais le corps des guides : ces
+ * derniers citent la garantie de l'article R.431-36 et des délais légaux, qui
+ * sont des faits réglementaires. Un motif appliqué partout aurait rendu le banc
+ * rouge sur du contenu juste — et l'aurait fait désactiver.
+ */
+$promesses_cta = array(
+	'du premier coup',
+	'/\b(un|deux|trois|\d+)\s+(jour|semaine|mois|an)s?\s+(gagn|[ée]conomis)/iu',
+	'/(z[ée]ro|aucune)\s+(pi[èe]ce|demande)\s+(compl[ée]mentaire|suppl[ée]mentaire)/iu',
+	'/\bgaranti(e|es|s)?\b/iu',
+	'/100\s*%/',
+);
+$trouve = array();
+if ( isset( $corps_cta[0] ) ) {
+	foreach ( $promesses_cta as $motif ) {
+		$hit = str_starts_with( $motif, '/' )
+			? preg_match( $motif, $corps_cta[0], $m )
+			: ( str_contains( $corps_cta[0], $motif ) ? ( $m = array( $motif ) ) && true : false );
+		if ( $hit ) { $trouve[] = $m[0]; }
+	}
+}
+check( 'Aucune promesse chiffrée ni absolue dans les textes du CTA',
+	array() === $trouve, implode( ' | ', $trouve ) );
 
 // Miroir du contrôle de `test-navigation.php` : les deux ont basculé ensemble
 // le jour où /guides/ a répondu 200.

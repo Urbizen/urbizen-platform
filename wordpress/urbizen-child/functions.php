@@ -201,7 +201,7 @@ const URBIZEN_CHILD_TEMPLATE_ACCUEIL = 'page-accueil-urbizen';
  * hasard à chaque affichage invaliderait le cache en permanence : ce n'est pas
  * une invalidation, c'est une suppression.
  */
-const URBIZEN_CHILD_FORMS_VERSION = '0.2.8';
+const URBIZEN_CHILD_FORMS_VERSION = '0.2.9';
 
 const URBIZEN_CHILD_TEMPLATES_PAGES = array(
 	'page-declaration-prealable',
@@ -699,6 +699,53 @@ function urbizen_child_interdire_cache_formulaire() {
 	}
 }
 add_action( 'template_redirect', 'urbizen_child_interdire_cache_formulaire' );
+
+/**
+ * L'ancien parcours de commande renvoie vers le tunnel actuel.
+ *
+ * POURQUOI CETTE PAGE DEVAIT PARTIR
+ *
+ * `/commander-un-dossier/` sert un formulaire Fluent Forms antérieur au tunnel
+ * de qualification. Elle est déjà en `noindex` et hors du plan de site, mais le
+ * bouton principal de l'en-tête — présent sur CHAQUE page, guides compris — y
+ * menait encore. C'était donc le chemin le plus court du site vers un dossier
+ * non qualifié, et il annulait l'intérêt du tunnel.
+ *
+ * POURQUOI UNE 301 ET NON UNE DÉPUBLICATION
+ *
+ * Dépublier rendrait un 404 à quiconque a gardé le lien — un courriel, un
+ * favori, un devis. La 301 conserve le peu de signal restant et conduit la
+ * personne là où le parcours commence vraiment. La page n'est pas supprimée :
+ * son contenu reste en base, et retirer ce hook la remet en ligne telle quelle.
+ *
+ * CE QU'ELLE NE TOUCHE PAS
+ *
+ * Une seule page, reconnue par son slug ET son type. Aucune autre URL n'est
+ * concernée, et la cible étant l'accueil, aucune boucle n'est possible. Les
+ * requêtes non-GET ne sont pas redirigées : une soumission POST encore en vol
+ * doit aboutir ou échouer franchement, pas être détournée en chemin.
+ *
+ * @return void
+ */
+function urbizen_child_rediriger_ancien_parcours() {
+	if ( is_admin() || ! is_singular( 'page' ) ) {
+		return;
+	}
+
+	if ( 'GET' !== strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? 'GET' ) ) ) {
+		return;
+	}
+
+	$page = get_queried_object();
+
+	if ( ! $page instanceof WP_Post || 'commander-un-dossier' !== $page->post_name ) {
+		return;
+	}
+
+	wp_safe_redirect( home_url( '/#localisation' ), 301 );
+	exit;
+}
+add_action( 'template_redirect', 'urbizen_child_rediriger_ancien_parcours' );
 
 /**
  * Configuration de soumission du formulaire affiché.
@@ -1359,37 +1406,85 @@ function urbizen_child_categorie_guide( $id ) {
 }
 
 /**
- * Destination de l'appel à l'action, selon la catégorie du guide.
+ * Ce que l'appel à l'action dit du service, selon la catégorie du guide.
+ *
+ * CE QUE CETTE TABLE NE PORTE PLUS
+ *
+ * Ni titre, ni destination. Les deux étaient variables ; ils ne le sont plus.
+ * Le titre est commun à tous les guides — « Besoin d'aide pour votre projet ? »
+ * — et les trois actions sont celles du tunnel, écrites une fois dans
+ * `guide-pied.php`. Une table qui porte des URL finit par en porter une de
+ * travers ; celle-ci ne porte que de l'éditorial.
+ *
+ * CE QU'ELLE PORTE
+ *
+ * Un texte et trois points, par catégorie, qui disent ce que le service produit
+ * SUR LE SUJET DU GUIDE. C'est ce qui distingue un appel à l'action d'un slogan,
+ * et c'est la seule chose qui ait besoin de varier.
+ *
+ * Ils décrivent un travail remis, jamais un résultat obtenu : la règle du lot C
+ * vaut ici comme ailleurs, et aucun de ces points ne peut se lire comme une
+ * garantie d'autorisation. Aucun montant non plus — les prix vivent sur
+ * `/tarifs/`, où le lien de texte du bloc mène.
+ *
+ * DEUX FORMULATIONS ONT ÉTÉ RESSERRÉES, ET POURQUOI
+ *
+ * « Un interlocuteur unique » promettait une organisation — une seule personne
+ * physique sur toutes les étapes — que rien ne garantit et qu'aucun banc ne
+ * peut vérifier. La valeur pour le lecteur est l'accompagnement continu, pas
+ * l'identité de qui le rend : c'est donc lui qui est écrit.
+ *
+ * « Du plan de masse à l'insertion » laissait entendre que tout dossier
+ * contient une insertion graphique. C'est faux : la composition d'un dossier
+ * dépend du projet, et la notice officielle le dit dès sa première ligne. La
+ * mention subsiste comme EXEMPLE, sous condition explicite. Un banc exige
+ * désormais que le mot « insertion » n'apparaisse ici que conditionné.
+ *
+ * « Un dossier complet du premier coup, c'est un mois gagné » cumulait deux
+ * promesses : que le dossier serait complet du premier coup, et que le gain
+ * vaudrait un mois. Ni l'une ni l'autre ne dépend d'Urbizen seul — une demande
+ * de pièces peut venir d'une exigence locale, et le délai d'instruction
+ * appartient à l'administration. La phrase dit maintenant ce qui est vrai :
+ * un dossier bien préparé LIMITE les demandes de pièces. Un banc refuse les
+ * promesses chiffrées ou absolues dans ces textes.
  *
  * @param int $id Identifiant de l'article.
- * @return array{titre:string,texte:string,url:string,libelle:string}
+ * @return array{texte:string,points:array<int,string>}
  */
 function urbizen_child_cta_guide( $id ) {
 	$repli = array(
-		'titre'   => 'Un projet en tête ?',
-		'texte'   => 'Urbizen prépare votre dossier d’urbanisme à distance, pièce par pièce, et vous le remet prêt à déposer en mairie.',
-		'url'     => home_url( '/tarifs/' ),
-		'libelle' => 'Voir les tarifs',
+		'texte'  => 'Urbizen prépare votre dossier d’urbanisme à distance, pièce par pièce, et vous le remet prêt à déposer en mairie.',
+		'points' => array(
+			'La formalité applicable vérifiée sur votre projet, avant toute pièce',
+			'Les plans et pièces exigés pour votre cas, dessinés et rassemblés',
+			'Un dossier prêt à déposer, en mairie ou sur le guichet en ligne',
+		),
 	);
 
 	$par_categorie = array(
 		'autorisations-projets' => array(
-			'titre'   => 'Votre projet relève-t-il d’une déclaration préalable ?',
-			'texte'   => 'Piscine, extension, abri, clôture, panneaux solaires : Urbizen prépare le dossier complet et vous le remet prêt à déposer.',
-			'url'     => home_url( '/declarations-prealables/' ),
-			'libelle' => 'La déclaration préalable',
+			'texte'  => 'Piscine, extension, abri, clôture, panneaux solaires : Urbizen prépare le dossier complet et vous le remet prêt à déposer.',
+			'points' => array(
+				'Le métré repris sur votre projet réel, emprise au sol et surface de plancher',
+				'Les pièces exigées pour votre cas, et pas celles qui ne le sont pas',
+				'Le dossier complet, prêt à déposer en mairie ou sur le guichet en ligne',
+			),
 		),
 		'regles-urbanisme'      => array(
-			'titre'   => 'Un doute sur ce que votre terrain autorise ?',
-			'texte'   => 'PLU, emprise au sol, surface de plancher, secteur protégé : Urbizen vérifie les règles applicables avant de dessiner quoi que ce soit.',
-			'url'     => home_url( '/conception/' ),
-			'libelle' => 'La conception de plans',
+			'texte'  => 'PLU, emprise au sol, surface de plancher, secteur protégé : Urbizen vérifie les règles applicables avant de dessiner quoi que ce soit.',
+			'points' => array(
+				'Le règlement de votre zone lu et rapporté à votre parcelle',
+				'Les surfaces calculées, avec les hypothèses écrites noir sur blanc',
+				'Des plans dessinés à partir de ces règles, plutôt que corrigés après coup',
+			),
 		),
 		'conseils-demarches'    => array(
-			'titre'   => 'Faites préparer votre dossier',
-			'texte'   => 'Un dossier complet du premier coup, c’est un mois gagné. Urbizen le monte pour vous, du plan de masse à l’insertion.',
-			'url'     => home_url( '/tarifs/' ),
-			'libelle' => 'Voir les tarifs',
+			'texte'  => 'Un dossier bien préparé limite les demandes de pièces complémentaires. Urbizen rassemble pour vous les éléments nécessaires à votre projet.',
+			'points' => array(
+				'Chaque pièce relue avant le dépôt, sur la liste qui s’applique à vous',
+				'Les plans et visuels nécessaires au dossier, du plan de masse à l’insertion lorsque ces pièces sont requises',
+				'Un accompagnement à distance, du premier échange à la remise du dossier',
+			),
 		),
 	);
 

@@ -21,11 +21,78 @@
  */
 
 /* ===========================================================================
+   0 · DEUX LARGEURS, DEUX JETONS, ET AUCUNE TROISIÈME
+   ----------------------------------------------------------------------------
+   Un guide fait cohabiter deux objets qui n'ont pas la même fonction : du texte
+   courant, qui se lit ligne à ligne, et des planches techniques, qui se
+   regardent. Les mesurer avec la même règle revient à sacrifier l'un à l'autre.
+   D'où deux jetons, et deux seulement.
+
+     --u-guide-col    A · la colonne de LECTURE
+                      chapô du hero, corps de l'article, encadrés textuels,
+                      sources, appel à l'action, retour à l'index.
+     --u-guide-large  B · la largeur ÉDITORIALE
+                      visuel d'en-tête, planches et schémas du corps,
+                      tableaux de seuils, grille « À lire aussi ».
+
+   POURQUOI PAS `ch`, QUI ÉTAIT LA VALEUR PRÉCÉDENTE
+
+   `ch` vaut l'avance du glyphe « 0 » de la police COURANTE. Dans IBM Plex Sans
+   elle fait 0,6 em (mesuré sur `ibm-plex-sans-latin.woff2` : 600 unités pour
+   1000 par em). La valeur dépend donc de la taille de texte de l'élément qui
+   la lit — et les deux éléments qui portaient `72ch` n'ont pas la même :
+
+     .guide-corps  ·  font-size 17px  ·  72ch = 734,4 px
+     .guide-cta    ·  font-size 16px  ·  72ch = 691,2 px
+
+   Deux blocs qui devaient être alignés l'étaient donc à 43 px près. Le même
+   jeton écrit deux fois ne suffit pas : il faut une unité qui ne dépende pas de
+   l'endroit où on la lit. `rem` se résout toujours sur la racine, jamais sur le
+   contexte local — c'est la seule qui tienne cette promesse.
+
+   D'OÙ VIENT 37,5rem
+
+   D'une mesure, pas d'une règle de pouce. Le corps de trois guides a été rendu
+   dans Chrome avec IBM Plex Sans réellement chargée, et le nombre de signes de
+   chaque ligne relevé caractère par caractère (déplacement d'un `Range`, saut
+   de ligne détecté au changement de `top`), lignes finales de paragraphe
+   exclues puisqu'elles sont partielles :
+
+     36rem   576 px   médiane 74   quartiles 71 – 78
+     37,5rem 600 px   médiane 77   quartiles 74 – 80      ← retenu
+     39rem   624 px   médiane 81   quartiles 78 – 84
+     42rem   672 px   médiane 87   quartiles 83 – 90
+     46rem   736 px   médiane 96   quartiles 93 – 100     ← la valeur d'avant
+
+   37,5rem est la seule largeur dont l'intervalle interquartile tienne
+   entièrement dans les 70 à 80 signes visés. 656 à 672 px — l'ordre de grandeur
+   attendu — donne 84 à 87 signes : la mesure tranche autrement que l'intuition.
+
+   65rem POUR B
+
+   C'est la bande utile du `.wrap` à partir de 1200 px de fenêtre
+   (1120 − 2 × 40 = 1040 px). B ne l'élargit donc jamais : il la NOMME, pour que
+   les planches puissent la réclamer explicitement au lieu de subir la colonne.
+   Les schémas de ces guides sont dessinés à 840 px et portent des libellés de
+   11 à 15 px : sous B ils tiennent leur taille naturelle, sous A ils étaient
+   réduits à 706 px, et à 600 px ils tomberaient à 71 % — libellés à 8 px.
+   ======================================================================== */
+
+.urbizen-guides {
+	--u-guide-col: 37.5rem;
+	--u-guide-large: 65rem;
+}
+
+/* ===========================================================================
    1 · Index et archive — la grille
    ======================================================================== */
 
+/* Non rendue par les patterns actuels : `guides-archive-entete.php` emploie
+   `.lead`. La règle est conservée pour un chapô d'index à venir — mais elle
+   prend le jeton, pour ne pas réintroduire une troisième largeur le jour où on
+   s'en servira. */
 .urbizen-guides .guides-intro {
-	max-width: 68ch;
+	max-width: var(--u-guide-col);
 	margin-top: 14px;
 	color: var(--u-ink-soft);
 	font-size: 16.5px;
@@ -132,6 +199,32 @@
    3 · Article — en-tête et corps
    ======================================================================== */
 
+/* L'AXE DE LA PAGE
+   ----------------------------------------------------------------------------
+   Mesuré avant reprise, sur une fenêtre de 1440 px (le `.wrap` fait alors
+   1120 − 2×40 = 1040 px de contenu utile) :
+
+     fil d'ariane, titre, chapô  ·  1040 px, calés à gauche du .wrap
+     chapô du hero               ·   609 px (58ch à 17,5px), calé à gauche
+     visuel d'en-tête            ·  1040 px, centré
+     corps de l'article          ·   734 px, centré
+     appel à l'action            ·   691 px, centré
+     retour à l'index            ·  1040 px, calé à gauche
+
+   Six blocs de lecture, quatre largeurs, trois alignements. Le titre commençait
+   152 px à gauche de sa propre première phrase. Aucune de ces valeurs n'était
+   fausse prise seule ; ensemble elles ne dessinaient aucune verticale.
+
+   Tout ce qui se LIT prend donc le jeton et se centre : l'article a un axe, et
+   un seul. Reste une exception, assumée : la grille « À lire aussi », qui n'est
+   pas de la lecture mais une liste de cartes — elle garde la largeur de bande
+   du `.wrap`, exactement comme la grille de l'index, pour que les deux pages
+   présentent leurs cartes de la même façon. */
+.urbizen-guides .guide-hero .wrap > :is(nav, div, h1, p) {
+	max-width: var(--u-guide-col);
+	margin-inline: auto;
+}
+
 .urbizen-guides .guide-hero-meta {
 	display: flex;
 	flex-wrap: wrap;
@@ -151,13 +244,17 @@
 
 /* LE VISUEL D'EN-TÊTE
    Mesuré avant reprise : la figure allait de 200 à 1240 px quand les `.wrap` du
-   hero et du corps allaient de 160 à 1280. Centrée dans la fenêtre, décalée de
-   la page — alignée sur rien. `margin-inline: 0` et `width: 100%` la remettent
-   sur la colonne, et le débord négatif la fait mordre sur le bandeau : elle
-   relie les deux zones au lieu de flotter entre elles. */
+   hero et du corps allaient de 160 à 1280. Un premier passage l'avait ramenée à
+   la largeur du `.wrap` ; elle dépassait donc encore de 152 px de chaque côté la
+   colonne de texte qu'elle annonce. Elle prend maintenant le même jeton que le
+   corps : elle prend la largeur éditoriale B, celle des planches, et se centre
+   sur le même axe que le texte. Le débord négatif est conservé — c'est
+   lui qui fait mordre la figure sur le bandeau et relie les deux zones au lieu
+   de la laisser flotter entre elles. */
 .urbizen-guides .guide-visuel {
 	width: 100%;
-	margin: clamp(-96px, -6vw, -48px) 0 clamp(28px, 3.4vw, 44px);
+	max-width: var(--u-guide-large);
+	margin: clamp(-96px, -6vw, -48px) auto clamp(28px, 3.4vw, 44px);
 	position: relative;
 	z-index: 1;
 	overflow: hidden;
@@ -231,15 +328,56 @@
 	border-bottom: 1px solid var(--u-line);
 }
 
-/* La colonne de lecture. 72ch tient la ligne autour de 70 caractères à la
-   taille du corps : au-delà, l'œil perd le début de la ligne suivante — et un
-   guide d'urbanisme se lit en entier, pas en diagonale. */
+/* LE CORPS EST LE CADRE, PAS LA COLONNE
+   `.guide-corps` prend la largeur éditoriale : c'est l'enveloppe dans laquelle
+   les planches ont le droit de s'étendre. La colonne de lecture est posée un
+   cran plus bas, sur les enfants de `.entry-content` (voir « L'ARCHITECTURE
+   CONTRAINTE » plus bas) — c'est ce qui permet à un schéma de sortir du texte
+   sans marge négative ni risque de débordement. */
 .urbizen-guides .guide-corps {
-	max-width: 72ch;
+	max-width: var(--u-guide-large);
 	margin: 0 auto;
 	color: var(--u-ink);
 	font-size: 17px;
 	line-height: 1.72;
+}
+
+/* L'ARCHITECTURE CONTRAINTE
+   ----------------------------------------------------------------------------
+   Tout enfant direct du contenu prend la colonne de lecture et se centre. C'est
+   le défaut, et il est volontairement aveugle au type de bloc : un bloc
+   Gutenberg ajouté demain sera lisible sans que personne ait à y penser.
+
+   Les objets qui se REGARDENT sortent ensuite de la colonne, nommément. Ils ne
+   « débordent » pas — ils s'étendent dans le cadre `.guide-corps`, qui vaut
+   déjà B. Aucune marge négative, donc aucun risque de débordement horizontal à
+   une largeur intermédiaire : c'est ce que la technique du `margin-left`
+   négatif n'aurait pas garanti.
+
+   Le tableau est du lot des objets larges, et c'est un écart assumé par rapport
+   à la liste initiale : un tableau de seuils est un objet technique, pas du
+   texte courant. À 600 px, ceux de ces guides passaient en défilement
+   horizontal — un tableau qu'il faut faire glisser pour lire la colonne de
+   droite ne se compare plus, et comparer est sa seule fonction. */
+.urbizen-guides .guide-corps > *,
+.urbizen-guides .guide-corps .entry-content > * {
+	max-width: var(--u-guide-col);
+	margin-inline: auto;
+}
+.urbizen-guides .guide-corps > :is(.wp-block-image, .wp-block-table),
+.urbizen-guides .guide-corps .entry-content > :is(.wp-block-image, .wp-block-table) {
+	max-width: var(--u-guide-large);
+}
+/* Le conteneur `.entry-content` est lui-même un enfant de `.guide-corps` : sans
+   cette reprise il hériterait de la colonne, et tout ce qu'il contient avec
+   lui — les planches comprises. Il reprend donc le cadre. */
+.urbizen-guides .guide-corps > .entry-content { max-width: none; }
+
+/* Une planche posée dans un cadre plus large qu'elle se calerait à gauche.
+   Elle se centre : c'est l'axe de la page, pas celui du paragraphe. */
+.urbizen-guides .guide-corps :is(img, .wp-block-image img) {
+	display: block;
+	margin-inline: auto;
 }
 /* LE SÉLECTEUR QUI NE MORDAIT PAS
    `wp:post-content` enveloppe tout le contenu dans un `.entry-content` : le
@@ -391,7 +529,7 @@
    ======================================================================== */
 
 .urbizen-guides .guide-cta {
-	max-width: 72ch;
+	max-width: var(--u-guide-col);
 	margin: clamp(34px, 4vw, 48px) auto 0;
 	padding: clamp(24px, 3vw, 32px);
 	border: 1px solid var(--u-line);
@@ -400,6 +538,20 @@
 	background: var(--u-surface);
 	box-shadow: var(--u-shadow-card);
 }
+/* Le cartouche qui NOMME le service. Sans lui, le bloc s'ouvrait sur une
+   question et le lecteur devait deviner qui la pose. Même graphie que les
+   « eyebrow » de l'accueil et que la méta du hero : mono, capitales, interlettre
+   ouvert — la marque parle toujours de la même voix. */
+.urbizen-guides .guide-cta-marque {
+	margin-bottom: 10px;
+	color: var(--u-brand);
+	font-family: var(--u-font-mono);
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .09em;
+	text-transform: uppercase;
+}
+
 .urbizen-guides .guide-cta h2 {
 	font-size: clamp(20px, 2vw, 24px);
 	font-weight: 600;
@@ -410,6 +562,38 @@
 	color: var(--u-ink-soft);
 	font-size: 16px;
 }
+
+/* CE QUE LE SERVICE PRODUIT, EN TROIS LIGNES
+   Le reset de la feuille d'accueil (`.urbizen-accueil *`) remet à zéro marge et
+   retrait de toutes les listes : celle-ci est donc dessinée entièrement ici, et
+   ne compte sur rien. Le marqueur est la même barre verte que celle des H2 du
+   corps, en plus court — un signe de plus, pas un de nouveau. */
+.urbizen-guides .guide-cta-points {
+	margin-top: 16px;
+	list-style: none;
+	color: var(--u-ink);
+	font-size: 15.5px;
+	line-height: 1.55;
+}
+.urbizen-guides .guide-cta-points li {
+	position: relative;
+	padding-left: 22px;
+}
+.urbizen-guides .guide-cta-points li + li { margin-top: 9px; }
+.urbizen-guides .guide-cta-points li::before {
+	content: "";
+	position: absolute;
+	left: 0;
+	/* Calée sur la hauteur de x plutôt que sur le haut de la ligne : la barre
+	   se lit alors comme un tiret en tête de phrase, pas comme une puce
+	   flottante. */
+	top: .62em;
+	width: 12px;
+	height: 2px;
+	border-radius: 2px;
+	background: var(--u-brand);
+}
+
 .urbizen-guides .guide-cta-actions {
 	display: flex;
 	flex-wrap: wrap;
@@ -418,11 +602,28 @@
 }
 .urbizen-guides .guide-cta-actions .btn { min-height: 44px; }
 
-.urbizen-guides .guide-voisins { margin-top: clamp(40px, 5vw, 60px); }
+/* « À lire aussi » relève de la largeur éditoriale : ce sont des cartes, et
+   elles doivent ressembler à celles de l'index — les rétrécir à la colonne de
+   lecture les ramènerait à 190 px de large. Le décrochement avec l'appel à
+   l'action est donc voulu ; le filet le dit, en annonçant « autre zone » là où
+   l'œil lisait « mauvais alignement ». */
+.urbizen-guides .guide-voisins {
+	max-width: var(--u-guide-large);
+	margin-top: clamp(40px, 5vw, 60px);
+	padding-top: clamp(32px, 4vw, 44px);
+	border-top: 1px solid var(--u-line);
+}
 .urbizen-guides .guide-voisins h2 {
 	margin-bottom: 16px;
 	font-size: clamp(19px, 1.9vw, 22px);
 	font-weight: 600;
+}
+
+/* Le lien de retour partage l'axe du reste : sans cette ligne, il repartait au
+   bord du `.wrap`, 152 px à gauche de l'appel à l'action qu'il suit. */
+.urbizen-guides .guide-retour-ligne {
+	max-width: var(--u-guide-col);
+	margin-inline: auto;
 }
 
 .urbizen-guides .guide-retour {
@@ -558,11 +759,21 @@
 	.urbizen-guides .guide-corps blockquote { padding: 16px 18px; font-size: 16.5px; }
 }
 
-/* Le lien de prestation, sous les deux boutons de l'accueil. En lien simple et
-   non en troisième bouton : trois appels à l'action de même poids ne
-   hiérarchisent plus rien, et celui-ci est un complément, pas une alternative. */
+/* La demande de renseignements, sous les deux boutons. Elle occupe la place que
+   tenait le lien de prestation avant que celui-ci ne passe en bouton principal.
+   En lien simple et non en troisième bouton : trois appels à l'action de même
+   poids ne hiérarchisent plus rien, et celui-ci s'adresse à qui hésite encore —
+   c'est un recours, pas une alternative. */
 .urbizen-guides .guide-cta-lien { margin-top: 14px; font-size: 14.5px; }
+/* Mesuré à la recette : cette ancre faisait 20 px de haut de 834 px à 1440 px,
+   quand les deux boutons au-dessus d'elle en font 44. C'est la troisième action
+   du bloc, pas un lien dans une phrase : elle prend la même cible que ses
+   voisines. Sous 700 px le libellé passe déjà sur deux lignes et l'atteignait
+   de lui-même — la règle ne change rien là-bas. */
 .urbizen-guides .guide-cta-lien a {
+	display: inline-flex;
+	align-items: center;
+	min-height: 44px;
 	color: var(--u-brand-dk);
 	font-weight: 600;
 	text-decoration: underline;

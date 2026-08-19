@@ -79,9 +79,15 @@ foreach ( (array) get_the_category( $id_guide ) as $terme ) {
   <figure class="guide-visuel<?php echo urbizen_child_visuel_entier( $id_guide ) ? ' guide-visuel--planche' : ''; ?>">
 	<?php
 	/*
-	 * Le visuel d'article occupe la colonne de contenu, au plus 1200 px. Il
-	 * est le plus grand élément peint de la page : `eager` et
-	 * `fetchpriority="high"` évitent que le navigateur le découvre tard.
+	 * Le visuel d'article relève de la largeur ÉDITORIALE — le jeton
+	 * `--u-guide-large`, soit 65rem = 1040 px — et non de la colonne de lecture :
+	 * c'est un objet qu'on regarde, pas qu'on lit. Le `sizes` suit : 1120 px est
+	 * le point où le `.wrap` cesse de contraindre la figure (1040 + 2 × 40 px de
+	 * gouttière), au-delà duquel elle est fixe. Un `sizes` faux sur ce visuel se
+	 * paie cher : c'est le plus grand élément peint de la page.
+	 *
+	 * `eager` et `fetchpriority="high"` restent : ils évitent que le navigateur
+	 * le découvre tard.
 	 */
 	echo get_the_post_thumbnail(
 		$id_guide,
@@ -90,7 +96,7 @@ foreach ( (array) get_the_category( $id_guide ) as $terme ) {
 			'loading'       => 'eager',
 			'decoding'      => 'async',
 			'fetchpriority' => 'high',
-			'sizes'         => '(max-width: 1240px) 92vw, 1140px',
+			'sizes'         => '(max-width: 1120px) 92vw, 1040px',
 		)
 	);
 	?>

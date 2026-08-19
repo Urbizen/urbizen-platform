@@ -178,7 +178,7 @@ check(
 );
 check(
 	'4 · la version du lot de formulaires reste distincte et intacte',
-	str_contains( $src, "URBIZEN_CHILD_FORMS_VERSION = '0.2.8'" )
+	str_contains( $src, "URBIZEN_CHILD_FORMS_VERSION = '0.2.9'" )
 );
 
 // ======================================================================

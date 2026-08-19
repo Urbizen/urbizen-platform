@@ -282,7 +282,7 @@ for (const chemin of NON_REGRESSION) {
   await page.waitForTimeout(900);
   const h1 = await page.evaluate(() => document.querySelector('#hero-title')?.textContent.replace(/\s+/g, ' ').trim() ?? '');
   check('accueil · le HERO validé est intact',
-    /Dossiers d.urbanisme\s*: du projet au dossier prêt à déposer\./u.test(decoder(h1)), h1);
+    /Vos travaux commencent par les bonnes démarches\./u.test(decoder(h1)), h1);
   const tarifs = await page.evaluate(() => document.querySelectorAll('main a[href*="/tarifs/"]').length);
   check('accueil · le lien vers /tarifs/ est conservé', tarifs >= 1, `${tarifs}`);
   await page.close();

@@ -143,11 +143,11 @@ check( 'En-tête : AUCUN attribut width/height sur le logo',
 // 17 balises <a> — menu desktop, menu mobile, connexion et CTA.
 check( 'En-tête : tous les liens de la maquette présents',
 	substr_count( $entete_rendu, '<a ' ) === substr_count( $entete_ref, '<a ' ) );
-check( 'En-tête : icônes téléphone + compte et CTA « Démarrer mon projet » présents',
+check( 'En-tête : icônes téléphone + compte et CTA « Étudier mon projet » présents',
 	str_contains( $entete_rendu, 'class="icon-btn link-tel"' )
 	&& str_contains( $entete_rendu, 'class="icon-btn link-login"' )
 	&& str_contains( $entete_rendu, 'js-start' )
-	&& str_contains( $entete_rendu, '>Démarrer mon projet</a>' ) );
+	&& str_contains( $entete_rendu, '>Étudier mon projet</a>' ) );
 check( 'En-tête : espace client = contrôle honnête (bouton aria-disabled, sans faux lien ni texte « Se connecter »)',
 	str_contains( $entete_rendu, 'aria-label="Espace client (bientôt disponible)"' )
 	&& str_contains( $entete_rendu, 'aria-disabled="true"' )
@@ -178,7 +178,7 @@ check( 'Centre de contact : « Appeler » = numéro réel de la charte, 1 seul c
 check( 'En-tête : CTA responsive à deux libellés et intitulé accessible stable',
 	str_contains( $entete_rendu, 'class="nav-cta-long"' )
 	&& str_contains( $entete_rendu, 'class="nav-cta-short"' )
-	&& str_contains( $entete_rendu, 'aria-label="Démarrer mon projet"' )
+	&& str_contains( $entete_rendu, 'aria-label="Étudier mon projet"' )
 	&& str_contains( $entete_rendu, 'aria-hidden="true"' ) );
 check( 'En-tête : burger mobile et ses attributs ARIA conservés',
 	str_contains( $entete_rendu, 'class="burger"' )

@@ -358,6 +358,201 @@ if ( is_file( $verif ) ) {
 		(bool) preg_match( '#\d{2}/\d{2}/2026#', $note ) );
 }
 
+// ------------------------------------------------- 8 · le lot GUIDES ---------
+
+/*
+ * TOUT LE RÉPERTOIRE, ET PLUS SEULEMENT LES SIX DU DISPOSITIF
+ *
+ * `GUIDES` ne couvre que les six guides livrés avec leur fichier de
+ * métadonnées : c'est ce que les sections 1 à 7 vérifient, et elles ne peuvent
+ * pas s'étendre sans exiger des `.meta.md` qui n'existent pas.
+ *
+ * Les douze autres articles n'étaient donc contrôlés par rien. Un défaut réel
+ * y dormait : `secteur-protege-abf-declaration-travaux` annonçait « un
+ * supplément de 80 € s'applique à nos forfaits » en plein corps de texte, et
+ * liait `/tarifs/` — les deux règles que la section 5 fait respecter aux six
+ * autres. Le lot GUIDES porte ses contrôles sur les DIX-HUIT.
+ *
+ * La liste est écrite, pas déduite du répertoire : un fichier supprimé doit
+ * faire échouer le banc, pas réduire son périmètre en silence.
+ */
+const TOUS_LES_GUIDES = array(
+	'cerfa-declaration-travaux',
+	'delais-urbanisme-debut-des-travaux',
+	'demande-pieces-complementaires-urbanisme',
+	'distance-limite-separative-construction',
+	'dp-ou-permis-de-construire',
+	'emprise-au-sol-surface-de-plancher',
+	'erreurs-dossier-urbanisme',
+	'extension-maison-verifications-avant-plans',
+	'insertion-graphique-dp6',
+	'lire-le-plu-de-son-terrain',
+	'pieces-declaration-prealable',
+	'piscine-garage-carport-autorisation',
+	'plan-coupe-dp3',
+	'plan-facades-toitures-dp4',
+	'plan-masse-dp2',
+	'recours-architecte-150-m2',
+	'refus-declaration-prealable',
+	'secteur-protege-abf-declaration-travaux',
+);
+
+/*
+ * Les trois pages de prestation, et elles seules. `/tarifs/` n'en fait pas
+ * partie : c'est la page d'intention prix, isolée au lot C, et un guide n'y
+ * renvoie pas depuis son corps. Le CTA de fin d'article s'en charge, lui, et
+ * hors du texte.
+ */
+const PAGES_PRESTATION = array( '/declarations-prealables/', '/permis-de-construire/', '/conception/' );
+
+$tous = array();
+foreach ( TOUS_LES_GUIDES as $slug ) {
+	$chemin = "$contenu/$slug.html";
+	check( "$slug : le fichier est au dépôt", is_file( $chemin ) );
+	$tous[ $slug ] = is_file( $chemin ) ? (string) file_get_contents( $chemin ) : '';
+}
+
+// Le répertoire ne doit rien contenir que la liste ignore : un dix-neuvième
+// guide déposé sans être inscrit ici passerait tous les contrôles sans en subir un.
+$fichiers = array_map(
+	static fn( $c ) => basename( $c, '.html' ),
+	glob( "$contenu/*.html" )
+);
+check( 'La liste couvre tout le répertoire, sans oubli ni surplus',
+	array() === array_diff( $fichiers, TOUS_LES_GUIDES ),
+	implode( ', ', array_diff( $fichiers, TOUS_LES_GUIDES ) ) );
+
+/*
+ * L'INTRODUCTION MET LE SERVICE EN AVANT — LE CŒUR DU LOT
+ *
+ * L'introduction, c'est tout ce qui précède le premier titre. Un lecteur venu
+ * d'un moteur y décide s'il reste ; c'est donc là, et pas au pied de page, que
+ * le service doit être nommé et joignable. Deux contrôles distincts, parce
+ * qu'ils se cassent séparément : la marque peut disparaître d'une réécriture,
+ * et le lien peut être déplacé plus bas « pour ne pas alourdir l'entrée ».
+ */
+foreach ( TOUS_LES_GUIDES as $slug ) {
+	$src = $tous[ $slug ];
+	if ( '' === $src ) { continue; }
+
+	$pos_titre = strpos( $src, '<!-- wp:heading' );
+	$intro     = false === $pos_titre ? $src : substr( $src, 0, $pos_titre );
+
+	check( "$slug : l'introduction nomme Urbizen",
+		str_contains( $intro, 'Urbizen' ) );
+
+	$prestations = array_filter(
+		PAGES_PRESTATION,
+		static fn( $url ) => str_contains( $intro, 'href="' . $url . '"' )
+	);
+	check( "$slug : l'introduction mène à une page de prestation", array() !== $prestations,
+		'aucun lien parmi ' . implode( ', ', PAGES_PRESTATION ) );
+
+	// Deux paragraphes : l'accroche du guide, puis ce qu'Urbizen en fait. Un
+	// seul signifierait que la réécriture n'a pas été appliquée à ce fichier.
+	check( "$slug : l'introduction tient en deux paragraphes au moins",
+		substr_count( $intro, '<!-- wp:paragraph' ) >= 2 );
+}
+
+/*
+ * Dix-huit fois la même phrase de service serait pire que rien : le lecteur qui
+ * ouvre deux guides le verrait, et un moteur aussi. On compare le SECOND
+ * paragraphe de chaque introduction — celui qui porte le service — deux à deux.
+ */
+$phrases = array();
+foreach ( TOUS_LES_GUIDES as $slug ) {
+	if ( preg_match_all( '#<p>(.*?)</p>#s', $tous[ $slug ], $m ) && isset( $m[1][1] ) ) {
+		$phrases[ $slug ] = trim( $m[1][1] );
+	}
+}
+check( 'Les dix-huit phrases de service sont deux à deux distinctes',
+	count( $phrases ) === count( array_unique( $phrases ) ) && 18 === count( $phrases ),
+	count( $phrases ) . ' relevée(s), ' . count( array_unique( $phrases ) ) . ' distincte(s)' );
+
+/*
+ * LES RÈGLES ÉDITORIALES, ÉTENDUES AUX DIX-HUIT
+ *
+ * Le motif de prix est plus large que celui de la section 5, qui n'attrapait
+ * que « 149 € TTC » ou « 149 €/dossier ». « un supplément de 80 € s'applique à
+ * nos forfaits » lui échappait. On vise donc un montant DANS LE VOISINAGE d'un
+ * mot de prestation, dans un sens comme dans l'autre — ce qui laisse passer les
+ * montants réglementaires (« 251 € le mètre carré de bassin », valeur
+ * forfaitaire de la taxe d'aménagement), qui décrivent un texte et non une
+ * offre. La borne de mot n'est pas décorative : sans `\b`, « valeur
+ * forfaitaire » — la base de calcul de la taxe d'aménagement, citée dans le
+ * guide piscine — se faisait prendre pour un forfait Urbizen.
+ */
+$mots_de_prestation = '(\bforfaits?\b|\bprestations?\b|suppl[ée]ment|à partir de|nos tarifs|notre tarif)';
+$prix_prestation    = array(
+	'/' . $mots_de_prestation . '[^.<]{0,90}\d{2,4}\s*(&nbsp;)?€/iu',
+	'/\d{2,4}\s*(&nbsp;)?€[^.<]{0,90}' . $mots_de_prestation . '/iu',
+);
+
+foreach ( TOUS_LES_GUIDES as $slug ) {
+	$src = $tous[ $slug ];
+	if ( '' === $src ) { continue; }
+
+	check( "$slug : aucun lien vers /tarifs/ dans le corps",
+		! str_contains( $src, 'href="/tarifs/"' ) );
+
+	/*
+	 * Le site a été harmonisé sur « Étudier mon projet » pour l'ancre
+	 * `/#localisation`. Le libellé abandonné n'a rien à faire dans un corps de
+	 * guide non plus — c'est là qu'il repasserait inaperçu le plus longtemps.
+	 */
+	check( "$slug : aucun libellé « Démarrer mon projet » dans le corps",
+		! str_contains( $src, 'Démarrer mon projet' ) );
+
+	$montants = array();
+	foreach ( $prix_prestation as $motif ) {
+		if ( preg_match( $motif, $src, $m ) ) { $montants[] = trim( $m[0] ); }
+	}
+	check( "$slug : aucun montant de prestation dans le corps", array() === $montants,
+		implode( ' | ', $montants ) );
+
+	$trouvees = array();
+	foreach ( $promesses as $motif ) {
+		if ( preg_match( $motif, $src, $m ) ) { $trouvees[] = $m[0]; }
+	}
+	check( "$slug : aucune promesse d'obtention d'autorisation", array() === $trouvees,
+		implode( ' | ', $trouvees ) );
+}
+
+/*
+ * LE MAILLAGE, SUR TOUT LE RÉPERTOIRE
+ *
+ * Les pages de projet autorisées sont DÉDUITES de `content/pages/`, et non
+ * réécrites ici : une page renommée ferait échouer le banc du côté du lien, ce
+ * qui est le bon endroit pour s'en apercevoir.
+ */
+$pages_projet = array_map(
+	static fn( $c ) => '/' . basename( $c, '.html' ) . '/',
+	glob( $racine . '/content/pages/*.html' )
+);
+check( 'Les pages de projet sont bien au dépôt', 9 === count( $pages_projet ),
+	count( $pages_projet ) . ' trouvée(s)' );
+
+$autorisees = array_merge( $pages_commerciales, $pages_projet );
+
+foreach ( TOUS_LES_GUIDES as $slug ) {
+	$src = $tous[ $slug ];
+	if ( '' === $src ) { continue; }
+
+	preg_match_all( '#href="/guides/([a-z0-9-]+)/"#', $src, $vers );
+	$morts = array_values( array_diff( array_unique( $vers[1] ), TOUS_LES_GUIDES ) );
+	check( "$slug : aucun lien vers un guide inexistant", array() === $morts,
+		implode( ', ', $morts ) );
+
+	preg_match_all( '#href="(/[a-z0-9/-]*)"#', $src, $internes );
+	$inconnus = array();
+	foreach ( array_unique( $internes[1] ) as $url ) {
+		if ( str_starts_with( $url, '/guides/' ) ) { continue; }
+		if ( ! in_array( $url, $autorisees, true ) ) { $inconnus[] = $url; }
+	}
+	check( "$slug : aucun lien interne vers une page hors périmètre", array() === $inconnus,
+		implode( ', ', $inconnus ) );
+}
+
 echo "\n";
 if ( $fail ) {
 	echo $fail . " CONTROLE(S) EN ECHEC\n";
