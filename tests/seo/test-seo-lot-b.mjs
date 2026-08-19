@@ -61,7 +61,6 @@ console.log(`\n════ LOT B — ${BASE} ════`);
   console.log('\n── 2 · URL conservées, hors index');
   for (const chemin of [
     '/autres-projets/',
-    '/commander-un-dossier/',
     '/formulaire-declaration-prealable/',
     '/formulaire-permis-de-construire/',
     '/formulaire-conception/',
@@ -75,14 +74,26 @@ console.log(`\n════ LOT B — ${BASE} ════`);
     check(`${chemin} laisse suivre ses liens`, !/nofollow/i.test(r.robots || ''), `robots : ${r.robots}`);
   }
 
-  // La page de commande est conservée pour son formulaire : sa mise hors index
-  // ne doit toucher ni au formulaire, ni à son rendu.
+  // L'ANCIEN PARCOURS DE COMMANDE NE SE SERT PLUS : IL REDIRIGE
+  //
+  // Ce banc exigeait ici que `/commander-un-dossier/` réponde 200 en portant le
+  // formulaire n° 6, contrat du lot SEO B. Le lot « parcours de formulaires » l'a
+  // retiré : la page redirige désormais vers le tunnel de l'accueil, et c'est le
+  // comportement voulu. Laisser l'ancienne attente en place ne protégeait plus
+  // rien — elle réclamait le retour d'un parcours abandonné, et maintenait ce
+  // banc au rouge en permanence, ce qui aurait masqué la prochaine vraie
+  // régression SEO.
+  //
+  // Le formulaire n° 6 n'est pas supprimé pour autant : il reste en base, et
+  // retirer le hook `urbizen_child_rediriger_ancien_parcours` remettrait la page
+  // en ligne telle quelle. Ce qui se contrôle ici est donc la redirection, pas
+  // la disparition. `tests/homepage/test-parcours-legacy.php` tient l'autre bout
+  // de la garde, côté sources.
   {
     const r = await lire('/commander-un-dossier/');
-    check('le formulaire n° 6 est toujours rendu sur /commander-un-dossier/',
-      /data-form_id="6"/.test(r.html), 'formulaire absent de la page');
-    const champs = (r.html.match(/<input[^>]*type="(?:text|email|tel)"/g) || []).length;
-    check('le formulaire n° 6 a conservé ses champs', champs >= 8, `${champs} champ(s) de saisie`);
+    check('/commander-un-dossier/ redirige en 301', r.code === 301, `code ${r.code}`);
+    check('/commander-un-dossier/ mène au tunnel de l’accueil',
+      /\/#localisation$/.test(r.vers || ''), `→ ${r.vers ?? '(aucune destination)'}`);
   }
 
   // Les archives de date ne sont pas contrôlées sur un code précis, et c'est
