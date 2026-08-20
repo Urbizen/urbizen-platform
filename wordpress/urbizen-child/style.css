@@ -21,3 +21,18 @@ Tags: urbanisme, block-theme
    Les surcharges Urbizen (tokens, gabarits, patterns) seront ajoutées ensuite,
    étape par étape, dans assets/css/urbizen-child.css.
    --------------------------------------------------------------------------- */
+
+/*
+ * Explorateur du dossier — les références DP1 / PCMI1, DP2 / PCMI2, etc.
+ * identifient déjà chaque pièce. Le compteur visuel 01, 02, 03… faisait donc
+ * doublon et alourdissait la lecture, notamment sur mobile.
+ */
+.urbizen-accueil .dx-item-n {
+	display: none !important;
+}
+
+.urbizen-accueil .dx-item {
+	grid-template-columns: 1fr !important;
+	grid-template-areas: "t" "c" !important;
+	column-gap: 0 !important;
+}
