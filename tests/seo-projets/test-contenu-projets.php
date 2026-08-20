@@ -150,7 +150,18 @@ $existantes = array(
 	'/formulaire-conception/',
 );
 foreach ( GUIDES_EXISTANTS as $slug ) { $existantes[] = "/guides/$slug/"; }
-$connues = array_merge( $existantes, array_keys( $src ) );
+
+/*
+ * Les guides ajoutés après le premier cocon disposent de leurs propres bancs
+ * et publishers. Pour le contrôle des liens morts, une cible /guides/<slug>/
+ * est donc connue dès lors que sa source versionnée existe réellement.
+ * Un slug sans fichier source reste un lien mort et fait toujours échouer ce banc.
+ */
+foreach ( glob( "$guides/*.html" ) as $fichier_guide ) {
+$existantes[] = '/guides/' . basename( $fichier_guide, '.html' ) . '/';
+}
+
+$connues = array_values( array_unique( array_merge( $existantes, array_keys( $src ) ) ) );
 
 foreach ( $src as $url => $corps ) {
 	if ( '' === $corps ) { continue; }

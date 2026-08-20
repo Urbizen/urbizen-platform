@@ -143,7 +143,7 @@ foreach ( GUIDES as $slug ) {
 	preg_match_all( '#href="/guides/([a-z0-9-]+)/"#', $src, $vers );
 	$morts = array();
 	foreach ( array_unique( $vers[1] ) as $cible ) {
-		if ( ! in_array( $cible, GUIDES, true ) ) { $morts[] = $cible; }
+		if ( ! is_file( "$contenu/$cible.html" ) ) { $morts[] = $cible; }
 	}
 	check( "$slug : aucun lien vers un guide inexistant", array() === $morts,
 		implode( ', ', $morts ) );
