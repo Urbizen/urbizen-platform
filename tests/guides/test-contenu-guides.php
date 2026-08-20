@@ -412,15 +412,20 @@ foreach ( TOUS_LES_GUIDES as $slug ) {
 	$tous[ $slug ] = is_file( $chemin ) ? (string) file_get_contents( $chemin ) : '';
 }
 
-// Le répertoire ne doit rien contenir que la liste ignore : un dix-neuvième
-// guide déposé sans être inscrit ici passerait tous les contrôles sans en subir un.
+/*
+ * Depuis le lot SEO 2, ce banc reste volontairement responsable des
+ * dix-huit guides historiques. Les nouveaux guides disposent de leur propre
+ * banc (`test-guides-lot-2.php`). On exige donc ici que les dix-huit anciens
+ * soient tous présents, sans considérer les fichiers du lot 2 comme un surplus.
+ */
 $fichiers = array_map(
 	static fn( $c ) => basename( $c, '.html' ),
 	glob( "$contenu/*.html" )
 );
-check( 'La liste couvre tout le répertoire, sans oubli ni surplus',
-	array() === array_diff( $fichiers, TOUS_LES_GUIDES ),
-	implode( ', ', array_diff( $fichiers, TOUS_LES_GUIDES ) ) );
+$manquants_historiques = array_values( array_diff( TOUS_LES_GUIDES, $fichiers ) );
+check( 'Les dix-huit guides historiques sont tous présents',
+	array() === $manquants_historiques,
+	implode( ', ', $manquants_historiques ) );
 
 /*
  * L'INTRODUCTION MET LE SERVICE EN AVANT — LE CŒUR DU LOT
@@ -539,7 +544,7 @@ foreach ( TOUS_LES_GUIDES as $slug ) {
 	if ( '' === $src ) { continue; }
 
 	preg_match_all( '#href="/guides/([a-z0-9-]+)/"#', $src, $vers );
-	$morts = array_values( array_diff( array_unique( $vers[1] ), TOUS_LES_GUIDES ) );
+	$morts = array_values( array_diff( array_unique( $vers[1] ), $fichiers ) );
 	check( "$slug : aucun lien vers un guide inexistant", array() === $morts,
 		implode( ', ', $morts ) );
 

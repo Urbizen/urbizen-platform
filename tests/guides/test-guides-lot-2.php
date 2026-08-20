@@ -183,7 +183,7 @@ foreach ( GUIDES_LOT_2 as $slug ) {
 	lot2_check( "$slug : aucun lien vers un guide source absent", array() === $morts, implode( ', ', $morts ) );
 	lot2_check( "$slug : au moins un lien vers un autre guide", count( array_diff( $cibles, array( $slug ) ) ) >= 1 );
 
-	preg_match_all( '#href="(/[^"#?]*)"#', $src, $internes );
+	preg_match_all( '~href="(/[^"#?]*)"~', $src, $internes );
 	$inconnus = array();
 	foreach ( array_unique( $internes[1] ) as $url ) {
 		if ( str_starts_with( $url, '/guides/' ) ) {
