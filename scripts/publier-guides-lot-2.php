@@ -324,6 +324,12 @@ foreach ( $guides as $g ) {
 		if ( ! is_file( $chemin ) ) {
 			WP_CLI::warning( "Visuel absent du thème : $chemin — guide publié sans vignette." );
 		} else {
+			/*
+			 * Réutiliser d'abord un média déjà importé. Les premiers cocons SEO
+			 * utilisaient `_urbizen_seo_image` ; le lot 2 possède son propre
+			 * marqueur. Le nom du fichier constitue un dernier filet avant tout
+			 * sideload afin de ne jamais dupliquer un attachment existant.
+			 */
 			$deja = get_posts(
 				array(
 					'post_type'   => 'attachment',
@@ -335,8 +341,59 @@ foreach ( $guides as $g ) {
 				)
 			);
 
+			$origine_media = $deja ? 'lot2' : '';
+
+			if ( ! $deja ) {
+				$deja = get_posts(
+					array(
+						'post_type'   => 'attachment',
+						'post_status' => 'inherit',
+						'numberposts' => 1,
+						'fields'      => 'ids',
+						'meta_key'    => '_urbizen_seo_image', // phpcs:ignore WordPress.DB.SlowDBQuery
+						'meta_value'  => $attendu,             // phpcs:ignore WordPress.DB.SlowDBQuery
+					)
+				);
+
+				if ( $deja ) {
+					$origine_media = 'seo';
+				}
+			}
+
+			if ( ! $deja ) {
+				$candidats = get_posts(
+					array(
+						'post_type'    => 'attachment',
+						'post_status'  => 'inherit',
+						'numberposts'  => -1,
+						'fields'       => 'ids',
+						'meta_key'     => '_wp_attached_file', // phpcs:ignore WordPress.DB.SlowDBQuery
+						'meta_value'   => $attendu,             // phpcs:ignore WordPress.DB.SlowDBQuery
+						'meta_compare' => 'LIKE',               // phpcs:ignore WordPress.DB.SlowDBQuery
+					)
+				);
+
+				foreach ( $candidats as $candidat ) {
+					$fichier_attache = (string) get_post_meta( (int) $candidat, '_wp_attached_file', true );
+
+					if ( basename( $fichier_attache ) === $attendu ) {
+						$deja          = array( (int) $candidat );
+						$origine_media = 'fichier';
+						break;
+					}
+				}
+			}
+
 			if ( $deja ) {
 				$att = (int) $deja[0];
+
+				if ( '' === (string) get_post_meta( $att, '_urbizen_seo_lot2_image', true ) ) {
+					update_post_meta( $att, '_urbizen_seo_lot2_image', $attendu );
+				}
+
+				WP_CLI::log(
+					"$slug : visuel existant réutilisé (ID $att, origine $origine_media)."
+				);
 			} else {
 				require_once ABSPATH . 'wp-admin/includes/file.php';
 				require_once ABSPATH . 'wp-admin/includes/media.php';

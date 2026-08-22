@@ -238,6 +238,32 @@ if ( '' !== $publisher ) {
 	lot2_check( 'Publisher : mode simulation présent', str_contains( $publisher, "in_array( 'simulation'" ) );
 	lot2_check( 'Publisher : publication idempotente par slug', str_contains( $publisher, 'get_page_by_path' ) );
 	lot2_check( 'Publisher : métadonnées AIOSEO prévues', str_contains( $publisher, "aioseo_posts" ) && str_contains( $publisher, "keyphrases" ) );
+	lot2_check(
+		'Publisher : réutilise les médias SEO déjà importés',
+		str_contains( $publisher, "_urbizen_seo_image" )
+		&& str_contains( $publisher, "_urbizen_seo_lot2_image" )
+		&& str_contains( $publisher, "_wp_attached_file" )
+	);
+	$ordre_medias = array(
+		strpos( $publisher, "'meta_key'    => '_urbizen_seo_lot2_image'" ),
+		strpos( $publisher, "'meta_key'    => '_urbizen_seo_image'" ),
+		strpos( $publisher, "'meta_key'     => '_wp_attached_file'" ),
+		strpos( $publisher, 'media_handle_sideload(' ),
+	);
+	$ordre_medias_valide = ! in_array( false, $ordre_medias, true );
+	if ( $ordre_medias_valide ) {
+		$ordre_medias_trie = $ordre_medias;
+		sort( $ordre_medias_trie );
+		$ordre_medias_valide = $ordre_medias === $ordre_medias_trie;
+	}
+	lot2_check(
+		'Publisher : ordre anti-doublon lot 2 → SEO → fichier → sideload',
+		$ordre_medias_valide
+	);
+	lot2_check(
+		'Publisher : le fallback fichier valide le basename exact',
+		str_contains( $publisher, 'basename( $fichier_attache ) === $attendu' )
+	);
 }
 
 printf( "\n" );
